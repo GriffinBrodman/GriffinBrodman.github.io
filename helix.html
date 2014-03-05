@@ -108,114 +108,11 @@
 		}
 
 
-		#lifelinks {
-			text-align:center;
-			transition: height 0.25s;
-			height:42px;
-			max-width:400px; /*adjust as needed */
-			margin-left:auto;
-			margin-right:auto;
-		}
-		#lifelinks:hover {
-			height:69px; 
-		}
-
-
-		#lifelinks li{
-			position:relative;
-			display:inline-block;
-			margin-left:32px;
-			margin-right:32px;
-			margin-top:10px;
-			margin-bottom:10px;
-			width:20px;
-			font-family:'fontawesome';
-		}
-
-		#lifelinks:hover li {
-			top:0px;
-			
-		}
-
-		#lifelinks a{
-			font-size:28px;
-			z-index:2;
-		}
-
-		#lifelinks .text {
-			display:block;
-			overflow:visible;
-			text-align:center;
-			font-size:24px;
-
-			position:absolute;
-			left:-85px;
-			width:200px;
-
-			opacity:0;
-			top:20px;
-
-			transition: opacity 0.25s, top 0.25s;
-			pointer-events:none;
-			font-family:'Bree Serif';
-			z-index:1;
-		}
-
-		#lifelinks li:hover .text {
-			opacity:1;
-			top:32px;
-		}
-
 		#about_me {
 			margin-top:12px;
 			margin-bottom:12px;
 		}
 
-
-		#projectsarea {
-			text-align:center;
-			padding:-20px;
-			margin-top:40px;
-		}
-
-		.project {
-			position:relative;
-			width:130px;
-			display:inline-block;
-			padding:20px;
-		}
-
-		.project .imgcontain{
-			width:80px;
-			height:80px;
-			transition: width 0.25s;
-			overflow:hidden;
-			margin-left:auto;
-			margin-right:auto;
-		}
-
-		.project:hover .imgcontain{
-			width:100%;
-		}
-
-		.project img{
-			position:relative;
-			left:-25px;
-			width:130px;
-			margin-left:auto;
-			margin-right:auto;
-
-			transition:left 0.25s;
-		}
-
-		.project:hover img {
-			left:0px;
-		}
-
-		.project p {
-			font-size: 12px;
-			color:rgb(68, 67, 73) !important;
-		}
 
 		#footer {
 			font-family:'Inika';
@@ -233,7 +130,7 @@
 
 		#project_text {
 			width: 60%;
-			margin-left: 30%;
+			margin-left: 35%;
 			padding-left: 30px;
 			height: 200px;
 		}
@@ -243,6 +140,24 @@
 
 		#postmort {
 			margin-top: 100px;
+		}
+
+		@media (max-width: 870px)
+		{
+			#project_image {
+				float: none;
+				margin-left: auto;
+				margin-right: auto;
+				display: block;
+			}
+
+			#project_text {
+				margin-top: 20px;
+				width: 100%;
+				text-align: center;
+				margin-left: 0;
+				padding-left: 0;
+			}
 		}
 
 	</style>
@@ -255,7 +170,7 @@
 			
 			<p id="page_subtitle">HTML, CSS, PHP, MySQL</p>
 			<br>
-			<img id="project_image" src="helixapp.png" width = "200">
+			<img id="project_image" src="helixapp.png" width = "250">
 
 			<div id="project_text">
 			<p>
