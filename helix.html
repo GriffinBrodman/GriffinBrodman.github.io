@@ -46,18 +46,7 @@
 
 		}
 
-		hr {
-			display:block;
-			margin-left:auto;
-			margin-right:auto;
-			width:100%;
-			max-width:400px;
-			height:3px;
-			border-top:1px solid rgb(68, 67, 73);
-			border-bottom:1px solid rgb(68, 67, 73);
-			border-right:none;
-			border-left:none;
-		}
+
 
 		a{
 			color:inherit;
@@ -142,6 +131,13 @@
 			
 		}
 
+		hr {
+			visibility: hidden;
+		}
+		/* Gradient transparent - color - transparent */
+		
+
+
 		@media (max-width: 870px)
 		{
 			#project_image {
@@ -160,7 +156,18 @@
 			}
 
 			#postmort {
+				margin-top: 20px;
+			}
+
+			hr {
 				margin-top: -100px;
+			visibility: visible;
+  		  	border: 0;
+    		height: 1px;
+    		background-image: -webkit-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:    -moz-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:     -ms-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:      -o-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
 			}
 		}
 
@@ -181,8 +188,8 @@
 				Confess your sins! Submit your confessions to the Helix Fossil, and see if you are forgiven. And when you're done, make sure to stop by to see what other people have been confessing.
 			</p>
 			</div>
-
-			<div id="postmort"><br>
+<hr>
+			<div id="postmort">
 			<p>
 				I'd been meaning to get into Web Apps for a while, and with the internet fad that was Twitch Plays Pokemon, I saw a perfect opportunity. Not only could the popularity maybe get me some exposure, I knew that knowing I had around 4-5 days to make a web app would push me to actually finish it. I played around with redhad's openshift platform to deploy the app, and learned MySQL. 
 			</p><br>
