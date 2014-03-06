@@ -1,0 +1,239 @@
+<!DOCTYPE HTML>
+<html>
+
+	<style>
+
+		@font-face {
+		    font-family: 'Inika';
+		    src: url('./fonts/Inika.eot'); 
+		    src: url('./fonts/Inika.eot?#iefix') format('embedded-opentype'),
+		         url('./fonts/Inika.svg#svgFontName') format('svg'),
+		         url('./fonts/Inika.woff') format('woff'),
+		         url('./fonts/Inika.ttf')  format('truetype');
+		}
+		
+		@font-face {
+		    font-family: 'Bree Serif';
+		    src: url('./fonts/Bree_Serif.eot'); 
+		    src: url('./fonts/Bree_Serif.eot?#iefix') format('embedded-opentype'),
+		         url('./fonts/Bree_Serif.svg#svgFontName') format('svg'),
+		         url('./fonts/Bree_Serif.woff') format('woff'),
+		         url('./fonts/Bree_Serif.ttf')  format('truetype');
+		}
+
+		@font-face {
+		    font-family: 'fontawesome';
+		    src: url('./fonts/fontawesome-webfont.eot'); 
+		    src: url('./fonts/fontawesome-webfont.eot?#iefix') format('embedded-opentype'),
+		         url('./fonts/fontawesome-webfont.svg#svgFontName') format('svg'),
+		         url('./fonts/fontawesome-webfont.woff') format('woff'),
+		         url('./fonts/fontawesome-webfont.ttf')  format('truetype');
+		}
+
+		* {
+			padding:0px;
+			margin:0px;
+		}
+		body {
+			background-color:rgb(68, 67, 73);
+			background-image:url(./stardust_@2X.png);
+
+			width:100%;
+			max-width:1024px;
+			min-width:600px;
+			margin:auto;
+			overflow-y:scroll;
+
+		}
+
+
+
+		a{
+			color:inherit;
+			text-decoration:none;
+
+			transition:color 0.25s;
+		}
+
+		a:hover{
+			color:#45B29D;
+		}
+
+		#content{
+			display:inline-block;
+			vertical-align:middle;
+			min-width: 450px;
+			background-color:#fefefe;
+			border-radius:2px;
+			padding:48px;
+			padding-left:64px;
+			padding-right:64px;
+			color:rgb(68, 67, 73);
+
+			margin:40px;
+		}
+
+		#content p {
+			font-family: 'Inika';
+		}
+		
+		h1,h2,h3,a,p {
+		  font-smooth: always;
+		  -webkit-font-smoothing: antialiased;
+		}
+
+		h1,h2,h3{
+			text-align:center;
+			font-family: 'Bree Serif';
+			font-style:none;
+		}
+
+		h1 { font-size: 36px;}
+		h2 { }
+		h3 { font-size: 18px;}
+		#page_subtitle {
+			font-size:24px;
+			text-align:center;
+		}
+
+
+		#about_me {
+			margin-top:12px;
+			margin-bottom:12px;
+		}
+
+
+		#footer {
+			font-family:'Inika';
+			color:rgba(255,255,255,0.2);
+			float:right;
+			position:relative;
+			top:-32px;
+			margin-left:48px;
+			margin-right:48px; 
+		}
+
+		#project_image {
+			float: left;
+		}
+
+		#project_text {
+			width: 60%;
+			margin-left: 35%;
+			padding-left: 30px;
+			height: 200px;
+		}
+		#project_title {
+			color: #45B29D;
+		}
+
+		#postmort {
+			
+		}
+
+		hr {
+			visibility: hidden;
+		}
+
+		#back {
+			font-size: 4em;
+			font-family: 'fontawesome';
+			margin-bottom: -20px;
+			text-align: center;
+
+		}
+
+		#back a {
+			text-decoration: none;
+			color: rgb(68, 67, 73);
+		}
+
+
+		#back a:hover {
+			color: #45B29D;
+		}
+		/* Gradient transparent - color - transparent */
+		
+
+
+		@media (max-width: 870px)
+		{
+			#project_image {
+				float: none;
+				margin-left: auto;
+				margin-right: auto;
+				display: block;
+			}
+
+			#project_text {
+				margin-top: 20px;
+				width: 100%;
+				text-align: center;
+				margin-left: 0;
+				padding-left: 0;
+			}
+
+			#postmort {
+				margin-top: 20px;
+			}
+
+			hr {
+				margin-top: -100px;
+			visibility: visible;
+  		  	border: 0;
+    		height: 1px;
+    		background-image: -webkit-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:    -moz-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:     -ms-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:      -o-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+			}
+		}
+
+	</style>
+	<link rel="icon" href="grifficon.png">
+	<title>Helix Confessional</title>
+
+	<body>
+
+		<div id="content">
+
+			
+			<h1><span id="project_title">Helix</span> Confessional</h1>
+			
+			<p id="page_subtitle">HTML, CSS, PHP, MySQL</p>
+			<br>
+			<img id="project_image" src="helixapp.png" width = "250">
+
+			<div id="project_text">
+			<p>
+				Confess your sins! Submit your confessions to the Helix Fossil, and see if you are forgiven. And when you're done, make sure to stop by to see what other people have been confessing.
+			</p>
+			</div>
+<hr>
+			<div id="postmort">
+			<p>
+				I'd been meaning to get into Web Apps for a while, and with the internet fad that was Twitch Plays Pokemon, I saw a perfect opportunity. Not only could the popularity maybe get me some exposure, I knew that knowing I had around 4-5 days to make a web app would push me to actually finish it. I played around with redhad's openshift platform to deploy the app, and learned MySQL. 
+			</p><br>
+			<p>
+				I got my friend Gabe to draw me two beautiful pictures, and my friend PJ helped by sending me photoshopped designs of what the site should look like, which I matched as closely as possible.
+			</p><br>
+			<p>
+				After a week, the app had over 2,500 unique visitors, which I considered to be a huge success for a small app I made for practice. 
+			</p><br>
+			<p>
+				A live version of the app can be found <a href="http://helixconfessional-griffmaster9000.rhcloud.com/">here</a>. As opposed to the version that I originally released, this version had the data base wiped, no longer takes input, and is filled with dummy data, just so all responses remain appropriate.
+			</p>
+			
+			</div>
+<br>
+		<div id="back"><a href="index.html">&#xf0a8; </a> </div>
+		</div>
+
+		<div id="footer">
+			Site &#169; 2014,
+			<a href="http://maxwell.huang-hobbs.com/">Maxwell Huang-Hobbs</a> 
+			of 
+			<a href="http://www.enigmasm.com">Enigma SM</a>
+		</div>
+	</body>
+</html>
