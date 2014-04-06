@@ -162,6 +162,7 @@
 			color:#45B29D;
 		}
 
+
 		@media (max-width: 870px)
 		{
 			#project_image {
@@ -174,9 +175,11 @@
 			#project_text {
 				margin-top: 20px;
 				width: 100%;
+				height: 220px;
 				text-align: center;
 				margin-left: 0;
 				padding-left: 0;
+
 			}
 
 			#postmort {
@@ -197,37 +200,37 @@
 
 	</style>
 	<link rel="icon" href="grifficon.png">
-	<title>Helix Confessional</title>
+	<title>Stories</title>
 
 	<body>
 
 		<div id="content">
 
 			
-			<h1><span id="project_title">Helix</span> Confessional</h1>
+			<h1><span id="project_title">Stories</span></h1>
 			
-			<p id="page_subtitle">HTML, CSS, PHP, MySQL</p>
+			<p id="page_subtitle">Flask, JQuery, MongoDB</p>
 			<br>
-			<img id="project_image" src="helixapp.png" width = "250">
+			<img id="project_image" src="stories.png" width = "250">
 
 			<div id="project_text">
 			<p>
-				Confess your sins! Submit your confessions to the Helix Fossil, and see if you are forgiven. And when you're done, make sure to stop by to see what other people have been confessing.
+				Ever had a story or message you had to share with multiple groups of people? Tired of typing up a story on facebook, then copy pasting it to a friend on skype, before ultimately texting the entire thing up again to another friend? No more! With Stories, write once, share everywhere.
 			</p>
 			</div>
 <hr>
 			<div id="postmort">
 			<p>
-				I'd been meaning to explore Web Apps for a while, and with the internet fad that was Twitch Plays Pokemon, I saw a perfect opportunity. Not only could the popularity maybe get me some exposure, I set myself a goal of a 4-5 day turnaround to publish the app, to make sure it stayed relevant and to push me to actually finish it. I used redhat's openshift platform to deploy the app, and learned MySQL in the process. 
+				For HackNY, my first hackathon, my friend <a href="jefftao.com">Jeff</a> and I decided we wanted to make a way to easily share stories across different platforms. Our aim was something more minimalist than a blog, something like pastebin but built for stories, or messages. Something that looked really nice, but also something so simple that those less technically inclined would feel comfortable with it.
 			</p><br>
 			<p>
-				My friend Gabe agreed to draw the illustrations and my friend PJ helped by sending me his photo-shopped designs of the site, which I matched as closely as possible.
+				Once we got to the hackathon, we ended up drafting two fellow students into our group, <a href="http://charlesjianlai.com/"> Charles</a> and Jen. We then divided into groups, but the workload was light enough that we all got a chance to be involved with every level of development.
 			</p><br>
 			<p>
-				After a week, the app had over 2,500 unique visitors, which I considered to be a huge success for a small “practice” app. 
-			</p><br>
-			<p>
-				A live version of the app can be found <a href="http://helixconfessional-griffmaster9000.rhcloud.com/">here</a>. This version no longer takes input, and is filled with dummy data so that all responses remain appropriate.
+				My primary responsbility was setting up, and configuring reading and writing to the database. I looked into MongoDB, and found PyMongo, as we were using python as our backend. Charles headed up the Flask, Jen tackled HTML templates, and Jeff manned the CSS and Ajax.
+			</p> <br>
+			<p> 
+				The repository for our application is <a href="https://github.com/GriffinBrodman/Stories"> here </a> and the app is hosted live <a href=""> here</a>.
 			</p>
 			
 			</div>
