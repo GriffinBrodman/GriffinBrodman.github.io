@@ -154,6 +154,13 @@
 		}
 		/* Gradient transparent - color - transparent */
 		
+		#postmort p a {
+			color: #777777;
+		}
+
+		#postmort p a:hover {
+			color:#45B29D;
+		}
 
 
 		@media (max-width: 870px)
@@ -168,9 +175,11 @@
 			#project_text {
 				margin-top: 20px;
 				width: 100%;
+				height: 220px;
 				text-align: center;
 				margin-left: 0;
 				padding-left: 0;
+
 			}
 
 			#postmort {
@@ -191,37 +200,37 @@
 
 	</style>
 	<link rel="icon" href="grifficon.png">
-	<title>Qb</title>
+	<title>Stories</title>
 
 	<body>
 
 		<div id="content">
 
 			
-			<h1><span id="project_title">Q</span>b</h1>
+			<h1><span id="project_title">Stories</span></h1>
 			
-			<p id="page_subtitle">Arduino, C++, Python </p>
+			<p id="page_subtitle">Flask, JQuery, MongoDB</p>
 			<br>
-			<img id="project_image" src="box.png" width = "250">
+			<img id="project_image" src="stories.png" width = "250">
 
 			<div id="project_text">
 			<p>
-				Ever wish that all computers came with a rotation based peripheral? Of course you did! Rotate the cube to see it rotate on the screen.
+				Ever had a story or message you had to share with multiple groups of people? Tired of typing up a story on facebook, then copy pasting it to a friend on Skype, before ultimately texting the entire thing up again to another friend? No more! With Stories, write once, share everywhere.
 			</p>
 			</div>
 <hr>
 			<div id="postmort">
 			<p>
-				A senior project I did in high school, our group used a 3-DOF accelerometer / gyroscope / magnetometer to make a rotation based computer peripheral. It was more of a proof of concept, and one of our intial goals was to eventually write an API around it so that others could develop applications for it.
+				For HackNY, my first hackathon, my friend <a href="http://www.jefftao.com">Jeff</a> and I decided we wanted to make a way to easily share stories across different platforms. Our aim was something more minimalist than a blog, something like pastebin but built for stories, or messages. Something that looked really nice, but also something so simple that those less technically inclined would feel comfortable with it.
 			</p><br>
 			<p>
-				 Initially, we were hoping to make it location based as well, but after further research into the topic, dead reckoning had nowhere near the degree of accuracy we'd need for our desired range of motion. While the sensors we had would have been appropriate for tracking the location of a model plane maybe, it couldn't quite be accurate enough for the 2'x2' area we designed it to be used in.
+				Once we got to the hackathon, we ended up drafting two fellow students into our group, <a href="http://charlesjianlai.com/"> Charles</a> and Jen. We then divided into groups, but the workload was light enough that we all got a chance to be involved with every level of development.
 			</p><br>
 			<p>
-				My role on the project became physics and graphics based. I was sent the data from the sensor, given to the computer through USB, and using that, I performed the calculations to move the "cube object" around the screen, and to update our drawing of it. After doing research into the topic of dead reckoning, I decided that we should use quaternions as our representation 
-			</p><br>
-			<p>
-				A live version of the app can be found <a href="http://helixconfessional-griffmaster9000.rhcloud.com/">here</a>. As opposed to the version that I originally released, this version had the data base wiped, no longer takes input, and is filled with dummy data, just so all responses remain appropriate.
+				My primary responsibility was setting up, and configuring reading and writing to the database. I looked into MongoDB, and found PyMongo, as we were using python as our backend. Charles headed up the Flask, Jen tackled HTML templates, and Jeff manned the CSS and Ajax.
+			</p> <br>
+			<p> 
+				The repository for our application is <a href="https://github.com/GriffinBrodman/Stories"> here </a> and the app is hosted live <a href="http://www.shareastory.net/"> here</a>.
 			</p>
 			
 			</div>
