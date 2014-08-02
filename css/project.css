@@ -1,0 +1,95 @@
+#content{
+			min-width: 450px;
+		}
+
+		#project_image {
+			float: left;
+		}
+
+		#project_text {
+			width: 60%;
+			margin-left: 35%;
+			padding-left: 30px;
+			height: 200px;
+		}
+		#project_title {
+			color: #45B29D;
+		}
+
+		#postmort {
+			
+		}
+
+		hr {
+			visibility: hidden;
+		}
+
+		#back {
+			font-size: 4em;
+			font-family: 'fontawesome';
+			margin-bottom: -20px;
+			text-align: center;
+
+		}
+
+		#back a {
+			text-decoration: none;
+			color: rgb(68, 67, 73);
+		}
+
+
+		#back a:hover {
+			color: #45B29D;
+		}
+		/* Gradient transparent - color - transparent */
+		#postmort p a {
+			color: #777777;
+		}
+
+		#postmort p a:hover {
+			color:#45B29D;
+		}		
+
+			#trailer
+			{
+				margin-left: auto;
+				margin-right: auto;
+				float: none;
+				display: block;
+			}
+
+
+		@media (max-width: 870px)
+		{
+			#project_image {
+				float: none;
+				margin-left: auto;
+				margin-right: auto;
+				display: block;
+			}
+
+			#project_text {
+				margin-top: 20px;
+				width: 100%;
+				text-align: center;
+				margin-left: 0;
+				padding-left: 0;
+			}
+
+			#postmort {
+				margin-top: 20px;
+			}
+
+		
+
+			hr {
+				margin-top: -100px;
+			visibility: visible;
+  		  	border: 0;
+    		height: 1px;
+    		background-image: -webkit-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:    -moz-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:     -ms-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+    		background-image:      -o-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0)); 
+			}
+		}
