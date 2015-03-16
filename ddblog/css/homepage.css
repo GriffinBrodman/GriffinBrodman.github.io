@@ -50,10 +50,12 @@ main {
 }
 
 .blogpost .readmore {
+	margin-top: 500px;
 	text-align: center;
-	margin-top: 20px;
 	padding-top: 8px;
 	padding-bottom: 8px;
+	padding-left: 4px;
+	padding-right: 4px;
 	border: 1px solid #AF6A25;
 	width: 160px;
 	font-weight: 600;
