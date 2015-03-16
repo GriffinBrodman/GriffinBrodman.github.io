@@ -2,7 +2,7 @@ header{
 	height: 150px;
 	background-color: #DDF4D8;
 	text-align: center;
-	color: #3D991F;
+	color: #AF6A25;
 	font-family: 'Open Sans', sans-serif;
 }
 
@@ -29,7 +29,7 @@ main {
 .blogpost h2{
 	font-size: 1em;
 	padding-bottom: 15px;
-	color: #3D991F;
+	color: #AF6A25;
 	font-family: 'Open Sans', sans-serif;
 	font-weight: 300;
 	font-style: italic;
@@ -47,4 +47,15 @@ main {
 	color: black;
 	font-size: 1em;
 	margin-top: 10px;
+}
+
+.blogpost .readmore {
+	text-align: center;
+	margin-top: 20px;
+	font-style: normal;
+	padding-top: 8px;
+	padding-bottom: 8px;
+	border: 1px solid #AF6A25;
+	width: 200px;
+	font-weight: 600;
 }
