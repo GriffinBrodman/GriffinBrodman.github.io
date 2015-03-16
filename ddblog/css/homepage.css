@@ -61,12 +61,10 @@ main {
 	transition: .5s;
 	font-style: normal;
 	color: #AF6A25;
-}
-
-.blogpost .readmore a{
 	text-decoration: none;
-	color: inherit;
-}
+	}
+
+
 
 .blogpost .readmore:hover {
 	background-color: #AF6A25;
