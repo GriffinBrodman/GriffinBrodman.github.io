@@ -1,0 +1,50 @@
+header{
+	height: 200px;
+	background-color: #66FF33;
+	text-align: center;
+	color: #3D991F;
+	font-family: 'Open Sans', sans-serif;
+}
+
+header h1 {
+	padding-top: 60px;
+	font-size: 2em;
+
+}
+
+main {
+	margin-top: 30px;
+}
+
+.blogpost{
+	width: 60%;
+	margin-left: 20%;
+	margin-bottom: 30px;
+}
+
+.blogpost h1{
+	font-family: 'Montserrat', sans-serif;
+}
+
+.blogpost h2{
+	font-size: 1em;
+	padding-bottom: 15px;
+	color: #3D991F;
+	font-family: 'Open Sans', sans-serif;
+	font-weight: 300;
+	font-style: italic;
+}
+
+.blogpost hr{
+	border: 0;
+    border-bottom: 1px dashed #ccc;
+    background: #999;
+}
+
+.blogpost p {
+	font-style: normal;
+	font-weight: 400;
+	color: black;
+	font-size: 1em;
+	margin-top: 10px;
+}
