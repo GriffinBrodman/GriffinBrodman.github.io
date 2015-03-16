@@ -42,6 +42,7 @@ main {
 }
 
 .blogpost p {
+	font-family: 'Open Sans', sans-serif;
 	font-style: normal;
 	font-weight: 400;
 	color: black;
@@ -50,12 +51,13 @@ main {
 }
 
 .blogpost .readmore {
+	font-family: 'Open Sans', sans-serif;
 	margin-top: 500px;
 	text-align: center;
 	padding-top: 8px;
 	padding-bottom: 8px;
-	padding-left: 4px;
-	padding-right: 4px;
+	padding-left: 12px;
+	padding-right: 12px;
 	border: 1px solid #AF6A25;
 	width: 160px;
 	font-weight: 600;
