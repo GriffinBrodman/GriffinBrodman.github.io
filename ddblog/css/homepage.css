@@ -1,13 +1,13 @@
 header{
-	height: 200px;
-	background-color: #66FF33;
+	height: 150px;
+	background-color: #DDF4D8;
 	text-align: center;
 	color: #3D991F;
 	font-family: 'Open Sans', sans-serif;
 }
 
 header h1 {
-	padding-top: 60px;
+	padding-top: 40px;
 	font-size: 2em;
 
 }
