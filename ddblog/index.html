@@ -1,0 +1,26 @@
+---
+layout: default
+---
+
+<head>
+	<link rel="stylesheet" href="{{ site.baseurl }}/css/homepage.css">
+</head>
+
+<header>
+	<h1>{{ site.title }}</h1>
+	<h2>Tales of Lorem - Ipsum Upsom Wupsom Mupsom </h2>
+</header>
+
+<main>
+
+	{% for post in site.posts reversed %}
+	<div class="blogpost">
+		<h1> {{ post.title }} </h1>
+		<h2> By {{ post.author }} &middot; {{ post.date | date: "%b %-d, %Y" }} </h2>
+		<hr>
+		<p> {{ post.content | truncatewords:50 }} </p>
+		<a class="readmore" href="{{ post.url | prepend: site.baseurl }}">READ FULL POST </a>
+	</div>
+	{% endfor %}
+
+</main>
