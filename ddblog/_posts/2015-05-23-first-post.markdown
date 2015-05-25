@@ -1,8 +1,0 @@
----
-layout: post
-title:  "Lorem Ipsum One!"
-author: "Griffin Brodman"
-date:   2015-05-23 22:23:34
----
-
-Lorem ipsum Pariatur Ut proident id dolore laboris eu tempor laborum pariatur veniam occaecat laborum occaecat Duis laboris proident ea veniam laboris laborum sed elit nostrud dolore dolore magna dolor Duis in ullamco laboris amet officia amet consectetur qui proident laborum voluptate laborum id mollit eu laborum ut in in magna ut ullamco sunt magna labore elit id in amet elit anim elit mollit culpa adipisicing est magna sed aute in eiusmod eiusmod occaecat dolore culpa amet pariatur elit aliqua sed dolore ea enim exercitation irure dolor dolore anim id officia consequat ut pariatur sunt deserunt anim aliqua minim cillum do in enim ex anim tempor ut incididunt in mollit aliqua est velit dolore ut amet nulla laboris anim et fugiat ut magna dolor mollit commodo dolor ullamco incididunt do in nisi mollit aliqua ad fugiat enim veniam consectetur ex consectetur adipisicing velit laborum ut sit irure eiusmod consectetur sint amet adipisicing nulla minim sint dolor dolor occaecat sed ut nisi Ut cupidatat ea laboris proident est elit magna sed dolore minim minim laborum dolore irure adipisicing officia velit amet in adipisicing minim anim laboris in ut in reprehenderit tempor laborum et quis incididunt incididunt ex minim velit ullamco elit deserunt veniam dolor eu eiusmod voluptate voluptate quis Excepteur fugiat dolor in qui mollit in sit nulla reprehenderit veniam qui aute culpa laborum minim velit anim voluptate sit tempor minim dolore adipisicing ad id ut in voluptate non et qui dolore ex et est non mollit dolor id est et consectetur amet elit dolor in aliquip cupidatat officia.

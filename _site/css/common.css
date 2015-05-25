@@ -1,0 +1,224 @@
+		@font-face {
+		    font-family: 'Inika';
+		    src: url('../fonts/Inika.eot'); 
+		    src: url('../fonts/Inika.eot?#iefix') format('embedded-opentype'),
+		         url('../fonts/Inika.svg#svgFontName') format('svg'),
+		         url('../fonts/Inika.woff') format('woff'),
+		         url('../fonts/Inika.ttf')  format('truetype');
+		}
+		
+		@font-face {
+		    font-family: 'Bree Serif';
+		    src: url('../fonts/Bree_Serif.eot'); 
+		    src: url('../fonts/Bree_Serif.eot?#iefix') format('embedded-opentype'),
+		         url('../fonts/Bree_Serif.svg#svgFontName') format('svg'),
+		         url('../fonts/Bree_Serif.woff') format('woff'),
+		         url('../fonts/Bree_Serif.ttf')  format('truetype');
+		}
+
+		@font-face {
+		    font-family: 'fontawesome';
+		    src: url('../fonts/fontawesome-webfont.eot'); 
+		    src: url('../fonts/fontawesome-webfont.eot?#iefix') format('embedded-opentype'),
+		         url('../fonts/fontawesome-webfont.svg#svgFontName') format('svg'),
+		         url('../fonts/fontawesome-webfont.woff') format('woff'),
+		         url('../fonts/fontawesome-webfont.ttf')  format('truetype');
+		}
+
+		* {
+			padding:0px;
+			margin:0px;
+		}
+		body {
+			background-color:rgb(68, 67, 73);
+			background-image:url(./stardust_@2X.png);
+
+			width:100%;
+			max-width:1024px;
+			min-width:600px;
+			margin:auto;
+			overflow-y:scroll;
+
+		}
+
+		hr {
+			display:block;
+			margin-left:auto;
+			margin-right:auto;
+			width:100%;
+			max-width:400px;
+			height:3px;
+			border-top:1px solid rgb(68, 67, 73);
+			border-bottom:1px solid rgb(68, 67, 73);
+			border-right:none;
+			border-left:none;
+		}
+
+		a{
+			color:inherit;
+			text-decoration:none;
+
+			transition:color 0.25s;
+		}
+
+		a:hover{
+			color:#45B29D;
+		}
+
+		#content{
+			display:inline-block;
+			vertical-align:middle;
+
+			background-color:#fefefe;
+			border-radius:2px;
+			padding:48px;
+			padding-left:64px;
+			padding-right:64px;
+			color:rgb(68, 67, 73);
+
+			margin:40px;
+		}
+
+		#content p {
+			font-family: 'Inika';
+		}
+		
+		h1,h2,h3,a,p {
+		  font-smooth: always;
+		  -webkit-font-smoothing: antialiased;
+		}
+
+		h1,h2,h3{
+			text-align:center;
+			font-family: 'Bree Serif';
+			font-style:none;
+		}
+
+		h1 { font-size: 36px;}
+		h2 { }
+		h3 { font-size: 18px;}
+		#page_subtitle {
+			font-size:24px;
+			text-align:center;
+		}
+
+
+		#lifelinks {
+			text-align:center;
+			transition: height 0.25s;
+			height:42px;
+			max-width:400px; /*adjust as needed */
+			margin-left:auto;
+			margin-right:auto;
+		}
+		#lifelinks:hover {
+			height:69px; 
+		}
+
+
+		#lifelinks li{
+			position:relative;
+			display:inline-block;
+			margin-left:32px;
+			margin-right:32px;
+			margin-top:10px;
+			margin-bottom:10px;
+			width:20px;
+			font-family:'fontawesome';
+		}
+
+		#lifelinks:hover li {
+			top:0px;
+			
+		}
+
+		#lifelinks a{
+			font-size:28px;
+			z-index:2;
+		}
+
+		#lifelinks .text {
+			display:block;
+			overflow:visible;
+			text-align:center;
+			font-size:24px;
+
+			position:absolute;
+			left:-85px;
+			width:200px;
+
+			opacity:0;
+			top:20px;
+
+			transition: opacity 0.25s, top 0.25s;
+			pointer-events:none;
+			font-family:'Bree Serif';
+			z-index:1;
+		}
+
+		#lifelinks li:hover .text {
+			opacity:1;
+			top:32px;
+		}
+
+		#about_me {
+			margin-top:12px;
+			margin-bottom:12px;
+		}
+
+
+		#projectsarea {
+			text-align:center;
+			padding:-20px;
+			margin-top:40px;
+		}
+
+		.project {
+			position:relative;
+			width:130px;
+			display:inline-block;
+			padding:20px;
+			vertical-align:top;
+		}
+
+		.project .imgcontain{
+			width:80px;
+			height:80px;
+			transition: width 0.25s;
+			overflow:hidden;
+			margin-left:auto;
+			margin-right:auto;
+		}
+
+		.project:hover .imgcontain{
+			width:100%;
+		}
+
+		.project img{
+			position:relative;
+			left:-25px;
+			width:130px;
+			margin-left:auto;
+			margin-right:auto;
+
+			transition:left 0.25s;
+		}
+
+		.project:hover img {
+			left:0px;
+		}
+
+		.project p {
+			font-size: 12px;
+			color:rgb(68, 67, 73) !important;
+		}
+
+		#footer {
+			font-family:'Inika';
+			color:rgba(255,255,255,0.2);
+			float:right;
+			position:relative;
+			top:-32px;
+			margin-left:48px;
+			margin-right:48px;
+		}
