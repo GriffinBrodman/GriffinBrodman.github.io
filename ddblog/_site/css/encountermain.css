@@ -1,0 +1,45 @@
+header{
+	height: 180px;
+	background-color: #FFD7C6;
+	text-align: center;
+	color: #AF6A25;
+	font-family: 'Montserrat', sans-serif;
+}
+
+header h1 {
+	padding-top: 30px;
+	font-size: 2.7em;
+}
+header h2 {
+	font-size: 1.7em;
+}
+
+main {
+	margin-top: -50px;
+	background-color: #FFFFFF;
+	width: 60%;
+	margin-left: 20%;
+	height: 200px;
+}
+
+main h2 {
+	text-align: center;
+	padding-top: 40px;
+	margin-bottom: 50px;
+	font-family: 'Montserrat', sans-serif;
+}
+
+main a {
+	font-family: 'Open Sans', sans-serif;
+	display: block;
+	text-align: center;
+	height: 50px;
+	margin-top: 20px;
+	padding-top: 17px;
+	background-color: #FFD7C6;
+	color: #AF6A25;
+	text-decoration: none;
+	width: 50%;
+	margin-left: 25%;
+	font-size: 1.5em;
+}

@@ -19,7 +19,7 @@ layout: default
 		<h2> By {{ post.author }} &middot; {{ post.date | date: "%b %-d, %Y" }} </h2>
 		<hr>
 		<p> {{ post.content | truncatewords:50 }} </p>
-		<a class="readmore" href="{{ post.url }}">READ FULL POST </a>
+		<a class="readmore" href="{{ post.url | prepend: site.baseurl }}">READ FULL POST </a>
 	</div>
 	{% endfor %}
 
