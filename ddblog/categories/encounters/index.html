@@ -1,0 +1,17 @@
+---
+layout: default
+---
+<head>
+	<link rel="stylesheet" href="/css/encountermain.css">
+</head>
+<main>
+	<h2> TABLE OF CONTENTS: </h2>
+
+	{% for post in site.posts %}
+	{% if post.layout == "encounter" %}
+	<a class="encounter" href="{{ post.url | prepend: site.baseurl }}">
+		{{ post.title }}
+	</a>
+	{% endif %}
+	{% endfor %}
+</main>
