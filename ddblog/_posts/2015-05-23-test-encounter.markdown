@@ -6,7 +6,7 @@ date:   2015-05-23 22:23:00
 teaser: "This is so cool. Definitely check this out."
 ---
 
-<img src="/assets/monkey.jpg" style="text-align:center; width:300px; display:block; margin-left:auto; margin-right: auto;">
+<img src="{{ site.baseurl }}/assets/monkey.jpg" style="text-align:center; width:300px; display:block; margin-left:auto; margin-right: auto;">
 
 This encounter is designed to be a portion of a dungeon, but it can certainly be adapted to other settings. It is also important to note that this puzzle relies on the party containing at least three members.
 
@@ -26,6 +26,6 @@ Now, if you want the next part to be as intense, realistic, and downright as sil
 
 Now, the next room can be entirely up to you, but a lot of typical dungeon rooms can be ridiculously difficult with a handicapped party. What I like to use is an obstacle course which requires teamwork, since the handicaps can really shine while still being somewhat manageable. The obstacle course I designed was very closely based on the Dungeon Duos minigame from Mario Party 4.
 
-<img src="/assets/mario.png" style="text-align:center; width:450px; display:block; margin-left:auto; margin-right: auto;"><br>
+<img src="{{ site.baseurl }}/assets/mario.png" style="text-align:center; width:450px; display:block; margin-left:auto; margin-right: auto;"><br>
 
 This obstacle course contains a series of impediments which require people to work together in order to advance. For example, as depicted in the image above, a platform that rotates, bringing whomever stands on it to the other end of a cliff. However, the platform is controlled by a crank which can\'t be reached if you\'re on the platform, meaning you need a party mate to rotate it for you. Other simple obstacles such as a rope swing or see-saw type platform can be added, but the important part is that teamwork should be crucial and the handicaps should play a role.
