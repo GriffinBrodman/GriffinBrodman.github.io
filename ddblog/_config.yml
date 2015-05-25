@@ -1,0 +1,6 @@
+# Site settings
+title: "D&amp;D Blog"
+baseurl: ""
+url: "http://griffinbrodman.com/" 
+
+markdown: kramdown
