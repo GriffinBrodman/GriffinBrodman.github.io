@@ -1,8 +1,8 @@
 header{
 	height: 180px;
-	background-color: #FFD7C6;
+	background-color: #B6FFB6;
 	text-align: center;
-	color: #AF6A25;
+	color: #33CC33;
 	font-family: 'Montserrat', sans-serif;
 }
 
@@ -31,7 +31,7 @@ main {
 .blogpost h2{
 	font-size: 1em;
 	padding-bottom: 15px;
-	color: #AF6A25;
+	color: #33CC33;
 	font-family: 'Open Sans', sans-serif;
 	font-weight: 300;
 	font-style: italic;
@@ -58,13 +58,13 @@ main {
 	text-align: center;
 	padding-top: 8px;
 	padding-bottom: 8px;
-	border: 1px solid #AF6A25;
+	border: 1px solid #33CC33;
 	width: 150px;
 	font-weight: 600;
 	font-size: 1em;
 	transition: .5s;
 	font-style: normal;
-	color: #AF6A25;
+	color: #33CC33;
 	text-decoration: none;
 	display: block;
 	}
@@ -72,7 +72,7 @@ main {
 
 
 .blogpost .readmore:hover {
-	background-color: #AF6A25;
+	background-color: #33CC33;
 	color: #FFFFFF;
 	border-radius: 3px;
 }
