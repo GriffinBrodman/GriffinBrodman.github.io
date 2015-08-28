@@ -1,8 +1,8 @@
 header{
 	height: 180px;
-	background-color: #FFD7C6;
+	background-color: #B6FFB6;
 	text-align: center;
-	color: #AF6A25;
+	color: #33CC33;
 	font-family: 'Montserrat', sans-serif;
 }
 
@@ -36,8 +36,8 @@ main a {
 	height: 50px;
 	margin-top: 20px;
 	padding-top: 17px;
-	background-color: #FFD7C6;
-	color: #AF6A25;
+	background-color: #B6FFB6;
+	color: #33CC33;
 	text-decoration: none;
 	width: 50%;
 	margin-left: 25%;
