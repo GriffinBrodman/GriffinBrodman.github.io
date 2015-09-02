@@ -46,11 +46,19 @@
 			color: #777777;
 		}
 
+		#project_text p a {
+			color: #777777;
+		}
+
 		#postmort p a:hover {
 			color:#45B29D;
-		}		
+		}	
 
-			#trailer
+		#project_text p a:hover {
+			color: #45B29D;
+		}	
+
+		#trailer
 			{
 				margin-left: auto;
 				margin-right: auto;
