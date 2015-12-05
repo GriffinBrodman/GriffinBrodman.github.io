@@ -1,0 +1,141 @@
+* {
+	margin: 0px;
+	border: 0px;
+	padding: 0px;
+}
+
+html, body
+{
+	width: 100%;
+	font-family: "Slabo 27px";
+}
+
+*, *:before, *:after{
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -o-box-sizing: border-box;
+    -ms-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+h1, h2, h3 {
+	font-family: 'Open Sans', sans-serif;
+	font-weight: 900;
+}
+
+#top
+{
+	padding-top: 50px;
+	text-align: center;
+	background-position:  fixed;
+	background-size: cover;
+	background-image: url("../images/forest.jpg");
+	height: 1000px;
+}
+
+#top h1{
+	font-family: "Slabo 27px";
+	font-size: 3.5em;
+}
+
+#me {
+	margin-top: 30px;
+}
+
+#quote{
+	font-family: "Slabo 27px";
+	font-style: italic;
+	margin-top: 40px;
+	color: #ffffff;
+	font-size: 2em;
+}
+
+#purpose{
+	padding-top: 90px;
+	padding-left: 80px;
+
+	margin-left: auto;
+	margin-right: auto;
+	max-width: 600px;
+	text-align: center;
+
+}
+
+#strengths{
+	margin-top: 100px;
+	padding-bottom: 10px;
+	width: 90%;
+	margin: 0 auto;
+	border-bottom: 1px solid #2F343B;
+	overflow: auto;
+	text-align: center;
+}
+
+.strengthSection{
+	padding-top: 100px;
+	float: left;
+	display: block;
+	width: 33%;
+	border-top: 2px solid #2F343B;
+	border-right: 2px solid #2F343B;
+	padding: 2.5% 3% 3% 3%;
+	min-width: 190px;
+	text-align: justify;
+	
+}
+
+.strengthIcon {
+	margin-left: auto;
+	margin-right: auto;
+	display: block;
+}
+
+.strengthSection h1 {
+	text-align: center;
+	margin-top: 20px;
+	font-size: 1.6em;
+}
+
+.strengthSection p {
+	margin-top: 40px;
+}
+
+.strengthSection.last{
+	border-right: none;
+}
+
+#minecart {
+	background-color: #7E827A;
+	margin-top: 100px;
+	height: 450px;
+	padding-top: 20px;
+	padding-left: 20px;
+	padding-right: 20px;
+}
+
+#minecart h1{
+	text-align: center;
+	color: #FFFFFF;
+	margin-bottom: 60px;
+}
+
+
+#mineGraphic {
+	display: inline-block;
+	width: 40%;
+}
+
+#mineText {
+	display: inline-block;
+	width: 55%;
+
+}
+
+#footer {
+	display: block;
+	background-color: #2F343B;
+	height: 200px;
+	padding: 40px;
+	color: #7E827A;
+	text-align: center;
+}

@@ -1,0 +1,15 @@
+/* latin */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 800;
+  src: "../fonts/opensans.woff2";
+}
+
+/* latin */
+@font-face {
+  font-family: 'Slabo 27px';
+  font-style: normal;
+  font-weight: 400;
+  src: "../fonts/slabo.woff2";
+}
