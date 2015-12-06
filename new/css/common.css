@@ -111,7 +111,7 @@ h1, h2, h3 {
 
 #minecart {
 	background-color: #E3CDA4;
-	margin-top: 100px;
+	margin-top: 80px;
 	height: 450px;
 	padding-top: 40px;
 	padding-left: 10%;
@@ -119,19 +119,32 @@ h1, h2, h3 {
 }
 
 #minecart h1{
-	text-align: center;
-	color: #7E827A;
-	margin-bottom: 60px;
+	text-align: left;
+	color: #2F343B; /* #7E827A #2F343B C77966 */
+	margin-bottom: 40px;
 	margin-top: 20px;
 	font-size: 2em;
+	padding-left: 600px;
+}
+
+#minecart hr {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0), #2F343B, rgba(0, 0, 0, 0));
+    width: 60%;
+    float: right;
+    margin-top: -20px;
+    margin-left: auto;
+    margin-right: 200px;
 }
 
 
 #mineGraphic {
 	display: block;
-	width: 40%;
+	width: 20%;
 	float: left;
 	position: relative;
+	margin-top: -50px;
 }
 
 #centralCircle {
@@ -141,10 +154,13 @@ h1, h2, h3 {
 	border-radius: 50%;
 }
 
-#centralCircle p {
-	padding-top: 80px;
+#centralCircle h1 {
 	text-align: center;
-	font-size: 10em;
+	font-size: 2em;
+	padding: 0;
+	padding-top: 100px;
+	margin: 0;
+	color: #ffffff;
 }
 
 #mineText {
@@ -152,11 +168,19 @@ h1, h2, h3 {
 	width: 55%;
 	color: #7E827A;
 	float: right;
+	margin-right: 200px;
+	margin-top: 20px;
+	line-height: 1.4em;
 }
 
 .derailer {
 	float:left;
 	cursor: pointer;
+	transition: all .25s ease;
+}
+
+.derailer:hover {
+	transform: translate(0, -10px);
 }
 
 #grow {

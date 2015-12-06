@@ -1,6 +1,8 @@
 $(document).ready(function() {
 	$(".derailer").on("click", function() {
 		$("#mineText").text($(this).data("text"));
-		$("#centralCircle p").text($(this).data("title"))
+		$("#minecart h1").text($(this).data("type"));
+		$("#centralCircle h1").text($(this).data("title"));
+		
 	});
 });
