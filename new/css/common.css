@@ -55,15 +55,20 @@ h1, h2, h3 {
 	padding-top: 90px;
 	margin-left: auto;
 	margin-right: auto;
-	max-width: 600px;
+	max-width: 700px;
 	text-align: justify;
-	margin-bottom: 80px;
+	margin-bottom: 120px;
 }
 
 #purpose h1{
 	text-align: center;
 	margin-bottom: 10px;
 	color: #703030;
+}
+
+#purpose p{
+	line-height: 1.6em;
+	font-size: 1.2em;
 }
 
 #strengths{
@@ -184,7 +189,7 @@ h1, h2, h3 {
 }
 
 #grow {
-	height: 200px;
+
 }
 
 #footer {
@@ -213,3 +218,71 @@ h1, h2, h3 {
 	float: right;
 	width: 60%;
 }
+
+
+
+    .carouselbox {
+      font-size: 14px;
+      width: 80%;
+      position: relative;
+      margin: 1em;
+      border: 1px solid #ccc;
+      box-shadow: 2px 2px 10px #ccc;
+      overflow: hidden;
+      margin-left: auto;
+      margin-right: auto;
+      height: 250px;
+      margin-bottom: 150px;
+    }
+
+    .content {
+      margin: 0;
+      padding: 0;
+    }
+    .content li {
+      font-size: 1.4em;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      list-style: none;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .carouselbox button {
+      border: 2px solid #000000;
+      padding: 2px 2px 2px 2px;
+      visibility: hidden;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .active button {
+      visibility: visible;
+    } 
+    .offscreen {
+      position: absolute;
+      left: -2000px;
+    }
+    .active .buttons {
+      padding: 5px 0;
+      background: #7E827A;
+      text-align: center;
+      z-index: 10;
+      position: relative;
+      font-size: 1em;
+    }
+    .active li {
+      position: absolute;
+      top: 130px;
+      opacity: 0;
+      transform: scale(0);
+      transition: 1s;
+    }
+    .active li.current {
+      top: 30px;
+      opacity: 1;
+      transform: scale(1);
+      transition: 1s;
+      padding-top: 20px;
+    }
