@@ -8,6 +8,7 @@ html, body
 {
 	width: 100%;
 	font-family: "Slabo 27px";
+	color: #2F343B;
 }
 
 *, *:before, *:after{
@@ -187,8 +188,20 @@ h1, h2, h3 {
 	transform: translate(0, -10px);
 }
 
-#grow {
+#grow h1{
+	text-align: center;
+	color: #703030;
+}
 
+#grow h2{
+	font-size: 1.3em;
+	margin-bottom: 15px;
+}
+
+#grow p {
+	width: 70%;
+	margin-left: auto;
+	margin-right: auto; 
 }
 
 #footer {
