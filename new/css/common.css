@@ -91,6 +91,8 @@ h1, h2, h3 {
 	padding: 2.5% 3% 3% 3%;
 	min-width: 190px;
 	text-align: justify;
+	line-height: 1.6em;
+	font-size: 1.2em;
 	
 }
 
@@ -175,7 +177,8 @@ h1, h2, h3 {
 	float: right;
 	margin-right: 200px;
 	margin-top: 20px;
-	line-height: 1.4em;
+	line-height: 1.6em;
+	font-size: 1.2em;
 }
 
 .derailer {
@@ -202,19 +205,25 @@ h1, h2, h3 {
 	width: 80%;
 	margin-left: auto;
 	margin-right: auto; 
+	
 }
 
 #footer {
 	display: block;
 	background-color: #2F343B;
-	height: 280px;
-	padding: 20px;
+	height: 300px;
+	padding-top: 40px;
+	padding-left: 50px;
 	color: #7E827A;
 	text-align: center;
 }
 
 #footer h1 {
 	padding-bottom: 30px;
+}
+
+#footer a {
+	color: #7E827A;
 }
 
 #contact {
@@ -233,9 +242,10 @@ h1, h2, h3 {
 
 
 
+
     .carouselbox {
       font-size: 14px;
-      width: 80%;
+      width: 70%;
       position: relative;
       margin: 1em;
       border: 1px solid #ccc;
