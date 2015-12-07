@@ -262,7 +262,7 @@ h1, h2, h3 {
     }
 
     .carouselbox button {
-      border: 2px solid #000000;
+      border: 1px solid #000000;
       padding: 2px 2px 2px 2px;
       visibility: hidden;
       font-family: 'Open Sans', sans-serif;
