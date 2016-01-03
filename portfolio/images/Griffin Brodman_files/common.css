@@ -1,0 +1,191 @@
+* {
+	margin: 0px;
+	border: 0px;
+	padding: 0px;
+}
+
+html, body
+{
+	width: 100%;
+	font-family: "Slabo 27px";
+}
+
+*, *:before, *:after{
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -o-box-sizing: border-box;
+    -ms-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+h1, h2, h3 {
+	font-family: 'Open Sans', sans-serif;
+	font-weight: 900;
+}
+
+#top
+{
+	padding-top: 50px;
+	text-align: center;
+	background-position:  fixed;
+	background-size: cover;
+	background-image: url("../images/forest.jpg");
+	height: 1000px;
+}
+
+#top h1{
+	margin-top: 80px;
+	font-family: "Slabo 27px";
+	font-size: 3.5em;
+}
+
+#me {
+	margin-top: 50px;
+}
+
+#quote{
+	font-family: "Slabo 27px";
+	font-style: italic;
+	margin-top: 50px;
+	color: #ffffff;
+	font-size: 2em;
+}
+
+#purpose{
+	padding-top: 90px;
+	margin-left: auto;
+	margin-right: auto;
+	max-width: 600px;
+	text-align: justify;
+	margin-bottom: 80px;
+}
+
+#purpose h1{
+	text-align: center;
+	margin-bottom: 10px;
+	color: #703030;
+}
+
+#strengths{
+	margin-top: 100px;
+	padding-bottom: 10px;
+	width: 90%;
+	margin: 0 auto;
+	border-bottom: 1px solid #2F343B;
+	overflow: auto;
+	text-align: center;
+}
+
+.strengthSection{
+	padding-top: 100px;
+	float: left;
+	display: block;
+	width: 33%;
+	border-top: 2px solid #2F343B;
+	border-right: 2px solid #2F343B;
+	padding: 2.5% 3% 3% 3%;
+	min-width: 190px;
+	text-align: justify;
+	
+}
+
+.strengthIcon {
+	margin-left: auto;
+	margin-right: auto;
+	display: block;
+}
+
+.strengthSection h1 {
+	text-align: center;
+	margin-top: 20px;
+	font-size: 1.6em;
+}
+
+.strengthSection p {
+	margin-top: 40px;
+}
+
+.strengthSection.last{
+	border-right: none;
+}
+
+#minecart {
+	background-color: #E3CDA4;
+	margin-top: 100px;
+	height: 450px;
+	padding-top: 40px;
+	padding-left: 10%;
+	padding-right: 10%;
+}
+
+#minecart h1{
+	text-align: center;
+	color: #7E827A;
+	margin-bottom: 60px;
+	margin-top: 20px;
+	font-size: 2em;
+}
+
+
+#mineGraphic {
+	display: block;
+	width: 40%;
+	float: left;
+	position: relative;
+}
+
+#centralCircle {
+	background-color: #7E827A;
+	width: 250px;
+	height: 250px;
+	border-radius: 50%;
+}
+
+#centralCircle p {
+	padding-top: 80px;
+	text-align: center;
+	font-size: 10em;
+}
+
+#mineText {
+	display: block;
+	width: 55%;
+	color: #7E827A;
+	float: right;
+}
+
+.derailer {
+	float:left;
+	cursor: pointer;
+}
+
+#grow {
+	height: 200px;
+}
+
+#footer {
+	display: block;
+	background-color: #2F343B;
+	height: 280px;
+	padding: 20px;
+	color: #7E827A;
+	text-align: center;
+}
+
+#footer h1 {
+	padding-bottom: 30px;
+}
+
+#contact {
+	display: block;
+	float: left;
+	width: 35%;
+	text-align: left;
+}
+
+
+#lastThoughts {
+	display: block;
+	float: right;
+	width: 60%;
+}

@@ -1,0 +1,311 @@
+* {
+	margin: 0px;
+	border: 0px;
+	padding: 0px;
+}
+
+html, body
+{
+	width: 100%;
+	font-family: "Slabo 27px";
+	color: #2F343B;
+}
+
+*, *:before, *:after{
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -o-box-sizing: border-box;
+    -ms-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+h1, h2, h3 {
+	font-family: 'Open Sans', sans-serif;
+	font-weight: 900;
+}
+
+#top
+{
+	padding-top: 50px;
+	text-align: center;
+	background-position:  fixed;
+	background-size: cover;
+	background-image: url("../images/forest.jpg");
+	height: 1000px;
+}
+
+#top h1{
+	margin-top: 80px;
+	font-size: 3.5em;
+}
+
+#me {
+	margin-top: 50px;
+}
+
+#quote{
+	font-family: "Slabo 27px";
+	font-style: italic;
+	margin-top: 50px;
+	color: #ffffff;
+	font-size: 2em;
+}
+
+#purpose{
+	padding-top: 90px;
+	margin-left: auto;
+	margin-right: auto;
+	max-width: 700px;
+	text-align: justify;
+	margin-bottom: 120px;
+}
+
+#purpose h1{
+	text-align: center;
+	margin-bottom: 10px;
+	color: #703030;
+}
+
+#purpose p{
+	line-height: 1.6em;
+	font-size: 1.2em;
+}
+
+#strengths{
+	margin-top: 100px;
+	padding-bottom: 10px;
+	width: 90%;
+	margin: 0 auto;
+	border-bottom: 1px solid #2F343B;
+	overflow: auto;
+	text-align: center;
+}
+
+.strengthSection{
+	padding-top: 100px;
+	float: left;
+	display: block;
+	width: 33%;
+	border-top: 2px solid #2F343B;
+	border-right: 2px solid #2F343B;
+	padding: 2.5% 3% 3% 3%;
+	min-width: 190px;
+	text-align: justify;
+	line-height: 1.6em;
+	font-size: 1.2em;
+	
+}
+
+.strengthIcon {
+	margin-left: auto;
+	margin-right: auto;
+	display: block;
+}
+
+.strengthSection h1 {
+	text-align: center;
+	margin-top: 20px;
+	font-size: 1.6em;
+}
+
+.strengthSection p {
+	margin-top: 40px;
+}
+
+.strengthSection.last{
+	border-right: none;
+}
+
+#minecart {
+	background-color: #E3CDA4;
+	margin-top: 80px;
+	height: 575px;
+	padding-top: 40px;
+	padding-left: 10%;
+	padding-right: 10%;
+}
+
+#minecart h1{
+	text-align: left;
+	color: #2F343B; /* #7E827A #2F343B C77966 */
+	margin-bottom: 40px;
+	margin-top: 20px;
+	font-size: 2em;
+	padding-left: 600px;
+}
+
+#minecart hr {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0), #2F343B, rgba(0, 0, 0, 0));
+    width: 60%;
+    float: right;
+    margin-top: -20px;
+    margin-left: auto;
+    margin-right: 200px;
+}
+
+
+#mineGraphic {
+	display: block;
+	width: 20%;
+	float: left;
+	position: relative;
+	margin-top: -50px;
+}
+
+#centralCircle {
+	background-color: #7E827A;
+	width: 250px;
+	height: 250px;
+	border-radius: 50%;
+}
+
+#centralCircle h1 {
+	text-align: center;
+	font-size: 2em;
+	padding: 0;
+	padding-top: 100px;
+	margin: 0;
+	color: #ffffff;
+}
+
+#mineText {
+	display: block;
+	width: 55%;
+	color: #7E827A;
+	float: right;
+	margin-right: 200px;
+	margin-top: 20px;
+	line-height: 1.6em;
+	font-size: 1.2em;
+}
+
+.derailer {
+	float:left;
+	cursor: pointer;
+	transition: all .25s ease;
+}
+
+.derailer:hover {
+	transform: translate(0, -10px);
+}
+
+#grow h1{
+	text-align: center;
+	color: #703030;
+}
+
+#grow h2{
+	font-size: 1.3em;
+	margin-bottom: 15px;
+}
+
+#grow p {
+	width: 80%;
+	margin-left: auto;
+	margin-right: auto; 
+
+}
+
+#footer {
+	display: block;
+	background-color: #2F343B;
+	height: 300px;
+	padding-top: 40px;
+	padding-left: 50px;
+	color: #7E827A;
+	text-align: center;
+}
+
+#footer h1 {
+	padding-bottom: 30px;
+}
+
+#footer a {
+	color: #7E827A;
+}
+
+#contact {
+	display: block;
+	float: left;
+	width: 35%;
+	text-align: left;
+}
+
+
+#lastThoughts {
+	display: block;
+	float: right;
+	width: 60%;
+}
+
+
+
+
+    .carouselbox {
+      font-size: 14px;
+      width: 70%;
+      position: relative;
+      margin: 1em;
+      border: 1px solid #ccc;
+      box-shadow: 2px 2px 10px #ccc;
+      overflow: hidden;
+      margin-left: auto;
+      margin-right: auto;
+      height: 400px;
+      margin-bottom: 150px;
+    }
+
+    .content {
+      margin: 0;
+      padding: 0;
+    }
+    .content li {
+      font-size: 1.4em;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      list-style: none;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .carouselbox button {
+      border: 1px solid #2F343B;
+      padding: 3px 3px 3px 3px;
+      visibility: hidden;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 900;
+      cursor: pointer;
+      width: 100px;
+    }
+    .active button {
+      visibility: visible;
+    } 
+    .offscreen {
+      position: absolute;
+      left: -2000px;
+    }
+    .active .buttons {
+      padding: 5px 0;
+      background: #7E827A;
+      text-align: center;
+      z-index: 10;
+      position: relative;
+      font-size: 1em;
+    }
+    .active li {
+      position: absolute;
+      top: 130px;
+      opacity: 0;
+      transform: scale(0);
+      transition: 1s;
+    }
+    .active li.current {
+      top: 30px;
+      opacity: 1;
+      transform: scale(1);
+      transition: 1s;
+      padding-top: 20px;
+    }
