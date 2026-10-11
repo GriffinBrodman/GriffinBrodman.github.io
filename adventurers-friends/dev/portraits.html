@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Portraits</title>
+<style>body{background:#1a1720;margin:6px}canvas{image-rendering:pixelated;margin:2px;vertical-align:bottom}</style>
+</head><body>
+<script src="../data/static.js"></script><script src="../js/art.js"></script><script src="../js/paint.js"></script>
+<script>
+const S = window.LD.static;
+const classes = Object.keys(S.classes);
+const skins=["#f6d5b8","#e8b088","#c98e62","#a06a42","#6e4428","#4a2e1c","#9cc48a","#a7b4d8"];
+const hairs=["#1c1a1f","#4b2e1e","#7a4424","#c46a2c","#e0b45a","#efe2c0","#9a9aa6","#e478b4","#4f7fe0","#4caf6a"];
+const favs=["#c8323c","#e8823a","#e8c83a","#4caf50","#2f9e9e","#3c64c8","#7a4cc8","#d860a8","#2b2b33","#e8e8e8"];
+const fams=["sword","axe","mace","daggers","spear","bow","crossbow","staff","wand","lute","frying_pan"];
+const scarsets=[[],[],["eyepatch"],["scar"],[],[],["burn"],["pale"]];
+const sc = +(new URLSearchParams(location.search).get("scale") || 3);
+classes.forEach((c,i)=>{
+  const h={id:"h"+i,look:{skin:skins[(i*3)%8],hair:hairs[i%10],style:i%8,face:(i*7)%4,fav:favs[(i*3)%10],scars:scarsets[i%8]},weapon:fams[i%fams.length],weapon_tier:1+(i%5),armor_tier:1+(i%5),legend:i===5};
+  const cv=Paint.portraitGrid(h,S.classes[c]).toCanvas(sc); cv.title=c; document.body.appendChild(cv);
+  if(new URLSearchParams(location.search).get("body")){const b=Art.heroGrid(h,0,S.classes[c]).toCanvas(sc); document.body.appendChild(b);}
+});
+</script></body></html>

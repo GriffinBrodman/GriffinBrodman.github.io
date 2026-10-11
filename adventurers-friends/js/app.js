@@ -1,0 +1,306 @@
+/* Core: data access, helpers, sprites, routing. */
+(function () {
+  "use strict";
+  const LD = window.LD || {};
+  const L = LD.league;
+  const S = LD.static;
+  const heroes = {};
+  const parties = {};
+  const events = {};
+  if (L) {
+    for (const h of L.heroes) heroes[h.id] = h;
+    for (const p of L.parties) parties[p.id] = p;
+    for (const e of L.events) events[e.id] = e;
+  }
+
+  // ---------- DOM helpers ----------
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "html") n.innerHTML = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat(Infinity)) {
+      if (k == null || k === false) continue;
+      n.appendChild(typeof k === "string" || typeof k === "number" ? document.createTextNode(String(k)) : k);
+    }
+    return n;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+  const IRREGULAR = { hero: "heroes", party: "parties" };
+  function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
+  function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
+  // ---------- sprites ----------
+  const animated = new Set();
+  let frame = 0;
+  setInterval(() => {
+    frame ^= 1;
+    for (const a of animated) {
+      if (!a.canvas.isConnected) { animated.delete(a); continue; }
+      a.draw(frame);
+    }
+  }, 650);
+  function heroLook(h) { return S.classes[h.cls] || S.classes.warrior; }
+  function spriteCanvas(gridFn, scale, cls, animate) {
+    const g0 = gridFn(0);
+    const cv = el("canvas", { width: g0.w * scale, height: g0.h * scale, class: cls || "" });
+    const ctx = cv.getContext("2d");
+    const draw = (f) => {
+      const g = gridFn(f);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(g.toCanvas(scale), 0, 0);
+    };
+    draw(0);
+    if (animate) animated.add({ canvas: cv, draw });
+    return cv;
+  }
+  function heroSprite(h, scale, opts) {
+    opts = opts || {};
+    const cv = spriteCanvas((f) => Art.heroGrid(h, f, heroLook(h)), scale || 2, opts.cls, opts.animate !== false && h.alive !== false);
+    if (h.alive === false && !opts.noGray) cv.style.filter = "grayscale(0.85) brightness(0.8)";
+    cv.title = h.name;
+    return cv;
+  }
+  function heroPortrait(h, scale, opts) {
+    opts = opts || {};
+    const cv = Paint.portraitGrid(h, heroLook(h)).toCanvas(scale || 2);
+    cv.className = "portrait-px " + (opts.cls || "");
+    if (h.alive === false && !opts.noGray) cv.style.filter = "grayscale(0.85) brightness(0.75)";
+    cv.title = h.name;
+    return cv;
+  }
+  function monsterSprite(mid, scale, animate) {
+    const m = S.monsters[mid];
+    return spriteCanvas((f) => Art.monsterGrid(m, f), scale || 2, "", animate);
+  }
+  function petSprite(pet, scale) { return spriteCanvas((f) => Art.petGrid(pet, f), scale || 3, "pet", true); }
+  function bannerSprite(b, scale, cls) { return Art.bannerGrid(b).toCanvas(scale || 3); }
+  function itemSprite(id, scale) { return Art.itemGrid(id).toCanvas(scale || 2); }
+
+  // ---------- names & links ----------
+  function heroLink(id, opts) {
+    const h = heroes[id];
+    if (!h) return el("span", null, "someone");
+    return el("a", { href: `#/hero/${id}`, class: opts && opts.cls }, h.name);
+  }
+  function partyLink(id) {
+    const p = parties[id];
+    return p ? el("a", { href: `#/party/${id}` }, p.name) : el("span", null, "a party");
+  }
+  function nodeName(id, mid) {
+    if (!id) return "";
+    const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || { name: id }).name;
+    return mid && n.startsWith("The ") ? "the" + n.slice(3) : n;
+  }
+  function clsName(id) { return (S.classes[id] || { name: id }).name; }
+  // turns plain event text into nodes with hero & party names linked
+  function richText(text, heroIds, partyIds) {
+    const names = [];
+    for (const id of heroIds || []) if (heroes[id]) names.push([heroes[id].name, `#/hero/${id}`]);
+    for (const id of partyIds || []) if (parties[id]) names.push([parties[id].name, `#/party/${id}`]);
+    names.sort((a, b) => b[0].length - a[0].length);
+    let parts = [text];
+    const word = /[\p{L}\p{N}]/u;
+    for (const [nm, href] of names) {
+      if (!nm) continue;
+      const next = [];
+      for (const p of parts) {
+        if (typeof p !== "string") { next.push(p); continue; }
+        let rest = p, i;
+        while ((i = indexOfWord(rest, nm, word)) >= 0) {
+          if (i > 0) next.push(rest.slice(0, i));
+          next.push(el("a", { href }, nm));
+          rest = rest.slice(i + nm.length);
+        }
+        if (rest) next.push(rest);
+      }
+      parts = next;
+    }
+    return parts;
+  }
+  function indexOfWord(s, nm, word) {
+    let from = 0;
+    for (;;) {
+      const i = s.indexOf(nm, from);
+      if (i < 0) return -1;
+      const before = i > 0 ? s[i - 1] : "", after = s[i + nm.length] || "";
+      if (!(before && word.test(before)) && !(after && word.test(after))) return i;
+      from = i + 1;
+    }
+  }
+
+  // ---------- events ----------
+  function dayLabel(e) {
+    return `S${e.season} · Day ${e.sday}`;
+  }
+  function eventRow(e, opts) {
+    opts = opts || {};
+    const who = el("div", { class: "who" });
+    const hs = (e.heroes || []).filter((id) => heroes[id]).slice(0, opts.max || 2);
+    for (const id of hs) who.appendChild(heroPortrait(heroes[id], 1, { noGray: true }));
+    const meta = [];
+    if (!opts.noDay) meta.push(dayLabel(e));
+    if (e.loc) meta.push(nodeName(e.loc));
+    const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
+    if (owners.length) meta.push("👤 " + owners.join(", "));
+    const fightLink = e.fight && LD_has("fight", e.fight) ? el("a", { class: "watch", href: `#/fight/${e.fight}` }, " ▶ watch")
+      : e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, " ♪ hear it") : null;
+    return el("li", { class: `ev imp${e.imp}` }, who,
+      el("div", { class: "body" }, el("div", { class: "text" }, richText(e.text, e.heroes, e.parties), fightLink ? " " : "", fightLink),
+        el("div", { class: "meta" }, meta.join(" · "))));
+  }
+  const fightIds = new Set((L && L.fights_index) || []);
+  function LD_has(kind, id) { return kind !== "fight" || fightIds.has(id); }
+  function feed(list, opts) {
+    const ul = el("ul", { class: "feed" });
+    let lastDay = null;
+    for (const e of list) {
+      if (opts && opts.dayHeaders && e.day !== lastDay) {
+        ul.appendChild(el("li", { class: "daydiv" }, `Season ${e.season} · Day ${e.sday}`));
+        lastDay = e.day;
+      }
+      ul.appendChild(eventRow(e, Object.assign({ noDay: opts && opts.dayHeaders }, opts)));
+    }
+    if (!list.length) ul.appendChild(el("li", { class: "empty" }, (opts && opts.empty) || "Nothing yet."));
+    return ul;
+  }
+
+  // ---------- lazy data ----------
+  const pending = {};
+  function load(key) {
+    if (LD[key]) return Promise.resolve(LD[key]);
+    if (pending[key]) return pending[key];
+    pending[key] = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = `data/${key}.js`;
+      s.onload = () => (LD[key] ? resolve(LD[key]) : reject(new Error("missing " + key)));
+      s.onerror = () => reject(new Error("could not load " + key));
+      document.head.appendChild(s);
+    });
+    return pending[key];
+  }
+
+  // ---------- follow ("my heroes") ----------
+  function mine() {
+    try { const v = JSON.parse(localStorage.getItem("al.mine") || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch (e) { return []; }
+  }
+  function setMine(ids) { try { localStorage.setItem("al.mine", JSON.stringify(ids)); } catch (e) { /* storage unavailable */ } }
+  function toggleMine(id) {
+    const m = mine();
+    const i = m.indexOf(id);
+    if (i >= 0) m.splice(i, 1); else m.push(id);
+    setMine(m);
+    return i < 0;
+  }
+
+  // ---------- misc ui ----------
+  function toast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => (t.hidden = true), 2200);
+  }
+  function copy(text, msg) {
+    const done = () => toast(msg || "Copied!");
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => fallback());
+    else fallback();
+    function fallback() {
+      const ta = el("textarea", { style: { position: "fixed", opacity: 0 } }, text);
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { toast("Copy failed; select the text manually."); }
+      ta.remove();
+    }
+  }
+  function shareUrl(hash) {
+    const base = location.href.split("#")[0];
+    return base + hash;
+  }
+  function bar(v, max, cls) {
+    const pct = Math.max(0, Math.min(100, (v / Math.max(1, max)) * 100));
+    return el("div", { class: "bar " + (cls || "") }, el("i", { style: { width: pct + "%" } }));
+  }
+  function heroCard(h, opts) {
+    opts = opts || {};
+    const m = mine().includes(h.id);
+    const where = h.alive === false ? `Fell in season ${h.died_season || "?"}` : h.travel ? `On the road to ${nodeName(h.travel.to)}` : h.doing ? cap(h.doing) : nodeName(h.loc);
+    return el("a", { class: `hcard ${h.alive === false ? "dead" : ""} ${m ? "mine" : ""}`, href: `#/hero/${h.id}` },
+      m ? el("span", { class: "badge" }, "YOURS") : null,
+      heroPortrait(h, 2, { cls: "spr" }),
+      el("div", { class: "info" },
+        el("div", { class: "nm" }, h.name, h.epithet ? el("span", { class: "gold small" }, " " + h.epithet) : null),
+        el("div", { class: "small" }, `Lv ${h.level} ${h.title || clsName(h.cls)}`),
+        el("div", { class: "small muted" }, h.npc ? "League hero" : `${h.owner}'s hero`),
+        el("div", { class: "small dim" }, where),
+        opts.extra || null));
+  }
+
+  // ---------- router ----------
+  const routes = [];
+  function route(re, fn) { routes.push([re, fn]); }
+  function render() {
+    const hash = location.hash.replace(/^#/, "") || "/";
+    const view = document.getElementById("view");
+    if (window.Sound) { Sound.stopSong(); Sound.setPage(hash); }
+    for (const a of document.querySelectorAll("#nav a")) {
+      const target = a.getAttribute("href").slice(1);
+      a.classList.toggle("on", target === "/" ? hash === "/" : hash.startsWith(target));
+    }
+    for (const [re, fn] of routes) {
+      const m = hash.match(re);
+      if (m) {
+        view.innerHTML = "";
+        animated.clear();
+        try {
+          const out = fn(view, ...m.slice(1));
+          if (out && out.catch) out.catch((err) => { view.appendChild(el("p", { class: "red" }, "Couldn't load that page: " + err.message)); });
+        } catch (err) {
+          console.error(err);
+          view.appendChild(el("p", { class: "red" }, "Something went wrong drawing this page."));
+        }
+        window.scrollTo(0, 0);
+        return;
+      }
+    }
+    view.innerHTML = "";
+    view.appendChild(el("div", { class: "panel" }, el("h2", null, "Lost in the woods"), el("p", null, "That page doesn't exist. ", el("a", { href: "#/" }, "Back to the Crier."))));
+  }
+
+  function start() {
+    if (!L || !S) {
+      document.getElementById("view").innerHTML = "<div class='panel'><h2>No league data</h2><p>Run <code>python -m league run</code> to build the site.</p></div>";
+      return;
+    }
+    const meta = L.meta;
+    document.title = meta.name;
+    document.getElementById("brand-name").textContent = meta.name;
+    const icon = document.getElementById("brand-icon");
+    const anyHero = L.heroes.find((h) => h.alive) || L.heroes[0];
+    if (anyHero) { const g = Art.heroGrid(anyHero, 0, heroLook(anyHero)); icon.width = g.w; icon.height = g.h; icon.getContext("2d").drawImage(g.toCanvas(1), 0, 0); icon.style.width = "22px"; icon.style.height = "27px"; }
+    if (L.annals && !document.querySelector('#nav a[href="#/annals"]')) {
+      const a = document.createElement("a");
+      a.href = "#/annals"; a.textContent = "Annals"; a.className = "annals-link";
+      document.getElementById("nav").insertBefore(a, document.querySelector('#nav a[href="#/guide"]'));
+    }
+    const clock = document.getElementById("clock");
+    if (meta.phase === "preseason") clock.innerHTML = `<b>Preseason</b> · ${plural(L.pending.length, "hero")} signed up`;
+    else if (L.annals) clock.innerHTML = `<b>The age is over</b> · <a href="#/annals">read the Annals</a>`;
+    else if (meta.phase === "offseason") clock.innerHTML = `<b>Season ${meta.season} is over</b> · next season starts with the next run`;
+    else clock.innerHTML = `<b>Season ${meta.season}</b> · Day ${meta.season_day} of ${meta.season_length} · Week ${Math.ceil(meta.season_day / 7)}`;
+    document.getElementById("foot-text").textContent = `${meta.name} · run by ${meta.commissioner} · world day ${meta.day} · nothing here needs your input, just check back tomorrow.`;
+    window.addEventListener("hashchange", render);
+    render();
+  }
+
+  window.App = {
+    LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
+    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, bar, heroCard, route, start, heroLook, spriteCanvas,
+    animated,
+  };
+})();
