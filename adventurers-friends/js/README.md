@@ -6,6 +6,7 @@
 | `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines) and hero bust portraits |
 | `beasts.js` | Shaded monster sprites for the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) |
 | `scenes.js` | Daylight backdrops by biome and story vignettes |
+| `tavern.js` | The preseason tavern on the Crier: an isometric pixel room where signed-up heroes walk, chat (lines from `league.voice.tavern_chatter`), order drinks and fuss over pets |
 | `isle.js` | World map: terraced island in oblique view with cliffs, river and falls, towns, dungeons, labels, heroes |
 | `app.js` | Data access, DOM helpers, sprite helpers, event feed, router, "my hero" pinning |
 | `views.js` | Pages: Crier, roster, hero, parties, party, map, digest, world, history, guide, finale, songs |

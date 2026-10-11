@@ -60,6 +60,9 @@
         el("button", { class: "btn small", onclick: () => { for (const h of yours) A.toggleMine(h.id); rerender(); } }, "Switch hero"))));
       else v.appendChild(skippedPick() ? panel(null, notListed()) : pickPanel());
       v.appendChild(pendingPanel());
+      if (L.pending.length && window.Tavern) v.appendChild(panel(L.tavern ? `Meanwhile, at ${L.tavern.name}` : "Meanwhile, at the tavern",
+        el("p", { class: "small muted" }, "Everyone who's signed up, the night before the league opens. Tap someone to hear what they have to say."),
+        Tavern.scene(L, S, A)));
       return;
     }
 

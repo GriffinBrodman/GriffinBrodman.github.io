@@ -398,3 +398,15 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .quiz-only .clock { display: none; }
 .letter { margin: 8px 0; padding: 10px 14px; background: #fbf3dc; border: 1px solid var(--edge2); border-left: 4px solid var(--brass); font-style: italic; box-shadow: 2px 2px 0 rgba(90, 60, 30, 0.2); }
 .letter .tiny { font-style: normal; }
+
+/* the preseason tavern */
+.tavern { position: relative; border: 3px solid var(--brass0); border-radius: 4px; overflow: hidden; background: #1a120c; }
+.tavern canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; cursor: pointer; }
+.tavern-talk { position: absolute; inset: 0; pointer-events: none; }
+.tavern-bubble { position: absolute; transform: translate(-50%, -100%); max-width: 46%; padding: 4px 8px; background: var(--parch); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 6px; font-size: 14px; line-height: 1.25; box-shadow: 0 2px 0 rgba(0,0,0,.35); animation: bubble-in .18s ease-out; }
+.tavern-bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--ink); border-bottom: 0; }
+.tavern-bubble b { color: var(--brass0); }
+.tavern-bubble.keeper { background: #e8d6ae; }
+@keyframes bubble-in { from { opacity: 0; transform: translate(-50%, -80%); } to { opacity: 1; transform: translate(-50%, -100%); } }
+@media (max-width: 600px) { .tavern-bubble { font-size: 11px; max-width: 60%; } }
