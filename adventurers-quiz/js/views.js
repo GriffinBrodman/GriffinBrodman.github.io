@@ -77,7 +77,7 @@
     if (lead) {
       const scene = Scenes.vignette(lead, 240, 72);
       scene.className = "scene";
-      const hl = headline(lead);
+      const hl = (L.llm_lead || {})[lead.id] || headline(lead);
       parch.appendChild(el("div", { class: "lead" },
         lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
         el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
@@ -879,6 +879,7 @@
       el("div", { class: "finale-kicker" }, `The Season ${s.season} Ceremony`),
       el("h1", null, s.theme),
       el("p", null, `${plural((s.end_day - (s.start_day || s.end_day - 27)) + 1, "day")} · ${num.events || "?"} stories · ${num.deaths || 0} fallen · ${num.bosses || 0} bosses slain`)));
+    if (s.recap) v.appendChild(panel("The season, as the Crier tells it", ...s.recap.split(/\n\s*\n/).map((t) => el("p", { class: "epilogue" }, t))));
 
     const spot = el("div", { class: "grid2 even finale-spot" });
     if (champ) spot.appendChild(el("section", { class: "panel laurel" },
@@ -1275,6 +1276,7 @@
     if (!an) { v.appendChild(panel("The Annals", el("p", { class: "empty" }, `The age isn't over yet. The books close after season ${(S.config && S.config.league_seasons) || 3}.`))); return; }
     v.appendChild(el("section", { class: "finale-hero" }, el("div", { class: "finale-kicker" }, "The end of an age"), el("h1", null, "The Annals of the League"),
       el("p", null, `${plural(an.seasons, "season")} · ${plural(an.days, "day")} · ${an.fallen.length} fallen · ${plural(an.artifacts.length, "artifact")} still in the world`)));
+    if (an.story) v.appendChild(panel("The story of the age", ...an.story.split(/\n\s*\n/).map((t) => el("p", { class: "epilogue" }, t))));
     const top = an.legends[0] && heroes[an.legends[0].hero];
     if (top) v.appendChild(el("section", { class: "panel laurel" }, el("div", { class: "finale-kicker" }, "Greatest of the age"),
       el("a", { href: `#/hero/${top.id}`, class: "laurel-frame" }, Art.laurelGrid().toCanvas(5), A.heroPortrait(top, 5, { cls: "champ" })), el("h2", { class: "champ-name" }, top.name),

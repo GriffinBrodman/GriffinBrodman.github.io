@@ -26,6 +26,11 @@
   A.route(/^\/join$/, (v) => {
     const ans = (load() || []).slice(0, Q.length);
     while (ans.length < Q.length) ans.push(null);
+    // the hidden hero-name slot mirrors the player's name, so the code format never changes
+    const NAME = Q.findIndex((q) => q.id === "name"), OWNER = Q.findIndex((q) => q.id === "owner");
+    ans[NAME] = ans[OWNER];
+    const shown = Q.length - Q.filter((q) => q.hidden).length;
+    let num = 0;
     v.appendChild(el("h1", null, "Join the League"));
     v.appendChild(el("p", { class: "muted" }, `Answer honestly (or don't). Your answers decide what your hero looks like, how they fight, what they're like, and what they might become. `,
       `You won't control them; you'll just get to watch. New heroes join at the start of the next season.`));
@@ -38,10 +43,11 @@
     v.appendChild(out);
 
     Q.forEach((q, i) => {
-      const box = el("section", { class: "panel q" }, el("h3", null, `${i + 1}. ${q.q}`));
+      if (q.hidden) { form.appendChild(el("div", { hidden: true })); return; }
+      const box = el("section", { class: "panel q" }, el("h3", null, `${++num}. ${q.q}`));
       if (q.kind === "text") {
-        const inp = el("input", { type: "text", maxlength: q.max, value: ans[i] || "", placeholder: q.id === "name" ? "e.g. Brix Ironbelly" : "Your name" });
-        inp.addEventListener("input", () => { ans[i] = inp.value.trim() || null; changed(); });
+        const inp = el("input", { type: "text", maxlength: q.max, value: ans[i] || "", placeholder: "Your name" });
+        inp.addEventListener("input", () => { ans[i] = inp.value.trim() || null; if (i === OWNER) ans[NAME] = ans[i]; changed(); });
         box.appendChild(inp);
       } else if (q.kind === "swatch") {
         const row = el("div", { class: "choices" });
@@ -66,7 +72,7 @@
     form.appendChild(el("div", { class: "row wrap" }, done, el("button", { class: "btn", onclick: () => { save([]); location.reload(); } }, "Start over")));
     done.onclick = () => {
       const missing = Q.findIndex((q, i) => ans[i] == null || ans[i] === "");
-      if (missing >= 0) { A.toast(`Question ${missing + 1} still needs an answer`); form.children[missing].scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      if (missing >= 0) { A.toast(`Question ${Q.slice(0, missing + 1).filter((q) => !q.hidden).length} still needs an answer`); form.children[missing].scrollIntoView({ behavior: "smooth", block: "center" }); return; }
       const code = encode(ans);
       out.innerHTML = "";
       out.appendChild(el("section", { class: "panel follow" }, el("h2", null, `${ans[0]} is ready`),
@@ -89,8 +95,8 @@
       cv.className = "main";
       prev.appendChild(el("div", { style: { position: "relative", display: "inline-block" } }, cv));
       prev.appendChild(el("p", { class: "small muted" }, "Who they become depends on your answers. You'll find out when they join."));
-      const answered = ans.filter((x) => x != null && x !== "").length;
-      prev.appendChild(el("div", { class: "small muted" }, `${answered} / ${Q.length} answered`, A.bar(answered, Q.length, "gold")));
+      const answered = ans.filter((x, i) => !Q[i].hidden && x != null && x !== "").length;
+      prev.appendChild(el("div", { class: "small muted" }, `${answered} / ${shown} answered`, A.bar(answered, shown, "gold")));
     }
     drawPreview();
   });
