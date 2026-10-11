@@ -289,7 +289,7 @@
 
   // ================= ROSTER =================
   A.route(/^\/roster(?:\/(\w+))?$/, (v, tab) => {
-    tab = tab || "active";
+    tab = tab || (!L.heroes.length && L.pending.length ? "pending" : "active");
     v.appendChild(el("h1", null, "The Roster"));
     const tabs = el("div", { class: "tabs" });
     const counts = { active: L.heroes.filter((h) => h.alive).length, pending: L.pending.length, fallen: L.heroes.filter((h) => !h.alive).length, mine: A.mine().length };
