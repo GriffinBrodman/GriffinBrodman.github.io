@@ -40,7 +40,7 @@
       el("p", null, `${plural(L.annals.seasons, "season")}, ${plural(L.annals.days, "day")}. The legends, the champions, the fallen and the grudges are written down.`),
       el("a", { class: "btn primary", href: "#/annals" }, "📜 Read the Annals of the Age")));
     if (mineFirst.length && meta.phase !== "preseason") v.appendChild(followPanel(mineFirst, lastDay()));
-    const picker = !mineFirst.length && !skippedPick() && meta.phase !== "preseason" ? pickPanel() : null;
+    const picker = !mineFirst.length && !skippedPick() && L.heroes.length ? pickPanel() : null;
     v.appendChild(parch);
     if ((L.card || []).length && meta.phase === "season") v.appendChild(panel("On the card", el("p", { class: "small dim" }, "What to watch for next."),
       el("ul", { class: "diary card-list" }, L.card.map((c) => el("li", null, A.richText(c.text, c.heroes, c.parties))))));
@@ -53,8 +53,12 @@
     if (meta.phase === "preseason" || !L.heroes.length) {
       parch.appendChild(el("div", { class: "lead" },
         el("h1", null, "The league opens soon"),
-        el("p", null, `Heroes are signing up. When ${meta.commissioner} runs the first day, every hero below will wake up in a random town and start living their life. You don't control them; you just check in.`),
-        el("p", null, el("a", { class: "btn primary", href: "#/join" }, "Make your hero →"))));
+        el("p", null, `Heroes are signing up. When ${meta.commissioner} runs the first day, every hero below will wake up in a random town and start living their life. You don't control them; you just check in.`)));
+      const yours = A.mine().map((id) => L.pending.find((h) => h.id === id)).filter(Boolean);
+      if (yours.length) v.appendChild(el("section", { class: "panel follow" }, el("div", { class: "row wrap between" },
+        el("b", null, `You're ${yours.map((h) => h.name).join(" and ")}. `, el("span", { class: "small muted" }, "They'll be waiting here every time you check in, from day 1.")),
+        el("button", { class: "btn small", onclick: () => { for (const h of yours) A.toggleMine(h.id); rerender(); } }, "Switch hero"))));
+      else v.appendChild(skippedPick() ? panel(null, notListed()) : pickPanel());
       v.appendChild(pendingPanel());
       return;
     }
@@ -203,17 +207,23 @@
 
   const rerender = () => window.dispatchEvent(new HashChangeEvent("hashchange"));
   function skippedPick() { try { return localStorage.getItem("al.nopick") === "1"; } catch (e) { return false; } }
+  function notListed() {
+    const url = L.meta.quiz_url;
+    return el("p", { class: "small muted", style: { marginTop: "8px" } }, "Not listed? ",
+      url ? [el("a", { href: url, target: "_blank", rel: "noopener" }, "Take the quiz"), ` and send ${L.meta.commissioner} the code it gives you.`]
+        : `Ask ${L.meta.commissioner} for the quiz.`);
+  }
   function pickPanel() {
-    const pool = L.heroes.filter((h) => h.alive && !h.npc)
+    const pool = (L.heroes.length ? L.heroes.filter((h) => h.alive && !h.npc) : L.pending.filter((h) => !h.npc).map((h) => Object.assign({}, h, { weapon_tier: 1, armor_tier: 1, alive: true })))
       .sort((a, b) => String(a.owner).localeCompare(String(b.owner)));
-    if (!pool.length) return el("span");
+    if (!pool.length) return panel("Which one is you?", notListed());
     const grid = el("div", { class: "pick-grid" });
     for (const h of pool) grid.appendChild(el("button", { class: "pick", title: `Pin ${h.name} to your Crier`, onclick: () => { A.toggleMine(h.id); A.toast(`${h.name} is yours. They'll be waiting here every time you check in.`); rerender(); } },
-      A.heroPortrait(h, 1), el("b", null, h.name), el("span", { class: "tiny dim" }, h.owner || "")));
+      A.heroPortrait(h, 1), el("b", null, h.name), String(h.owner || "").startsWith(h.name) ? null : el("span", { class: "tiny dim" }, h.owner)));
     return el("section", { class: "panel follow pick-panel tight" },
-      el("div", { class: "row between pick-head" }, el("b", null, "Which hero is yours? ", el("span", { class: "small muted" }, "Tap to pin them here.")),
+      el("div", { class: "row between pick-head" }, el("b", null, "Which one is you? ", el("span", { class: "small muted" }, "Tap to pin them here.")),
         el("button", { class: "btn small", onclick: () => { try { localStorage.setItem("al.nopick", "1"); } catch (e) { /* storage unavailable */ } rerender(); } }, "Just browsing")),
-      grid);
+      grid, notListed());
   }
   function followPanel(list, today) {
     const p = el("section", { class: "panel follow" }, el("div", { class: "row wrap between" },
@@ -275,7 +285,7 @@
   }
   function pendingPanel(compact) {
     const box = panel(compact ? "Joining next season" : "Signed up so far");
-    if (!L.pending.length) box.appendChild(el("p", { class: "empty" }, "Nobody yet. ", el("a", { href: "#/join" }, "Be the first.")));
+    if (!L.pending.length) box.appendChild(el("p", { class: "empty" }, "Nobody yet."));
     const wrap = el("div", { class: compact ? "chip-heroes" : "cols" });
     for (const h of L.pending) {
       const hs = Object.assign({}, h, { weapon_tier: 1, armor_tier: 1, alive: true });
@@ -289,7 +299,7 @@
 
   // ================= ROSTER =================
   A.route(/^\/roster(?:\/(\w+))?$/, (v, tab) => {
-    tab = tab || "active";
+    tab = tab || (!L.heroes.length && L.pending.length ? "pending" : "active");
     v.appendChild(el("h1", null, "The Roster"));
     const tabs = el("div", { class: "tabs" });
     const counts = { active: L.heroes.filter((h) => h.alive).length, pending: L.pending.length, fallen: L.heroes.filter((h) => !h.alive).length, mine: A.mine().length };

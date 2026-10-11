@@ -184,7 +184,7 @@
     const mats = {
       skin: ramp(skinHex), hair: ramp(look.hair), fav: ramp(look.fav), favd: ramp(mix(look.fav, "#1a1622", 0.45)), metal: ramp(metal), dmetal: ramp("#4a4656"),
       leather: ramp("#7a5034"), dleather: ramp("#4e3424"), fur: ramp("#a88a64"), cream: ramp("#e4dac4"), gold: ramp("#d8a838"),
-      wood: ramp("#7a5232"), bone: ramp("#d8d0bc"), cloth: ramp(mix(look.fav, "#3a3440", 0.55)), lip: ramp(mix(skinHex, "#a0403a", 0.35)), stub: ramp(mix(skinHex, look.hair, 0.45)),
+      wood: ramp("#7a5232"), bone: ramp("#d8d0bc"), cloth: ramp(mix(look.fav, "#3a3440", 0.55)), lip: ramp(mix(skinHex, "#a0403a", 0.35)), stub: ramp(mix(skinHex, mix(look.hair, "#2a1c14", 0.4), 0.5)),
       leaf: ramp("#5a9a3a"), ice: ramp("#9ad8f0"), flame: ramp("#f08a2a"), horn: ramp("#d8ccb0"), antler: ramp("#8a6a48"), feather: ramp("#ece6d6"),
       wmetal: ramp(METAL[Math.max(1, Math.min(5, h.weapon_tier || 1))]), boot: ramp("#5a3a26"), pants: ramp("#4e4250"),
     };
@@ -366,6 +366,8 @@
       if (!c.covered || c.head === "helm" || c.head === "bandana" || c.head === "feather_cap") for (const x of [11, 12, 15, 16]) P.px(x, 8, "hair", -0.6);
       P.px(14, 12, "skin", -0.6);
       if (c.look.face !== 2) { P.px(13, 13, "lip", -0.6); P.px(14, 13, "lip", -0.75); }
+      // the scaled head skips 1px detail, so stubble is drawn here at sprite size: a shadow along the jaw
+      if (c.look.face === 1) for (const [x, y, s] of [[12, 13, 0], [15, 13, -0.3], [12, 14, -0.1], [13, 14, 0], [14, 14, -0.2], [15, 14, -0.35]]) P.px(x, y, "stub", s);
     } else { P.px(12, 10, c.glint || "#e6dccf"); P.px(15, 10, c.glint || "#e6dccf"); }
     P.layer = 8;
     heldWeapon(P, o.weapon, o.weaponTier || 1);
