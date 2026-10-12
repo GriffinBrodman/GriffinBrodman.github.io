@@ -410,3 +410,12 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .tavern-bubble.keeper { background: #e8d6ae; }
 @keyframes bubble-in { from { opacity: 0; transform: translate(-50%, -80%); } to { opacity: 1; transform: translate(-50%, -100%); } }
 @media (max-width: 600px) { .tavern-bubble { font-size: 11px; max-width: 60%; } }
+
+/* ===== tonight: the hero-page scene (camp.js) ===== */
+.night { max-width: 600px; margin: 0 auto; }
+.night .tavern { max-width: 600px; }
+.night-cap { margin-top: 8px; font-size: 15px; }
+.tavern-bubble.focus { border-color: var(--brass0); box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 0 0 2px var(--brass2); }
+.tavern-bubble.pet { background: #f6efdc; font-style: italic; font-size: 13px; padding: 2px 6px; }
+.tavern-bubble.pet b { color: var(--muted); }
+@media (max-width: 600px) { .night-cap { font-size: 13px; } .tavern-bubble.pet { font-size: 10px; } }

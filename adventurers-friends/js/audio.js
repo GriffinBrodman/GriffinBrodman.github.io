@@ -6,7 +6,7 @@
   const prefs = (() => { try { return Object.assign({ on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return { on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }; } })();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* storage unavailable */ } };
 
-  let ctx = null, master, bus = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false;
+  let ctx = null, master, bus = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
@@ -148,9 +148,77 @@
     }
     src.connect(f); f.connect(g); g.connect(bus.amb); src.start(); ambNodes.push(src);
   }
+  // ---------- scene ambience: the hero page's "tonight" scene, while it is on screen ----------
+  function crackle(t, vol) {
+    const n = 1 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.012 + Math.random() * 0.03, vol * (0.4 + Math.random()), "bandpass", 1800 + Math.random() * 3200, bus.amb, 1.5);
+  }
+  function cricket(t, vol) {
+    const f = 4200 + Math.random() * 900;
+    for (let k = 0; k < 3; k++) {
+      const o = ctx.createOscillator(), g = ctx.createGain(), at = t + k * 0.075;
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.05);
+      o.connect(g); g.connect(bus.amb); o.start(at); o.stop(at + 0.06);
+    }
+  }
+  function owl(t) {
+    for (const [dt, len] of [[0, 0.35], [0.5, 0.18], [0.75, 0.5]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain(), at = t + dt;
+      o.frequency.setValueAtTime(410, at); o.frequency.linearRampToValueAtTime(370, at + len);
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.05); g.gain.linearRampToValueAtTime(0.0001, at + len);
+      o.connect(g); g.connect(bus.amb); o.start(at); o.stop(at + len + 0.05);
+    }
+  }
+  function plink(t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), f0 = 900 + Math.random() * 900;
+    o.frequency.setValueAtTime(f0 * 1.8, t); o.frequency.exponentialRampToValueAtTime(f0, t + 0.06);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.25);
+    const d = ctx.createDelay(), fb = ctx.createGain();
+    d.delayTime.value = 0.19; fb.gain.value = 0.35;
+    o.connect(g); g.connect(bus.amb); g.connect(d); d.connect(fb); fb.connect(d); d.connect(bus.amb);
+    o.start(t); o.stop(t + 0.3);
+  }
+  function snort(t) { noise(t, 0.35, 0.12, "bandpass", 500 + Math.random() * 300, bus.amb, 2); noise(t + 0.08, 0.2, 0.06, "lowpass", 300, bus.amb); }
+  function footstep(t, vol) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 70; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.14); noise(t, 0.05, vol * 0.5, "lowpass", 900, bus.amb); }
+  const SCENES = {
+    camp: { beds: [["lowpass", 260, 0.1, 0.3], ["bandpass", 1400, 0.012, 0.05]], tick: 260, step(t, n) {
+      crackle(t, 0.12); if (Math.random() < 0.18) noise(t, 0.4, 0.04, "lowpass", 500, bus.amb);
+      if (n % 3 === 0 && Math.random() < 0.7) cricket(t + Math.random() * 0.2, 0.012);
+      if (Math.random() < 0.006) owl(t); } },
+    inn: { beds: [["bandpass", 520, 0.1, 0.4], ["bandpass", 900, 0.05, 0.23], ["lowpass", 240, 0.05, 0.3]], tick: 420, step(t, n, root) {
+      if (Math.random() < 0.5) crackle(t, 0.05);
+      if (Math.random() < 0.09) { bell(95 + Math.floor(Math.random() * 6), t, 0.03, bus.amb); if (Math.random() < 0.5) bell(98 + Math.floor(Math.random() * 4), t + 0.07, 0.02, bus.amb); }
+      if (n % 2 === 0 && Math.random() < 0.55) pluck(root + PENTA[Math.floor(Math.random() * 5)] + (Math.random() < 0.3 ? 12 : 0), t + Math.random() * 0.2, 0.16, bus.amb);
+      if (Math.random() < 0.02) noise(t, 0.5, 0.05, "bandpass", 700, bus.amb, 0.8); } },
+    room: { beds: [["lowpass", 200, 0.06, 0.2]], tick: 380, step(t, n, root) {
+      if (Math.random() < 0.55) crackle(t, 0.05);
+      if (n % 9 === 0 && Math.random() < 0.6) { const d = ctx.createBiquadFilter(); d.type = "lowpass"; d.frequency.value = 600; d.connect(bus.amb); pluck(root + PENTA[Math.floor(Math.random() * 5)], t, 0.14, d); }
+      if (n % 4 === 0 && Math.random() < 0.4) cricket(t, 0.005); } },
+    stable: { beds: [["lowpass", 300, 0.05, 0.15]], tick: 400, step(t, n) {
+      if (n % 3 === 0 && Math.random() < 0.7) cricket(t + Math.random() * 0.2, 0.01);
+      if (Math.random() < 0.03) snort(t);
+      if (Math.random() < 0.05) noise(t, 0.25, 0.04, "highpass", 2500, bus.amb); } },
+    dungeon: { beds: [["bandpass", 140, 0.16, 0.06], ["lowpass", 90, 0.12, 0.03]], tick: 450, step(t) {
+      if (Math.random() < 0.35) crackle(t, 0.04);
+      if (Math.random() < 0.16) plink(t, 0.06);
+      if (Math.random() < 0.03) noise(t, 1.6, 0.06, "lowpass", 120, bus.amb); } },
+    cell: { beds: [["bandpass", 160, 0.1, 0.05]], tick: 500, step(t) {
+      if (Math.random() < 0.12) plink(t, 0.06);
+      if (Math.random() < 0.025) { for (let k = 0; k < 4; k++) footstep(t + k * 0.55, 0.08 - k * 0.012); }
+      if (Math.random() < 0.015) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(3000, t); o.frequency.linearRampToValueAtTime(3600, t + 0.06); g.gain.setValueAtTime(0.015, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.08); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.1); } } },
+  };
+  function sceneAmbience(kind) {
+    const sc = SCENES[kind], root = 50 + Math.floor(Math.random() * 5);
+    for (const [type, f, vol, lfo] of sc.beds) bed(type, f, vol, lfo);
+    let n = 0;
+    ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root), sc.tick);
+  }
+
   function ambience(kind) {
     stopAmb();
     if (!ctx || !prefs.on) return;
+    if (SCENES[kind]) { sceneAmbience(kind); return; }
     const root = 50 + Math.floor(Math.random() * 5);
     if (kind === "map") {
       bed("bandpass", 500, 0.22, 0.07);
@@ -182,9 +250,22 @@
   }
   function setPage(route) {
     const kind = /^\/fight\//.test(route) ? "fight" : /^\/map/.test(route) ? "map" : /^\/finale/.test(route) ? "finale" : "town";
-    if (kind === page && ambTimer) return;
+    const was = scenery;
+    scenery = null;
+    if (kind === page && ambTimer && !was) return;
     page = kind;
     if (started) { sfx("page"); ambience(kind); }
+  }
+  // a scene on the page asks for its own ambience while visible, and hands back the page's when it leaves the screen
+  // owner is the scene's element, so a scene leaving the page can't silence the one that replaced it
+  let sceneOwner = null;
+  function scene(kind, owner) {
+    const next = kind && SCENES[kind] ? kind : null;
+    if (!next && owner && owner !== sceneOwner) return;
+    if (next) sceneOwner = owner || null;
+    if (next === scenery) return;
+    scenery = next;
+    if (started) ambience(scenery || page);
   }
 
   // ---------- the bard ----------
@@ -263,7 +344,7 @@
     tog.className = "btn small";
     const togTxt = () => (tog.textContent = prefs.on ? "Mute" : "Unmute");
     togTxt();
-    tog.onclick = () => { prefs.on = !prefs.on; save(); levels(); icon(); togTxt(); if (prefs.on) { start(); ambience(page); } else stopAmb(); };
+    tog.onclick = () => { prefs.on = !prefs.on; save(); levels(); icon(); togTxt(); if (prefs.on) { start(); ambience(scenery || page); } else stopAmb(); };
     panel.append(tog, row("Volume", "master"), row("Ambience", "amb"), row("Music", "music"), row("Effects", "sfx"));
     btn.onclick = (e) => { e.stopPropagation(); panel.hidden = !panel.hidden; start(); };
     document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== btn) panel.hidden = true; });
@@ -276,7 +357,7 @@
     if (!init()) return;
     if (ctx.state === "suspended") ctx.resume();
     started = true;
-    ambience(page || "town");
+    ambience(scenery || page || "town");
   }
   document.addEventListener("pointerdown", (e) => {
     start();
@@ -285,5 +366,5 @@
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
 
-  window.Sound = { sfx, setPage, playSong, stopSong, syllables, get on() { return prefs.on; } };
+  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, get on() { return prefs.on; } };
 })();

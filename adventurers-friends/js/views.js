@@ -358,6 +358,8 @@
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
+    const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
+    if (night) v.appendChild(panel(null, night));
 
     const tabs = el("div", { class: "tabs" });
     const body = el("div");
@@ -697,6 +699,7 @@
     const bodies = (L.remains || {})[id] || [];
     if (bodies.length) p.appendChild(el("p", { class: "small red" }, "Unburied here: ", bodies.map((r, i) => [i ? ", " : "", A.heroLink(r.hero)])));
     side.appendChild(p);
+    if (t) side.appendChild(boardPanel(id));
     if (t) side.appendChild(townLedger(id));
     if (t) side.appendChild(civicPanel(id));
     const who = panel(here.length ? `Here now (${here.length})` : "Nobody here right now");
@@ -1113,6 +1116,37 @@
   const repTier = (v, town) => REP_TIERS.find(([f]) => v >= f)[1](A.nodeName(town));
   const folkWord = (v) => (v >= 60 ? "old friend" : v >= 30 ? "friendly" : v <= -60 ? "sworn enemy" : v <= -30 ? "can't stand them" : null);
   const GUARDS = ["no guards to speak of", "a night watch", "a proper garrison", "walls and a garrison"];
+
+  const JOB = { escort: ["📦", "Escort"], bounty: ["🎯", "Wanted"], clear: ["🗡", "Clear-out"], retrieve: ["🔦", "Retrieval"], defend: ["🛡", "Defend the town"] };
+  function boardPanel(id) {
+    const p = panel("Notice board");
+    const day = L.meta.day;
+    const jobs = ((L.boards || {})[id] || []).filter((c) => c.kind !== "shady");
+    const shady = ((L.boards || {})[id] || []).some((c) => c.kind === "shady");
+    const line = (c) => {
+      const to = A.nodeName(c.dest, true);
+      const left = Math.max(0, c.expires - day);
+      const what = {
+        escort: `Guard ${c.cargo} to ${to}`,
+        bounty: `${c.name}, ${c.what}, last seen in ${to}`,
+        clear: `Clear ${c.need} ${c.mon ? (S.monsters[c.mon] || {}).name || "beasts" : "beasts"} out of ${to} by day ${c.deadline}`,
+        retrieve: `Fetch ${c.item} from floor ${c.floor} of ${to}`,
+        defend: `Raiders expected on day ${c.night}. Hold the walls`,
+      }[c.kind] || "Work going";
+      const [icon, label] = JOB[c.kind] || ["📜", "Job"];
+      return el("li", null, el("b", null, `${icon} ${label}: `), what, el("span", { class: "dim small" }, ` · ${c.pay} silver${c.kind === "bounty" ? "" : " each"} · ${left ? `${left} day${left > 1 ? "s" : ""} left` : "last day"}`));
+    };
+    if (jobs.length) p.appendChild(el("ul", { class: "board" }, jobs.map(line)));
+    else p.appendChild(el("p", { class: "empty" }, "The board is bare today. Someone has drawn a rude goblin on it."));
+    const wanted = (L.wanted || []).filter((b) => b.town === id);
+    for (const b of wanted) {
+      const hunters = b.takers.map((t) => heroes[t] ? A.heroLink(t) : parties[t] ? A.partyLink(t) : null).filter(Boolean);
+      p.appendChild(el("p", { class: "small" }, el("b", null, "WANTED: "), `${b.name}. ${b.pay} silver, until day ${b.until}. `,
+        hunters.length ? ["Hunting it: ", hunters.map((x, i) => [i ? ", " : "", x])] : "Nobody has taken the job yet."));
+    }
+    if (shady) p.appendChild(el("p", { class: "small dim" }, "Someone in the back of the tavern is hiring for work that isn't on the board."));
+    return p;
+  }
 
   function townLedger(id) {
     const ts = (L.town_state || {})[id] || { guards: 0, raids: 0, repelled: 0, looted: 0, history: [] };
