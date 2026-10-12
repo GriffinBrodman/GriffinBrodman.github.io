@@ -445,7 +445,7 @@
     tp.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } },
       h.fears.length ? `Afraid of ${h.fears.join(" and ")}. ` : "Afraid of nothing (allegedly). ",
       `Orders ${h.food === "milk" ? "a glass of milk" : h.food === "ale" ? "a big ale" : h.food === "wine" ? "red wine" : h.food === "mystery stew" ? "the mystery stew" : "whatever's cheapest"}.`,
-      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : ""));
+      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
     left.appendChild(tp);
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
