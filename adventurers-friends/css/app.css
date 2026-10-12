@@ -176,7 +176,7 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 @media (max-width: 600px) { .hero-head .portrait canvas.main { width: 160px; height: 160px; } .hero-head .portrait canvas.full { width: 56px; height: 68px; } }
 .statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
 .statgrid div { background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 6px 2px; }
-.statgrid b { display: block; font-family: var(--px); font-size: 22px; color: var(--ink); }
+.statgrid b { display: block; font-family: var(--body); font-weight: 700; font-size: 26px; line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; color: var(--ink); }
 .statgrid span { font-size: 13px; color: var(--muted); text-transform: uppercase; }
 .trait { display: grid; grid-template-columns: 120px 1fr 110px; gap: 8px; align-items: center; margin: 3px 0; }
 .trait .tbar { position: relative; height: 10px; background: linear-gradient(90deg, #c08a6a, #dcc89c 50%, #9ab07a); border-radius: 2px; border: 1px solid var(--edge2); }
