@@ -485,7 +485,7 @@
     const over = document.createElement("canvas");
     over.width = W; over.height = H;
     const ctx = over.getContext("2d");
-    const actors = A ? ambient(info, place, seed, true) : [];
+    const actors = A ? ambient(info, place, seed, true, true) : [];
     const sprite = (a, b, x, y, i) => {
       if (A) actors.push(A.flip({ a: a.toCanvas(1), b: b.toCanvas(1), x, y, z: 5e3, rate: 0.8, seed: i * 3 + 1, front: true }));
       else ctx.drawImage(a.toCanvas(1), x, y);
