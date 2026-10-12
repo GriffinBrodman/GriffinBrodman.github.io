@@ -847,7 +847,7 @@
       ["Other traits", "Greed, sociability, honour, curiosity, temper and loyalty. They shape choices (skimming loot, picking fights, staying with a party). Big events can shift them, and the Crier will notice."],
       ["Titles", "A hero's class name is their title, from Warrior to Lich. Evolved classes are earned by how a hero actually fights. Faction members also carry a rank (Squire, Knight, Paladin...), shown under their name."],
       ["Stress", "Builds up from danger and bad days. A night at the tavern or a quiet rest brings it down. Stressed heroes argue more."],
-      ["Classes", "Everyone starts as a Warrior, Ranger or Mage. At levels 9 and 18 a hero evolves into a new class shaped by what sets them apart (heal a lot and you lean holy, loot corpses and you lean dark). Crowded classes are harder to get into. Level 25 makes a Legend."],
+      ["Classes", "Everyone starts as a Warrior, Ranger or Mage. At levels 9 and 18 a hero evolves into a new class shaped by what sets them apart (heal a lot and you lean holy, loot corpses and you lean dark). Crowded classes are harder to get into. The first few heroes to reach level 21 become Legends; once those places are taken, the age has its Legends."],
       ["Scars", "Bad fights leave marks: a lost eye, a hook for a hand, burn scars. They change stats and appearance for good."],
       ["Death", "Heroes can die. The fallen get a funeral (if anyone pays for it) and a spot on the History page. Their bodies may be sold to a necromancer first."],
     ]],
