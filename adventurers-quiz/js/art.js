@@ -168,6 +168,13 @@
       g.set(9, 2, c[2]); g.set(11, 2, c[2]); g.set(9, 4, "#5ac85a"); g.set(11, 4, "#5ac85a");
       g.rect(4, 8, 1, 1, c[1]); g.rect(8, 8, 1, 1, c[1]);
       g.set(2, 5 - oy, c[2]); g.set(1, 4 - oy, c[2]); g.set(1, 3 - oy, c[3]);
+    } else if (kind === "horse") {
+      const c = ramp(["#8a5a3a", "#3a2a22", "#d8c8a8", "#a8a8b0", "#c8803a"][Math.floor(r() * 5)]);
+      const mane = c[2];
+      g.blob(6, 4.5 + oy, 4, 2, c); g.rect(9, 1 + oy, 2, 4, c[1]); g.blob(11.5, 1.5 + oy, 1.8, 1.2, c);
+      g.set(12, 1 + oy, "#1a1220"); g.set(10, 0 + oy, c[1]);
+      g.rect(9, 1 + oy, 1, 3, mane); g.set(1, 4 + oy, mane); g.set(1, 5 + oy, mane); g.set(2, 4 + oy, mane);
+      g.rect(3, 6 + oy, 1, 4 - oy, c[1]); g.rect(5, 6 + oy, 1, 4 - oy, c[2]); g.rect(8, 6 + oy, 1, 4 - oy, c[1]); g.rect(9, 6 + oy, 1, 4 - oy, c[2]);
     } else {
       const c = ramp(["#5ab04a", "#e8823a", "#4a8ac8"][Math.floor(r() * 3)]);
       g.blob(6, 6, 4, 1.5, c); g.blob(11, 5.5, 1.8, 1.4, c); g.set(12, 5, "#1a1220");

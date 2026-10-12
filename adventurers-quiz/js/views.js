@@ -60,6 +60,9 @@
         el("button", { class: "btn small", onclick: () => { for (const h of yours) A.toggleMine(h.id); rerender(); } }, "Switch hero"))));
       else v.appendChild(skippedPick() ? panel(null, notListed()) : pickPanel());
       v.appendChild(pendingPanel());
+      if (L.pending.length && window.Tavern) v.appendChild(panel(L.tavern ? `Meanwhile, at ${L.tavern.name}` : "Meanwhile, at the tavern",
+        el("p", { class: "small muted" }, "Everyone who's signed up, the night before the league opens. Tap someone to hear what they have to say."),
+        Tavern.scene(L, S, A)));
       return;
     }
 
@@ -355,6 +358,8 @@
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
+    const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
+    if (night) v.appendChild(panel(null, night));
 
     const tabs = el("div", { class: "tabs" });
     const body = el("div");
@@ -440,7 +445,7 @@
     tp.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } },
       h.fears.length ? `Afraid of ${h.fears.join(" and ")}. ` : "Afraid of nothing (allegedly). ",
       `Orders ${h.food === "milk" ? "a glass of milk" : h.food === "ale" ? "a big ale" : h.food === "wine" ? "red wine" : h.food === "mystery stew" ? "the mystery stew" : "whatever's cheapest"}.`,
-      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : ""));
+      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
     left.appendChild(tp);
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
@@ -493,10 +498,17 @@
       el("b", null, h.gear.armor.name), el("span", { class: "dim small" }, ` (tier ${h.gear.armor.tier})`)));
     const inv = el("div", { class: "inv" });
     inv.appendChild(el("span", { class: "it" }, A.itemSprite("gold", 2), `${h.gold} silver`));
-    for (const [g, q] of Object.entries(h.inv)) inv.appendChild(el("span", { class: "it" }, A.itemSprite(g, 2), `${q} ${S.goods[g].name.toLowerCase()}`));
+    const one = { "Fangs & Claws": "fang", "Remains": "set of remains", "Stolen Goods": "bag of stolen goods" };
+    const goodName = (g, q) => { const n = S.goods[g].name; return (q === 1 ? one[n] || n.replace(/s$/, "") : n).toLowerCase(); };
+    for (const [g, q] of Object.entries(h.inv)) inv.appendChild(el("span", { class: "it" }, A.itemSprite(g, 2), `${q} ${goodName(g, q)}`));
     for (const r of h.relics) inv.appendChild(el("span", { class: "it" }, A.itemSprite("relic", 2), r.identified === false ? "an unidentified relic" : r.name));
     for (const rid of h.remains_of) inv.appendChild(el("span", { class: "it red" }, A.itemSprite("remains", 2), `the remains of ${(heroes[rid] || {}).name || "someone"}`));
     p.appendChild(inv);
+    if ((h.maps || []).length) {
+      p.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } }, "Maps in the pack"));
+      p.appendChild(el("div", { class: "small" }, h.maps.map((m, i) => [i ? " · " : "", el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name),
+        ` (${m.pct}% mapped${m.worked ? `, ${m.worked}% opened up by ${h.name}` : ""})`])));
+    }
     return p;
   }
   function peopleTab(b, h) {
@@ -678,11 +690,19 @@
       const buys = Object.entries(t.buyers).filter(([, m]) => m > 1).map(([g]) => S.goods[g].name.toLowerCase());
       if (buys.length) p.appendChild(el("p", { class: "small gold" }, "Pays well for: " + buys.join(", ")));
       p.appendChild(el("p", { class: "small dim" }, "Odd jobs: " + t.jobs.join(", ").replace(/_/g, " ")));
+      const maps = (L.map_stock || {})[id] || [];
+      if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
+        el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
     }
     if (d) {
       const st = L.dungeons[id] || {};
       p.appendChild(el("p", { class: "small muted" }, `Level ${d.level} dungeon · ${d.floors} floors · ${dangerWord(st.danger)}`));
       p.appendChild(el("p", null, d.desc));
+      const pct = Math.round(st.explored || 0);
+      p.appendChild(el("div", { class: "small" }, `Explored: ${st.explored_word || "untouched (0%)"}`,
+        el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));
+      const mappers = L.heroes.filter((x) => (x.maps || []).some((m) => m.dungeon === id && m.pct >= 30));
+      if (mappers.length) p.appendChild(el("p", { class: "small dim" }, "Holding maps of it: ", mappers.map((x, i) => [i ? ", " : "", A.heroLink(x.id)])));
       const bossRow = el("div", { class: "row" }, A.monsterSprite(d.boss, 2, true), el("div", null, el("b", null, d.boss_name),
         el("div", { class: st.boss_alive === false ? "green small" : "red small" }, st.boss_alive === false ? "Slain. Something new will move in." : "Lurking in the deepest chamber.")));
       p.appendChild(bossRow);
@@ -692,6 +712,7 @@
     const bodies = (L.remains || {})[id] || [];
     if (bodies.length) p.appendChild(el("p", { class: "small red" }, "Unburied here: ", bodies.map((r, i) => [i ? ", " : "", A.heroLink(r.hero)])));
     side.appendChild(p);
+    if (t) side.appendChild(boardPanel(id));
     if (t) side.appendChild(townLedger(id));
     if (t) side.appendChild(civicPanel(id));
     const who = panel(here.length ? `Here now (${here.length})` : "Nobody here right now");
@@ -772,11 +793,11 @@
     v.appendChild(factionsPanel());
     v.appendChild(legendsPanel());
     const dt = el("table");
-    dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num" }, "Floors"), el("th", null, "Boss"), el("th", null, "Monsters"), el("th", { class: "num" }, "Delves")));
+    dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num" }, "Floors"), el("th", null, "Boss"), el("th", null, "Monsters"), el("th", null, "Explored"), el("th", { class: "num" }, "Delves")));
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
       const st = L.dungeons[id] || {};
       dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)), el("td", null, el("a", { href: `#/map/${id}` }, d.name)), el("td", { class: "num" }, d.level), el("td", { class: "num" }, d.floors),
-        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", null, dangerWord(st.danger)), el("td", { class: "num" }, st.visits || 0)));
+        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", null, dangerWord(st.danger)), el("td", null, st.explored_word || "untouched (0%)"), el("td", { class: "num" }, st.visits || 0)));
     }
     v.appendChild(panel("Dungeons", el("div", { class: "scrollx" }, dt)));
     const goods = ["ration", "potion", "herbs", "pelt", "fang", "ore", "gem", "trinket", "remains", "bones", "relic", "frost_crystal", "ember_core"];
@@ -844,7 +865,7 @@
       ["Other traits", "Greed, sociability, honour, curiosity, temper and loyalty. They shape choices (skimming loot, picking fights, staying with a party). Big events can shift them, and the Crier will notice."],
       ["Titles", "A hero's class name is their title, from Warrior to Lich. Evolved classes are earned by how a hero actually fights. Faction members also carry a rank (Squire, Knight, Paladin...), shown under their name."],
       ["Stress", "Builds up from danger and bad days. A night at the tavern or a quiet rest brings it down. Stressed heroes argue more."],
-      ["Classes", "Everyone starts as a Warrior, Ranger or Mage. At levels 9 and 18 a hero evolves into a new class shaped by what sets them apart (heal a lot and you lean holy, loot corpses and you lean dark). Crowded classes are harder to get into. Level 25 makes a Legend."],
+      ["Classes", "Everyone starts as a Warrior, Ranger or Mage. At levels 9 and 18 a hero evolves into a new class shaped by what sets them apart (heal a lot and you lean holy, loot corpses and you lean dark). Crowded classes are harder to get into. The first few heroes to reach level 21 become Legends; once those places are taken, the age has its Legends."],
       ["Scars", "Bad fights leave marks: a lost eye, a hook for a hand, burn scars. They change stats and appearance for good."],
       ["Death", "Heroes can die. The fallen get a funeral (if anyone pays for it) and a spot on the History page. Their bodies may be sold to a necromancer first."],
     ]],
@@ -855,7 +876,9 @@
       ["Party awards", "Parties get their own season awards, a party of the week and power rankings, alongside the heroes'."],
     ]],
     ["The world", [
-      ["Delve", "A trip into a dungeon, one floor at a time, with the boss in the deepest chamber. Parties decide each floor whether to push on or turn back."],
+      ["Delve", "An expedition into a dungeon that can last days. Each day the crew dives deeper, maps side passages, sweeps for loot, rests in a cleared chamber, takes on the boss or climbs out. Bold crews dive; careful ones map first, and a mapped lair makes the boss fight fairer."],
+      ["Explored", "How much of a dungeon has been opened up, from untouched to picked clean. A worked-over dungeon is safer but pays less. Something always moves back in: it slowly fills up again, and a lot faster when a new boss arrives."],
+      ["Maps", "Heroes map what they explore and can sell copies to a town's mapmaker. Other crews buy them before setting out."],
       ["Hunt", "A trip into the wilderness for pelts, herbs and bounties. Lower risk, lower reward."],
       ["Monsters", "Dungeons can be teeming, normal, recovering or thinned out. Clearing a dungeon thins it out for a while, and slain bosses are eventually replaced."],
       ["The economy", "Every town pays different prices. Heroes remember prices and swap tips, so some carry loot across the map to sell it better. The undertaker in Ashfen pays well for remains, no questions asked."],
@@ -1108,6 +1131,37 @@
   const repTier = (v, town) => REP_TIERS.find(([f]) => v >= f)[1](A.nodeName(town));
   const folkWord = (v) => (v >= 60 ? "old friend" : v >= 30 ? "friendly" : v <= -60 ? "sworn enemy" : v <= -30 ? "can't stand them" : null);
   const GUARDS = ["no guards to speak of", "a night watch", "a proper garrison", "walls and a garrison"];
+
+  const JOB = { escort: ["📦", "Escort"], bounty: ["🎯", "Wanted"], clear: ["🗡", "Clear-out"], retrieve: ["🔦", "Retrieval"], defend: ["🛡", "Defend the town"] };
+  function boardPanel(id) {
+    const p = panel("Notice board");
+    const day = L.meta.day;
+    const jobs = ((L.boards || {})[id] || []).filter((c) => c.kind !== "shady");
+    const shady = ((L.boards || {})[id] || []).some((c) => c.kind === "shady");
+    const line = (c) => {
+      const to = A.nodeName(c.dest, true);
+      const left = Math.max(0, c.expires - day);
+      const what = {
+        escort: `Guard ${c.cargo} to ${to}`,
+        bounty: `${c.name}, ${c.what}, last seen in ${to}`,
+        clear: `Clear ${c.need} ${c.mon ? (S.monsters[c.mon] || {}).name || "beasts" : "beasts"} out of ${to} by day ${c.deadline}`,
+        retrieve: `Fetch ${c.item} from floor ${c.floor} of ${to}`,
+        defend: `Raiders expected on day ${c.night}. Hold the walls`,
+      }[c.kind] || "Work going";
+      const [icon, label] = JOB[c.kind] || ["📜", "Job"];
+      return el("li", null, el("b", null, `${icon} ${label}: `), what, el("span", { class: "dim small" }, ` · ${c.pay} silver${c.kind === "bounty" ? "" : " each"} · ${left ? `${left} day${left > 1 ? "s" : ""} left` : "last day"}`));
+    };
+    if (jobs.length) p.appendChild(el("ul", { class: "board" }, jobs.map(line)));
+    else p.appendChild(el("p", { class: "empty" }, "The board is bare today. Someone has drawn a rude goblin on it."));
+    const wanted = (L.wanted || []).filter((b) => b.town === id);
+    for (const b of wanted) {
+      const hunters = b.takers.map((t) => heroes[t] ? A.heroLink(t) : parties[t] ? A.partyLink(t) : null).filter(Boolean);
+      p.appendChild(el("p", { class: "small" }, el("b", null, "WANTED: "), `${b.name}. ${b.pay} silver, until day ${b.until}. `,
+        hunters.length ? ["Hunting it: ", hunters.map((x, i) => [i ? ", " : "", x])] : "Nobody has taken the job yet."));
+    }
+    if (shady) p.appendChild(el("p", { class: "small dim" }, "Someone in the back of the tavern is hiring for work that isn't on the board."));
+    return p;
+  }
 
   function townLedger(id) {
     const ts = (L.town_state || {})[id] || { guards: 0, raids: 0, repelled: 0, looted: 0, history: [] };
