@@ -46,7 +46,7 @@
       if (q.hidden) { form.appendChild(el("div", { hidden: true })); return; }
       const box = el("section", { class: "panel q" }, el("h3", null, `${++num}. ${q.q}`));
       if (q.kind === "text") {
-        const inp = el("input", { type: "text", maxlength: q.max, value: ans[i] || "", placeholder: "Your name" });
+        const inp = el("input", { type: "text", maxlength: q.max, value: ans[i] || "", placeholder: "Your real first name, e.g. Sam" });
         inp.addEventListener("input", () => { ans[i] = inp.value.trim() || null; if (i === OWNER) ans[NAME] = ans[i]; changed(); });
         box.appendChild(inp);
       } else if (q.kind === "swatch") {
