@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Terrain</title>
+<style>body{background:#1a1720;margin:0}canvas{image-rendering:pixelated}</style>
+</head><body>
+<script src="../data/static.js"></script><script src="../js/art.js"></script><script src="../js/paint.js"></script><script src="../js/beasts.js"></script><script src="../js/isle.js"></script>
+<script>
+window.App = { S: window.LD.static, L: { heroes: [], meta: { day: 1 } }, heroLook: () => ({}) };
+const cv = document.createElement("canvas"); document.body.appendChild(cv);
+Isle.drawMap(cv, {});
+</script></body></html>
