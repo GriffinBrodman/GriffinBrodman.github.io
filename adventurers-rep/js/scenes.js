@@ -292,12 +292,19 @@
   const HOODS = ["#8a3a2a", "#3a5a8a", "#6a5a44", "#5a6a3a", "#7a4a3a"];
 
   // the small lives of a place: what moves, where, keyed off the painting's recorded layout and the place itself
-  function ambient(info, place, seed, vig) {
-    const A = window.Anim;
-    if (!A) return [];
+  // ground-dwelling actors; in a fight the fighters own the ground, so these stay far back on the horizon (small because distant)
+  const GROUND = new Set(["villager", "wagon", "quad", "rabbit", "crab", "cat", "skeleton", "butterfly"]);
+  function ambient(info, place, seed, vig, battle) {
+    const A0 = window.Anim;
+    if (!A0) return [];
+    const A = !battle ? A0 : new Proxy(A0, { get(t, k) {
+      const f = t[k];
+      if (!GROUND.has(k)) return f;
+      return (cfg) => (k === "wagon" || cfg.mode === "cross") ? null : f(Object.assign({}, cfg, { y: Math.min(cfg.y, info.horizon + 2), h: cfg.h ? Math.min(cfg.h, 4) : cfg.h }));
+    } });
     const { W, H, kind } = info, hz = info.horizon, r = rng((seed ^ 0x2545f491) >>> 0), out = [];
     const s = () => Math.floor(r() * 1e9), pick = (a) => a[Math.floor(r() * a.length)], rx = (a, b) => a + r() * (b - a);
-    const d = place && place.d, add = (x) => out.push(x);
+    const d = place && place.d, add = (x) => { if (x) out.push(x); };
     const n = (k) => (vig ? Math.ceil(k / 2) : k);
 
     if (kind === "tavern" || kind === "jail") {
@@ -445,10 +452,10 @@
     c.getContext("2d").drawImage(cv, 0, 0);
     return c;
   }
-  function backdrop(kind, W, H, seed) {
+  function backdrop(kind, W, H, seed, opts) {
     const place = placeOf(seed);
     const cv = paint(kind, W, H, seed, place);
-    if (window.Anim) Anim.stage(cv, copyOf(cv), ambient(cv.info, place, seed));
+    if (window.Anim) Anim.stage(cv, copyOf(cv), ambient(cv.info, place, seed, false, !!(opts && opts.battle)));
     return cv;
   }
 
@@ -478,7 +485,7 @@
     const over = document.createElement("canvas");
     over.width = W; over.height = H;
     const ctx = over.getContext("2d");
-    const actors = A ? ambient(info, place, seed, true) : [];
+    const actors = A ? ambient(info, place, seed, true, true) : [];
     const sprite = (a, b, x, y, i) => {
       if (A) actors.push(A.flip({ a: a.toCanvas(1), b: b.toCanvas(1), x, y, z: 5e3, rate: 0.8, seed: i * 3 + 1, front: true }));
       else ctx.drawImage(a.toCanvas(1), x, y);

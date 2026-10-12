@@ -580,15 +580,23 @@
     const e = L.events.filter((x) => (x.parties || []).includes(p.id) && x.imp >= 2).sort(byDayDesc)[0];
     return e ? el("p", { class: "small", style: { marginTop: "6px" } }, el("span", { class: "dim" }, `Day ${e.sday || e.day}: `), e.text) : null;
   }
+  function moraleWord(m) { return m >= 70 ? "happy" : m >= 40 ? "steady" : m >= 20 ? "grumbling" : "about to split"; }
+  function moraleBar(p) {
+    return el("div", { class: "has-tip", title: "The party's mood, 0 to 100. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.",
+      style: { marginTop: "6px" } },
+      el("div", { class: "small", style: { display: "flex", justifyContent: "space-between" } }, el("span", null, "Morale"),
+        el("span", { class: p.morale < 30 ? "red" : "muted" }, `${p.morale}/100 · ${moraleWord(p.morale)}`)),
+      A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"));
+  }
   function partyCard(p) {
     const ms = el("div", { class: "row", style: { gap: "0" } });
     for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
     return el("a", { class: "panel", href: `#/party/${p.id}`, style: { display: "block", color: "inherit", opacity: p.disbanded ? 0.65 : 1 } },
       el("div", { class: "row" }, A.bannerSprite(p.banner, 3), el("div", null, el("h3", { style: { marginBottom: "2px" } }, p.name),
         el("div", { class: "small muted" }, p.disbanded ? `Disbanded day ${p.disbanded}` : [el("span", { class: "has-tip", title: S.dispositions[p.disposition] || "" }, cap(p.disposition)),
-          ` · morale ${p.morale} (${p.morale >= 70 ? "happy" : p.morale >= 40 ? "steady" : p.morale >= 20 ? "grumbling" : "about to split"}) · ${p.renown} renown`]),
+          ` · ${p.renown} renown`]),
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
-      ms, p.disbanded ? null : A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"), lastNews(p));
+      ms, p.disbanded ? null : moraleBar(p), lastNews(p));
   }
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);
@@ -596,7 +604,7 @@
       el("div", { style: { flex: 1 } }, el("h1", null, p.name),
         el("p", { class: "muted" }, `Founded day ${p.founded_day} (season ${p.founded_season})`, p.disbanded ? ` · disbanded day ${p.disbanded}` : ` · ${p.renown} renown`),
         el("p", null, S.dispositions[p.disposition]),
-        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
+        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
           el("div", { class: "tiny dim" }, "The party's mood. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.")),
         p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, cap(p.doing || ""), (p.doing || "").includes(p.loc_name) ? "" : ` · in ${p.loc_name}`),
         p.why && !p.disbanded && !p.quest ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${p.why}.`) : null,
