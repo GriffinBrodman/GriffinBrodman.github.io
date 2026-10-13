@@ -627,7 +627,10 @@
           el("div", null, el("b", { class: "gold" }, String(h.gold)), " silver"),
           h.joined ? el("div", { style: { minWidth: "150px" } }, el("b", { class: "gold" }, h.renown), " renown",
             el("div", { class: "tiny dim" }, renownCaption(h)),
-            (h.renown_parts || []).length ? el("div", { class: "tiny" }, "Renown from: " + h.renown_parts.slice(0, 4).map(([k, v]) => `${k} ${v > 0 ? "+" : ""}${v}`).join(" · ")) : null) : null,
+            (h.renown_parts || []).length ? el("div", { class: "tiny" }, "Renown from: ", h.renown_parts.slice(0, 4).map(([k, v], i) => {
+              const part = el("span", k === "a steady hand" ? { class: "has-tip" } : null, `${k} ${v > 0 ? "+" : ""}${v}`);
+              return [i ? " · " : "", k === "a steady hand" ? tip(part, "Renown for careful heroes. Cautious heroes skip the risky fights that pay out the most fame, so instead they earn a little renown for every clean fight they win and every job they finish properly: the more cautious the hero, the more. Bold heroes earn none of it.", "A steady hand") : part];
+            })) : null) : null,
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
@@ -1334,6 +1337,7 @@
     ]],
     ["Heroes", [
       ["Renown", "Fame. It comes from fights won, floors cleared, bosses slain, silver earned and stories told about you. It drives the standings and the awards."],
+      ["A steady hand", "Renown for careful heroes. Cautious heroes skip the risky fights that pay out the most fame, so instead they earn a little renown for every clean fight they win and every job they finish properly: the more cautious the hero, the more. Bold heroes earn none of it."],
       ["Boldness", "How brave a hero is in a fight. Bold heroes hold the line longer before breaking and running."],
       ["Risk tolerance", "How big a gamble a hero will take when choosing what to do: deeper dungeons, longer odds, dice at the tavern."],
       ["Other traits", "Greed, sociability, honour, curiosity, temper and loyalty. They shape choices (skimming loot, picking fights, staying with a party). Big events can shift them, and the Crier will notice."],
