@@ -381,6 +381,14 @@
   const notOrder = (t) => !t.startsWith("One ");
 
   // ---------- the camp ----------
+  const STALL_COAT = {
+    grey: { b: "#c0b8ac", d: "#8e877c", m: "#3e3834", l: "#d8d0c4" }, white: { b: "#ece8e0", d: "#c4beb4", m: "#d8d0c4", l: "#fbf8f2" },
+    bay: { b: "#8a4a26", d: "#62321a", m: "#1e1410", l: "#a8623a" }, chestnut: { b: "#a8552a", d: "#7a3a1c", m: "#8a4220", l: "#c4703e" },
+    black: { b: "#3a3438", d: "#26222a", m: "#141014", l: "#524a50" }, dun: { b: "#c4a46a", d: "#94784a", m: "#3e2e1e", l: "#d8bc84" },
+    brown: { b: "#6e4a2e", d: "#4e341e", m: "#2a1c12", l: "#8a6040" }, piebald: { b: "#e8e2d8", d: "#2e2a2c", m: "#2e2a2c", l: "#f8f4ec" },
+    sand: { b: "#c8a470", d: "#9a7a4e", m: "#7a5c38", l: "#dcbc8a" }, bone: { b: "#d8d0b8", d: "#9a9280", m: "#5a5448", l: "#ece6d2" },
+    red: { b: "#8a3e26", d: "#62281a", m: "#3e1a10", l: "#a8563a" }, cream: { b: "#e0d4b4", d: "#b4a684", m: "#6e6250", l: "#f0e6cc" },
+  };
   function camp(t, cast, seed, onVisible) {
     const st = T().stage(W, H, 100, 60);
     const r = Art.rng(Art.hash(seed + "camp"));
@@ -412,6 +420,17 @@
       if (steam) steam.draw(ctx, now);
       if (embers) embers.draw(ctx, now); else drawSparks(ctx, fx.sparks);
     } });
+    // the crew's horses tethered at the edge of the firelight, and the wagon parked behind them
+    const MA = window.MountArt;
+    if (MA && t.wagon) {
+      const [wx, wy] = st.iso(1.2, 8.6), pl = t.wagon.puller ? { kind: t.wagon.puller.kind, colour: t.wagon.puller.colour } : null;
+      props.push({ key: 1.2 + 8.6, draw: (ctx, now, flick, still) => { MA.drawWagon(ctx, t.wagon.kind, Math.round(wx) - 20, Math.round(wy), 1, pl, still ? 0 : (Math.floor(now * 0.6) % 5 === 0 ? 1 : 0)); } });
+    }
+    if (MA) (t.mounts || []).slice(0, 4).forEach((m, i) => {
+      const [u, v] = [[8.6, 1.4], [9.4, 3.0], [7.6, 0.4], [9.8, 4.6]][i];
+      const [mx, my] = st.iso(u, v), ph = Art.hash(m.name || String(i)) % 7;
+      props.push({ key: u + v, draw: (ctx, now, flick, still) => { MA.drawMount(ctx, m.kind, m.colour, Math.round(mx) - 12, Math.round(my), still ? 0 : (Math.floor(now * 0.8 + ph) % 4 === 0 ? 1 : 0), 1); } });
+    });
     const night = [];
     if (biome === "forest" || biome === "plains") night.push(anim("fireflies", { x: 8, y: HZ + 12, w: 60, h: 40, n: 5, seed: 3 }), anim("fireflies", { x: 132, y: HZ + 20, w: 60, h: 50, n: 4, seed: 4 }));
     if (biome === "marsh") night.push(anim("wisp", { x: 140, y: HZ + 14, w: 50, h: 20, seed: 6 }), anim("fireflies", { x: 10, y: HZ + 30, w: 50, h: 40, n: 4, rgb: "160,255,200", seed: 7 }));
@@ -573,9 +592,11 @@
       fp(b, st.quad(st.rwall, 2.0, 3.2, 18, 26), "#5a3a20"); fp(b, st.quad(st.rwall, 2.2, 3.0, 22, 24), "#8a6a40");
       // the horse looks out over its stall door on the left wall, into the room
       const hx = st.iso(0.5, 6.6), horse = HORSE.map((row) => row.split("").reverse().join(""));
+      // the hero's own horse in the stall, in its own colour; a stranger's grey otherwise
+      const coat = STALL_COAT[((t.host || {}).mount || {}).colour] || STALL_COAT.grey;
       props.push({ key: 1, draw: (ctx, now, flick, still) => {
         const nod = still ? 0 : Math.floor(now * 0.7) % 4 === 0 ? 1 : 0;
-        pix(ctx, Math.round(hx[0]) - 6, Math.round(hx[1]) - 34 + nod, horse, { o: "#1a1210", b: "#c0b8ac", d: "#8e877c", e: "#0a0604", m: "#3e3834", l: "#d8d0c4", n: "#2a2420", w: "#f4f0e8" });
+        pix(ctx, Math.round(hx[0]) - 6, Math.round(hx[1]) - 34 + nod, horse, Object.assign({ o: "#1a1210", e: "#0a0604", n: "#2a2420", w: "#f4f0e8" }, coat));
       } });
       props.push({ key: 2, cv: st.box(0.05, 5.0, 1.0, 3.2, 12, "#6a4426", "#553620", "#4a2e1a") });
       props.push({ key: 2.1, cv: layer(st, (ctx) => { for (const v of [5.0, 8.2]) { const p = st.iso(1.05, v); ctx.fillStyle = "#2e1c10"; ctx.fillRect(Math.round(p[0]), Math.round(p[1]) - 13, 1, 13); } fp(ctx, [st.up(st.iso(1.05, 5.0), 7), st.up(st.iso(1.05, 8.2), 7), st.up(st.iso(1.05, 8.2), 6), st.up(st.iso(1.05, 5.0), 6)], "#2e1c10"); }) });

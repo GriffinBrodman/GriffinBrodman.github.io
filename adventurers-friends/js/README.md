@@ -3,6 +3,7 @@
 | File | Purpose |
 |------|---------|
 | `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, gear icons (`gearIcon`), graves, the party-page target dummy (`dummyGrid`) |
+| `mount_art.js` | Mounts and wagons: side-view sprites for every mount kind and colour in `league/content/mounts.py` (2-frame idle), wagons alone or hitched to a puller, and `stablePen`, a live stables-yard canvas |
 | `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines), hero sprites and bust portraits drawn from the worn kit (all nine slots, tiers, magic glows), and the gear pieces `Paint.Gear` shares with the icons |
 | `beasts.js` | Shaded monster sprites for the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) |
 | `anim.js` | Ambient pixel animation: one shared, visibility-gated ticker (`Anim.stage`) and small looping actors (villagers, birds, bats, skeletons, torches, smoke, snow, waves...) that any scene can reuse; API listed at the top of the file |
@@ -21,7 +22,7 @@
 Plain `<script>` tags, no modules and no build step, so everything works from `file://`. Order matters:
 
 1. `data/static.js`, `data/league.js` (written by `league/export.py`): fill `window.LD.static` and `window.LD.league`. Per-hero, per-party and per-fight files (`data/hero/<id>.js` and so on) are loaded on demand by `App.load`.
-2. `audio.js` (defines `Sound`; uses only WebAudio), `art.js` (`Art`), `paint.js` (`Paint`), `beasts.js` (`Beasts`), `anim.js` (`Anim`), `scenes.js` (`Scenes`), `tavern.js` (`Tavern`), `camp.js` (`Night`, after `tavern.js`), `isle.js` (`Isle`). These reference each other only inside functions (`Art` calls `Paint` and `Beasts` when drawing, `Scenes` calls `Isle` and `Anim`, `Night` calls `Tavern` and, when present, `Anim`), so the order among them is not load-critical, but all must load before `app.js`.
+2. `audio.js` (defines `Sound`; uses only WebAudio), `art.js` (`Art`), `mount_art.js` (`MountArt`, right after `art.js`, which it needs at load), `paint.js` (`Paint`), `beasts.js` (`Beasts`), `anim.js` (`Anim`), `scenes.js` (`Scenes`), `tavern.js` (`Tavern`), `camp.js` (`Night`, after `tavern.js`), `isle.js` (`Isle`). These reference each other only inside functions (`Art` calls `Paint` and `Beasts` when drawing, `Scenes` calls `Isle` and `Anim`, `Night` calls `Tavern` and, when present, `Anim`), so the order among them is not load-critical, but all must load before `app.js`.
 3. `app.js` (`App`; reads `LD`, builds lookup tables, registers nothing yet), `views.js` (registers the main routes with `App.route`), `replay.js` (`#/fight/<id>`), `quiz.js` (`#/join`).
 4. The inline `App.start()` runs the router, so every route must be registered before it.
 
@@ -34,6 +35,7 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 | `LD` | `data/*.js` | Exported game data: `LD.static` (map, goods, monsters, classes, factions, quiz) and `LD.league` (current state). Never written by the site |
 | `App` | `app.js` | `el`, `esc`, `plural`, `cap`, sprite helpers (`heroSprite`, `heroPortrait`, ...), `heroLink`/`partyLink`, `eventRow`/`feed`, `load` (fetch a detail file), `mine` (pinned hero), `route`, `start`. Also `App.L`, `App.S`, and `heroes`/`parties`/`events` lookup tables by id |
 | `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites; `gearIcon(item, look)` is a 16x16 icon for any kit item (`{slot, art, tier, gem, tint, glow}`) or curio |
+| `MountArt` | `mount_art.js` | `mountGrid(kind, colour, frame)` and `wagonGrid(kind, puller, frame)` (cached 1x canvases), `mountSprite(kind, colour, scale, opts)` (an idling page canvas), `drawMount`/`drawWagon` (onto a canvas: x left edge, y ground), `stablePen(mounts, opts)` (live yard canvas with `.spots` for labels), `COLOURS`, `WAGONS` |
 | `Paint` | `paint.js` | Shaded painter, `fullBody` (28x34 sprite) and `portraitGrid` (bust portraits), both drawn from `h.kit` when present and from the class look otherwise; `Gear` holds the shared piece painters (`headgear`, `offhand`, `weapon`, `axis`, `backSprite`, `makeMats`, `glowUp`) and `soften` (reins in the saturation of quiz colours for cloth and hair) |
 | `Beasts` | `beasts.js` | `draw(body, pal, frame, boss, palette)` for non-humanoid monsters; called from `Art.monsterGrid` |
 | `Anim` | `anim.js` | `stage(canvas, base, actors, opts)` plus actor factories (`villager`, `bat`, `torch`, `snow`...); every actor is a pure function of time. Respects `prefers-reduced-motion` |

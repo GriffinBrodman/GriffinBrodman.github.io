@@ -192,6 +192,9 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .hero-head .portrait canvas.main { width: 200px; height: 200px; display: block; }
 .hero-head .portrait canvas.full { width: 84px; height: 102px; }
 .hero-head .portrait canvas.pet { position: absolute; bottom: 8px; right: -10px; width: 56px; height: 40px; }
+.hero-head .portrait canvas.portrait-mount { width: auto; height: 57px; margin-left: -6px; }
+.hero-head .portrait.has-mount canvas.pet { position: static; width: 42px; height: 30px; margin-left: -8px; }
+.hero-head .portrait canvas.full { position: relative; z-index: 1; }
 .hero-head h1 { font-size: 40px; margin-bottom: 0; }
 .hero-head .epi { color: var(--gold); font-family: var(--px); font-size: 18px; }
 @media (max-width: 600px) { .hero-head .portrait canvas.main { width: 160px; height: 160px; } .hero-head .portrait canvas.full { width: 56px; height: 68px; } }
@@ -290,6 +293,7 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
   .hero-head .portrait { flex-wrap: wrap; justify-content: center; align-items: flex-end; max-width: 128px; row-gap: 4px; }
   .hero-head .portrait canvas.full { width: 42px; height: 51px; }
   .hero-head .portrait canvas.pet { position: static; width: 42px; height: 30px; }
+  .hero-head .portrait canvas.portrait-mount { position: static; height: 36px; }
   .hero-head h1 { font-size: 28px; }
 }
 .quest-seal { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px; font-family: var(--px); font-size: 11px; line-height: 1.1; color: #ffe9b8; background: radial-gradient(circle at 35% 30%, #c8503e, #8e2a22 60%, #6a1c16); border: 2px solid #4a100c; box-shadow: inset 0 0 0 3px rgba(255, 190, 150, 0.2); }
@@ -617,3 +621,7 @@ table.lifetime td.live { font-style: italic; color: var(--muted); }
 table.boxscore { margin-bottom: 8px; }
 .today-box { margin: 6px 0 4px; padding: 6px 10px; border-left: 3px solid var(--edge); background: var(--parch2); max-width: 520px; }
 .today-box > div + div { margin-top: 2px; }
+.mount-row { gap: 12px; align-items: center; }
+.mount-art { min-width: 96px; display: flex; justify-content: center; }
+.mount-art canvas, .mount-art img { image-rendering: pixelated; }
+.stables h3 { font-size: 15px; }
