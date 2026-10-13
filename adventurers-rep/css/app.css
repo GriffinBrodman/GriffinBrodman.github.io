@@ -452,3 +452,9 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .pill.gold .dim { color: #4a3010; }
 .together { border-left: 2px solid var(--edge); padding-left: 14px; }
 @media (max-width: 860px) { .together { border-left: 0; padding-left: 0; border-top: 2px solid var(--edge); padding-top: 10px; } }
+.formation .rank { min-width: 110px; }
+.formation .nobody { font-style: italic; align-self: center; margin: 0 auto 18px; }
+.formation { align-items: stretch; }
+.pill.soft { background: rgba(255, 250, 235, 0.55); font-style: italic; }
+.formation .foe { margin-left: auto; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.formation .dummy { width: 48px; height: auto; image-rendering: pixelated; }

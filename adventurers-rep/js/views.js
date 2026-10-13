@@ -49,6 +49,17 @@
     if (nx && nx.level === h.level + 1) return `Becomes ${/^[aeiou]/i.test(nx.name) ? "an" : "a"} ${nx.name} at level ${nx.level}`;
     return `New skill at level ${h.level + 1}`;
   }
+  // the strongest few traits, in the same words as the Personality panel, plus what they fear
+  function strongTraits(traits, n) {
+    return Object.entries(traits || {}).filter(([t, v]) => TRAIT_WORDS[t] && Math.abs(v) >= 0.35).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, n).map(([t, v]) => traitWord(t, v));
+  }
+  function personaStrip(h) {
+    const words = strongTraits(h.traits, 4);
+    const fears = (h.fears || []).slice(0, 1).map((f) => `afraid of ${f}`);
+    if (!words.length && !fears.length) return null;
+    return el("div", { class: "class-strip persona" }, ...words.map((w) => el("span", { class: "pill soft" }, w)), ...fears.map((f) => el("span", { class: "pill soft" }, f)),
+      h.voice ? el("span", { class: "pill soft" }, `talks ${h.voice}`) : null);
+  }
   function classStrip(h) {
     const c = S.classes[h.cls] || {}, path = basePath(h.cls), sig = signature(h);
     return el("div", { class: "class-strip" }, classIcon(path, 2),
@@ -424,6 +435,7 @@
         el("div", { class: "small" }, `Level ${h.level} `, el("span", { class: "has-tip", title: (S.classes[h.cls] || {}).desc || "" }, h.title), h.party ? [" of ", A.partyLink(h.party)] : " · solo"),
         (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by how " + h.name + " fights)" : ""}`) : null,
         classStrip(h),
+        personaStrip(h),
         h.faction && (S.factions || {})[h.faction] ? el("div", { class: "tiny" }, `${S.factions[h.faction].icon || ""} ${S.factions[h.faction].ranks[h.frank || 0]} of ${S.factions[h.faction].name}`,
           el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
         el("div", { class: "small muted" }, h.npc ? "A league hero" : `${h.owner}'s hero`, ` · joined season ${h.joined || "next"}`,
@@ -496,7 +508,6 @@
     return p;
   }
   function storyTab(b, h) {
-    if (h.alive) b.appendChild(fightCard(h));
     const lp = lettersPanel(h);
     if (lp) b.appendChild(lp);
     const th = threadsPanel(h);
@@ -514,6 +525,7 @@
     b.appendChild(panel("Diary", el("p", { class: "small dim" }, "The small stuff: shifts worked, dice lost, conversations had."), ul));
   }
   function charTab(b, h) {
+    if (h.alive) b.appendChild(fightCard(h));
     const g = el("div", { class: "grid2" });
     const left = el("div"), right = el("div");
     g.append(left, right);
@@ -654,6 +666,16 @@
         el("span", { class: p.morale < 30 ? "red" : "muted" }, `${p.morale}/100 · ${moraleWord(p.morale)}`)),
       A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"));
   }
+  function partyTags(p) {
+    const t = p.tactics;
+    if (!t || p.disbanded) return null;
+    const temper = ["bold", "cautious", "patient", "reckless", "silver-hungry"];
+    const persona = [cap(p.disposition), ...strongTraits(t.traits, 3)].filter((w, i, a) => a.indexOf(w) === i);
+    const fight = [t.mix, ...t.style.filter((s) => !temper.includes(s))];
+    return el("div", null,
+      el("div", { class: "class-strip persona" }, ...persona.map((w) => el("span", { class: "pill soft" }, w))),
+      el("div", { class: "class-strip" }, ...fight.map((w) => el("span", { class: "pill" }, w))));
+  }
   function tacticsPanel(p) {
     const t = p.tactics;
     if (!t) return null;
@@ -662,12 +684,11 @@
     const fig = (id) => el("a", { class: "fig", href: `#/hero/${id}` }, A.heroSprite(who(id), 2), el("div", { class: "tiny" }, who(id).name),
       el("div", { class: "tiny gold" }, ((p.roles || {})[id] || "").replace("Leader · ", "")), classIcon(basePath(who(id).cls), 1));
     const form = el("div", { class: "formation" },
-      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "BACK ROW"), ...t.back.filter(who).map(fig)),
-      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "FRONT ROW"), ...t.front.filter(who).map(fig)),
-      el("div", { class: "foe tiny dim" }, "the enemy ▸"));
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "BACK ROW"), ...(t.back.some(who) ? t.back.filter(who).map(fig) : [el("div", { class: "small dim nobody" }, "nobody")])),
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "FRONT ROW"), ...(t.front.some(who) ? t.front.filter(who).map(fig) : [el("div", { class: "small dim nobody" }, "nobody")])),
+      el("div", { class: "foe" }, window.Art && Art.dummyGrid ? Object.assign(Art.dummyGrid().toCanvas(1), { className: "dummy" }) : null, el("div", { class: "tiny dim" }, "the enemy")));
     pn.appendChild(form);
     if (t.plan) pn.appendChild(el("p", { style: { marginTop: "8px" } }, el("b", null, "The plan: "), t.plan));
-    pn.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, el("span", { class: "small muted" }, `${t.mix} · `), ...t.style.map((s) => el("span", { class: "pill" }, s))));
     if (t.notes.length) pn.appendChild(el("ul", { class: "small tac-notes" }, ...t.notes.map((n) => el("li", null, n))));
     const g = el("div", { class: "grid2 even", style: { marginTop: "10px" } });
     const share = el("div");
@@ -675,7 +696,7 @@
     share.appendChild(el("div", { class: "tiny gold skill-group" }, "Who does what this season"));
     for (const [k, label, col] of cols) {
       const tot = t.share.reduce((a, s) => a + s[k], 0);
-      if (!tot && k === "taken" && t.share.some((s) => s.dmg)) { share.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label), el("p", { class: "tiny dim" }, "Counted from the next fight on.")); continue; }
+      if (!tot && k === "taken" && t.share.some((s) => s.dmg)) { share.append(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label), el("div", { class: "small dim", style: { fontStyle: "italic" } }, "Not a scratch so far.")); continue; }
       if (!tot) continue;
       share.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label));
       for (const s of t.share.slice().sort((a, b) => b[k] - a[k])) if (who(s.hero) && s[k]) share.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, who(s.hero).name), A.bar(s[k], tot, col), el("span", { class: "word small" }, `${Math.round((100 * s[k]) / tot)}%`)));
@@ -710,12 +731,12 @@
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);
     head.appendChild(el("div", { class: "row wrap", style: { gap: "16px" } }, A.bannerSprite(p.banner, 6),
-      el("div", { style: { flex: 1 } }, el("h1", null, p.name), p.motto ? el("div", { class: "motto big" }, `“${p.motto}”`) : null,
+      el("div", { style: { flex: 1 } }, el("h1", null, p.name), p.motto ? el("div", { class: "motto big" }, `“${p.motto}”`) : null, partyTags(p),
         el("p", { class: "muted" }, `Founded day ${p.founded_day} (season ${p.founded_season})`, p.disbanded ? ` · disbanded day ${p.disbanded}` : ` · ${p.renown} renown`),
         el("p", null, S.dispositions[p.disposition]),
         p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
           el("div", { class: "tiny dim" }, "The party's mood. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.")),
-        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, cap(p.doing || ""), (p.doing || "").includes(p.loc_name) ? "" : ` · in ${p.loc_name}`),
+        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, p.doing ? [cap(p.doing), p.doing.includes(p.loc_name) ? "" : ` · in ${p.loc_name}`] : `In ${p.loc_name}`),
         p.why && !p.disbanded && !p.quest ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${p.why}.`) : null,
         goalLine(p.goal), ...(p.vows || []).map((v) => vowLine(v))),
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
