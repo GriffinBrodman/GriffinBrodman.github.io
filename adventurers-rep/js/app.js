@@ -141,9 +141,34 @@
     }
   }
 
+  // ---------- days: one style everywhere, the season and its day ----------
+  function seasonOf(day) {
+    const s = ((L && L.seasons) || []).find((x) => x.start_day <= day && day <= x.end_day);
+    if (s) return [s.season, day - s.start_day + 1];
+    const m = (L && L.meta) || {};
+    return m.season ? [m.season, day - (m.day - m.season_day)] : [1, day];
+  }
+  // "S2 · Day 9" on cards; in a sentence "day 9", or "season 2, day 9" when it isn't this season
+  function when(day, prose) {
+    if (day == null) return "";
+    const [s, d] = seasonOf(day);
+    if (!prose) return `S${s} · Day ${d}`;
+    return s === ((L && L.meta) || {}).season ? `day ${d}` : `season ${s}, day ${d}`;
+  }
+
   // ---------- events ----------
   function dayLabel(e) {
-    return `S${e.season} · Day ${e.sday}`;
+    return e.sday ? `S${e.season} · Day ${e.sday}` : when(e.day);
+  }
+  const SHARE_KINDS = new Set(["showdown", "pvp", "rescue", "boss_kill", "boss", "death", "evolve", "keystone", "legend", "vow_kept", "epithet", "race_won", "funeral"]);
+  function shareBtn(text, hash, msg) {
+    return el("button", { class: "share-mini", type: "button", title: "Copy this with a link, to paste anywhere",
+      onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); copy(`${typeof text === "function" ? text() : text}
+${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ share");
+  }
+  function eventHash(e) {
+    const h = (e.heroes || []).find((id) => heroes[id]);
+    return h ? `#/hero/${h}` : `#/day/${e.day}`;
   }
   function eventRow(e, opts) {
     opts = opts || {};
@@ -157,10 +182,20 @@
     if (owners.length) meta.push("👤 " + owners.join(", "));
     const fightLink = e.fight && LD_has("fight", e.fight) ? el("a", { class: "watch", href: `#/fight/${e.fight}` }, " ▶ watch")
       : e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, " ♪ hear it") : null;
-    return el("li", { class: `ev imp${e.imp}` }, who,
+    const ks = e.kind === "keystone", tag = ks ? "✦ Keystone" : e.sk ? `✧ ${e.sk}` : null;
+    const share = !opts.noShare && (SHARE_KINDS.has(e.kind) || e.imp >= 5) ? shareBtn(e.text, eventHash(e)) : null;
+    const jump = (movesOf[e.id] || []).filter((m) => heroes[m.hero] || parties[m.party]);
+    const chips = jump.slice(0, 3).map((m) => el("span", { class: "jump", title: `${m.from ? ordinal(m.from) : "unranked"} to ${ordinal(m.to)}` },
+      `${heroes[m.hero] ? heroes[m.hero].name : parties[m.party].name} +${m.gain}${m.to < m.from ? " ▲" + (m.from - m.to) : ""}`));
+    return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}` }, who,
       el("div", { class: "body" }, el("div", { class: "text" }, richText(e.text, e.heroes, e.parties), fightLink ? " " : "", fightLink),
-        el("div", { class: "meta" }, meta.join(" · "))));
+        chips.length ? el("div", { class: "jumps" }, chips) : null,
+        el("div", { class: "meta" }, tag ? el("span", { class: "ks-tag" }, tag) : null, tag && meta.length ? " · " : null, meta.join(" · "), share ? [" ", share] : null)));
   }
+  // a "+N renown" line names the story that caused it, so the jump can sit on that story as chips
+  const movesOf = {};
+  for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
+  function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   const fightIds = new Set((L && L.fights_index) || []);
   function LD_has(kind, id) { return kind !== "fight" || fightIds.has(id); }
   function feed(list, opts) {
@@ -168,7 +203,7 @@
     let lastDay = null;
     for (const e of list) {
       if (opts && opts.dayHeaders && e.day !== lastDay) {
-        ul.appendChild(el("li", { class: "daydiv" }, `Season ${e.season} · Day ${e.sday}`));
+        ul.appendChild(el("li", { class: "daydiv" }, e.sday ? `Season ${e.season} · Day ${e.sday}` : when(e.day)));
         lastDay = e.day;
       }
       ul.appendChild(eventRow(e, Object.assign({ noDay: opts && opts.dayHeaders }, opts)));
@@ -259,6 +294,9 @@
       const target = a.getAttribute("href").slice(1);
       a.classList.toggle("on", target === "/" ? hash === "/" : hash.startsWith(target));
     }
+    // on a phone the nav is one scrolling row; keep the current page's tab in sight
+    const nav = document.getElementById("nav"), on = nav && nav.querySelector("a.on");
+    if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, on.offsetLeft - nav.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2);
     for (const [re, fn] of routes) {
       const m = hash.match(re);
       if (m) {
@@ -297,9 +335,10 @@
     }
     const clock = document.getElementById("clock");
     if (meta.phase === "preseason") clock.innerHTML = `<b>Preseason</b> · ${plural(L.pending.length, "hero")} signed up`;
-    else if (L.annals) clock.innerHTML = `<b>The age is over</b> · <a href="#/annals">read the Annals</a>`;
-    else if (meta.phase === "offseason") clock.innerHTML = `<b>Season ${meta.season} is over</b> · next season starts with the next run`;
-    else clock.innerHTML = `<b>Season ${meta.season}</b> · Day ${meta.season_day} of ${meta.season_length} · Week ${Math.ceil(meta.season_day / 7)}`;
+    else if (L.annals) clock.innerHTML = `<b class="clock-long">The age is over</b><b class="clock-short">Age over</b> · <a href="#/annals"><span class="clock-long">read the </span>Annals</a>`;
+    else if (meta.phase === "offseason") clock.innerHTML = `<b>Season ${meta.season} is over</b><span class="clock-long"> · next season starts with the next run</span>`;
+    else clock.innerHTML = `<span class="clock-long"><b>Season ${meta.season}</b> · Day ${meta.season_day} of ${meta.season_length} · Week ${Math.ceil(meta.season_day / 7)}</span>`
+      + `<span class="clock-short"><b>S${meta.season}</b> · Day ${meta.season_day}/${meta.season_length}</span>`;
     document.getElementById("foot-text").textContent = `${meta.name} · run by ${meta.commissioner} · world day ${meta.day} · nothing here needs your input, just check back tomorrow.`;
     window.addEventListener("hashchange", render);
     render();
@@ -307,7 +346,7 @@
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, bar, heroCard, route, start, heroLook, spriteCanvas,
+    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, spriteCanvas, when,
     animated,
   };
 })();
