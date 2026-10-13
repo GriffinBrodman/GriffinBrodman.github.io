@@ -79,7 +79,14 @@
     return spriteCanvas((f) => Art.monsterGrid(m, f), scale || 2, "", animate);
   }
   function petSprite(pet, scale) { return spriteCanvas((f) => Art.petGrid(pet, f), scale || 3, "pet", true); }
-  function bannerSprite(b, scale, cls) { return Art.bannerGrid(b).toCanvas(scale || 3); }
+  // from scale 3 up the detailed 24x30 banner is drawn at two thirds the scale, so the footprint matches the 16x20 one;
+  // at scale 1 the 16x20 banner's emblem is too small to read, so the 24x30 one stands in at its own size
+  function bannerSprite(b, scale, cls) {
+    scale = scale || 3;
+    const cv = scale === 2 ? Art.bannerGrid(b).toCanvas(2) : Art.bannerGrid(b, true).toCanvas(Math.max(1, Math.round(scale * 2 / 3)));
+    cv.className = "banner-px" + (cls ? " " + cls : "");
+    return cv;
+  }
   function itemSprite(id, scale) { return Art.itemGrid(id).toCanvas(scale || 2); }
 
   // ---------- names & links ----------
