@@ -116,6 +116,98 @@
   function sortedHeroes(list) { return list.slice().sort((a, b) => (b.alive - a.alive) || b.renown - a.renown || b.level - a.level); }
 
   // ================= HOME: The Daily Crier =================
+  const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind);
+  // what one day's front page shows, from that day's events and the two days before it
+  function crierDay(today, E) {
+    const allToday = E.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id));
+    const todays = allToday.filter(heroic);
+    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
+    const seasonEnd = todays.find((e) => e.kind === "season_end");
+    // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
+    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id))[0];
+    const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
+    const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
+    let lead = seasonEnd || fresh || todays[0];
+    if (!lead || lead.imp < 3) {
+      const recent = E.filter((e) => heroic(e) && e.day >= today - 1 && e.day <= today && e.imp >= 3).sort((a, b) => b.imp - a.imp || b.day - a.day);
+      lead = recent[0] || lead || E.filter((e) => heroic(e) && e.day <= today).sort(byDayDesc)[0];
+    }
+    const second = todays.filter((e) => e !== lead && e.imp >= 3).slice(0, 4);
+    const shown = new Set([lead, ...second]);
+    return { todays, elsewhere, lead, second, main: todays.filter((e) => e.imp >= 2 && !shown.has(e)), small: todays.filter((e) => e.imp < 2) };
+  }
+  function leadAndSecond(parch, lead, second, today) {
+    if (lead) {
+      const scene = Scenes.vignette(lead, 240, 72);
+      scene.className = "scene";
+      const hl = (L.llm_lead || {})[lead.id] || headline(lead);
+      parch.appendChild(el("div", { class: "lead" },
+        lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
+        el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
+        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => `${x.name} (${x.owner})`))].slice(0, 4);
+          return owners.length ? el("div", { class: "small muted" }, "Starring " + owners.join(", ")) : null; })(),
+        scene,
+        el("p", { class: "muted" }, hl === lead.text ? (lead.loc ? A.nodeName(lead.loc) : "") : A.richText(lead.text, lead.heroes, lead.parties),
+          lead.fight && fightSet.has(lead.fight) ? el("a", { href: `#/fight/${lead.fight}`, class: "watch" }, "  ▶ watch the fight") : null),
+        lead.kind === "season_end" ? el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
+          L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null) : null));
+    }
+    if (second.length) {
+      parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
+      parch.appendChild(A.feed(second, { noDay: true }));
+    }
+  }
+  function smallerHappenings(p, small) {
+    if (!small.length) return;
+    const more = el("div", { hidden: true }, A.feed(small, { noDay: true }));
+    p.appendChild(el("button", { class: "btn small", onclick: (ev) => { more.hidden = !more.hidden; ev.target.textContent = more.hidden ? `+ ${small.length} smaller happenings` : "hide"; } }, `+ ${small.length} smaller happenings`));
+    p.appendChild(more);
+  }
+  const issueOf = (day) => (L.issues || []).find((x) => x.day === day);
+  const issueLabel = (x) => `Season ${x.season} · Day ${x.sday}`;
+  const issueHref = (x) => (x.day === lastDay() ? "#/" : `#/day/${x.day}`);
+  function issueNav(day) {
+    const is = L.issues || [], i = is.findIndex((x) => x.day === day);
+    const prev = i > 0 ? is[i - 1] : null, next = i >= 0 && i < is.length - 1 ? is[i + 1] : null;
+    if (!prev && !next) return null;
+    return el("div", { class: "issue-nav" },
+      prev ? el("a", { href: issueHref(prev) }, `‹ Day ${prev.sday}`) : el("span"),
+      el("a", { href: "#/days" }, "Back issues"),
+      next ? el("a", { href: issueHref(next) }, `Day ${next.sday} ›`) : el("span"));
+  }
+
+  // ================= BACK ISSUES =================
+  A.route(/^\/days$/, (v) => {
+    const is = (L.issues || []).slice().reverse();
+    const p = panel("Back issues of the Crier", el("p", { class: "small muted" }, "Every day's front page this age, newest first."));
+    let season = null, ul = null;
+    for (const x of is) {
+      if (x.season !== season) { season = x.season; p.appendChild(el("h4", null, `Season ${season}`)); ul = el("div", { class: "issues" }); p.appendChild(ul); }
+      ul.appendChild(el("a", { class: "btn small", href: issueHref(x) }, `Day ${x.sday}`));
+    }
+    if (!is.length) p.appendChild(el("p", { class: "empty" }, "The first issue comes out on day 1."));
+    v.appendChild(p);
+  });
+  A.route(/^\/day\/(\d+)$/, (v, d) => {
+    const day = +d, x = issueOf(day);
+    if (!x) { v.appendChild(panel("No such issue", el("p", null, el("a", { href: "#/days" }, "All back issues →")))); return; }
+    return A.load(`day/${day}`).then((iss) => {
+      const parch = el("section", { class: "panel parch" });
+      parch.appendChild(el("div", { class: "mast" },
+        el("div", { class: "title" }, "The Daily Crier"),
+        el("div", { class: "sub" }, el("span", null, issueLabel(x)), el("span", null, L.meta.name), el("span", null, "Back issue")),
+        issueNav(day)));
+      const { elsewhere, lead, second, main, small } = crierDay(day, iss.events);
+      leadAndSecond(parch, lead, second, day);
+      v.appendChild(parch);
+      const p = panel(`That day · ${issueLabel(x)}`);
+      p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
+      smallerHappenings(p, small);
+      v.appendChild(p);
+      if (elsewhere.length) v.appendChild(panel("Elsewhere in the realm", el("ul", { class: "diary" }, elsewhere.slice(0, 5).map((e) => el("li", null, A.richText(e.text, [], e.parties))))));
+    });
+  });
+
   A.route(/^\/$/, (v) => {
     const meta = L.meta;
     const parch = el("section", { class: "panel parch" });
@@ -125,7 +217,8 @@
       el("div", { class: "sub" },
         el("span", null, meta.phase === "preseason" ? "Preseason edition" : `Season ${meta.season} · Day ${meta.season_day}`),
         el("span", null, meta.name),
-        el("span", null, theme ? theme.name : "All the news that's fit to shout"))));
+        el("span", null, theme ? theme.name : "All the news that's fit to shout")),
+      meta.phase === "preseason" ? null : issueNav(lastDay())));
     const mineFirst = A.mine().map((id) => heroes[id]).filter(Boolean);
     if (L.annals) v.appendChild(el("section", { class: "finale-hero age-end" },
       el("div", { class: "finale-kicker" }, "The end of an age"),
@@ -160,41 +253,8 @@
     }
 
     const today = lastDay();
-    const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind);
-    const allToday = L.events.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id));
-    const todays = allToday.filter(heroic);
-    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
-    const seasonEnd = todays.find((e) => e.kind === "season_end");
-    // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
-    const leadOf = (day) => L.events.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id))[0];
-    const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
-    const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
-    let lead = seasonEnd || fresh || todays[0];
-    if (!lead || lead.imp < 3) {
-      const recent = L.events.filter((e) => heroic(e) && e.day >= today - 1 && e.imp >= 3).sort((a, b) => b.imp - a.imp || b.day - a.day);
-      lead = recent[0] || lead || evs().filter(heroic).sort(byDayDesc)[0];
-    }
-    if (lead) {
-      const scene = Scenes.vignette(lead, 240, 72);
-      scene.className = "scene";
-      const hl = (L.llm_lead || {})[lead.id] || headline(lead);
-      parch.appendChild(el("div", { class: "lead" },
-        lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
-        el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
-        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => `${x.name} (${x.owner})`))].slice(0, 4);
-          return owners.length ? el("div", { class: "small muted" }, "Starring " + owners.join(", ")) : null; })(),
-        scene,
-        el("p", { class: "muted" }, hl === lead.text ? (lead.loc ? A.nodeName(lead.loc) : "") : A.richText(lead.text, lead.heroes, lead.parties),
-          lead.fight && fightSet.has(lead.fight) ? el("a", { href: `#/fight/${lead.fight}`, class: "watch" }, "  ▶ watch the fight") : null),
-        lead.kind === "season_end" ? el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
-          L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null) : null));
-    }
-    const second = todays.filter((e) => e !== lead && e.imp >= 3).slice(0, 4);
-    if (second.length) {
-      const g = el("div", { class: "grid2", style: { gap: "12px" } });
-      parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
-      parch.appendChild(A.feed(second, { noDay: true }));
-    }
+    const { elsewhere, lead, second, main, small } = crierDay(today, L.events);
+    leadAndSecond(parch, lead, second, today);
 
     const lastSeason = (L.seasons || [])[L.seasons.length - 1];
     if (lastSeason && (meta.phase === "offseason" || lastSeason.end_day >= meta.day - 1)) v.appendChild(finalePanel(lastSeason));
@@ -209,9 +269,6 @@
     grid.append(left, right);
     v.appendChild(grid);
 
-    const shown = new Set([lead, ...second]);
-    const main = todays.filter((e) => e.imp >= 2 && !shown.has(e));
-    const small = todays.filter((e) => e.imp < 2);
     const p = panel(`Since yesterday · Day ${L.meta.season_day}`);
     p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
     const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
@@ -219,11 +276,7 @@
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
       p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(x.text + ".", Object.keys(heroes), []) : [A.heroLink(x.hero), " " + x.text + "."]))));
     }
-    if (small.length) {
-      const more = el("div", { hidden: true }, A.feed(small, { noDay: true }));
-      p.appendChild(el("button", { class: "btn small", onclick: (ev) => { more.hidden = !more.hidden; ev.target.textContent = more.hidden ? `+ ${small.length} smaller happenings` : "hide"; } }, `+ ${small.length} smaller happenings`));
-      p.appendChild(more);
-    }
+    smallerHappenings(p, small);
     left.appendChild(p);
     const week = L.events.filter((e) => e !== lead && heroic(e) && e.day < today && e.day >= today - 6 && e.imp >= 4).sort(byDayDesc).slice(0, 14);
     if (week.length) left.appendChild(panel("Earlier this week", A.feed(week, { dayHeaders: true })));
@@ -948,7 +1001,7 @@
     m.appendChild(el("p", { class: "small" }, "Hot: ", d.market_hot.map((x, i) => [i ? ", " : "", el("span", { class: "green" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));
     m.appendChild(el("p", { class: "small" }, "Glutted: ", d.market_cold.map((x, i) => [i ? ", " : "", el("span", { class: "red" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));
     right.appendChild(m);
-    const arch = panel("Back issues");
+    const arch = panel("Back issues", el("p", { class: "small" }, el("a", { href: "#/days" }, "Every day's Crier →")));
     for (const x of ds) arch.appendChild(el("div", null, el("a", { href: `#/digest/${x.season}/${x.week}`, class: x === d ? "gold" : "" }, `Season ${x.season}, week ${x.week}`)));
     right.appendChild(arch);
     g.appendChild(right);

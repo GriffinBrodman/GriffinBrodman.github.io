@@ -461,3 +461,5 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .skilltip { position: absolute; z-index: 50; display: none; max-width: 280px; background: var(--parch); border: 2px solid var(--edge2); box-shadow: 3px 3px 0 rgba(42, 27, 17, 0.35); padding: 8px 10px; pointer-events: none; }
 .skilltip .nm { font-family: var(--px); font-size: 15px; color: var(--ink); }
 .tipped { cursor: help; }
+.issue-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.9em; }
+.issues { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
