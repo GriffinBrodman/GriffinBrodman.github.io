@@ -148,12 +148,14 @@
     const m = (L && L.meta) || {};
     return m.season ? [m.season, day - (m.day - m.season_day)] : [1, day];
   }
-  // "S2 · Day 9" on cards; in a sentence "day 9", or "season 2, day 9" when it isn't this season
+  // "S2 · Day 9" on cards; in a sentence "day 9", or "season 2, day 9" when it isn't this season ("in season 2, on day 9" after "on")
   function when(day, prose) {
     if (day == null) return "";
     const [s, d] = seasonOf(day);
     if (!prose) return `S${s} · Day ${d}`;
-    return s === ((L && L.meta) || {}).season ? `day ${d}` : `season ${s}, day ${d}`;
+    const now = s === ((L && L.meta) || {}).season;
+    if (prose === "on") return now ? `on day ${d}` : `in season ${s}, on day ${d}`;
+    return now ? `day ${d}` : `season ${s}, day ${d}`;
   }
 
   // ---------- events ----------
