@@ -615,3 +615,5 @@ input[type=text].pick-search { margin-top: 6px; font-size: 17px; max-width: 320p
 .jump { font: 12px var(--px); color: #2a1a0b; background: linear-gradient(180deg, #f2d27a, var(--brass)); border: 1px solid var(--brass0); padding: 0 6px; border-radius: 2px; }
 table.lifetime td.live { font-style: italic; color: var(--muted); }
 table.boxscore { margin-bottom: 8px; }
+.today-box { margin: 6px 0 4px; padding: 6px 10px; border-left: 3px solid var(--edge); background: var(--parch2); max-width: 520px; }
+.today-box > div + div { margin-top: 2px; }
