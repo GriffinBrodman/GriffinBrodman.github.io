@@ -20,9 +20,194 @@
   function traitWord(t, v) { const w = TRAIT_WORDS[t]; return w[Math.min(4, Math.max(0, Math.floor((v + 1) / 0.4)))]; }
 
   function panel(title, ...kids) { return el("section", { class: "panel" }, title ? el("h2", null, title) : null, ...kids); }
+
+  // ---------- class identity: blade, bow or spell gives a hero's page its own colours, emblem and fighting summary ----------
+  function basePath(c) {
+    let k = c;
+    for (let i = 0; i < 4 && S.classes[k] && (S.classes[k].from || []).length; i++) k = S.classes[k].from[0];
+    return { warrior: "warrior", ranger: "ranger", mage: "mage" }[k] || "warrior";
+  }
+  const PATH = {
+    warrior: { word: "steel", stat: "might" },
+    ranger: { word: "the bow", stat: "agility" },
+    mage: { word: "spellwork", stat: "mind" },
+  };
+  // class emblems come from the art engine (Art.classEmblem); until it has them, the slot stays empty
+  function classIcon(path, px) {
+    if (!(window.Art && Art.classEmblem)) return el("span", { class: "cls-icon empty" });
+    const cv = Art.classEmblem(path).toCanvas(1);
+    cv.className = "cls-icon";
+    cv.style.width = cv.style.height = 16 * (px || 2) + "px";
+    return cv;
+  }
+  function signature(h) {
+    const used = (h.skills || []).filter((s) => s.type !== "world" && s.uses).sort((a, b) => b.uses - a.uses);
+    return used[0] || null;
+  }
+  function nextStep(h) {
+    const nx = h.next_class;
+    if (nx && nx.level === h.level + 1) return `Becomes ${/^[aeiou]/i.test(nx.name) ? "an" : "a"} ${nx.name} at level ${nx.level}`;
+    return `New skill at level ${h.level + 1}`;
+  }
+  // the strongest few traits, in the same words as the Personality panel, plus what they fear
+  function strongTraits(traits, n) {
+    return Object.entries(traits || {}).filter(([t, v]) => TRAIT_WORDS[t] && Math.abs(v) >= 0.35).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, n).map(([t, v]) => traitWord(t, v));
+  }
+  function personaStrip(h) {
+    const words = strongTraits(h.traits, 4);
+    const fears = (h.fears || []).slice(0, 1).map((f) => `afraid of ${f}`);
+    if (!words.length && !fears.length) return null;
+    return el("div", { class: "class-strip persona" }, ...words.map((w) => el("span", { class: "pill soft" }, w)), ...fears.map((f) => el("span", { class: "pill soft" }, f)),
+      h.voice ? el("span", { class: "pill soft" }, `talks ${h.voice}`) : null);
+  }
+  function classStrip(h) {
+    const c = S.classes[h.cls] || {}, path = basePath(h.cls), sig = signature(h);
+    return el("div", { class: "class-strip" }, classIcon(path, 2),
+      el("span", { class: "pill" }, c.row === "front" ? "Front row" : "Back row"),
+      el("span", { class: "pill" }, `Fights with ${PATH[path].word}`),
+      sig ? el("span", { class: "pill gold has-tip", title: sig.desc }, `Signature: ${sig.name} ×${sig.uses}`) : null,
+      h.alive ? el("span", { class: "pill" }, nextStep(h)) : null);
+  }
+  function fightCard(h) {
+    const c = S.classes[h.cls] || {}, path = basePath(h.cls), sig = signature(h);
+    const fighting = (h.skills || []).filter((s) => s.type !== "world");
+    const learned = (h.diary || []).slice().reverse().map(([, t]) => /learned ([^;)]+)/.exec(t)).find(Boolean);
+    const line = `${h.name} fights from the ${c.row === "front" ? "front row, taking the hits" : "back row, out of reach"}, with ${PATH[path].word}` +
+      (sig ? `. Best known for ${sig.name} (${plural(sig.uses, "use")}).` : ". No signature move yet; the first real fight will tell.");
+    return el("section", { class: "panel tight fight-card" }, el("div", { class: "row", style: { gap: "12px", alignItems: "flex-start" } }, classIcon(path, 3),
+      el("div", { style: { flex: 1 } }, el("div", { class: "small" }, el("b", null, `${h.title}. `), c.desc || ""), el("div", { class: "small", style: { marginTop: "3px" } }, line),
+        fighting.length ? el("div", { class: "row wrap", style: { gap: "4px", marginTop: "6px" } }, ...fighting.map((s) => skillTip(el("span", { class: "pill" + (sig && s.id === sig.id ? " gold" : "") }, s.name), s))) : null,
+        learned ? el("div", { class: "tiny dim", style: { marginTop: "4px" } }, `Latest trick: ${learned[1]}. ${nextStep(h)}.`) : null)));
+  }
+  const SKILL_GROUPS = [["Damage", ["attack", "aoe", "multi", "cleave"]], ["Healing", ["heal", "heal_all"]], ["Defence", ["guard", "buff_all", "rally", "buff_self"]],
+    ["Tricks", ["debuff_all", "fear", "stealth", "summon", "trigger"]], ["Always on", ["passive"]], ["On the road", ["world"]]];
+  function skillsPanel(h) {
+    const sk = panel("Skills");
+    const sig = signature(h);
+    const most = Math.max(1, ...(h.skills || []).map((s) => s.uses || 0));
+    const kinds = { passive: "passive", trigger: "trigger", world: "world" };
+    for (const [label, types] of SKILL_GROUPS) {
+      const list = (h.skills || []).filter((s) => types.includes(s.type)).sort((a, b) => (b.uses || 0) - (a.uses || 0));
+      if (!list.length) continue;
+      sk.appendChild(el("div", { class: "tiny gold skill-group" }, label));
+      for (const s of list) sk.appendChild(el("div", { class: `skill ${kinds[s.type] || ""}${sig && s.id === sig.id ? " sig" : ""}`, style: { marginBottom: "5px" } },
+        el("div", { class: "row between" }, el("span", { class: "nm" }, sig && s.id === sig.id ? "★ " : "", s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
+          el("span", { class: "tiny dim" }, s.type === "world" ? "out of combat" : s.type === "passive" ? "always on" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet")),
+        el("div", { class: "small muted" }, s.desc),
+        s.uses && s.type !== "world" && s.type !== "passive" ? A.bar(s.uses, most, "gold") : null,
+        el("div", { class: "tiny dim" }, s.tags.join(" · "))));
+    }
+    if (!(h.skills || []).length) sk.appendChild(el("p", { class: "empty" }, "No skills yet."));
+    sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, `Every level brings a skill, picked by what ${h.name} has been doing. ${nextStep(h)}.`));
+    return sk;
+  }
+  function classTree(h) {
+    const p = panel("Class journey");
+    const row = el("div", { class: "journey" });
+    const sprite = (c) => A.spriteCanvas((f) => Art.heroGrid(Object.assign({}, h, { cls: c, legend: false }), f, S.classes[c]), 2, "", false);
+    h.class_history.forEach(([day, c], i) => {
+      if (i) row.appendChild(el("div", { class: "arrow" }, "→"));
+      row.appendChild(el("div", { class: "step" }, sprite(c), el("div", { class: "small" }, S.classes[c].name), el("div", { class: "tiny dim" }, day ? `world day ${day}` : "")));
+    });
+    p.appendChild(row);
+    p.appendChild(el("p", { class: "small muted" }, S.classes[h.cls].desc));
+    return p;
+  }
   function sortedHeroes(list) { return list.slice().sort((a, b) => (b.alive - a.alive) || b.renown - a.renown || b.level - a.level); }
 
   // ================= HOME: The Daily Crier =================
+  const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind);
+  // what one day's front page shows, from that day's events and the two days before it
+  function crierDay(today, E) {
+    const allToday = E.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id));
+    const todays = allToday.filter(heroic);
+    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
+    const seasonEnd = todays.find((e) => e.kind === "season_end");
+    // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
+    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id))[0];
+    const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
+    const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
+    let lead = seasonEnd || fresh || todays[0];
+    if (!lead || lead.imp < 3) {
+      const recent = E.filter((e) => heroic(e) && e.day >= today - 1 && e.day <= today && e.imp >= 3).sort((a, b) => b.imp - a.imp || b.day - a.day);
+      lead = recent[0] || lead || E.filter((e) => heroic(e) && e.day <= today).sort(byDayDesc)[0];
+    }
+    const second = todays.filter((e) => e !== lead && e.imp >= 3).slice(0, 4);
+    const shown = new Set([lead, ...second]);
+    return { todays, elsewhere, lead, second, main: todays.filter((e) => e.imp >= 2 && !shown.has(e)), small: todays.filter((e) => e.imp < 2) };
+  }
+  function leadAndSecond(parch, lead, second, today) {
+    if (lead) {
+      const scene = Scenes.vignette(lead, 240, 72);
+      scene.className = "scene";
+      const hl = (L.llm_lead || {})[lead.id] || headline(lead);
+      parch.appendChild(el("div", { class: "lead" },
+        lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
+        el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
+        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => `${x.name} (${x.owner})`))].slice(0, 4);
+          return owners.length ? el("div", { class: "small muted" }, "Starring " + owners.join(", ")) : null; })(),
+        scene,
+        el("p", { class: "muted" }, hl === lead.text ? (lead.loc ? A.nodeName(lead.loc) : "") : A.richText(lead.text, lead.heroes, lead.parties),
+          lead.fight && fightSet.has(lead.fight) ? el("a", { href: `#/fight/${lead.fight}`, class: "watch" }, "  ▶ watch the fight") : null),
+        lead.kind === "season_end" ? el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
+          L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null) : null));
+    }
+    if (second.length) {
+      parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
+      parch.appendChild(A.feed(second, { noDay: true }));
+    }
+  }
+  function smallerHappenings(p, small) {
+    if (!small.length) return;
+    const more = el("div", { hidden: true }, A.feed(small, { noDay: true }));
+    p.appendChild(el("button", { class: "btn small", onclick: (ev) => { more.hidden = !more.hidden; ev.target.textContent = more.hidden ? `+ ${small.length} smaller happenings` : "hide"; } }, `+ ${small.length} smaller happenings`));
+    p.appendChild(more);
+  }
+  const issueOf = (day) => (L.issues || []).find((x) => x.day === day);
+  const issueLabel = (x) => `Season ${x.season} · Day ${x.sday}`;
+  const issueHref = (x) => (x.day === lastDay() ? "#/" : `#/day/${x.day}`);
+  function issueNav(day) {
+    const is = L.issues || [], i = is.findIndex((x) => x.day === day);
+    const prev = i > 0 ? is[i - 1] : null, next = i >= 0 && i < is.length - 1 ? is[i + 1] : null;
+    if (!prev && !next) return null;
+    return el("div", { class: "issue-nav" },
+      prev ? el("a", { href: issueHref(prev) }, `‹ Day ${prev.sday}`) : el("span"),
+      el("a", { href: "#/days" }, "Back issues"),
+      next ? el("a", { href: issueHref(next) }, `Day ${next.sday} ›`) : el("span"));
+  }
+
+  // ================= BACK ISSUES =================
+  A.route(/^\/days$/, (v) => {
+    const is = (L.issues || []).slice().reverse();
+    const p = panel("Back issues of the Crier", el("p", { class: "small muted" }, "Every day's front page this age, newest first."));
+    let season = null, ul = null;
+    for (const x of is) {
+      if (x.season !== season) { season = x.season; p.appendChild(el("h4", null, `Season ${season}`)); ul = el("div", { class: "issues" }); p.appendChild(ul); }
+      ul.appendChild(el("a", { class: "btn small", href: issueHref(x) }, `Day ${x.sday}`));
+    }
+    if (!is.length) p.appendChild(el("p", { class: "empty" }, "The first issue comes out on day 1."));
+    v.appendChild(p);
+  });
+  A.route(/^\/day\/(\d+)$/, (v, d) => {
+    const day = +d, x = issueOf(day);
+    if (!x) { v.appendChild(panel("No such issue", el("p", null, el("a", { href: "#/days" }, "All back issues →")))); return; }
+    return A.load(`day/${day}`).then((iss) => {
+      const parch = el("section", { class: "panel parch" });
+      parch.appendChild(el("div", { class: "mast" },
+        el("div", { class: "title" }, "The Daily Crier"),
+        el("div", { class: "sub" }, el("span", null, issueLabel(x)), el("span", null, L.meta.name), el("span", null, "Back issue")),
+        issueNav(day)));
+      const { elsewhere, lead, second, main, small } = crierDay(day, iss.events);
+      leadAndSecond(parch, lead, second, day);
+      v.appendChild(parch);
+      const p = panel(`That day · ${issueLabel(x)}`);
+      p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
+      smallerHappenings(p, small);
+      v.appendChild(p);
+      if (elsewhere.length) v.appendChild(panel("Elsewhere in the realm", el("ul", { class: "diary" }, elsewhere.slice(0, 5).map((e) => el("li", null, A.richText(e.text, [], e.parties))))));
+    });
+  });
+
   A.route(/^\/$/, (v) => {
     const meta = L.meta;
     const parch = el("section", { class: "panel parch" });
@@ -32,7 +217,8 @@
       el("div", { class: "sub" },
         el("span", null, meta.phase === "preseason" ? "Preseason edition" : `Season ${meta.season} · Day ${meta.season_day}`),
         el("span", null, meta.name),
-        el("span", null, theme ? theme.name : "All the news that's fit to shout"))));
+        el("span", null, theme ? theme.name : "All the news that's fit to shout")),
+      meta.phase === "preseason" ? null : issueNav(lastDay())));
     const mineFirst = A.mine().map((id) => heroes[id]).filter(Boolean);
     if (L.annals) v.appendChild(el("section", { class: "finale-hero age-end" },
       el("div", { class: "finale-kicker" }, "The end of an age"),
@@ -67,41 +253,8 @@
     }
 
     const today = lastDay();
-    const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind);
-    const allToday = L.events.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id));
-    const todays = allToday.filter(heroic);
-    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
-    const seasonEnd = todays.find((e) => e.kind === "season_end");
-    // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
-    const leadOf = (day) => L.events.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id))[0];
-    const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
-    const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
-    let lead = seasonEnd || fresh || todays[0];
-    if (!lead || lead.imp < 3) {
-      const recent = L.events.filter((e) => heroic(e) && e.day >= today - 1 && e.imp >= 3).sort((a, b) => b.imp - a.imp || b.day - a.day);
-      lead = recent[0] || lead || evs().filter(heroic).sort(byDayDesc)[0];
-    }
-    if (lead) {
-      const scene = Scenes.vignette(lead, 240, 72);
-      scene.className = "scene";
-      const hl = (L.llm_lead || {})[lead.id] || headline(lead);
-      parch.appendChild(el("div", { class: "lead" },
-        lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
-        el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
-        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => `${x.name} (${x.owner})`))].slice(0, 4);
-          return owners.length ? el("div", { class: "small muted" }, "Starring " + owners.join(", ")) : null; })(),
-        scene,
-        el("p", { class: "muted" }, hl === lead.text ? (lead.loc ? A.nodeName(lead.loc) : "") : A.richText(lead.text, lead.heroes, lead.parties),
-          lead.fight && fightSet.has(lead.fight) ? el("a", { href: `#/fight/${lead.fight}`, class: "watch" }, "  ▶ watch the fight") : null),
-        lead.kind === "season_end" ? el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
-          L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null) : null));
-    }
-    const second = todays.filter((e) => e !== lead && e.imp >= 3).slice(0, 4);
-    if (second.length) {
-      const g = el("div", { class: "grid2", style: { gap: "12px" } });
-      parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
-      parch.appendChild(A.feed(second, { noDay: true }));
-    }
+    const { elsewhere, lead, second, main, small } = crierDay(today, L.events);
+    leadAndSecond(parch, lead, second, today);
 
     const lastSeason = (L.seasons || [])[L.seasons.length - 1];
     if (lastSeason && (meta.phase === "offseason" || lastSeason.end_day >= meta.day - 1)) v.appendChild(finalePanel(lastSeason));
@@ -116,9 +269,6 @@
     grid.append(left, right);
     v.appendChild(grid);
 
-    const shown = new Set([lead, ...second]);
-    const main = todays.filter((e) => e.imp >= 2 && !shown.has(e));
-    const small = todays.filter((e) => e.imp < 2);
     const p = panel(`Since yesterday · Day ${L.meta.season_day}`);
     p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
     const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
@@ -126,11 +276,7 @@
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
       p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(x.text + ".", Object.keys(heroes), []) : [A.heroLink(x.hero), " " + x.text + "."]))));
     }
-    if (small.length) {
-      const more = el("div", { hidden: true }, A.feed(small, { noDay: true }));
-      p.appendChild(el("button", { class: "btn small", onclick: (ev) => { more.hidden = !more.hidden; ev.target.textContent = more.hidden ? `+ ${small.length} smaller happenings` : "hide"; } }, `+ ${small.length} smaller happenings`));
-      p.appendChild(more);
-    }
+    smallerHappenings(p, small);
     left.appendChild(p);
     const week = L.events.filter((e) => e !== lead && heroic(e) && e.day < today && e.day >= today - 6 && e.imp >= 4).sort(byDayDesc).slice(0, 14);
     if (week.length) left.appendChild(panel("Earlier this week", A.feed(week, { dayHeaders: true })));
@@ -323,9 +469,11 @@
     return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "story"); });
   });
 
-  function heroPage(v, h, tab) {
-    const cls = S.classes[h.cls];
-    const head = el("section", { class: "panel" });
+  function heroPage(page, h, tab) {
+    const v = el("div", { class: `heropage path-${basePath(h.cls)}` });
+    page.appendChild(v);
+    const head = el("section", { class: "panel hero-panel" });
+    head.appendChild(el("div", { class: "path-mark" }, classIcon(basePath(h.cls), 8)));
     const portrait = el("div", { class: "portrait" }, A.heroPortrait(h, 5, { cls: "main" }), A.heroSprite(h, 3, { cls: "full" }));
     if (h.pet) portrait.appendChild(A.petSprite(h.pet, 4));
     const isMine = A.mine().includes(h.id);
@@ -339,6 +487,8 @@
         h.epithet ? el("div", { class: "epi" }, h.epithet) : null,
         el("div", { class: "small" }, `Level ${h.level} `, el("span", { class: "has-tip", title: (S.classes[h.cls] || {}).desc || "" }, h.title), h.party ? [" of ", A.partyLink(h.party)] : " · solo"),
         (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by how " + h.name + " fights)" : ""}`) : null,
+        classStrip(h),
+        personaStrip(h),
         h.faction && (S.factions || {})[h.faction] ? el("div", { class: "tiny" }, `${S.factions[h.faction].icon || ""} ${S.factions[h.faction].ranks[h.frank || 0]} of ${S.factions[h.faction].name}`,
           el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
         el("div", { class: "small muted" }, h.npc ? "A league hero" : `${h.owner}'s hero`, ` · joined season ${h.joined || "next"}`,
@@ -428,6 +578,7 @@
     b.appendChild(panel("Diary", el("p", { class: "small dim" }, "The small stuff: shifts worked, dice lost, conversations had."), ul));
   }
   function charTab(b, h) {
+    if (h.alive) b.appendChild(fightCard(h));
     const g = el("div", { class: "grid2" });
     const left = el("div"), right = el("div");
     g.append(left, right);
@@ -450,16 +601,9 @@
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
-    left.appendChild(journeyPanel(h));
-    const sk = panel("Skills");
-    const order = { attack: 0, multi: 0, aoe: 0, cleave: 0, heal: 1, heal_all: 1, guard: 2, buff_all: 2, rally: 2, fear: 2, summon: 2, debuff_all: 2, stealth: 2, trigger: 3, passive: 4, world: 5 };
-    const kinds = { passive: "passive", trigger: "trigger", world: "world" };
-    for (const s of h.skills.slice().sort((a, b) => (order[a.type] || 0) - (order[b.type] || 0))) sk.appendChild(el("div", { class: `skill ${kinds[s.type] || ""}`, style: { marginBottom: "5px" } },
-      el("div", { class: "row between" }, el("span", { class: "nm" }, s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""), el("span", { class: "tiny dim" }, s.type === "world" ? "out of combat" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet")),
-      el("div", { class: "small muted" }, s.desc), el("div", { class: "tiny dim" }, s.tags.join(" · "))));
-    if (!h.skills.length) sk.appendChild(el("p", { class: "empty" }, "No skills yet."));
+    left.appendChild(classTree(h));
+    right.appendChild(skillsPanel(h));
     right.appendChild(affinityPanel(h));
-    right.appendChild(sk);
     right.appendChild(gearPanel(h));
   }
   function traitRow(t, v, big) {
@@ -479,19 +623,6 @@
     return p;
   }
   function nextClass(h) { return h.next_class || null; }
-  function journeyPanel(h) {
-    const p = panel("Class journey");
-    const row = el("div", { class: "journey" });
-    h.class_history.forEach(([day, c], i) => {
-      if (i) row.appendChild(el("div", { class: "arrow" }, "→"));
-      const look = Object.assign({}, h, { cls: c, legend: false });
-      row.appendChild(el("div", { class: "step" }, A.spriteCanvas((f) => Art.heroGrid(look, f, S.classes[c]), 2, "", false),
-        el("div", { class: "small" }, S.classes[c].name), el("div", { class: "tiny dim" }, day ? `world day ${day}` : "")));
-    });
-    p.appendChild(row);
-    p.appendChild(el("p", { class: "small muted" }, S.classes[h.cls].desc));
-    return p;
-  }
   function gearPanel(h) {
     const p = panel("Gear & pack");
     p.appendChild(el("p", null, el("b", null, h.gear.weapon.name), el("span", { class: "dim small" }, ` (tier ${h.gear.weapon.tier} ${h.gear.weapon.family.replace("_", " ")})`), " · ",
@@ -580,25 +711,113 @@
     const e = L.events.filter((x) => (x.parties || []).includes(p.id) && x.imp >= 2).sort(byDayDesc)[0];
     return e ? el("p", { class: "small", style: { marginTop: "6px" } }, el("span", { class: "dim" }, `Day ${e.sday || e.day}: `), e.text) : null;
   }
+  function moraleWord(m) { return m >= 70 ? "happy" : m >= 40 ? "steady" : m >= 20 ? "grumbling" : "about to split"; }
+  function moraleBar(p) {
+    return el("div", { class: "has-tip", title: "The party's mood, 0 to 100. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.",
+      style: { marginTop: "6px" } },
+      el("div", { class: "small", style: { display: "flex", justifyContent: "space-between" } }, el("span", null, "Morale"),
+        el("span", { class: p.morale < 30 ? "red" : "muted" }, `${p.morale}/100 · ${moraleWord(p.morale)}`)),
+      A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"));
+  }
+  // a parchment card that follows a skill badge: what it does, whose it is, how often it's been used
+  let tipBox = null;
+  function skillTip(node, s, owner) {
+    const show = () => {
+      if (!tipBox) { tipBox = el("div", { class: "skilltip", role: "tooltip" }); document.body.appendChild(tipBox); }
+      tipBox.innerHTML = "";
+      tipBox.append(el("div", { class: "nm" }, s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
+        owner ? el("div", { class: "tiny gold" }, owner) : null,
+        el("div", { class: "small" }, s.desc),
+        el("div", { class: "tiny dim" }, [(s.tags || []).join(" · "), s.uses ? `used ${plural(s.uses, "time")}` : "not used yet"].filter(Boolean).join(" — ")));
+      const r = node.getBoundingClientRect();
+      tipBox.style.display = "block";
+      const w = tipBox.offsetWidth, hgt = tipBox.offsetHeight;
+      tipBox.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+      tipBox.style.top = (r.top - hgt - 8 > 8 ? r.top - hgt - 8 : r.bottom + 8) + window.scrollY + "px";
+    };
+    const hide = () => { if (tipBox) tipBox.style.display = "none"; };
+    node.classList.add("tipped");
+    node.tabIndex = 0;
+    node.addEventListener("mouseenter", show);
+    node.addEventListener("focus", show);
+    node.addEventListener("mouseleave", hide);
+    node.addEventListener("blur", hide);
+    node.addEventListener("click", (e) => { e.stopPropagation(); show(); });
+    return node;
+  }
+  window.addEventListener("hashchange", () => { if (tipBox) tipBox.style.display = "none"; });
+  document.addEventListener("click", () => { if (tipBox) tipBox.style.display = "none"; });
+  function partyTags(p) {
+    const t = p.tactics;
+    if (!t || p.disbanded) return null;
+    const temper = ["bold", "cautious", "patient", "reckless", "silver-hungry"];
+    const persona = [cap(p.disposition), ...strongTraits(t.traits, 3)].filter((w, i, a) => a.indexOf(w) === i);
+    const fight = [t.mix, ...t.style.filter((s) => !temper.includes(s))];
+    return el("div", null,
+      el("div", { class: "class-strip persona" }, ...persona.map((w) => el("span", { class: "pill soft" }, w))),
+      el("div", { class: "class-strip" }, ...fight.map((w) => el("span", { class: "pill" }, w))));
+  }
+  function tacticsPanel(p) {
+    const t = p.tactics;
+    if (!t) return null;
+    const pn = panel("How they fight");
+    const who = (id) => heroes[id];
+    const fig = (id) => el("a", { class: "fig", href: `#/hero/${id}` }, A.heroSprite(who(id), 2), el("div", { class: "tiny" }, who(id).name),
+      el("div", { class: "tiny gold" }, ((p.roles || {})[id] || "").replace("Leader · ", "")), classIcon(basePath(who(id).cls), 1));
+    const form = el("div", { class: "formation" },
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "BACK ROW"), ...(t.back.some(who) ? t.back.filter(who).map(fig) : [el("div", { class: "small dim nobody" }, "nobody")])),
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "FRONT ROW"), ...(t.front.some(who) ? t.front.filter(who).map(fig) : [el("div", { class: "small dim nobody" }, "nobody")])),
+      el("div", { class: "foe" }, window.Art && Art.dummyGrid ? Object.assign(Art.dummyGrid().toCanvas(1), { className: "dummy" }) : null, el("div", { class: "tiny dim" }, "the enemy")));
+    pn.appendChild(form);
+    if (t.plan) pn.appendChild(el("p", { style: { marginTop: "8px" } }, el("b", null, "The plan: "), t.plan));
+    if (t.notes.length) pn.appendChild(el("ul", { class: "small tac-notes" }, ...t.notes.map((n) => el("li", null, n))));
+    const g = el("div", { class: "grid2 even", style: { marginTop: "10px" } });
+    const share = el("div");
+    const cols = [["dmg", "Damage dealt", "red"], ["healed", "Healing", "green"], ["taken", "Damage taken", "blue"]];
+    share.appendChild(el("div", { class: "tiny gold skill-group" }, "Who does what this season"));
+    for (const [k, label, col] of cols) {
+      const tot = t.share.reduce((a, s) => a + s[k], 0);
+      if (!tot && k === "taken" && t.share.some((s) => s.dmg)) { share.append(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label), el("div", { class: "small dim", style: { fontStyle: "italic" } }, "Not a scratch so far.")); continue; }
+      if (!tot) continue;
+      share.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label));
+      for (const s of t.share.slice().sort((a, b) => b[k] - a[k])) if (who(s.hero) && s[k]) share.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, who(s.hero).name), A.bar(s[k], tot, col), el("span", { class: "word small" }, `${Math.round((100 * s[k]) / tot)}%`)));
+    }
+    if (!t.share.some((s) => s.dmg || s.healed || s.taken)) share.appendChild(el("p", { class: "empty" }, "No fights together yet."));
+    if (t.ground) share.appendChild(el("p", { class: "small", style: { marginTop: "8px" } }, "Home ground: ", el("b", null, t.ground.name), el("span", { class: "dim" }, ` (${plural(t.ground.fights, "fight")})`)));
+    const sk = el("div", { class: "together" });
+    sk.appendChild(el("div", { class: "tiny gold skill-group" }, "What they can do, together"));
+    for (const grp of t.skills) {
+      if (grp.label === "On the road" || grp.label === "Always on") continue;
+      sk.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, grp.label));
+      sk.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, ...grp.skills.map((s) => skillTip(el("span", { class: "pill" + (s.uses ? " gold" : "") },
+        `${s.name}`, el("span", { class: "dim" }, ` · ${who(s.hero) ? who(s.hero).name : ""}${s.uses ? " ×" + s.uses : ""}`)), s, who(s.hero) ? `${who(s.hero).name}'s skill` : ""))));
+    }
+    const road = t.skills.filter((g) => g.label === "On the road" || g.label === "Always on").flatMap((g) => g.skills);
+    if (road.length) sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, "Also: ", ...road.map((s, i) => [i ? ", " : "", skillTip(el("span", null, `${s.name} (${who(s.hero) ? who(s.hero).name : ""})`), s, who(s.hero) ? `${who(s.hero).name}'s skill` : "")])));
+    g.append(share, sk);
+    pn.appendChild(g);
+    return pn;
+  }
   function partyCard(p) {
     const ms = el("div", { class: "row", style: { gap: "0" } });
     for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
     return el("a", { class: "panel", href: `#/party/${p.id}`, style: { display: "block", color: "inherit", opacity: p.disbanded ? 0.65 : 1 } },
       el("div", { class: "row" }, A.bannerSprite(p.banner, 3), el("div", null, el("h3", { style: { marginBottom: "2px" } }, p.name),
+        p.motto ? el("div", { class: "small motto" }, `“${p.motto}”`) : null,
         el("div", { class: "small muted" }, p.disbanded ? `Disbanded day ${p.disbanded}` : [el("span", { class: "has-tip", title: S.dispositions[p.disposition] || "" }, cap(p.disposition)),
-          ` · morale ${p.morale} (${p.morale >= 70 ? "happy" : p.morale >= 40 ? "steady" : p.morale >= 20 ? "grumbling" : "about to split"}) · ${p.renown} renown`]),
+          ` · ${p.renown} renown`]),
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
-      ms, p.disbanded ? null : A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"), lastNews(p));
+      ms, p.disbanded ? null : moraleBar(p), lastNews(p));
   }
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);
-    head.appendChild(el("div", { class: "row wrap", style: { gap: "16px" } }, A.bannerSprite(p.banner, 4),
-      el("div", { style: { flex: 1 } }, el("h1", null, p.name),
+    head.appendChild(el("div", { class: "row wrap", style: { gap: "16px" } }, A.bannerSprite(p.banner, 6),
+      el("div", { style: { flex: 1 } }, el("h1", null, p.name), p.motto ? el("div", { class: "motto big" }, `“${p.motto}”`) : null, partyTags(p),
         el("p", { class: "muted" }, `Founded day ${p.founded_day} (season ${p.founded_season})`, p.disbanded ? ` · disbanded day ${p.disbanded}` : ` · ${p.renown} renown`),
         el("p", null, S.dispositions[p.disposition]),
-        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
+        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
           el("div", { class: "tiny dim" }, "The party's mood. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.")),
-        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, cap(p.doing || ""), (p.doing || "").includes(p.loc_name) ? "" : ` · in ${p.loc_name}`),
+        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, p.doing ? [cap(p.doing), p.doing.includes(p.loc_name) ? "" : ` · in ${p.loc_name}`] : `In ${p.loc_name}`),
         p.why && !p.disbanded && !p.quest ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${p.why}.`) : null,
         goalLine(p.goal), ...(p.vows || []).map((v) => vowLine(v))),
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
@@ -614,9 +833,11 @@
         q.floors ? el("div", { class: "small" }, `Floor ${Math.min(q.floors, (q.floor || 0) + 1)} of ${q.floors}`, A.bar((q.floor || 0) + 1, q.floors, "gold")) : null,
         q.why ? el("p", { class: "small muted", style: { fontStyle: "italic", marginTop: "4px" } }, `Why: ${q.why}.`) : null))) : null;
     if (quest) v.appendChild(quest);
+    const tac = p.disbanded ? null : tacticsPanel(p);
     v.appendChild(panel("Members", mem,
       p.fallen.length ? el("p", { class: "small red", style: { marginTop: "8px" } }, "Fallen: ", p.fallen.map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null,
       p.former.length ? el("p", { class: "small dim" }, "Former members: ", p.former.filter((f) => !p.fallen.includes(f)).map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null));
+    if (tac) v.appendChild(tac);
     const g = el("div", { class: "grid2" });
     const list = p.events.map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
     g.appendChild(panel("History", A.feed(list, { dayHeaders: true })));
@@ -766,7 +987,7 @@
         if (!p) return;
         const grp = el("div", { class: "grp-row" });
         for (const m of p.members) if (heroes[m]) grp.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp" }));
-        t.appendChild(el("tr", null, el("td", { class: "dim" }, r.rank || i + 1), el("td", null, moveMark(r, d.week)), el("td", null, A.bannerSprite(p.banner, 1)), el("td", null, A.partyLink(p.id), grp), el("td", { class: "num gold" }, r.renown)));
+        t.appendChild(el("tr", null, el("td", { class: "dim" }, r.rank || i + 1), el("td", null, moveMark(r, d.week)), el("td", null, A.bannerSprite(p.banner, 2)), el("td", null, A.partyLink(p.id), grp), el("td", { class: "num gold" }, r.renown)));
       });
       right.appendChild(panel("Party power rankings", t));
     }
@@ -780,7 +1001,7 @@
     m.appendChild(el("p", { class: "small" }, "Hot: ", d.market_hot.map((x, i) => [i ? ", " : "", el("span", { class: "green" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));
     m.appendChild(el("p", { class: "small" }, "Glutted: ", d.market_cold.map((x, i) => [i ? ", " : "", el("span", { class: "red" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));
     right.appendChild(m);
-    const arch = panel("Back issues");
+    const arch = panel("Back issues", el("p", { class: "small" }, el("a", { href: "#/days" }, "Every day's Crier →")));
     for (const x of ds) arch.appendChild(el("div", null, el("a", { href: `#/digest/${x.season}/${x.week}`, class: x === d ? "gold" : "" }, `Season ${x.season}, week ${x.week}`)));
     right.appendChild(arch);
     g.appendChild(right);

@@ -256,27 +256,237 @@
     return n;
   }
 
-  // ---------- banners & icons ----------
-  function drawBanner(b, size) {
-    const g = new Grid(16, 20);
-    const c1 = ramp(b.c1), c2 = ramp(b.c2);
-    g.vline(1, 0, 19, WOOD); g.set(1, 0, GOLD);
-    for (let y = 1; y < 15; y++) { const w = y > 11 ? 14 - (y - 11) * 3 : 14; g.hline(2, Math.max(2, 1 + w), y, y % 2 ? c1[2] : c1[2]); }
-    g.rect(2, 1, 14, 2, c2[2]);
-    for (let y = 1; y < 12; y++) g.set(2, y, c1[3]);
-    const e = EMBLEM[b.emblem] || EMBLEM.star;
-    for (const [x, y] of e) g.set(x + 6, y + 5, c2[3]);
+  // ---------- banners ----------
+  // emblem marks: o deep, - shade, # base, + light, * highlight. S is drawn on the 16x20 banner, L on the 24x30 one
+  const EMBLEM = {
+    sword: {
+      S: [".......*", "......+-", ".....+-.", "..#.+-..", "...#....", "..-.#...", ".+......", "#......."],
+      L: ["............*", "...........*-", "..........+-.", ".........+-..", "........+-...", ".......+-....", "..#+..+-.....", "...#++-......", "....#+.......", "...-.#+......", "..-...#......", "+#...........", "#-..........."],
+    },
+    skull: {
+      S: [".+++#-.", "+*+###-", "+oo#oo-", "#oo#oo-", ".##o##.", ".#-#-#.", "..-.-.."],
+      L: ["...+++##...", ".+*+++###-.", "+*++++####-", "+#ooo#ooo#-", "#+ooo#ooo#-", "#+oo###oo#-", ".##++o+##-.",
+        "..#-#o#-#..", "..#o#o#o#..", "...-#-#-...", "..........."],
+    },
+    star: {
+      S: ["...*...", "..+*#..", "++++##-", ".+###-.", "..##-..", ".+#.#-.", "+#...--"],
+      L: [".....*.....", ".....+.....", "....+*-....", "....+#-....", "*++++##----", ".++####---.", "..+####--..",
+        "..+##.##-..", ".+#-...+#-.", ".#-.....-#.", "..........."],
+    },
+    paw: {
+      S: [".+#.+#.", ".#-.#-.", "+.....+", "#.+#-.-", ".+###-.", ".####-.", "..-.-.."],
+      L: ["..+#...+#..", ".+*#-.+*#-.", ".##--.##--.", "..--...--..", "+#.......+#", "*#-.+#-.*#-", "#-.+*##-.#-", "..+*####-..", ".+######--.", ".###-.-##-.", "..--...--.."],
+    },
+    tree: {
+      S: ["...*...", "..+#-..", ".+*#--.", "..+#-..", ".+*##-.", "+*###--", "..o#o.."],
+      L: [".....*.....", "....+#-....", "...+*#--...", "....+#-....", "..+*##---..", ".+*###----.", "...+##--...", ".+*####---.", "+*#####----", "....o#o....", "...-###-..."],
+    },
+    moon: {
+      S: ["..*+#..", ".+#-...", "+#-....", "+#-....", "##-....", ".#--...", "..-##.."],
+      L: ["...+*++#...", "..+*#-.....", ".+*#-......", "+*#-.......", "+##-.......", "+##-.......", "##--.......",
+        ".##--......", ".-##--.....", "..-###--...", "....----..."],
+    },
+    flame: {
+      S: ["...+...", "..+#...", ".+##-.+", "+#+##-#", "#+*+##-", "#+**+#-", ".-###-."],
+      L: [".....+.....", "....+#.....", "...+##-....", "...+##-..+.", ".+.#+#-.+-.", ".+##++###-.", "+##+*++##-.", "+##+***+##-", "+##+***+##-", ".###+*+##-.", "..-#####-.."],
+    },
+    crown: {
+      S: ["*..*..*", "#.+#-.#", "#+###-#", "#*#*#*-", "-------"],
+      L: ["*....*....*", "+-..+#-..+-", "#+..+#-..#-", "#+-+*##-+#-", "#*###+###--", "+*++####---", "#*##*##*##-", "-----------"],
+    },
+    eye: {
+      S: ["..---..", ".-+oo-.", "-+o*o+-", ".-ooo-.", "..---.."],
+      L: ["...-----...", ".--+ooo+--.", "-++ooooo++-", "-+*o*ooo++-", ".-+ooooo+-.", "..--ooo--..", "....---...."],
+    },
+    coin: {
+      S: ["..+##..", ".+ooo-.", "+o*+#o-", "+o+#-o-", "+o#--o-", ".-ooo-.", "..---.."],
+      L: ["...+###...", ".+*++##-#..", ".+*#ooo##-.", "+*#o###o#-.", "+#o##+##o#-", "+#o#+#-#o#-", "+#o##-##o#-", ".#-o###o#-.", ".-#-ooo##-.", "..-##-##-..", "....---...."],
+    },
+    hammer: {
+      S: ["...**...", "..**++..", "..+#+++.", "...-#++-", "...#-#--", "..#..-o.", ".#......", "#......."],
+      L: [".....**.....", "....**++....", "...++#+++...", "....-##+++..", ".....-##+++.", ".....+-##++-", "....+##-##--", "...+##..-oo.", "..-##....o..", ".+oo........", "-##.........", "oo.........."],
+    },
+    wave: {
+      S: ["..+*...+", ".+*-#.+*", "+#..-##-", "-.....-.", "..+*...+", ".+*-#.+*", "+#..-##-", "-.....-."],
+      L: ["..+**....+*", ".+*-#+..+*-", "+#-..-#+#-.", "-.....--...", "..+**....+*", ".+*-#+..+*-", "+#-..-#+#-.", "-.....--...", "..+**....+*", ".+*-#+..+*-", "+#-..-#+#-.", "-.....--..."],
+    },
+    horseshoe: {
+      S: [".+***#-.", "+*#--##-", "+#-..-#-", "+#....#-", "+o....o-", "+#....#-", "*#-..-##", "--....--"],
+      L: ["...++**+...", ".+*##o##+-.", "+*o-...-o#-", "+#-.....-#-", "+o-.....-o-", "+#-.....-#-", ".+o-...-o-.", ".+#-...-#-.", "+*#-...-##-", "---.....---"],
+    },
+    lizard: {
+      S: ["..+*-..", "+.+#-.+", ".++#--.", "..+#-..", "..+#-..", ".++#--.", "+.+#-.-", "...#...", "....#..", "...-..."],
+      L: ["....+#-....", "...o+##o...", "+...+#-...+", ".+-+*##-+-.", "....+##-...", "....+#--...", "....+##-...", ".+-+###-+-.", "+...+#-...+", ".....##....", "......#-...", "......-#...", ".......-#..", "........-.."],
+    },
+    snowflake: {
+      S: ["..+++..", ".+.+.#.", "+.+*#.-", "++**---", "+.#--.-", ".#.-.-.", "..---.."],
+      L: [".....+.....", "....+++....", "..+..+..#..", "...+.+.#...", ".+..+*#..-.", "++++**-----", ".+..#--..-.", "...#.-.-...", "..#..-..-..", "....---....", ".....-....."],
+    },
+    bolt: {
+      S: ["...+**#", "..+*#-.", ".+*#-..", "+*####-", "...+#-.", "..+#-..", "..#-...", ".-....."],
+      L: [".....+**#-.", "....+*##-..", "...+*##-...", "..+*##-....", ".+*##-.....", "+*#######-.", ".....+##-..", ".....+#-...", "....+#-....", "....+-.....", "...+-......", "...-.......", "..-........"],
+    },
+    shield: {
+      S: ["+*++##-", "++#o#--", "+ooooo-", "+##o#--", ".+#o#-.", ".-#o--.", "..-o-..", "...-..."],
+      L: ["+*+++++##--", "+*++#o###--", "++++#o###--", "+++##o###--", "+ooooooooo-", "++##-o-##--", "+###-o-##--", ".+##-o-#--.", ".-##-o-#--.", "..-##o--...", "...-#o-....", "....---...."],
+    },
+    arrows: {
+      S: ["*+#...#+*", "+#.....#+", "#.+...#.#", "...+.#...", "....*....", "...#.+...", ".+#...+#.", "+#-...-+#", "#-.....-+"],
+      L: ["*++#.....#++*", "++#.......#++", "+#+.......##+", "#..+.....#..#", "....+...#....", ".....+.#.....", "......*......", ".....#.+.....", "....#...+....", "..+#.....+#..", ".+#-.....-+#.", "+#-.......-+#", "#-.........-+"],
+    },
+    lute: {
+      S: [".......+", "......+-", ".....+-.", "....+-..", ".+*+#-..", "+*+o##-.", "+#####-.", ".-###--.", "..---..."],
+      L: ["..........+.", ".........+*-", "........+#o-", ".......+#-..", "......+#-...", ".....+#-....", "...++*#-....", "..+*++##-...", ".+*+oo###-..", "+*++oo####-.", "+#++####--..", ".+#####--...", "..-###--....", "...---......"],
+    },
+    lantern: {
+      S: ["..-#-..", "..#.#..", ".+##-..", "+o**o-.", "+o*+o-.", "+o++o-.", ".+##-..", "+###--."],
+      L: ["....-#-....", "....#.#....", "...+###-...", "..+*###-...", ".+-o-o-o-..", ".+o*+*+o-..", ".#o***+o-..", ".#o*+*+o-..", ".#o+*+*o-..", ".#o+++#o-..", ".+-o-o-o-..", "..+###--...", ".+*####--..", "..-----...."],
+    },
+  };
+  const BANNER_SHAPES = ["flag", "swallow", "point", "tails", "fringe", "notch"];
+  const BANNER_FIELDS = ["plain", "chief", "bordure", "end", "bars", "pale", "bend"];
+  const METAL_TINCT = { gold: "#e8b84a", silver: "#d4d8e2", sable: "#3a3444", gules: "#b8323a", azure: "#243f8c" };
+  const WOOD_R = ["#3e2616", "#5e3a22", "#8a5a32", "#ac7a46", "#cc9a5e"];
+  const GOLD_R = ramp(GOLD);
+  function dist(a, b) { const x = hexToRgb(a), y = hexToRgb(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); }
+  function lum(hex) { const [r, g, b] = hexToRgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+
+  function bannerLook(b) {
+    const h = hash(String(b.c1) + "|" + String(b.c2) + "|" + b.emblem);
+    const c1 = b.c1 || "#c8323c";
+    let c2 = b.c2 || GOLD;
+    if (c1.toLowerCase() === c2.toLowerCase()) c2 = lum(c1) > 0.5 ? mix(c1, "#1a1220", 0.45) : (h & 1 ? GOLD : METAL_TINCT.silver);
+    // the old heraldic rule: a charge needs a light tincture on a dark field or a dark one on a light field
+    const reads = (t, f = c1) => lum(t) >= 0.24 && Math.abs(lum(t) - lum(f)) >= 0.33 && Math.max(lum(t), lum(f)) >= 0.58 && dist(t, f) > 120;
+    let tinct = c2;
+    if (!reads(c2)) {
+      const warm = ["flame", "coin", "crown", "star", "bolt", "lantern"].includes(b.emblem), cold = ["moon", "skull", "sword", "eye", "snowflake", "wave", "horseshoe", "shield", "hammer"].includes(b.emblem);
+      const pool = lum(c1) > 0.55 ? [METAL_TINCT.gules, METAL_TINCT.azure] : warm ? [METAL_TINCT.gold] : cold ? [METAL_TINCT.silver] : [METAL_TINCT.gold, METAL_TINCT.silver];
+      const ok = pool.filter((t) => reads(t));
+      tinct = ok.length ? ok[(h >>> 3) % ok.length] : lum(c1) > 0.55 ? METAL_TINCT.sable : pool[(h >>> 3) % pool.length];
+    }
+    let field = BANNER_FIELDS[(h >>> 8) % BANNER_FIELDS.length];
+    if ((field === "pale" || field === "bend") && !reads(tinct, c2)) field = "chief";
+    if (tinct !== c2 && field === "plain") field = "bordure";
+    if (tinct === c2 && (field === "chief" || field === "end")) field = (h >>> 12) & 1 ? "bordure" : "bars";
+    return { h, c1, c2, tinct, field, shape: BANNER_SHAPES[(h >>> 16) % BANNER_SHAPES.length] };
+  }
+
+  function drawBanner(b, big) {
+    const k = big ? 1.5 : 1, W = big ? 24 : 16, H = big ? 30 : 20, R = (v) => Math.round(v * k);
+    const L = bannerLook(b), r1 = ramp(L.c1), r2 = ramp(L.c2), dark = lum(L.tinct) < 0.2, rnd = rng(L.h);
+    const rt = dark ? ["#120e16", "#1c1820", L.tinct, mix(L.tinct, "#8a8098", 0.22), mix(L.tinct, "#a89cb8", 0.4)] : ramp(L.tinct);
+    const g = new Grid(W, H), cloth = new Grid(W, H), shade = new Float32Array(W * H), zone = new Uint8Array(W * H);
+    const flying = L.shape === "flag" || L.shape === "swallow";
+    let x0, x1, top = [], bot = [], ex, ey, cy0, cy1;
+    if (flying) {
+      const px = big ? 2 : 1, pw = big ? 2 : 1;
+      x0 = px + pw + 1; x1 = W - 2;
+      const y0 = big ? 6 : 4, ch = R(11), phi = rnd() * 6.28, amp = big ? 1.6 : 1.1;
+      for (let x = x0; x <= x1; x++) {
+        const t = (x - x0) / (x1 - x0), ph = t * 7 + phi, lift = Math.max(0, (t - 0.5) / 0.5);
+        const dy = Math.round(amp * Math.sin(ph) * lift);
+        top[x] = y0 + dy; bot[x] = y0 + ch - 1 + dy;
+        const s = 0.75 * Math.cos(ph) * (0.35 + 0.65 * Math.min(1, t * 3));
+        for (let y = top[x]; y <= bot[x]; y++) {
+          if (L.shape === "swallow") {
+            const nd = R(3.5), mid = (top[x] + bot[x]) / 2, into = x - (x1 - nd);
+            if (into > 0 && Math.abs(y - mid) < into * (ch / 2) / nd - 0.2) continue;
+          }
+          cloth.set(x, y, 1);
+          shade[y * W + x] = s + (y === top[x] ? 0.45 : 0) + (y === bot[x] ? -0.45 : 0) + (x === x0 ? -0.7 : 0);
+        }
+      }
+      for (let y = 1; y < H; y++) for (let i = 0; i < pw; i++) g.set(px + i, y, WOOD_R[pw === 1 ? (y < 8 ? 3 : 2) : i === 0 ? 3 : 1]);
+      if (big) {
+        [[2, 0, 4], [3, 0, 3], [1, 1, 3], [2, 1, 4], [3, 1, 2], [4, 1, 1], [2, 2, 3], [3, 2, 1], [1, 3, 3], [2, 3, 2], [3, 3, 2], [4, 3, 0]].forEach(([x, y, i]) => g.set(x, y + 1, GOLD_R[i]));
+        g.rect(1, 5, 1, 1, GOLD_R[2]); g.rect(4, 5, 1, 1, GOLD_R[1]);
+      } else {
+        g.set(1, 0, GOLD_R[4]); g.set(1, 1, GOLD_R[3]); g.set(0, 2, GOLD_R[3]); g.set(1, 2, GOLD_R[2]); g.set(2, 2, GOLD_R[1]);
+      }
+      ex = x0 + Math.round((x1 - x0) * 0.42); ey = y0 + Math.floor(ch / 2); cy0 = y0; cy1 = y0 + ch - 1;
+    } else {
+      const pc = W / 2 - 1, cb = big ? 5 : 3;
+      x0 = big ? 4 : 3; x1 = W - 1 - x0;
+      const y0 = cb + (big ? 2 : 1), yb = big ? 22 : 14, pd = R(2.6), w = x1 - x0;
+      for (let y = 1; y < H; y++) { g.set(pc, y, WOOD_R[3]); g.set(pc + 1, y, WOOD_R[1]); }
+      if (big) {
+        [[1, 0, 4], [0, 1, 3], [1, 1, 4], [2, 1, 2], [-1, 2, 3], [0, 2, 2], [1, 2, 2], [2, 2, 1], [0, 3, 1], [1, 3, 0]].forEach(([x, y, i]) => g.set(pc + x, y, GOLD_R[i]));
+      } else {
+        g.set(pc, 0, GOLD_R[4]); g.set(pc + 1, 0, GOLD_R[2]); g.set(pc, 1, GOLD_R[3]); g.set(pc + 1, 1, GOLD_R[1]);
+      }
+      for (let x = 2; x <= W - 3; x++) { g.set(x, cb, WOOD_R[3]); if (big) g.set(x, cb + 1, WOOD_R[1]); }
+      for (const ax of [1, W - 2]) { g.set(ax, cb, GOLD_R[3]); if (big) g.set(ax, cb + 1, GOLD_R[1]); }
+      const tl = big ? 6 : 4;
+      // tassels hang a pixel in from the canvas edge so they keep their outline
+      for (const tx of big ? [2, W - 3] : [1, W - 2]) {
+        for (let y = cb + 1; y < cb + tl; y++) g.set(tx, y, GOLD_R[1]);
+        g.set(tx, cb + tl, GOLD_R[3]); g.set(tx, cb + tl + 1, GOLD_R[2]);
+        if (big) { g.set(tx + (tx > W / 2 ? 1 : -1), cb + tl + 1, GOLD_R[1]); g.set(tx, cb + tl + 2, GOLD_R[1]); }
+      }
+      for (let x = x0; x <= x1; x++) {
+        const u = (x - x0) / w, c = Math.abs(u - 0.5) * 2;
+        let yy = yb;
+        if (L.shape === "point") yy = yb + Math.round(pd * (1 - c));
+        else if (L.shape === "notch") yy = yb + Math.round(pd * c);
+        else if (L.shape === "tails") yy = yb + Math.round(pd * (1 - Math.abs(((u * 3) % 1) - 0.5) * 2));
+        top[x] = y0; bot[x] = yy;
+        const s = 0.55 * Math.sin(u * 6.28 * 1.5 + 0.8) + (x === x0 ? 0.5 : 0) + (x === x1 ? -0.6 : 0);
+        for (let y = y0; y <= yy; y++) {
+          cloth.set(x, y, 1);
+          shade[y * W + x] = s + (y === y0 ? -0.9 : 0) + (y >= yy - (big ? 1 : 0) ? -0.35 : 0) + (y - y0) / (yb - y0) * -0.25;
+        }
+      }
+      if (L.shape === "fringe") for (let x = x0; x <= x1; x++) { g.set(x, yb + 1, GOLD_R[(x & 1) ? 2 : 3]); if ((x & 1) === 0 || big) g.set(x, yb + 2, GOLD_R[x & 1 ? 1 : 2]); }
+      ex = Math.floor((x0 + x1) / 2) + 1; ey = y0 + Math.round((yb - y0) * 0.5); cy0 = y0; cy1 = yb;
+    }
+    const inC = (x, y) => !!cloth.get(x, y);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!inC(x, y)) continue;
+      const u = (x - x0) / (x1 - x0), v = (y - top[x]) / Math.max(1, bot[x] - top[x]);
+      let z = 0;
+      const edge = !inC(x - 1, y) || !inC(x + 1, y) || !inC(x, y - 1) || !inC(x, y + 1) || (big && (!inC(x - 1, y - 1) || !inC(x + 1, y + 1) || !inC(x + 1, y - 1) || !inC(x - 1, y + 1)));
+      switch (L.field) {
+        case "chief": z = v < 0.24 ? 1 : 0; break;
+        case "bordure": z = edge ? 1 : 0; break;
+        case "end": z = flying ? (u > 0.74 ? 1 : 0) : (y > (big ? 19 : 12) ? 1 : 0); break;
+        case "bars": { const yy = y - top[x], hh = bot[x] - top[x]; z = flying ? (yy === 1 || yy === hh - 1 || (big && (yy === 2 || yy === hh - 2)) ? 1 : 0) : (x - x0 === 1 || x1 - x === 1 ? 1 : 0); break; }
+        case "pale": z = u > 0.5 ? 1 : 0; break;
+        case "bend": z = u * 1.2 + v > 1.1 ? 1 : 0; break;
+      }
+      zone[y * W + x] = z;
+    }
+    const em = (EMBLEM[b.emblem] || EMBLEM.star)[big ? "L" : "S"];
+    const eh = em.length, ew = em[0].length, ox = ex - Math.floor(ew / 2);
+    // under a chief the charge drops into the open field below it
+    const oy = L.field === "chief" ? Math.max(ey - Math.floor(eh / 2), Math.min(cy0 + Math.ceil((cy1 - cy0) * 0.24) + 1, cy1 - eh)) : ey - Math.floor(eh / 2);
+    const emb = new Grid(W, H);
+    em.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") emb.set(ox + i, oy + j, ch); }));
+    // a light charge gets a dark rim; a dark charge on a light field is crisp enough without one
+    const rim = lum(L.tinct) > lum(L.c1) - 0.1;
+    const MARK = { o: 0, "-": 1, "#": 2, "+": 3, "*": 4 };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!inC(x, y)) continue;
+      const i = y * W + x, s = shade[i] + ((x + y) & 1 ? 0.05 : -0.05) * (big ? 1 : 0);
+      const fr = zone[i] ? r2 : r1;
+      let idx = s > 0.85 ? 4 : s > 0.32 ? 3 : s < -0.85 ? 0 : s < -0.32 ? 1 : 2;
+      if (fr === r1 && idx === 4 && !big) idx = 3;
+      const m = emb.get(x, y);
+      if (m) {
+        let ei = MARK[m];
+        if (big && ei > 0) ei = Math.max(1, Math.min(4, ei + (shade[i] > 0.6 ? 1 : shade[i] < -0.6 ? -1 : 0)));
+        // a dark charge is voided: its inner marks show the field through
+        g.set(x, y, ei ? rt[ei] : dark ? fr[3] : mix(rt[0], OUTLINE, 0.45));
+        continue;
+      }
+      const at = (dx, dy) => !!emb.get(x + dx, y + dy);
+      // the charge casts a shadow down and to the right; the large banner also gets a thin rim on every side
+      const near = rim && (at(-1, 0) || at(0, -1) || at(-1, -1) || (big && (at(1, 0) || at(0, 1))));
+      g.set(x, y, near ? mix(fr[0], OUTLINE, 0.35) : fr[idx]);
+    }
     g.outline(OUTLINE);
     return g;
   }
-  const EMBLEM = {
-    sword: [[2, 0], [2, 1], [2, 2], [2, 3], [1, 4], [2, 4], [3, 4], [2, 5]], skull: [[1, 0], [2, 0], [3, 0], [0, 1], [2, 1], [4, 1], [1, 2], [2, 2], [3, 2], [1, 3], [3, 3]],
-    star: [[2, 0], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [1, 3], [3, 3], [0, 4], [4, 4]],
-    paw: [[0, 0], [2, 0], [4, 0], [1, 2], [2, 2], [3, 2], [1, 3], [2, 3], [3, 3]], tree: [[2, 0], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [2, 3], [2, 4]],
-    moon: [[1, 0], [2, 0], [0, 1], [0, 2], [0, 3], [1, 4], [2, 4]], flame: [[2, 0], [1, 1], [2, 1], [1, 2], [2, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3], [1, 4], [2, 4]],
-    crown: [[0, 0], [2, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2]], eye: [[1, 1], [2, 1], [3, 1], [0, 2], [2, 2], [4, 2], [1, 3], [2, 3], [3, 3]],
-    coin: [[1, 0], [2, 0], [3, 0], [0, 1], [4, 1], [0, 2], [2, 2], [4, 2], [0, 3], [4, 3], [1, 4], [2, 4], [3, 4]],
-  };
 
   function drawGrave(name) {
     const g = new Grid(14, 16);
@@ -285,6 +495,40 @@
     g.rect(6, 4, 2, 6, st[0]); g.rect(4, 6, 6, 2, st[0]); g.rect(0, 14, 14, 2, "#3a5a3a"); g.set(1, 13, "#5a8a4a"); g.set(12, 13, "#5a8a4a");
     g.outline(OUTLINE);
     return g;
+  }
+
+  // the target dummy on party pages: a straw-stuffed sack on a post, bullseye on the chest, a dented pot for a helmet
+  function drawDummy() {
+    const R = Paint.ramp, P = new Paint.Paint(24, 32);
+    const M = { wood: R("#7a5232"), sack: R("#b8986a"), straw: R("#d8b450"), rope: R("#8a6a40"), red: R("#b0303a"), cream: R("#ece0c4"),
+      pot: R("#5e5c6a"), dirt: R("#6a5034"), grass: R("#5a8a3a") };
+    P.layer = 1;
+    P.ell(12, 30.6, 6.5, 1.9, "dirt", { s: -0.15 });
+    P.rect(11, 20, 2, 11, "wood", (x) => (x === 11 ? 0.3 : -0.35));
+    P.rect(1, 12, 22, 2, "wood", (x, y) => (y === 12 ? 0.35 : -0.3) - (x - 12) * 0.02);
+    P.layer = 2;
+    P.ell(12, 16.5, 5.8, 6.6, "sack", { s: 0.05 });
+    P.ell(12, 6.2, 3.6, 3.3, "sack", { s: 0.1 });
+    P.rect(11, 9, 2, 1, "sack", -0.25);
+    for (const [x, y, s] of [[8, 12, 0.2], [15, 12, -0.1], [9, 20, -0.1], [14, 21, -0.4]]) P.px(x, y, "sack", s - 0.5);
+    P.ell(12, 16, 4.3, 4.3, "red", { k: 0.35, s: 0.05 });
+    P.ell(12, 16, 3.2, 3.2, "cream", { k: 0.35, s: 0.15 });
+    P.ell(12, 16, 2.1, 2.1, "red", { k: 0.3, s: 0.1 });
+    P.rect(11, 15, 2, 2, "cream", (x, y) => (x === 11 && y === 15 ? 0.6 : 0.2));
+    P.layer = 3;
+    P.rect(10, 9, 4, 1, "rope", (x) => 0.25 - (x - 10) * 0.2);
+    P.rect(7, 21, 10, 1, "rope", (x) => 0.3 - (x - 7) * 0.08);
+    for (const [x, y] of [[10, 6], [13, 6]]) P.px(x, y, "#3a2a1a");
+    for (const x of [10, 12, 13]) P.px(x, 8, "#5a4028");
+    P.layer = 4;
+    P.ell(12, 4, 4.2, 2.6, "pot", { s: 0.15, fn: (x, y) => (y > 4 ? false : undefined) });
+    P.rect(7, 4, 10, 1, "pot", (x) => 0.1 - (x - 7) * 0.06);
+    P.rect(17, 3, 3, 1, "pot", -0.2);
+    P.px(10, 2, "pot", -0.75); P.px(11, 3, "pot", -0.6);
+    for (const [x, y, s] of [[0, 11, 0.3], [0, 13, 0.1], [0, 14, -0.2], [1, 15, -0.3], [23, 11, 0], [23, 14, -0.4], [22, 15, -0.5], [23, 12, -0.2]]) P.px(x, y, "straw", s);
+    for (const [x, y, s] of [[9, 23, 0.2], [10, 24, 0], [12, 23, -0.1], [14, 24, -0.4], [15, 23, -0.3], [8, 22, 0.1]]) P.px(x, y, "straw", s);
+    for (const [x, y, s] of [[7, 29, 0.3], [6, 28, 0.4], [16, 29, 0], [17, 28, 0.2], [14, 29, -0.2]]) P.px(x, y, "grass", s);
+    return P.render(M, { outline: OUTLINE });
   }
 
   const ITEM = {
@@ -323,6 +567,65 @@
     return P.render(M, { outline: OUTLINE });
   }
 
+  // ---------- class path emblems ----------
+  const STEEL_R = ["#3a4252", "#6a7486", "#9ca6b4", "#c8d0da", "#f2f5f8"];
+  const CRIMSON_R = ["#4a1418", "#7a2228", "#a8343a", "#c85a52", "#e08a74"];
+  const ORB_R = ["#0e3a5a", "#1a7898", "#34b8cc", "#86e6ea", "#eaffff"];
+  const LEAF_R = ["#1e3a1c", "#2e6a2c", "#4a9a3a", "#7ac25a", "#b8e88a"];
+  function drawClassEmblem(path) {
+    const g = new Grid(16, 16), put = (x, y, r, i) => g.set(x, y, r[Math.max(0, Math.min(4, i))]);
+    if (path === "warrior") {
+      const half = (y) => (y <= 8 ? 5 : 5 - (y - 8) * 0.9), inS = (x, y) => y >= 3 && y <= 14 && Math.abs(x + 0.5 - 9.5) <= half(y);
+      for (let y = 3; y <= 14; y++) for (let x = 3; x <= 15; x++) {
+        if (!inS(x, y)) continue;
+        const rim = !inS(x - 1, y) || !inS(x + 1, y) || !inS(x, y - 1) || !inS(x, y + 1);
+        if (rim) put(x, y, GOLD_R, y === 3 || (x < 10 && y < 10) ? 3 : 1);
+        else put(x, y, CRIMSON_R, x + y < 13 ? 3 : x + y > 20 ? 1 : 2);
+      }
+      for (const [x, y] of [[6, 5], [6, 6], [7, 5]]) put(x, y, CRIMSON_R, 4);
+      // the sword lies across the shield, edged in dark so it reads against the field
+      for (let i = 0; i < 9; i++) {
+        const x = 14 - i, y = 1 + i;
+        if (inS(x - 1, y)) g.set(x - 1, y, OUTLINE);
+        if (inS(x + 1, y + 1) && i > 0) g.set(x + 1, y + 1, OUTLINE);
+        put(x, y, STEEL_R, i < 3 ? 4 : 3); put(x, y + 1, STEEL_R, 1);
+      }
+      put(15, 0, STEEL_R, 3);
+      for (const [x, y, k] of [[2, 8, 3], [3, 9, 3], [4, 10, 2], [5, 11, 2], [6, 12, 1]]) put(x, y, GOLD_R, k);
+      put(4, 11, WOOD_R, 1); put(3, 12, WOOD_R, 2);
+      put(2, 13, GOLD_R, 3); put(1, 13, GOLD_R, 4); put(1, 14, GOLD_R, 2); put(2, 14, GOLD_R, 1);
+    } else if (path === "ranger") {
+      // a recurve bow bellied to the left, string drawn, arrow nocked and pointing left
+      for (let y = 1; y <= 14; y++) {
+        const t = (y - 1) / 13, x = Math.round(10.5 - 6.5 * Math.sin(Math.PI * t) + (t < 0.08 || t > 0.92 ? 1 : 0));
+        const grip = y >= 6 && y <= 9;
+        put(x, y, grip ? CRIMSON_R : WOOD_R, grip ? (y === 6 ? 3 : 1) : 3);
+        put(x + 1, y, grip ? CRIMSON_R : WOOD_R, grip ? 0 : 1);
+      }
+      for (let y = 1; y <= 14; y++) if (!g.get(12, y)) g.set(12, y, y === 7 || y === 8 ? "#f4ecd4" : "#d8ccac");
+      for (let x = 2; x <= 13; x++) if (x < 4 || x > 6) put(x, 8, WOOD_R, 4);
+      for (const [x, y, i] of [[1, 8, 4], [2, 7, 3], [2, 9, 2], [3, 8, 3], [1, 7, 3], [1, 9, 1], [0, 8, 2]]) put(x, y, STEEL_R, i);
+      for (const [x, y, i] of [[13, 7, 3], [14, 6, 4], [14, 7, 2], [13, 9, 1], [14, 9, 2], [14, 10, 0], [13, 8, 3], [14, 8, 3]]) put(x, y, LEAF_R, i);
+    } else {
+      // a staff topped with a glowing orb held in gold prongs
+      for (let i = 0; i < 10; i++) { put(1 + i, 14 - i, WOOD_R, 3); put(2 + i, 14 - i, WOOD_R, 1); }
+      put(1, 15, WOOD_R, 2);
+      for (const [x, y, i] of [[4, 11, 3], [5, 11, 2], [5, 10, 1]]) put(x, y, GOLD_R, i);
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const dx = x + 0.5 - 11, dy = y + 0.5 - 5, d = Math.hypot(dx, dy);
+        if (d > 3.6) continue;
+        const l = -dx * 0.5 - dy * 0.6 + (3.6 - d) * 0.35;
+        put(x, y, ORB_R, d < 1.3 ? 4 : l > 1.2 ? 4 : l > 0.4 ? 3 : l > -0.8 ? 2 : 1);
+      }
+      put(10, 3, ORB_R, 4); put(9, 4, "#ffffff" && ORB_R, 4);
+      for (const [x, y, i] of [[8, 7, 3], [8, 8, 2], [9, 8, 2], [13, 8, 1], [12, 9, 1], [11, 9, 2], [10, 9, 2], [7, 4, 3], [7, 5, 2]]) put(x, y, GOLD_R, i);
+      for (const [x, y] of [[14, 1], [3, 3], [15, 9]]) g.set(x, y, "#fff6c8");
+      for (const [x, y] of [[13, 1], [15, 1], [14, 0], [14, 2], [3, 2], [3, 4], [2, 3], [4, 3]]) g.set(x, y, GOLD_R[3]);
+    }
+    g.outline(OUTLINE);
+    return g;
+  }
+
   // ---------- public API with caching ----------
   const cache = new Map();
   function cached(key, fn) {
@@ -338,7 +641,7 @@
   function heroCanvas(h, scale, frame, cls) { return heroGrid(h, frame, cls).toCanvas(scale); }
   function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : ""), () => drawMonster(m.body, m.pal, frame, m.boss)); }
   function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (frame || 0), () => drawPet(pet.kind, pet.name, frame)); }
-  function bannerGrid(b) { return cached("b:" + JSON.stringify(b), () => drawBanner(b)); }
+  function bannerGrid(b, big) { return cached("b:" + (big ? "L" : "S") + JSON.stringify(b), () => drawBanner(b, big)); }
   // the champion's medallion: a lit gold pixel ring with laurel sprays and a ribbon
   function laurelGrid() {
     return cached("laurel", () => {
@@ -373,6 +676,8 @@
   }
   function itemGrid(id) { return cached("i:" + id, () => drawItem(id)); }
   function graveGrid() { return cached("grave", () => drawGrave()); }
+  function dummyGrid() { return cached("dummy", drawDummy); }
+  function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, bannerGrid, itemGrid, laurelGrid, graveGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, bannerGrid, classEmblem, itemGrid, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

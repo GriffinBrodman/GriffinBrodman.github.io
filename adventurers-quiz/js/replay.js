@@ -96,7 +96,7 @@
     v.appendChild(g);
 
     const kind = Scenes.locKind(f.place);
-    const bg = Scenes.backdrop(kind === "town" ? "plains" : kind, W, H, Art.hash(f.id));
+    const bg = Scenes.backdrop(kind === "town" ? "plains" : kind, W, H, Art.hash(f.id), { battle: true });
     const ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     const off = document.createElement("canvas");

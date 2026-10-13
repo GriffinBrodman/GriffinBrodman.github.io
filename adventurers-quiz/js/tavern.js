@@ -302,6 +302,9 @@
     }
 
     const actors = [];
+    // real exchanges from league.voice.night_talk, each played once when its two heroes pair up
+    const talks = (cfg.talks || []).slice();
+    const talkFor = (a, b) => a.h && b.h && talks.find((ex) => { const ids = ex.map((l) => l.id); return ids.includes(a.h.id) && ids.includes(b.h.id); });
     function blocked(u, v) {
       return TABLES.some(([tu, tv]) => u > tu - 0.45 && u < tu + 1.45 && v > tv - 0.45 && v < tv + 1.45) || (u < 1.7 && v > FIRE.v0 - 0.3 && v < FIRE.v1 + 0.3 && u < 0.9);
     }
@@ -356,7 +359,9 @@
       } else if (roll < 0.64) { go(a, fire[0], fire[1]); a.then = () => { a.face = -1; a.wait = 4 + r() * 4; if (a.focus) later(800, () => say(a, pick(a, r))); }; }
       else {
         const free = actors.filter((b) => b !== a && !b.local && b.mode !== "chat" && b.mode !== "join");
-        const other = free[Math.floor(r() * free.length)];
+        // someone a real conversation is waiting with comes first
+        const owed = free.filter((b) => talkFor(a, b));
+        const other = owed.length ? owed[Math.floor(r() * owed.length)] : free[Math.floor(r() * free.length)];
         if (!other) { a.wait = 2; if (a.focus && !T.speaking(a)) say(a, pick(a, r)); return; }
         // a pair needs two free places side by side on screen, not one in front of the other
         const pair = roomAt(() => freeSpot(a, other), a, other);
@@ -368,9 +373,11 @@
         go(other, ou, ov); other.mode = "join";
         a.then = () => {
           a.mode = "chat"; a.partner = other;
-          const turns = [a, other, a, other].slice(0, 2 + Math.floor(r() * 3));
-          turns.forEach((s, i) => later(300 + i * 2600, () => say(s, pick(s, r), 2.8)));
-          const end = 300 + turns.length * 2600;
+          const ex = talkFor(a, other);
+          const turns = ex ? ex.map((l) => [l.id === a.h.id ? a : other, l.text]) : [a, other, a, other].slice(0, 2 + Math.floor(r() * 3)).map((s) => [s, null]);
+          if (ex) talks.splice(talks.indexOf(ex), 1);
+          turns.forEach(([s, t], i) => later(300 + i * 2800, () => say(s, t || pick(s, r), 3.2)));
+          const end = 300 + turns.length * 2800;
           later(end, () => { a.mode = "idle"; a.wait = 1 + r() * 2; other.mode = "idle"; other.wait = 1 + r() * 2; });
           a.wait = end / 1000 + 1;
         };

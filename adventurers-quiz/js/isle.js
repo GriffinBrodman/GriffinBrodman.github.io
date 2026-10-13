@@ -108,10 +108,13 @@
     const img = ctx.createImageData(TW, TH), D = img.data;
     const put = (x, y, c) => { if (x < 0 || y < 0 || x >= TW || y >= TH) return; const i = (y * TW + x) * 4, v = typeof c === "string" ? rgb(c) : c; D[i] = v[0]; D[i + 1] = v[1]; D[i + 2] = v[2]; D[i + 3] = 255; };
     const bayer = (x, y) => [0, 0.5, 0.75, 0.25][(x & 1) + (y & 1) * 2] - 0.375;
+    // pixels that move: wave crests, shore foam, river glints and falls; each kept with its colour index so the live map can shift them
+    const fx = { crest: [], foam: [], river: [], falls: [] };
     for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
       const l = landv[y * TW + x], v = fbm(n2, x / 14, y / 5);
       let c = l > 0.12 + bayer(x, y) * 0.04 ? "#7cc8f0" : l > 0.02 + bayer(x, y) * 0.06 ? "#5aaee6" : l > -0.25 ? "#3f94d8" : l > -0.5 + bayer(x, y) * 0.08 ? "#3484cc" : "#2c74bc";
-      if (l <= 0.12 && v > 0.7 && (x + (y >> 1)) % 7 < 3) c = "#a4dcf8";
+      if (l <= 0.12 && v > 0.7) fx.crest.push([x, y, (x + (y >> 1)) % 6, c]);
+      if (l <= 0.12 && v > 0.7 && (x + (y >> 1)) % 6 < 3) c = "#a4dcf8";
       put(x, y, c);
     }
     for (let x = 0; x < TW; x++) for (let y = 0; y < TH; y++) {
@@ -121,7 +124,7 @@
       for (let sy = ty + 1; sy <= y; sy++) {
         const t = (sy - ty) / (L * CH);
         let c;
-        if (river[i]) c = FALLS[(sy + x * 2 + (x >> 1)) % 3];
+        if (river[i]) { c = FALLS[(sy + x * 2 + (x >> 1)) % 3]; fx.falls.push([x, sy, (sy + x * 2 + (x >> 1)) % 3]); }
         else if (road[i]) c = (sy - ty) % 2 ? "#c4a462" : "#8e7046";
         else {
           let k = t < 0.12 ? 0 : t < 0.5 ? 1 : t < 0.86 ? 2 : 3;
@@ -135,7 +138,7 @@
       const front = y + 1 < TH && lev[i + TW] < L, back = y > 0 && lev[i - TW] < L, left = x > 0 && lev[i - 1] < L, right = x + 1 < TW && lev[i + 1] < L;
       if (back || left) c = pal[2];
       if (right) c = pal[0];
-      if (river[i]) c = (x + y) % 5 === 0 ? "#bfe6fa" : bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2";
+      if (river[i]) { c = (x + y) % 6 === 0 ? "#bfe6fa" : bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"; fx.river.push([x, ty, (x + y) % 6, bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"]); }
       else if (road[i]) c = (road[i - 1] && road[i + 1] && road[i - TW] && road[i + TW]) ? "#ecd49a" : "#d2b072";
       else if (b === "marsh" && fbm(n2, x / 6, y / 6) > 0.66) c = (x + y) % 3 ? "#6aa0a0" : "#88b8b4";
       else if (b === "volcanic" && fbm(n2, x / 4, y / 4) > 0.72) c = (x + y) % 2 ? "#ff7a2a" : "#ffb04a";
@@ -146,8 +149,10 @@
         for (let k = 1; k <= S; k++) {
           const t = k / S;
           put(x, y + k, river[i] ? FALLS[(y + k + x * 2) % 3] : SEACLIFF[t < 0.2 ? 0 : t < 0.55 ? 1 : t < 0.85 ? 2 : 3 - ((x * 5 + k) % 9 === 0 ? 1 : 0)]);
+          if (river[i]) fx.falls.push([x, y + k, (y + k + x * 2) % 3]);
         }
         put(x, y + S + 1, (x + y) % 3 ? "#f2fbff" : "#c4e6fa");
+        fx.foam.push([x, y + S + 1, (x + y) % 3]);
         put(x, y + S + 2, "#2f80c4");
       }
     }
@@ -176,14 +181,37 @@
     sprites.push({ y: by + 1, draw: () => bridge(ctx, bx, by) });
     sprites.sort((a, b) => a.y - b.y);
     for (const s of sprites) s.draw();
-    clouds(ctx, landv);
+    // a moving pixel only moves where no house, tree or bridge was drawn over it
+    const after = ctx.getImageData(0, 0, TW, TH).data;
+    const bare = ([x, y]) => { const i = (y * TW + x) * 4; return D[i] === after[i] && D[i + 1] === after[i + 1] && D[i + 2] === after[i + 2]; };
+    for (const k of Object.keys(fx)) fx[k] = fx[k].filter((p) => p[1] >= 0 && p[1] < TH && bare(p));
+    T.fx = fx;
+    T.clouds = clouds(landv);
     return cv;
+  }
+
+  // the moving water, as six frames drawn once each: crests drift, foam pulses, the river glints downstream, the falls fall
+  const PH = 6, phaseCache = [];
+  function phase(p) {
+    if (phaseCache[p]) return phaseCache[p];
+    const cv = document.createElement("canvas");
+    cv.width = TW; cv.height = TH;
+    const ctx = cv.getContext("2d"), fx = T.fx;
+    for (const [x, y, m, base] of fx.crest) { ctx.fillStyle = (m + PH - p) % PH < 3 ? "#a4dcf8" : base; ctx.fillRect(x, y, 1, 1); }
+    for (const [x, y, m] of fx.foam) { ctx.fillStyle = (m + p) % 3 ? "#f2fbff" : "#c4e6fa"; ctx.fillRect(x, y, 1, 1); }
+    for (const [x, y, m, base] of fx.river) { ctx.fillStyle = (m + PH - p) % PH === 0 ? "#bfe6fa" : base; ctx.fillRect(x, y, 1, 1); }
+    for (const [x, y, m] of fx.falls) { ctx.fillStyle = FALLS[(m + 3 - (p % 3)) % 3]; ctx.fillRect(x, y, 1, 1); }
+    return (phaseCache[p] = cv);
   }
 
   const F = (ctx, x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
   const Ln = (ctx, x0, y0, x1, y1, c) => { const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0))); for (let i = 0; i <= n; i++) F(ctx, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 1, 1, c); };
 
-  function cloud(ctx, x, y, w, seed) {
+  function cloud(w, seed) {
+    // one cloud and its shadow on their own canvas, so the live map can slide it across
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(w * 1.6) + 12; cv.height = Math.ceil(w * 0.6) + 18;
+    const ctx = cv.getContext("2d"), x = Math.ceil(w * 0.8), y = Math.ceil(w * 0.42);
     const r = rng(seed), puffs = [];
     for (let k = 0; k < 5; k++) { const t = k / 4; puffs.push([x + (t - 0.5) * w, y - Math.sin(t * Math.PI) * w * 0.12, w * (0.16 + Math.sin(t * Math.PI) * 0.12) * (0.8 + r() * 0.4)]); }
     const inside = (px, py) => puffs.some(([cx, cy, rr]) => (px - cx) ** 2 + ((py - cy) * 1.5) ** 2 <= rr * rr) && py <= y + w * 0.08;
@@ -195,15 +223,21 @@
       ctx.fillStyle = top ? "#ffffff" : low ? ((px + py) % 2 ? "#c4d8ee" : "#d8e6f4") : "#f2f6fc";
       ctx.fillRect(px, py, 1, 1);
     }
+    return { cv, ox: x, oy: y };
   }
-  function clouds(ctx, landv) {
+  function clouds(landv) {
     const r = rng(4242), spots = [[30, 26, 70], [TW - 60, 34, 60], [TW / 2 - 40, 10, 54], [24, TH - 40, 64], [TW - 40, TH - 30, 70]];
     for (let k = 0; k < 40 && spots.length < 9; k++) {
       const x = 30 + r() * (TW - 60), y = 20 + r() * (TH - 40);
       if (landv[Math.floor(y) * TW + Math.floor(x)] > -0.3 || spots.some(([a, b]) => Math.hypot(a - x, b - y) < 120)) continue;
       spots.push([x, y, 40 + r() * 30]);
     }
-    spots.forEach(([x, y, w], k) => cloud(ctx, x, y, w, 77 + k));
+    return spots.map(([x, y, w], k) => Object.assign(cloud(w, 77 + k), { x, y, w, speed: 1.6 + (k % 3) * 0.7 }));
+  }
+  // a cloud drifts east and comes round again from the west edge, so the sky never empties
+  function cloudAt(c, t) {
+    const span = TW + c.cv.width * 2;
+    return ((c.x + c.speed * t + c.cv.width) % span + span) % span - c.cv.width;
   }
 
   function castle(ctx, x, y) {
@@ -387,9 +421,16 @@
     const k = opts.small ? 1 : 2;
     const ter = terrain();
     cv.width = TW * k; cv.height = TH * k; cv._k = k;
-    const ctx = cv.getContext("2d");
+    const base = document.createElement("canvas");
+    base.width = cv.width; base.height = cv.height;
+    const bctx = base.getContext("2d");
+    bctx.imageSmoothingEnabled = false;
+    bctx.drawImage(ter, 0, 0, TW * k, TH * k);
+    // heroes, labels and markers go on a clear sheet above the moving water and clouds
+    const over = document.createElement("canvas");
+    over.width = cv.width; over.height = cv.height;
+    const ctx = over.getContext("2d");
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(ter, 0, 0, TW * k, TH * k);
     const S = App.S, placed = [], groups = {}, extra = {};
     for (const h of App.L.heroes) {
       if (!h.alive) continue;
@@ -469,6 +510,14 @@
       if (d.kind === "dungeon") { const st = (App.L.dungeons || {})[d.id] || {}; if (st.boss_alive === false) txt += " ✝"; }
       plaque(txt, x * k, (y + (d.kind === "town" ? 8 : 6)) * k, d.kind);
     }
+    const water = { z: 0, draw: (c, t) => { c.imageSmoothingEnabled = false; c.drawImage(phase(Math.floor(t * 2.5) % PH), 0, 0, TW * k, TH * k); } };
+    const sky = { z: 1, draw: (c, t) => {
+      c.imageSmoothingEnabled = false;
+      for (const cl of T.clouds) c.drawImage(cl.cv, Math.round((cloudAt(cl, t) - cl.ox) * k), Math.round((cl.y - cl.oy) * k), cl.cv.width * k, cl.cv.height * k);
+    } };
+    if (cv.anim) cv.anim.stop();
+    if (window.Anim) Anim.stage(cv, base, [water, sky], { over, fps: 8, still: 0 });
+    else { const c = cv.getContext("2d"); c.drawImage(base, 0, 0); water.draw(c, 0); sky.draw(c, 0); c.drawImage(over, 0, 0); }
     return placed;
   }
 

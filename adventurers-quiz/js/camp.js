@@ -292,9 +292,20 @@
     const fx = { sparks: [], now: 0 };
     let chatAt = 0.9, moveAt = 8 + r() * 6, petAt = 7 + r() * 8, hostAt = 5 + r() * 8, first = true;
 
+    // real exchanges between the people here (league.voice.night_talk) take turns with the idle chatter
+    const talks = (cfg.talks || []).map((ex) => ex.map((l) => [actors.find((a) => a.h.id === l.id), l.text])).filter((ex) => ex.every(([a]) => a));
+    let talkAt = 0;
+    function exchange() {
+      const ex = talks.shift();
+      talks.push(ex);
+      ex.forEach(([a, t], i) => later(i * 2900, () => { faceTo(a); say(a, t, 3.4); }));
+      chatAt = Talk.now + ex.length * 2.9 + 1.5;
+      talkAt = Talk.now + ex.length * 2.9 + 9 + r() * 6;
+    }
     function talkTurn() {
       if (Talk.count >= 2) { chatAt = Talk.now + 1.5; return; }
-      if (first) { first = false; say(focus, focus.lines[0]); focus.said.push(focus.lines[0]); chatAt = Talk.now + 4 + r() * 2; return; }
+      if (first) { first = false; say(focus, focus.lines[0]); focus.said.push(focus.lines[0]); chatAt = Talk.now + 4 + r() * 2; talkAt = chatAt; return; }
+      if (talks.length && Talk.now >= talkAt && actors.every((a) => a.mode === "idle")) return exchange();
       const others = actors.filter((a) => a !== focus && a.mode === "idle");
       const sp = !others.length || r() < 0.45 ? focus : others[Math.floor(r() * others.length)];
       if (sp.mode !== "idle") { chatAt = Talk.now + 1; return; }
@@ -408,7 +419,7 @@
     if ((GROUND[biome] || {}).sea) sky2.push(anim("waves", { x0: 0, x1: W, y: HZ - 5, h: 6, rgb: "40,60,110", seed: 8 }));
     let shoot = null, shootAt = 6 + r() * 14;
     const spots = fromScreen(5, 5, [[28, 4], [-28, 2], [-4, -24], [52, -16], [-54, 14], [24, -30]]);
-    return gather({ kind: "camp", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible,
+    return gather({ talks: t.talk, kind: "camp", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible,
       update(dt, f) {
         const [x, y] = st.iso(5, 5);
         if (!embers) sparks(f.sparks, x, y - 10, dt, false);
@@ -476,7 +487,7 @@
       anim("cobweb", { x: Math.round(st.iso(0, 0)[0]) + 1, y: Math.round(st.iso(0, 0)[1]) - WH + 3, size: 14, side: "r" }),
       t.theme === "cave" || t.theme === "beast" || t.theme === "goblin" ? anim("bat", { W, y0: 18, y1: 50, seed: 5 }) : null].filter(Boolean);
     const spots = fromScreen(5, 5, [[28, 4], [-28, 2], [-4, -24], [-48, 8], [50, 14]]);
-    return gather({ kind: "dungeon", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible,
+    return gather({ talks: t.talk, kind: "dungeon", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible,
       update(dt, f) {
         const [x, y] = st.iso(5, 5);
         sparks(f.sparks, x, y - 6, dt, false, 4);
@@ -528,7 +539,7 @@
     });
     const gate = st.iso(NU + 0.6, 5.5);
     const host = t.host && Object.assign({}, t.host, { at: [gate[0] + 10, gate[1] - 40] });
-    return gather({ kind: "cell", st, bg, props, cast, seed, center: [4, 4], spots: fromScreen(4, 4, [[-12, 0], [-40, 10], [10, 18]]), pred: notOrder, host, onVisible,
+    return gather({ talks: t.talk, kind: "cell", st, bg, props, cast, seed, center: [4, 4], spots: fromScreen(4, 4, [[-12, 0], [-40, 10], [10, 18]]), pred: notOrder, host, onVisible,
       update(dt, f) {
         if (rat.t <= 0 && f.now > rat.at) { rat.t = 0.01; rat.u = 0.4; rat.v = rat.dir > 0 ? 0.6 : 7.4; }
         if (rat.t > 0) { rat.t += dt; rat.v += rat.dir * dt * 3; if (rat.v < 0.5 || rat.v > 7.6) { rat.t = 0; rat.dir = -rat.dir; rat.at = f.now + 14 + r() * 14; } }
@@ -597,7 +608,7 @@
     const door = st.lwall(8.0, 30);
     const host = t.host && t.host.lines && Object.assign({}, t.host, { at: kind === "stables" ? [st.iso(0.5, 6.6)[0] + 4, st.iso(0.5, 6.6)[1] - 40] : [door[0] + 4, door[1] - 2] });
     const spots = fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46]]);
-    return gather({ kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
+    return gather({ talks: t.talk, kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
       under(ctx, now, flick) { if (fire) T().flames(ctx, st, now, fire[0], fire[1], flick); },
       over(ctx, now, flick) {
         if (candleAt) candle(ctx, Math.round(candleAt[0]), Math.round(candleAt[1]), now, flick);
@@ -622,7 +633,7 @@
     if (t.setting === "inn") {
       const others = (t.others || []).map((o) => ({ h: by[o.id], lines: o.lines })).filter((o) => o.h);
       const crowd = [Object.assign(cast[0], { focus: true })].concat(cast.slice(1), others);
-      stage = Tavern.inn({ seed, keeper: t.host, cast: crowd, locals: Math.max(4, crowd.length), onVisible });
+      stage = Tavern.inn({ seed, keeper: t.host, cast: crowd, talks: t.talk, locals: Math.max(4, crowd.length), onVisible });
       stage.classList.add("night-inn");
     } else stage = ({ camp, dungeon, cell, room, stable: room })[t.setting](t, cast, seed, onVisible);
     const box = document.createElement("div");
