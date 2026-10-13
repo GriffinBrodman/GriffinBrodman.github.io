@@ -52,6 +52,7 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 | `#/parties`, `#/party/<id>` | `views.js` | |
 | `#/map/<node>` | `views.js` + `isle.js` | Side panel: town ledger, civic panel (ruler, edict, Watch), node details |
 | `#/digest/<season>/<week>` | `views.js` | Weekly digest |
+| `#/days`, `#/day/<n>` | `views.js` | Back issues: any past day's front page (lead, also today, that day's feed), from `data/day/<n>.js` |
 | `#/world` | `views.js` | Factions and legendary figures |
 | `#/history` | `views.js` | Seasons, memorial, artifacts panel |
 | `#/songs/<id>` | `views.js` | Songbook and the bard's karaoke stage (uses `Sound.playSong`) |
