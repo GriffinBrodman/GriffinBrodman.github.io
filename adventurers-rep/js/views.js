@@ -76,7 +76,7 @@
       (sig ? `. Best known for ${sig.name} (${plural(sig.uses, "use")}).` : ". No signature move yet; the first real fight will tell.");
     return el("section", { class: "panel tight fight-card" }, el("div", { class: "row", style: { gap: "12px", alignItems: "flex-start" } }, classIcon(path, 3),
       el("div", { style: { flex: 1 } }, el("div", { class: "small" }, el("b", null, `${h.title}. `), c.desc || ""), el("div", { class: "small", style: { marginTop: "3px" } }, line),
-        fighting.length ? el("div", { class: "row wrap", style: { gap: "4px", marginTop: "6px" } }, ...fighting.map((s) => el("span", { class: "pill" + (sig && s.id === sig.id ? " gold" : ""), title: s.desc }, s.name))) : null,
+        fighting.length ? el("div", { class: "row wrap", style: { gap: "4px", marginTop: "6px" } }, ...fighting.map((s) => skillTip(el("span", { class: "pill" + (sig && s.id === sig.id ? " gold" : "") }, s.name), s))) : null,
         learned ? el("div", { class: "tiny dim", style: { marginTop: "4px" } }, `Latest trick: ${learned[1]}. ${nextStep(h)}.`) : null)));
   }
   const SKILL_GROUPS = [["Damage", ["attack", "aoe", "multi", "cleave"]], ["Healing", ["heal", "heal_all"]], ["Defence", ["guard", "buff_all", "rally", "buff_self"]],
@@ -666,6 +666,34 @@
         el("span", { class: p.morale < 30 ? "red" : "muted" }, `${p.morale}/100 · ${moraleWord(p.morale)}`)),
       A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"));
   }
+  // a parchment card that follows a skill badge: what it does, whose it is, how often it's been used
+  let tipBox = null;
+  function skillTip(node, s, owner) {
+    const show = () => {
+      if (!tipBox) { tipBox = el("div", { class: "skilltip", role: "tooltip" }); document.body.appendChild(tipBox); }
+      tipBox.innerHTML = "";
+      tipBox.append(el("div", { class: "nm" }, s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
+        owner ? el("div", { class: "tiny gold" }, owner) : null,
+        el("div", { class: "small" }, s.desc),
+        el("div", { class: "tiny dim" }, [(s.tags || []).join(" · "), s.uses ? `used ${plural(s.uses, "time")}` : "not used yet"].filter(Boolean).join(" — ")));
+      const r = node.getBoundingClientRect();
+      tipBox.style.display = "block";
+      const w = tipBox.offsetWidth, hgt = tipBox.offsetHeight;
+      tipBox.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+      tipBox.style.top = (r.top - hgt - 8 > 8 ? r.top - hgt - 8 : r.bottom + 8) + window.scrollY + "px";
+    };
+    const hide = () => { if (tipBox) tipBox.style.display = "none"; };
+    node.classList.add("tipped");
+    node.tabIndex = 0;
+    node.addEventListener("mouseenter", show);
+    node.addEventListener("focus", show);
+    node.addEventListener("mouseleave", hide);
+    node.addEventListener("blur", hide);
+    node.addEventListener("click", (e) => { e.stopPropagation(); show(); });
+    return node;
+  }
+  window.addEventListener("hashchange", () => { if (tipBox) tipBox.style.display = "none"; });
+  document.addEventListener("click", () => { if (tipBox) tipBox.style.display = "none"; });
   function partyTags(p) {
     const t = p.tactics;
     if (!t || p.disbanded) return null;
@@ -708,11 +736,11 @@
     for (const grp of t.skills) {
       if (grp.label === "On the road" || grp.label === "Always on") continue;
       sk.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, grp.label));
-      sk.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, ...grp.skills.map((s) => el("span", { class: "pill" + (s.uses ? " gold" : ""), title: `${who(s.hero) ? who(s.hero).name : ""}: ${s.desc}` },
-        `${s.name}`, el("span", { class: "dim" }, ` · ${who(s.hero) ? who(s.hero).name : ""}${s.uses ? " ×" + s.uses : ""}`)))));
+      sk.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, ...grp.skills.map((s) => skillTip(el("span", { class: "pill" + (s.uses ? " gold" : "") },
+        `${s.name}`, el("span", { class: "dim" }, ` · ${who(s.hero) ? who(s.hero).name : ""}${s.uses ? " ×" + s.uses : ""}`)), s, who(s.hero) ? `${who(s.hero).name}'s skill` : ""))));
     }
     const road = t.skills.filter((g) => g.label === "On the road" || g.label === "Always on").flatMap((g) => g.skills);
-    if (road.length) sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, "Also: " + road.map((s) => `${s.name} (${who(s.hero) ? who(s.hero).name : ""})`).join(", ")));
+    if (road.length) sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, "Also: ", ...road.map((s, i) => [i ? ", " : "", skillTip(el("span", null, `${s.name} (${who(s.hero) ? who(s.hero).name : ""})`), s, who(s.hero) ? `${who(s.hero).name}'s skill` : "")])));
     g.append(share, sk);
     pn.appendChild(g);
     return pn;

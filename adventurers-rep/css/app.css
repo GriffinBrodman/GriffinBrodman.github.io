@@ -458,3 +458,6 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .pill.soft { background: rgba(255, 250, 235, 0.55); font-style: italic; }
 .formation .foe { margin-left: auto; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .formation .dummy { width: 48px; height: auto; image-rendering: pixelated; }
+.skilltip { position: absolute; z-index: 50; display: none; max-width: 280px; background: var(--parch); border: 2px solid var(--edge2); box-shadow: 3px 3px 0 rgba(42, 27, 17, 0.35); padding: 8px 10px; pointer-events: none; }
+.skilltip .nm { font-family: var(--px); font-size: 15px; color: var(--ink); }
+.tipped { cursor: help; }
