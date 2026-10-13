@@ -2,7 +2,7 @@
 
 | File | Purpose |
 |------|---------|
-| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, graves |
+| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, graves, the party-page target dummy (`dummyGrid`) |
 | `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines) and hero bust portraits |
 | `beasts.js` | Shaded monster sprites for the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) |
 | `anim.js` | Ambient pixel animation: one shared, visibility-gated ticker (`Anim.stage`) and small looping actors (villagers, birds, bats, skeletons, torches, smoke, snow, waves...) that any scene can reuse; API listed at the top of the file |
