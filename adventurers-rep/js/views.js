@@ -20,6 +20,88 @@
   function traitWord(t, v) { const w = TRAIT_WORDS[t]; return w[Math.min(4, Math.max(0, Math.floor((v + 1) / 0.4)))]; }
 
   function panel(title, ...kids) { return el("section", { class: "panel" }, title ? el("h2", null, title) : null, ...kids); }
+
+  // ---------- class identity: blade, bow or spell gives a hero's page its own colours, emblem and fighting summary ----------
+  function basePath(c) {
+    let k = c;
+    for (let i = 0; i < 4 && S.classes[k] && (S.classes[k].from || []).length; i++) k = S.classes[k].from[0];
+    return { warrior: "warrior", ranger: "ranger", mage: "mage" }[k] || "warrior";
+  }
+  const PATH = {
+    warrior: { word: "steel", stat: "might" },
+    ranger: { word: "the bow", stat: "agility" },
+    mage: { word: "spellwork", stat: "mind" },
+  };
+  // class emblems come from the art engine (Art.classEmblem); until it has them, the slot stays empty
+  function classIcon(path, px) {
+    if (!(window.Art && Art.classEmblem)) return el("span", { class: "cls-icon empty" });
+    const cv = Art.classEmblem(path).toCanvas(1);
+    cv.className = "cls-icon";
+    cv.style.width = cv.style.height = 16 * (px || 2) + "px";
+    return cv;
+  }
+  function signature(h) {
+    const used = (h.skills || []).filter((s) => s.type !== "world" && s.uses).sort((a, b) => b.uses - a.uses);
+    return used[0] || null;
+  }
+  function nextStep(h) {
+    const nx = h.next_class;
+    if (nx && nx.level === h.level + 1) return `Becomes ${/^[aeiou]/i.test(nx.name) ? "an" : "a"} ${nx.name} at level ${nx.level}`;
+    return `New skill at level ${h.level + 1}`;
+  }
+  function classStrip(h) {
+    const c = S.classes[h.cls] || {}, path = basePath(h.cls), sig = signature(h);
+    return el("div", { class: "class-strip" }, classIcon(path, 2),
+      el("span", { class: "pill" }, c.row === "front" ? "Front row" : "Back row"),
+      el("span", { class: "pill" }, `Fights with ${PATH[path].word}`),
+      sig ? el("span", { class: "pill gold has-tip", title: sig.desc }, `Signature: ${sig.name} ×${sig.uses}`) : null,
+      h.alive ? el("span", { class: "pill" }, nextStep(h)) : null);
+  }
+  function fightCard(h) {
+    const c = S.classes[h.cls] || {}, path = basePath(h.cls), sig = signature(h);
+    const fighting = (h.skills || []).filter((s) => s.type !== "world");
+    const learned = (h.diary || []).slice().reverse().map(([, t]) => /learned ([^;)]+)/.exec(t)).find(Boolean);
+    const line = `${h.name} fights from the ${c.row === "front" ? "front row, taking the hits" : "back row, out of reach"}, with ${PATH[path].word}` +
+      (sig ? `. Best known for ${sig.name} (${plural(sig.uses, "use")}).` : ". No signature move yet; the first real fight will tell.");
+    return el("section", { class: "panel tight fight-card" }, el("div", { class: "row", style: { gap: "12px", alignItems: "flex-start" } }, classIcon(path, 3),
+      el("div", { style: { flex: 1 } }, el("div", { class: "small" }, el("b", null, `${h.title}. `), c.desc || ""), el("div", { class: "small", style: { marginTop: "3px" } }, line),
+        fighting.length ? el("div", { class: "row wrap", style: { gap: "4px", marginTop: "6px" } }, ...fighting.map((s) => el("span", { class: "pill" + (sig && s.id === sig.id ? " gold" : ""), title: s.desc }, s.name))) : null,
+        learned ? el("div", { class: "tiny dim", style: { marginTop: "4px" } }, `Latest trick: ${learned[1]}. ${nextStep(h)}.`) : null)));
+  }
+  const SKILL_GROUPS = [["Damage", ["attack", "aoe", "multi", "cleave"]], ["Healing", ["heal", "heal_all"]], ["Defence", ["guard", "buff_all", "rally", "buff_self"]],
+    ["Tricks", ["debuff_all", "fear", "stealth", "summon", "trigger"]], ["Always on", ["passive"]], ["On the road", ["world"]]];
+  function skillsPanel(h) {
+    const sk = panel("Skills");
+    const sig = signature(h);
+    const most = Math.max(1, ...(h.skills || []).map((s) => s.uses || 0));
+    const kinds = { passive: "passive", trigger: "trigger", world: "world" };
+    for (const [label, types] of SKILL_GROUPS) {
+      const list = (h.skills || []).filter((s) => types.includes(s.type)).sort((a, b) => (b.uses || 0) - (a.uses || 0));
+      if (!list.length) continue;
+      sk.appendChild(el("div", { class: "tiny gold skill-group" }, label));
+      for (const s of list) sk.appendChild(el("div", { class: `skill ${kinds[s.type] || ""}${sig && s.id === sig.id ? " sig" : ""}`, style: { marginBottom: "5px" } },
+        el("div", { class: "row between" }, el("span", { class: "nm" }, sig && s.id === sig.id ? "★ " : "", s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
+          el("span", { class: "tiny dim" }, s.type === "world" ? "out of combat" : s.type === "passive" ? "always on" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet")),
+        el("div", { class: "small muted" }, s.desc),
+        s.uses && s.type !== "world" && s.type !== "passive" ? A.bar(s.uses, most, "gold") : null,
+        el("div", { class: "tiny dim" }, s.tags.join(" · "))));
+    }
+    if (!(h.skills || []).length) sk.appendChild(el("p", { class: "empty" }, "No skills yet."));
+    sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, `Every level brings a skill, picked by what ${h.name} has been doing. ${nextStep(h)}.`));
+    return sk;
+  }
+  function classTree(h) {
+    const p = panel("Class journey");
+    const row = el("div", { class: "journey" });
+    const sprite = (c) => A.spriteCanvas((f) => Art.heroGrid(Object.assign({}, h, { cls: c, legend: false }), f, S.classes[c]), 2, "", false);
+    h.class_history.forEach(([day, c], i) => {
+      if (i) row.appendChild(el("div", { class: "arrow" }, "→"));
+      row.appendChild(el("div", { class: "step" }, sprite(c), el("div", { class: "small" }, S.classes[c].name), el("div", { class: "tiny dim" }, day ? `world day ${day}` : "")));
+    });
+    p.appendChild(row);
+    p.appendChild(el("p", { class: "small muted" }, S.classes[h.cls].desc));
+    return p;
+  }
   function sortedHeroes(list) { return list.slice().sort((a, b) => (b.alive - a.alive) || b.renown - a.renown || b.level - a.level); }
 
   // ================= HOME: The Daily Crier =================
@@ -323,9 +405,11 @@
     return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "story"); });
   });
 
-  function heroPage(v, h, tab) {
-    const cls = S.classes[h.cls];
-    const head = el("section", { class: "panel" });
+  function heroPage(page, h, tab) {
+    const v = el("div", { class: `heropage path-${basePath(h.cls)}` });
+    page.appendChild(v);
+    const head = el("section", { class: "panel hero-panel" });
+    head.appendChild(el("div", { class: "path-mark" }, classIcon(basePath(h.cls), 8)));
     const portrait = el("div", { class: "portrait" }, A.heroPortrait(h, 5, { cls: "main" }), A.heroSprite(h, 3, { cls: "full" }));
     if (h.pet) portrait.appendChild(A.petSprite(h.pet, 4));
     const isMine = A.mine().includes(h.id);
@@ -339,6 +423,7 @@
         h.epithet ? el("div", { class: "epi" }, h.epithet) : null,
         el("div", { class: "small" }, `Level ${h.level} `, el("span", { class: "has-tip", title: (S.classes[h.cls] || {}).desc || "" }, h.title), h.party ? [" of ", A.partyLink(h.party)] : " · solo"),
         (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by how " + h.name + " fights)" : ""}`) : null,
+        classStrip(h),
         h.faction && (S.factions || {})[h.faction] ? el("div", { class: "tiny" }, `${S.factions[h.faction].icon || ""} ${S.factions[h.faction].ranks[h.frank || 0]} of ${S.factions[h.faction].name}`,
           el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
         el("div", { class: "small muted" }, h.npc ? "A league hero" : `${h.owner}'s hero`, ` · joined season ${h.joined || "next"}`,
@@ -411,6 +496,7 @@
     return p;
   }
   function storyTab(b, h) {
+    if (h.alive) b.appendChild(fightCard(h));
     const lp = lettersPanel(h);
     if (lp) b.appendChild(lp);
     const th = threadsPanel(h);
@@ -450,16 +536,9 @@
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
-    left.appendChild(journeyPanel(h));
-    const sk = panel("Skills");
-    const order = { attack: 0, multi: 0, aoe: 0, cleave: 0, heal: 1, heal_all: 1, guard: 2, buff_all: 2, rally: 2, fear: 2, summon: 2, debuff_all: 2, stealth: 2, trigger: 3, passive: 4, world: 5 };
-    const kinds = { passive: "passive", trigger: "trigger", world: "world" };
-    for (const s of h.skills.slice().sort((a, b) => (order[a.type] || 0) - (order[b.type] || 0))) sk.appendChild(el("div", { class: `skill ${kinds[s.type] || ""}`, style: { marginBottom: "5px" } },
-      el("div", { class: "row between" }, el("span", { class: "nm" }, s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""), el("span", { class: "tiny dim" }, s.type === "world" ? "out of combat" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet")),
-      el("div", { class: "small muted" }, s.desc), el("div", { class: "tiny dim" }, s.tags.join(" · "))));
-    if (!h.skills.length) sk.appendChild(el("p", { class: "empty" }, "No skills yet."));
+    left.appendChild(classTree(h));
+    right.appendChild(skillsPanel(h));
     right.appendChild(affinityPanel(h));
-    right.appendChild(sk);
     right.appendChild(gearPanel(h));
   }
   function traitRow(t, v, big) {
@@ -479,19 +558,6 @@
     return p;
   }
   function nextClass(h) { return h.next_class || null; }
-  function journeyPanel(h) {
-    const p = panel("Class journey");
-    const row = el("div", { class: "journey" });
-    h.class_history.forEach(([day, c], i) => {
-      if (i) row.appendChild(el("div", { class: "arrow" }, "→"));
-      const look = Object.assign({}, h, { cls: c, legend: false });
-      row.appendChild(el("div", { class: "step" }, A.spriteCanvas((f) => Art.heroGrid(look, f, S.classes[c]), 2, "", false),
-        el("div", { class: "small" }, S.classes[c].name), el("div", { class: "tiny dim" }, day ? `world day ${day}` : "")));
-    });
-    p.appendChild(row);
-    p.appendChild(el("p", { class: "small muted" }, S.classes[h.cls].desc));
-    return p;
-  }
   function gearPanel(h) {
     const p = panel("Gear & pack");
     p.appendChild(el("p", null, el("b", null, h.gear.weapon.name), el("span", { class: "dim small" }, ` (tier ${h.gear.weapon.tier} ${h.gear.weapon.family.replace("_", " ")})`), " · ",
@@ -588,11 +654,54 @@
         el("span", { class: p.morale < 30 ? "red" : "muted" }, `${p.morale}/100 · ${moraleWord(p.morale)}`)),
       A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"));
   }
+  function tacticsPanel(p) {
+    const t = p.tactics;
+    if (!t) return null;
+    const pn = panel("How they fight");
+    const who = (id) => heroes[id];
+    const fig = (id) => el("a", { class: "fig", href: `#/hero/${id}` }, A.heroSprite(who(id), 2), el("div", { class: "tiny" }, who(id).name),
+      el("div", { class: "tiny gold" }, ((p.roles || {})[id] || "").replace("Leader · ", "")), classIcon(basePath(who(id).cls), 1));
+    const form = el("div", { class: "formation" },
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "BACK ROW"), ...t.back.filter(who).map(fig)),
+      el("div", { class: "rank" }, el("div", { class: "tiny dim lbl" }, "FRONT ROW"), ...t.front.filter(who).map(fig)),
+      el("div", { class: "foe tiny dim" }, "the enemy ▸"));
+    pn.appendChild(form);
+    if (t.plan) pn.appendChild(el("p", { style: { marginTop: "8px" } }, el("b", null, "The plan: "), t.plan));
+    pn.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, el("span", { class: "small muted" }, `${t.mix} · `), ...t.style.map((s) => el("span", { class: "pill" }, s))));
+    if (t.notes.length) pn.appendChild(el("ul", { class: "small tac-notes" }, ...t.notes.map((n) => el("li", null, n))));
+    const g = el("div", { class: "grid2 even", style: { marginTop: "10px" } });
+    const share = el("div");
+    const cols = [["dmg", "Damage dealt", "red"], ["healed", "Healing", "green"], ["taken", "Damage taken", "blue"]];
+    share.appendChild(el("div", { class: "tiny gold skill-group" }, "Who does what this season"));
+    for (const [k, label, col] of cols) {
+      const tot = t.share.reduce((a, s) => a + s[k], 0);
+      if (!tot && k === "taken" && t.share.some((s) => s.dmg)) { share.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label), el("p", { class: "tiny dim" }, "Counted from the next fight on.")); continue; }
+      if (!tot) continue;
+      share.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, label));
+      for (const s of t.share.slice().sort((a, b) => b[k] - a[k])) if (who(s.hero) && s[k]) share.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, who(s.hero).name), A.bar(s[k], tot, col), el("span", { class: "word small" }, `${Math.round((100 * s[k]) / tot)}%`)));
+    }
+    if (!t.share.some((s) => s.dmg || s.healed || s.taken)) share.appendChild(el("p", { class: "empty" }, "No fights together yet."));
+    if (t.ground) share.appendChild(el("p", { class: "small", style: { marginTop: "8px" } }, "Home ground: ", el("b", null, t.ground.name), el("span", { class: "dim" }, ` (${plural(t.ground.fights, "fight")})`)));
+    const sk = el("div", { class: "together" });
+    sk.appendChild(el("div", { class: "tiny gold skill-group" }, "What they can do, together"));
+    for (const grp of t.skills) {
+      if (grp.label === "On the road" || grp.label === "Always on") continue;
+      sk.appendChild(el("div", { class: "tiny dim", style: { marginTop: "6px" } }, grp.label));
+      sk.appendChild(el("div", { class: "row wrap", style: { gap: "4px" } }, ...grp.skills.map((s) => el("span", { class: "pill" + (s.uses ? " gold" : ""), title: `${who(s.hero) ? who(s.hero).name : ""}: ${s.desc}` },
+        `${s.name}`, el("span", { class: "dim" }, ` · ${who(s.hero) ? who(s.hero).name : ""}${s.uses ? " ×" + s.uses : ""}`)))));
+    }
+    const road = t.skills.filter((g) => g.label === "On the road" || g.label === "Always on").flatMap((g) => g.skills);
+    if (road.length) sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, "Also: " + road.map((s) => `${s.name} (${who(s.hero) ? who(s.hero).name : ""})`).join(", ")));
+    g.append(share, sk);
+    pn.appendChild(g);
+    return pn;
+  }
   function partyCard(p) {
     const ms = el("div", { class: "row", style: { gap: "0" } });
     for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
     return el("a", { class: "panel", href: `#/party/${p.id}`, style: { display: "block", color: "inherit", opacity: p.disbanded ? 0.65 : 1 } },
       el("div", { class: "row" }, A.bannerSprite(p.banner, 3), el("div", null, el("h3", { style: { marginBottom: "2px" } }, p.name),
+        p.motto ? el("div", { class: "small motto" }, `“${p.motto}”`) : null,
         el("div", { class: "small muted" }, p.disbanded ? `Disbanded day ${p.disbanded}` : [el("span", { class: "has-tip", title: S.dispositions[p.disposition] || "" }, cap(p.disposition)),
           ` · ${p.renown} renown`]),
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
@@ -600,8 +709,8 @@
   }
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);
-    head.appendChild(el("div", { class: "row wrap", style: { gap: "16px" } }, A.bannerSprite(p.banner, 4),
-      el("div", { style: { flex: 1 } }, el("h1", null, p.name),
+    head.appendChild(el("div", { class: "row wrap", style: { gap: "16px" } }, A.bannerSprite(p.banner, 6),
+      el("div", { style: { flex: 1 } }, el("h1", null, p.name), p.motto ? el("div", { class: "motto big" }, `“${p.motto}”`) : null,
         el("p", { class: "muted" }, `Founded day ${p.founded_day} (season ${p.founded_season})`, p.disbanded ? ` · disbanded day ${p.disbanded}` : ` · ${p.renown} renown`),
         el("p", null, S.dispositions[p.disposition]),
         p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
@@ -622,9 +731,11 @@
         q.floors ? el("div", { class: "small" }, `Floor ${Math.min(q.floors, (q.floor || 0) + 1)} of ${q.floors}`, A.bar((q.floor || 0) + 1, q.floors, "gold")) : null,
         q.why ? el("p", { class: "small muted", style: { fontStyle: "italic", marginTop: "4px" } }, `Why: ${q.why}.`) : null))) : null;
     if (quest) v.appendChild(quest);
+    const tac = p.disbanded ? null : tacticsPanel(p);
     v.appendChild(panel("Members", mem,
       p.fallen.length ? el("p", { class: "small red", style: { marginTop: "8px" } }, "Fallen: ", p.fallen.map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null,
       p.former.length ? el("p", { class: "small dim" }, "Former members: ", p.former.filter((f) => !p.fallen.includes(f)).map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null));
+    if (tac) v.appendChild(tac);
     const g = el("div", { class: "grid2" });
     const list = p.events.map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
     g.appendChild(panel("History", A.feed(list, { dayHeaders: true })));
@@ -774,7 +885,7 @@
         if (!p) return;
         const grp = el("div", { class: "grp-row" });
         for (const m of p.members) if (heroes[m]) grp.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp" }));
-        t.appendChild(el("tr", null, el("td", { class: "dim" }, r.rank || i + 1), el("td", null, moveMark(r, d.week)), el("td", null, A.bannerSprite(p.banner, 1)), el("td", null, A.partyLink(p.id), grp), el("td", { class: "num gold" }, r.renown)));
+        t.appendChild(el("tr", null, el("td", { class: "dim" }, r.rank || i + 1), el("td", null, moveMark(r, d.week)), el("td", null, A.bannerSprite(p.banner, 2)), el("td", null, A.partyLink(p.id), grp), el("td", { class: "num gold" }, r.renown)));
       });
       right.appendChild(panel("Party power rankings", t));
     }
