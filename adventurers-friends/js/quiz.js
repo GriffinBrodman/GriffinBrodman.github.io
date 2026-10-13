@@ -32,6 +32,7 @@
     const shown = Q.length - Q.filter((q) => q.hidden).length;
     let num = 0;
     v.appendChild(el("h1", null, "Join the League"));
+    v.appendChild(el("p", { class: "quiz-len" }, `${shown} questions, about 3 minutes.`));
     v.appendChild(el("p", { class: "muted" }, `Answer honestly (or don't). Your answers decide what your hero looks like, how they fight, what they're like, and what they might become. `,
       `You won't control them; you'll just get to watch. New heroes join at the start of the next season.`));
     const wrap = el("div", { class: "quiz" });
@@ -70,18 +71,22 @@
     });
     const done = el("button", { class: "btn primary", style: { fontSize: "18px" } }, "Get my hero code →");
     form.appendChild(el("div", { class: "row wrap" }, done, el("button", { class: "btn", onclick: () => { save([]); location.reload(); } }, "Start over")));
+    // a phone scrolls the preview away, so the count rides along at the bottom of the screen
+    const sticky = el("div", { class: "quiz-sticky" });
+    form.appendChild(sticky);
     done.onclick = () => {
       const missing = Q.findIndex((q, i) => ans[i] == null || ans[i] === "");
       if (missing >= 0) { A.toast(`Question ${Q.slice(0, missing + 1).filter((q) => !q.hidden).length} still needs an answer`); form.children[missing].scrollIntoView({ behavior: "smooth", block: "center" }); return; }
       const code = encode(ans);
       out.innerHTML = "";
+      const when = L.meta.phase === "season" ? "next season" : "the season";
       out.appendChild(el("section", { class: "panel follow" }, el("h2", null, `${ans[0]} is ready`),
-        el("p", null, `Send this code to ${L.meta.commissioner}. They'll add your hero, who joins at the start of ${L.meta.phase === "season" ? "next season" : "the season"}.`),
-        el("div", { class: "code" }, code),
-        el("div", { class: "row wrap", style: { marginTop: "8px" } },
-          el("button", { class: "btn primary", onclick: () => A.copy(code, "Hero code copied") }, "Copy code"),
-          el("button", { class: "btn", onclick: () => A.copy(`Here's my hero for the league: ${ans[0]}.\n${code}`, "Message copied") }, "Copy as a message")),
-        el("p", { class: "small dim", style: { marginTop: "8px" } }, `For ${L.meta.commissioner}: python -m league enlist ${code.slice(0, 12)}…`)));
+        el("p", null, `One last step: send this to ${L.meta.commissioner}. Your hero joins the league at the start of ${when}.`),
+        el("div", { class: "row wrap", style: { margin: "8px 0" } },
+          el("button", { class: "btn primary big", onclick: () => A.copy(`Here's my hero for the league: ${ans[0]}.\n${code}`, `Copied. Paste it to ${L.meta.commissioner}.`) }, "Copy as a message"),
+          el("button", { class: "btn", onclick: () => A.copy(code, "Hero code copied") }, "Copy just the code")),
+        el("p", { class: "small muted" }, `The message says who your hero is, then gives the code: a long jumble of letters that holds your answers. Paste it anywhere you talk to ${L.meta.commissioner}.`),
+        el("details", { class: "small" }, el("summary", null, "Show the code"), el("div", { class: "code" }, code))));
       out.scrollIntoView({ behavior: "smooth" });
     };
 
@@ -97,6 +102,8 @@
       prev.appendChild(el("p", { class: "small muted" }, "Who they become depends on your answers. You'll find out when they join."));
       const answered = ans.filter((x, i) => !Q[i].hidden && x != null && x !== "").length;
       prev.appendChild(el("div", { class: "small muted" }, `${answered} / ${shown} answered`, A.bar(answered, shown, "gold")));
+      sticky.innerHTML = "";
+      sticky.append(el("span", null, answered >= shown ? "All answered: get your code below" : `${answered} of ${shown} answered`), A.bar(answered, shown, "gold"));
     }
     drawPreview();
   });

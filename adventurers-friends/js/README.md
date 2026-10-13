@@ -2,8 +2,8 @@
 
 | File | Purpose |
 |------|---------|
-| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, graves, the party-page target dummy (`dummyGrid`) |
-| `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines) and hero bust portraits |
+| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, gear icons (`gearIcon`), graves, the party-page target dummy (`dummyGrid`) |
+| `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines), hero sprites and bust portraits drawn from the worn kit (all nine slots, tiers, magic glows), and the gear pieces `Paint.Gear` shares with the icons |
 | `beasts.js` | Shaded monster sprites for the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) |
 | `anim.js` | Ambient pixel animation: one shared, visibility-gated ticker (`Anim.stage`) and small looping actors (villagers, birds, bats, skeletons, torches, smoke, snow, waves...) that any scene can reuse; API listed at the top of the file |
 | `scenes.js` | Daylight backdrops by biome and story vignettes, brought to life with `Anim` actors chosen per place |
@@ -12,7 +12,7 @@
 | `isle.js` | World map: terraced island in oblique view with cliffs, river and falls, towns, dungeons, labels, heroes |
 | `app.js` | Data access, DOM helpers, sprite helpers, event feed, router, "my hero" pinning |
 | `views.js` | Pages: Crier, roster, hero, parties, party, map, digest, world, history, guide, finale, songs |
-| `replay.js` | Animated fight replays |
+| `replay.js` | Animated fight replays: a camera framed on the fighters, marked fighters with a live hp roster, and highlights |
 | `quiz.js` | Join quiz with live preview and hero-code output |
 | `audio.js` | All sound, synthesised with WebAudio: page ambience, scene ambience for the hero page's tonight scene, UI and fight effects, the bard's sung songs, sound settings |
 
@@ -33,8 +33,8 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 |--------|-----------|------------|
 | `LD` | `data/*.js` | Exported game data: `LD.static` (map, goods, monsters, classes, factions, quiz) and `LD.league` (current state). Never written by the site |
 | `App` | `app.js` | `el`, `esc`, `plural`, `cap`, sprite helpers (`heroSprite`, `heroPortrait`, ...), `heroLink`/`partyLink`, `eventRow`/`feed`, `load` (fetch a detail file), `mine` (pinned hero), `route`, `start`. Also `App.L`, `App.S`, and `heroes`/`parties`/`events` lookup tables by id |
-| `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites |
-| `Paint` | `paint.js` | Shaded painter and `portraitGrid` (bust portraits) |
+| `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites; `gearIcon(item, look)` is a 16x16 icon for any kit item (`{slot, art, tier, gem, tint, glow}`) or curio |
+| `Paint` | `paint.js` | Shaded painter, `fullBody` (28x34 sprite) and `portraitGrid` (bust portraits), both drawn from `h.kit` when present and from the class look otherwise; `Gear` holds the shared piece painters (`headgear`, `offhand`, `weapon`, `axis`, `backSprite`, `makeMats`, `glowUp`) and `soften` (reins in the saturation of quiz colours for cloth and hair) |
 | `Beasts` | `beasts.js` | `draw(body, pal, frame, boss, palette)` for non-humanoid monsters; called from `Art.monsterGrid` |
 | `Anim` | `anim.js` | `stage(canvas, base, actors, opts)` plus actor factories (`villager`, `bat`, `torch`, `snow`...); every actor is a pure function of time. Respects `prefers-reduced-motion` |
 | `Scenes` | `scenes.js` | `backdrop`, `vignette`, `locKind`, plus `drawMap` and `nearestNode` that forward to `Isle`. The canvases it returns animate themselves once on screen (the place is recognised from the seed `Art.hash(id)`) |
@@ -47,14 +47,14 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 
 | Route | File | Notes |
 |-------|------|-------|
-| `#/` (Crier) | `views.js` | Weather strip, hyper-event banner, headline, finale panel, tables of heroes/parties/bonds, songs panel, mini map |
-| `#/roster`, `#/hero/<id>/<tab>` | `views.js` + `camp.js` | Tonight scene above the tabs; hero page tabs: story (with dirge for the dead), diary, character, people, record; reputation, artifact and faction panels |
+| `#/` (Crier) | `views.js` | Weather strip, hyper-event banner, headline, finale panel, tables of heroes/parties/bonds, songs panel, mini map. Keystone events always make the lead or Also today; three or more in a day share one "Reaching new heights" box |
+| `#/roster`, `#/hero/<id>/<tab>` | `views.js` + `camp.js` | Tonight scene above the tabs; hero page tabs: story (with dirge for the dead), diary, character (keystone badges by the title, a "what they're wearing" strip, the Kit paper doll from `kit`, `kit_items` (with each item's `history`), `curios`, `relics`; keystone cards first in Skills, out-of-combat skills folded into one line), people, record; reputation, artifact and faction panels |
 | `#/parties`, `#/party/<id>` | `views.js` | |
 | `#/map/<node>` | `views.js` + `isle.js` | Side panel: town ledger, civic panel (ruler, edict, Watch), node details |
 | `#/digest/<season>/<week>` | `views.js` | Weekly digest |
 | `#/days`, `#/day/<n>` | `views.js` | Back issues: any past day's front page (lead, also today, that day's feed), from `data/day/<n>.js` |
 | `#/world` | `views.js` | Factions and legendary figures |
-| `#/history` | `views.js` | Seasons, memorial, artifacts panel |
+| `#/history` | `views.js` | Seasons, memorial, treasures of the age (`L.treasures`, every magic item with its timeline), artifacts panel |
 | `#/songs/<id>` | `views.js` | Songbook and the bard's karaoke stage (uses `Sound.playSong`) |
 | `#/guide`, `#/finale/<season>` | `views.js` | |
 | `#/fight/<id>` | `replay.js` | Animated replay of a stored fight log |
