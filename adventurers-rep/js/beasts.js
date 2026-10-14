@@ -8,11 +8,11 @@
   const SIZES = {
     rat: [20, 12], wolf: [26, 18], boar: [26, 18], bear: [30, 26], spider: [24, 16], spider_big: [24, 16], bat: [26, 16], slime: [22, 16],
     troll: [30, 36], drake: [30, 22], dragon: [48, 36], chest: [24, 20], wraith: [22, 30], golem: [30, 34], crab: [26, 16], wisp: [16, 16],
-    elemental: [24, 30], serpent: [30, 26], kraken: [44, 38], blob: [16, 16], lich: [34, 44], crone: [36, 36],
+    elemental: [24, 30], serpent: [30, 26], kraken: [44, 38], blob: [16, 16], lich: [34, 44], crone: [36, 36], warchief: [50, 50],
   };
   // threat read: beasts that fight heroes toe to toe are drawn closer to hero height
   const BODYK = { rat: 1.1, wolf: 1.2, boar: 1.15, drake: 1.25, serpent: 1.4, spider: 1.2, crab: 1.1, bat: 1.1, bear: 1.1 };
-  const NATIVE_BOSS = new Set(["dragon", "kraken", "lich", "crone"]);
+  const NATIVE_BOSS = new Set(["dragon", "kraken", "lich", "crone", "warchief"]);
 
   const fur = (x, y, s) => s + ((x * 7 + y * 13) % 5 === 0 ? -0.28 : 0);
   const from = (y0) => (x, y, s) => (y < y0 ? false : s);
@@ -40,6 +40,7 @@
       a: ramp(p[0]), ad: ramp(dk(p[0], 0.38)), b: ramp(p[1]), bd: ramp(dk(p[1], 0.38)), horn: ramp("#e8dcc0"), dhorn: ramp("#a8987c"),
       n: ramp(mix(p[0], "#ffffff", 0.08)), wm: ramp(dk(mix(p[0], p[1], 0.15), 0.3)), wmd: ramp(dk(p[0], 0.55)), wb: ramp(mix(p[0], p[1], 0.4)),
       cloth: ramp("#6a4430"), void: ramp("#0c0a16"), pink: ramp("#d88a8a"), glow: ramp(p[1]), gold: ramp("#d8a838"), iron: ramp("#4a4656"),
+      arm: ramp(p[0]), wood: ramp("#7a5232"), fur: ramp("#8a7458"), steel: ramp("#9aa2aa"), rust: ramp("#9a5a34"),
     };
   }
 
@@ -563,6 +564,94 @@
     }
   }
 
+  function warchief(P, c, f) {
+    const E = c.E, d = f;
+    const flut = (k) => (f ? 1 : -1) * Math.sin(k * 1.7) * 0.9;
+    P.layer = 1;
+    P.rect(9, 5, 2, 43, "wood", (x) => (x === 9 ? 0.35 : -0.25));
+    P.rect(2, 6, 9, 1, "wood", -0.1);
+    P.poly([[2, 7], [9, 7], [9, 21 + flut(1)], [7.6, 19.6 + flut(2)], [6.2, 23 + flut(3)], [4.8, 20 + flut(4)], [3.4, 22.4 + flut(5)], [2, 20 + flut(6)]], "b",
+      (x, y) => 0.3 - (y - 7) * 0.025 + (Math.sin(x * 1.6 + f * 1.4) > 0.55 ? -0.45 : 0));
+    P.layer = 2;
+    P.rect(3, 10, 5, 3, "horn", 0.3); P.rect(4, 13, 3, 1, "horn", 0);
+    P.px(4, 11, "void"); P.px(6, 11, "void"); P.px(5, 13, "void");
+    for (let i = 0; i < 4; i++) { P.px(3 + i * 1.34, 15 + i, "horn", -0.1); P.px(7 - i * 1.34, 15 + i, "horn", -0.1); }
+    P.ell(10, 2.6, 2.1, 1.9, "horn", { s: 0.2 });
+    P.px(9, 2, "void"); P.px(11, 2, "void"); P.rect(9, 4, 3, 1, "horn", -0.3);
+    P.layer = 3;
+    for (const [sx, s] of [[20, -1], [30, 1]]) {
+      limb(P, [[sx, 38 + d], [sx + s * 1.6, 42.4], [sx + s * 1.2, 45.6]], 2.9, 2.4, "a");
+      P.rect(sx + s * 1.2 - 2.4, 44, 5, 2, "cloth", -0.15);
+      P.ell(sx + s * 1.8, 47, 3.4, 1.4, "a", { s: -0.2 });
+      P.px(sx + s * 1.8 + 2.6 * s, 47, "horn", 0.3); P.px(sx + s * 1.8 + 1 * s, 48, "horn", 0);
+    }
+    P.layer = 4;
+    P.ell(25, 29.4 + d, 10, 8.2, "a", { s: -0.12, k: 0.9 });
+    P.ell(25.4, 32 + d, 6.8, 4.8, "n", { s: 0.05, k: 0.7 });
+    for (const x of [21, 22, 23, 27, 28, 29]) P.px(x, 27.6 + d + (x === 23 || x === 27 ? 0.6 : 0), "a", -0.75);
+    P.px(25, 31 + d, "ad", -0.4);
+    P.layer = 5;
+    P.poly([[15.6, 36 + d], [34.4, 36 + d], [35, 40.4 + d], [32, 39.2 + d], [29.6, 41 + d], [27, 39.4 + d], [24, 41 + d], [21, 39.4 + d], [18.4, 41 + d], [15, 40.4 + d]], "fur",
+      (x, y) => 0.2 - (y - 36 - d) * 0.13 + ((x * 7 + y * 3) % 5 === 0 ? -0.35 : 0));
+    P.layer = 6;
+    P.poly([[22, 37 + d], [28.4, 37 + d], [28, 44 + d], [25.2, 42.6 + d], [22.4, 44 + d]], "b", (x) => 0.25 - (x - 22) * 0.08);
+    P.rect(15.6, 35 + d, 19, 2, "cloth", (x) => 0.3 - (x - 16) * 0.04);
+    P.rect(23, 34.6 + d, 4, 3, "gold", 0.25); P.rect(24, 35.6 + d, 2, 1, "gold", -0.5);
+    ln(P, 17, 24 + d, 33, 35 + d, "cloth", -0.05, 1);
+    P.px(25, 29.6 + d, "iron", 0.3); P.px(29, 32.4 + d, "iron", 0.3);
+    for (const x of [18, 31]) { P.px(x, 37 + d, "horn", 0.3); P.px(x, 38 + d, "horn", 0); P.px(x, 39 + d, "horn", -0.3); }
+    P.layer = 7;
+    limb(P, [[16.4, 25 + d], [13.8, 28.4 + d], [11.6, 31 + d]], 3, 2.4, "arm", 0.05);
+    P.rect(11.4, 27.6 + d, 4, 2, "cloth", 0.1); P.px(12, 28 + d, "iron", 0.5); P.px(14, 28 + d, "iron", 0.5);
+    limb(P, [[33.6, 25 + d], [36.6, 28.6 + d], [38.6, 31.6 + d]], 3, 2.5, "arm", -0.15);
+    P.rect(35.4, 28 + d, 4, 2, "cloth", -0.1); P.px(36, 28.4 + d, "iron", 0.4); P.px(38, 28.4 + d, "iron", 0.4);
+    P.layer = 8;
+    P.ell(25, 23.6 + d, 12.4, 3.6, "fur", { fn: fur, k: 0.8, s: 0.1 });
+    for (let x = 14; x <= 36; x++) if ((x * 5) % 3 !== 0) P.px(x, 26.8 + d + (x % 2), "fur", -0.5);
+    for (let i = 0; i < 7; i++) { const x = 19.8 + i * 1.75, y = 27.4 + d + Math.sin((i / 6) * Math.PI) * 1.4; P.px(x, y, i === 3 ? E : "horn", i === 3 ? 0 : 0.35); }
+    P.layer = 9;
+    P.ell(15.2, 22.8 + d, 4, 3, "steel", { s: -0.15 });
+    P.rect(11.6, 24.6 + d, 8, 1, "iron", 0);
+    P.px(13, 22 + d, "iron", -0.3); P.px(16, 21.4 + d, "iron", -0.3); P.px(14.6, 23.6 + d, "iron", -0.3);
+    P.ell(35, 22 + d, 3.3, 2.9, "horn", { s: 0.2 });
+    P.px(34, 21.6 + d, "void"); P.px(36, 21.6 + d, "void"); P.px(35, 23 + d, "void");
+    P.rect(34, 24.4 + d, 3, 1, "horn", -0.3); P.px(35, 24.4 + d, "void");
+    P.layer = 10;
+    P.rect(38.4, 26.4 + d, 2, 4, "wood", (x) => (x < 39 ? 0.4 : -0.1)); P.rect(38.4, 25.6 + d, 2, 1, "iron", 0.4);
+    const bx = 36, by = 34.4 + d;
+    P.poly([[bx, by], [bx + 9, by - 0.8], [bx + 10, by + 11], [bx + 1, by + 11.8]], "steel", (x, y) => 0.4 - (x - bx) * 0.03 - (y - by) * 0.045);
+    ln(P, bx + 0.4, by + 0.2, bx + 9.2, by - 0.6, "iron", 0.1);
+    ln(P, bx + 9.2, by + 0.4, bx + 10.1, by + 10.8, "steel", 1);
+    ln(P, bx + 1.4, by + 11.6, bx + 9.8, by + 10.8, "steel", 0.7);
+    P.ell(bx + 2.6, by + 2.4, 0.8, 0.8, "void", { k: 0 });
+    for (const [x, y] of [[bx + 3, by + 7], [bx + 4, by + 8], [bx + 2, by + 9], [bx + 6, by + 4]]) P.px(x, y, "rust", 0.1);
+    P.erase(Math.floor(bx + 10.2), Math.floor(by + 5.4));
+    P.ell(39, 32.4 + d, 2.5, 2.3, "arm", { s: 0.1 });
+    P.rect(37.6, 31.4 + d, 3, 1, "ad", -0.4);
+    P.ell(11, 32 + d, 2.4, 2.2, "arm", { s: 0.2 });
+    P.rect(9.6, 31 + d, 3, 1, "ad", -0.4);
+    P.layer = 11;
+    P.poly([[19.6, 12.6 + d], [11.4, 8.2 + d], [13, 11.6 + d], [19.6, 16.4 + d]], "a", 0.3);
+    P.poly([[19, 13.4 + d], [14.4, 10.8 + d], [19, 15.4 + d]], "pink", -0.25);
+    P.poly([[30.4, 12.6 + d], [38.6, 8.2 + d], [37, 11.6 + d], [30.4, 16.4 + d]], "a", -0.1);
+    P.poly([[31, 13.4 + d], [35.6, 10.8 + d], [31, 15.4 + d]], "pink", -0.4);
+    P.px(35, 12.6 + d, "gold", 0.5); P.px(35, 13.6 + d, "gold", 0);
+    P.ell(25, 14.4 + d, 7, 5.8, "a", { s: 0.1 });
+    P.ell(25, 18.4 + d, 6.8, 3, "a", { s: -0.08, k: 0.7 });
+    P.layer = 12;
+    P.rect(18.6, 8.6 + d, 13, 2, "gold", (x) => 0.35 - (x - 18) * 0.05);
+    for (const [x, h] of [[19, 2.4], [22, 4.2], [25, 5.6], [28, 3.6], [31, 2.6]]) P.poly([[x - 1.1, 8.8 + d], [x + 0.2 - (x === 28 ? 1 : 0), 8.8 - h + d], [x + 1.2, 8.8 + d]], "gold", 0.3 - (x - 19) * 0.04);
+    P.px(25, 9.4 + d, "b", 0.6); P.px(21, 9.4 + d, "void"); P.px(29, 9.4 + d, "void");
+    ln(P, 20, 12 + d, 23.6, 13.4 + d, "ad", -0.7); ln(P, 30, 12 + d, 26.4, 13.4 + d, "ad", -0.7);
+    P.rect(21.6, 14 + d, 2, 1, E); P.px(23, 14 + d, INK); P.rect(26.4, 14 + d, 2, 1, E); P.px(26.4, 14 + d, INK);
+    P.px(21.6, 15 + d, "ad", -0.4); P.px(22.6, 15 + d, "ad", -0.4); P.px(27.4, 15 + d, "ad", -0.4); P.px(28.4, 15 + d, "ad", -0.4);
+    P.ell(25, 16.6 + d, 1.7, 1.5, "n", { s: 0.35 });
+    P.px(24, 17.4 + d, "ad", -0.6); P.px(26, 17.4 + d, "ad", -0.6);
+    P.rect(21.6, 19 + d, 7, 1, "void", 0);
+    P.px(21, 18 + d, TOOTH); P.px(21, 17 + d, TOOTH); P.px(29, 18 + d, TOOTH); P.px(29, 17 + d, TOOTH);
+    P.px(23.4, 19 + d, TOOTH); P.px(26.6, 19 + d, TOOTH);
+  }
+
   function blob(P, c, f) {
     P.layer = 2;
     P.ell(8, 8.4 + f * 0.3, 6.4, 6.4, "a");
@@ -570,7 +659,7 @@
     P.px(6, 6.4, c.E); P.px(10, 6.4, c.E); P.px(6, 5.6, "#ffffff"); P.px(10, 5.6, "#ffffff");
   }
 
-  const DRAW = { rat, wolf, boar, bear, bat, slime, chest, wraith, crab, wisp, elemental, serpent, kraken, lich, crone };
+  const DRAW = { rat, wolf, boar, bear, bat, slime, chest, wraith, crab, wisp, elemental, serpent, kraken, lich, crone, warchief };
 
   function draw(body, pal, frame, boss, palette) {
     const f = frame || 0, size = SIZES[body] || SIZES.blob;

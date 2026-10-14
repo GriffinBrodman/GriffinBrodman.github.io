@@ -152,24 +152,162 @@
   const drawHero = (o) => Paint.fullBody(o);
 
   // ---------- pets ----------
-  function drawPet(kind, name, frame) {
+  // Dogs, cats and lizards are hand-mapped bodies, one letter per region, which a named coat paints. Regions:
+  // h head, r ear, n neck, m muzzle, j chin, f cheek, c chest, b back, s side, u belly, t tail, q tail tip, d crest,
+  // w dewlap, L/l far/near leg, P/p far/near paw; E eye and N nose are not fur. shade is the ramp step each region takes,
+  // so a white chest on a black dog is lit like the rest of it. A mark selector is space-separated tokens: a part name,
+  // "@regions", or "x,y" (frame-0 pixels); later marks win, and a null colour leaves the pixel bare (a bobbed tail).
+  // move(x, y, region) is the vertical step a pixel takes in frame 1.
+  const PET_BODY = {
+    dog: {
+      shade: { h: 2.6, r: 1, n: 2, m: 2.8, j: 1.5, f: 2, c: 3, b: 2.6, s: 2, u: 1.5, t: 2, q: 2, L: 1.3, l: 2, P: 1.3, p: 2 },
+      rows: [
+        "",
+        ".........rhh",
+        "........nrEmm",
+        ".q.bbbbbncfmN",
+        "..tssssssccj",
+        "..sssssuc",
+        "...uuuuuu",
+        "...L.l..Ll",
+        "...P.p..Pp",
+      ],
+      move: (x, y, k) => ("LlPp".includes(k) ? 0 : 1),
+      parts: {
+        blaze: "11,1 @m", brow: "10,1", socks: "@LlPp", saddle: "@b 3,4 4,4 5,4 6,4 7,4",
+        merle: "4,3 5,3 2,4 3,4 6,4 7,4 3,5 6,5 8,2 @r", merleLight: "3,3 6,3 4,4 5,5",
+        spots: "4,3 7,3 5,4 3,5 7,5 10,1", brindle: "3,4 3,5 5,3 5,4 5,5 7,3 7,4 7,5", flecks: "4,3 6,3 3,4 7,4 4,5 6,5 11,1",
+      },
+    },
+    cat: {
+      shade: { h: 2.6, r: 2, n: 2, f: 2, c: 2.8, b: 2.6, s: 2, u: 1.5, t: 2, q: 2.6, L: 1.3, l: 2, P: 1.3, p: 2 },
+      nose: "#e8909a",
+      rows: [
+        "",
+        "",
+        ".........r.r",
+        ".q......nhhh",
+        ".t..bbbbnEhE",
+        "..tssssssfNf",
+        "...sssuucc",
+        "....Luuul",
+        "....P...p",
+      ],
+      move: (x, y, k) => ("qt".includes(k) ? -1 : 0),
+      parts: {
+        stripes: "4,4 4,5 4,6 6,4 6,5 8,5 10,3 @q 2,5", mackerel: "3,5 5,4 5,5 5,6 7,4 7,5 9,3 11,3 10,3 @q 2,5",
+        face: "10,3 10,4 @f",
+      },
+    },
+    lizard: {
+      shade: { d: 3, h: 2.6, b: 2.6, u: 1.6, f: 2, m: 3, w: 2, t: 2, q: 2, L: 1.3, l: 2, P: 1.3, p: 2 },
+      rows: [
+        "",
+        "",
+        "",
+        "..........hh",
+        "....d.d.d.hEm",
+        ".q..bbbbbbfmm",
+        ".tttuuuuuuww",
+        "....L...l.w",
+        "...PP...pp",
+      ],
+      move: (x) => (x >= 10 ? -1 : 0),
+      parts: {
+        tailBands: "1,5 3,6", bands: "6,5 6,6 9,5 9,6", spots: "5,5 8,5 6,6 9,6 2,6 11,3",
+      },
+    },
+  };
+  const K = "#2a2630", WH = "#f2eee6", TAN = "#c8783a";
+  // a pet with no coat of its own wears one picked by its name, so it keeps its looks from day to day
+  const PET_COATS = {
+    dog: {
+      aussie: { fur: "#8a96a8", marks: [["merleLight", "#aab4c4"], ["merle 11,1", K], ["@f brow socks", TAN], ["@mjc 8,3 @Pp", WH], ["@q", null]] },
+      red_merle: { fur: "#c89a7c", marks: [["merleLight", "#e4c4aa"], ["merle 11,1", "#8a3e24"], ["@f brow socks", "#d8904a"], ["@mjc 8,3 @Pp", WH], ["@q", null]] },
+      collie: { fur: K, eye: "#b07a3a", marks: [["blaze @jcn @Pp @q", WH]] },
+      golden: { fur: "#d8a050", marks: [["@c @q", "#ecc483"]] },
+      black_lab: { fur: "#2e2a2e", eye: "#b07a3a" },
+      chocolate_lab: { fur: "#6a4232", eye: "#d0a050" },
+      beagle: { fur: "#c47a36", marks: [["saddle", K], ["blaze @jcu @Pp @l @q", WH]] },
+      husky: { fur: "#7c8492", eye: "#7ac8f0", marks: [["@b", "#4c525e"], ["brow @fmjc @u @LlPp @q", WH]] },
+      dalmatian: { fur: WH, marks: [["spots @r", K]] },
+      brindle: { fur: "#a06a3a", marks: [["brindle @m", "#3a2a22"], ["@c", "#d8b088"]] },
+      shepherd: { fur: "#c8843a", marks: [["saddle @m @r", K], ["@Pp", "#e0a860"]] },
+      corgi: { fur: "#d47a34", marks: [["blaze @jcu @Pp", WH], ["@q", null]] },
+      terrier: { fur: "#7e7e80", marks: [["flecks @mj", "#b8b6b0"], ["@r", "#56565a"]] },
+      mutt: { fur: "#e6d6b2", marks: [["@r 10,1", "#5a3a26"]] },
+    },
+    cat: {
+      orange_tabby: { fur: "#e0883a", eye: "#e8c040", marks: [["stripes", "#a84e1e"]] },
+      grey_tabby: { fur: "#9a9aa4", eye: "#8ad05a", marks: [["stripes", "#4a4a56"]] },
+      brown_tabby: { fur: "#a07a52", eye: "#c8c040", marks: [["mackerel", "#3a2a1e"], ["@f", "#c8a47a"]] },
+      tuxedo: { fur: K, eye: "#a0e050", marks: [["face @c @u @Pp", WH]] },
+      calico: { fur: WH, eye: "#e8b030", marks: [["4,4 5,4 3,5 4,5 9,3 @r 2,5", "#d8782e"], ["6,4 7,4 7,5 6,5 11,3 @q", K]] },
+      tortie: { fur: "#2e2628", eye: "#e8b030", nose: "#5a3a3a", marks: [["4,4 3,5 6,5 7,4 9,3 2,5 5,6 11,3", "#c8642a"]] },
+      siamese: { fur: "#ece0c6", eye: "#5aa8f0", nose: "#4a3428", marks: [["@r @f 10,4 @LlPp @qt", "#4a3428"]] },
+      black: { fur: "#262230", eye: "#6ae05a", nose: "#4a3a44" },
+      white: { fur: WH, eye: ["#5aa8f0", "#e8b030"] },
+      blue: { fur: "#7a8696", eye: "#e8a030", nose: "#8a6a74" },
+      cream: { fur: "#ecd2a4", eye: "#e8a040", marks: [["stripes", "#d4aa72"]] },
+      ginger_white: { fur: "#d87a32", eye: "#c8d050", marks: [["face @c @u @LlPp", WH]] },
+    },
+    lizard: {
+      green: { fur: "#5aa848", marks: [["bands", "#4a9440"], ["tailBands", "#2e6a2a"], ["@d", "#b0dc7a"]] },
+      blue: { fur: "#5a86c0", marks: [["bands", "#4a74ac"], ["tailBands", "#2e4a7a"], ["@d @w", "#a8c8f0"]] },
+      banded: { fur: "#e87a2a", marks: [["bands tailBands", "#2a2228"], ["@d", "#f0b050"]] },
+      sandy: { fur: "#d8b878", marks: [["spots", "#8a6a3a"], ["@u", "#ead8a8"]] },
+      red_throat: { fur: "#7a9248", marks: [["tailBands", "#4a6230"], ["@w", "#d8402a"], ["@d", "#c86a3a"]] },
+      gecko: { fur: "#e8c84a", marks: [["@u", "#f2e6c4"], ["spots", "#4a3a34"], ["tailBands", "#f2e6c4"]] },
+      black: { fur: "#3a3a42", eye: "#e8c040", marks: [["tailBands", "#9aa0a8"], ["@d", "#6a7078"]] },
+      red: { fur: "#c8502a", marks: [["tailBands", "#7a2a1a"], ["@d", "#f0a050"]] },
+    },
+  };
+  const selCache = {};
+  function petSel(kind, sel) {
+    const key = kind + "|" + sel;
+    if (selCache[key]) return selCache[key];
+    const B = PET_BODY[kind], out = { re: "", pts: new Set() };
+    for (const tok of sel.split(" ").filter(Boolean)) {
+      if (B.parts[tok]) { const s = petSel(kind, B.parts[tok]); out.re += s.re; s.pts.forEach((p) => out.pts.add(p)); }
+      else if (tok[0] === "@") out.re += tok.slice(1);
+      else out.pts.add(tok);
+    }
+    return (selCache[key] = out);
+  }
+  function petCoat(kind, name, coat) {
+    const list = PET_COATS[kind], keys = Object.keys(list);
+    return list[coat] || list[keys[Math.floor(rng(hash(name || "pet"))() * keys.length)]];
+  }
+  function drawCoatedPet(kind, co, frame) {
+    const B = PET_BODY[kind], g = new Grid(14, 10), cells = [];
+    let eyes = 0;
+    B.rows.forEach((row, y) => [...row].forEach((k, x) => {
+      if (k === ".") return;
+      let col;
+      if (k === "E") { const e = co.eye || OUTLINE; col = Array.isArray(e) ? e[eyes++ % e.length] : e; }
+      else if (k === "N") col = co.nose || B.nose || OUTLINE;
+      else {
+        let fur = co.fur;
+        for (const [sel, c] of co.marks || []) { const s = petSel(kind, sel); if (s.re.includes(k) || s.pts.has(x + "," + y)) fur = c; }
+        if (!fur) return;
+        const R = ramp(fur), sh = B.shade[k], lo = Math.floor(sh);
+        col = sh === lo ? R[sh] : mix(R[lo], R[lo + 1], sh - lo);
+      }
+      cells.push([x, y, col, frame ? B.move(x, y, k) : 0]);
+    }));
+    // the still pixels go on last, so a dog's planted legs stay in front of its bobbing body
+    for (const [x, y, col, dy] of cells) if (dy) g.set(x, y + dy, col);
+    for (const [x, y, col, dy] of cells) if (!dy) g.set(x, y, col);
+    g.outline(OUTLINE);
+    return g;
+  }
+  function drawPet(kind, name, frame, coat) {
+    if (PET_COATS[kind]) return drawCoatedPet(kind, petCoat(kind, name, coat), frame);
     const r = rng(hash(name || "pet"));
     const g = new Grid(14, 10);
     const oy = frame === 1 ? 1 : 0;
     const paint = (rows, pal, dy) => rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") g.set(x, y + dy, pal[ch]); }));
-    if (kind === "dog") {
-      const c = ramp(["#a0703a", "#d8b078", "#3a2a22", "#f0e8d8", "#7a4a2a"][Math.floor(r() * 5)]);
-      g.blob(6, 5 + oy, 4, 2.2, c); g.blob(10.5, 3 + oy, 2.2, 2, c);
-      g.set(12, 3 + oy, "#1a1220"); g.set(10, 2 + oy, "#1a1220"); g.set(9, 1 + oy, c[1]); g.set(9, 2 + oy, c[1]);
-      g.rect(3, 7, 1, 2, c[1]); g.rect(5, 7, 1, 2, c[2]); g.rect(8, 7, 1, 2, c[1]); g.rect(9, 7, 1, 2, c[2]);
-      g.set(1, 3 + oy, c[2]); g.set(2, 4 + oy, c[2]);
-    } else if (kind === "cat") {
-      const c = ramp(["#9a9aa8", "#e8903a", "#2a2430", "#f0ece0", "#7a6a5a"][Math.floor(r() * 5)]);
-      g.blob(6, 6 + oy * 0, 3.5, 2, c); g.blob(10, 4, 2, 2, c);
-      g.set(9, 2, c[2]); g.set(11, 2, c[2]); g.set(9, 4, "#5ac85a"); g.set(11, 4, "#5ac85a");
-      g.rect(4, 8, 1, 1, c[1]); g.rect(8, 8, 1, 1, c[1]);
-      g.set(2, 5 - oy, c[2]); g.set(1, 4 - oy, c[2]); g.set(1, 3 - oy, c[3]);
-    } else if (kind === "horse") {
+    if (kind === "horse") {
       const c = ramp(["#8a5a3a", "#3a2a22", "#d8c8a8", "#a8a8b0", "#c8803a"][Math.floor(r() * 5)]);
       const mane = c[2];
       g.blob(6, 4.5 + oy, 4, 2, c); g.rect(9, 1 + oy, 2, 4, c[1]); g.blob(11.5, 1.5 + oy, 1.8, 1.2, c);
@@ -209,10 +347,6 @@
         ".323",
       ], pal, 0);
       paint(["", "", "......44", ".....4332", "....43322", "...432221", "...32211", "....211"], pal, -oy);
-    } else {
-      const c = ramp(["#5ab04a", "#e8823a", "#4a8ac8"][Math.floor(r() * 3)]);
-      g.blob(6, 6, 4, 1.5, c); g.blob(11, 5.5, 1.8, 1.4, c); g.set(12, 5, "#1a1220");
-      g.set(1, 7, c[1]); g.set(0, 7, c[1]); g.set(4, 8, c[1]); g.set(8, 8, c[1]);
     }
     g.outline(OUTLINE);
     return g;
@@ -247,16 +381,16 @@
       weapon: opts.weapon || "sword", weaponTier: opts.tier || 1, armorTier: 1, frame: f,
     });
     switch (body) {
-      case "goblin": case "goblin_big": case "kobold": {
-        const big = body === "goblin_big";
-        g = humanoid(p[0], p[1], { style: 4, outfit: big ? "fur" : "leather", head: pal === "green_shaman" ? "antlers" : big ? "horns" : "none",
-          weapon: pal.includes("archer") || pal.includes("sling") ? "bow" : pal === "green_shaman" ? "staff" : big ? "axe" : "daggers", off: big ? "banner" : "none" });
+      case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p);
+      case "goblin": case "kobold": {
+        g = humanoid(p[0], p[1], { style: 4, outfit: "leather", head: pal === "green_shaman" ? "antlers" : "none",
+          weapon: pal.includes("archer") || pal.includes("sling") ? "bow" : pal === "green_shaman" ? "staff" : "daggers" });
         for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
           if (g.get(x, y) === "#1a1220" && y > 8 && y < 12 && x > 9 && x < 16) g.set(x, y, E);
         }
         g.set(8, 8, A[2]); g.set(7, 7, A[2]); g.set(6, 6, A[3]); g.set(19, 8, A[1]); g.set(20, 7, A[1]); g.set(21, 6, A[2]);
         if (body === "kobold") { g.set(12, 14, A[3]); g.set(13, 14, A[3]); g.set(14, 15, A[1]); }
-        g = shrink(g, big ? 1.0 : 0.82);
+        g = shrink(g, 0.82);
         break;
       }
       case "human": {
@@ -278,7 +412,6 @@
       }
       default: return Beasts.draw(body, pal, f, boss, p);
     }
-    if (boss) g = scaleGrid(g, 1.35);
     return g;
   }
 
@@ -897,7 +1030,7 @@
   }
   function heroCanvas(h, scale, frame, cls) { return heroGrid(h, frame, cls).toCanvas(scale); }
   function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : ""), () => drawMonster(m.body, m.pal, frame, m.boss)); }
-  function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (frame || 0), () => drawPet(pet.kind, pet.name, frame)); }
+  function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (pet.coat || "") + (frame || 0), () => drawPet(pet.kind, pet.name, frame, pet.coat)); }
   function bannerGrid(b, big) { return cached("b:" + (big ? "L" : "S") + JSON.stringify(b), () => drawBanner(b, big)); }
   // the champion's medallion: a lit gold pixel ring with laurel sprays and a ribbon
   function laurelGrid() {
@@ -937,5 +1070,5 @@
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

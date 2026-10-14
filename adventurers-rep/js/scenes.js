@@ -508,8 +508,9 @@
     if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
       const m = S.monsters[S.dungeons[e.loc].boss];
       const g = Art.monsterGrid(m, 0);
-      ctx.save(); ctx.globalAlpha = 0.9;
-      ctx.translate(px + g.w / 2, ground - 6); ctx.rotate(Math.PI / 2 * 0.95); ctx.drawImage(g.toCanvas(1), -g.w / 2, -g.h / 2); ctx.restore();
+      // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
+      ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
+      ctx.translate(px + (g.w >> 1), Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
       if (A) actors.push(A.smoke({ x: px + g.w / 2, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
     } else if (["fight", "ambush", "boss"].includes(e.kind) && (e.foes || []).length) {
       e.foes.slice(0, 3).forEach((mid, i) => {

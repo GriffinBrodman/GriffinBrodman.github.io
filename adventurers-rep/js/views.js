@@ -321,7 +321,7 @@
     const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
     if (main.length < 5 && snips.length) {
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
-      p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(x.text + ".", Object.keys(heroes), []) : [A.heroLink(x.hero), " " + x.text + "."]))));
+      p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(endDot(x.text), Object.keys(heroes), []) : [A.heroLink(x.hero), " " + endDot(x.text)]))));
     }
     smallerHappenings(p, small);
     left.appendChild(p);
@@ -595,6 +595,7 @@
     head.appendChild(el("div", { class: "path-mark" }, classIcon(basePath(h.cls), 8)));
     const portrait = el("div", { class: "portrait" }, A.heroPortrait(h, 5, { cls: "main" }), A.heroSprite(h, 3, { cls: "full" }));
     if (h.pet) portrait.appendChild(A.petSprite(h.pet, 4));
+    if (h.mount && !h.mount.hitched) { const ma = mountArt(h.mount, 3); if (ma) { ma.classList.add("portrait-mount"); portrait.classList.add("has-mount"); ma.title = `${h.mount.name} the ${h.mount.label}`; portrait.appendChild(ma); } }
     const isMine = A.mine().includes(h.id);
     const followBtn = el("button", { class: "btn " + (isMine ? "primary" : ""), onclick: () => { const on = A.toggleMine(h.id); followBtn.textContent = on ? "★ Yours" : "☆ This is mine"; followBtn.classList.toggle("primary", on); A.toast(on ? `${h.name} pinned to your Crier` : "Unpinned"); } }, isMine ? "★ Yours" : "☆ This is mine");
     const shareBtn = el("button", { class: "btn", onclick: () => A.copy(`${shareBlurb(h)}\n${A.shareUrl("#/hero/" + h.id)}`, "Link & blurb copied. Go brag.") }, "Share");
@@ -616,14 +617,17 @@
           el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
         el("div", { class: "small muted" }, `Joined season ${h.joined || "next"}`,
           h.home ? ` · owns a ${h.home.kind} in ${A.nodeName(h.home.town, true)}` : ""),
-        el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status),
+        el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
+          h.progress ? el("span", { class: "dim" }, ` · ${h.progress}`) : null),
         h.why ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${h.why}.`) : null,
+        todayBox(h.daybook && window.Daybook ? null : h.route, h.today),
         goalLine(h.goal, h.party),
         ...(h.vows || []).map((v) => vowLine(v, h.party)),
         h.alive ? el("div", { class: "row wrap small", style: { gap: "14px" } },
           el("div", { style: { minWidth: "150px" } }, `HP ${h.hp}/${h.maxhp}`, A.bar(h.hp, h.maxhp)),
           el("div", { style: { minWidth: "150px" } }, `XP ${h.xp}/${h.xp_next} (to level ${h.level + 1})`, A.bar(h.xp, h.xp_next, "gold")),
-          el("div", { style: { minWidth: "150px" } }, `Stress ${h.stress} (${h.stress >= 70 ? "frayed" : h.stress >= 40 ? "tense" : "calm"})`, A.bar(h.stress, 100, "red")),
+          el("div", { style: { minWidth: "150px" } }, `Stress ${h.stress} (${h.stress >= 70 ? "frayed" : h.stress >= 40 ? "tense" : "calm"})`, A.bar(h.stress, 100, "red"),
+            (h.stress_why || []).length ? el("div", { class: "tiny dim" }, "This week: " + h.stress_why.map(([k, v]) => `${k} ${v > 0 ? "+" : "−"}${Math.abs(v)}`).join(", ")) : null),
           el("div", null, el("b", { class: "gold" }, String(h.gold)), " silver"),
           h.joined ? el("div", { style: { minWidth: "150px" } }, el("b", { class: "gold" }, h.renown), " renown",
             el("div", { class: "tiny dim" }, renownCaption(h)),
@@ -634,6 +638,8 @@
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
+    const cal = dayCalendar(h);
+    if (cal) v.appendChild(el("section", { class: "panel daybook-panel" }, cal));
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
     if (night) v.appendChild(panel(null, night));
 
@@ -756,8 +762,9 @@
     tp.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } },
       h.fears.length ? `Afraid of ${h.fears.join(" and ")}. ` : "Afraid of nothing (allegedly). ",
       `Orders ${h.food === "milk" ? "a glass of milk" : h.food === "ale" ? "a big ale" : h.food === "wine" ? "red wine" : h.food === "mystery stew" ? "the mystery stew" : "whatever's cheapest"}.`,
-      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
+      h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.mount ? ` Rides ${h.mount.name}, ${aOrAn(h.mount.colour + " " + h.mount.label)}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
     left.appendChild(tp);
+    if (h.mount) left.appendChild(mountPanel(h.mount));
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
@@ -767,7 +774,7 @@
     right.appendChild(gearPanel(h));
   }
   function traitRow(t, v, big) {
-    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", { class: big ? "" : "small" }, TRAIT_LABEL[t]),
+    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", null, TRAIT_LABEL[t]),
       el("div", { class: "tbar" }, el("i", { style: { left: ((v + 1) / 2) * 100 + "%" } })), el("span", { class: "word" }, traitWord(t, v)));
   }
   function affinityPanel(h) {
@@ -1040,6 +1047,87 @@
     pn.appendChild(g);
     return pn;
   }
+  // the hero's day as a little almanac strip (web/js/daybook.js); the plain day box below still lists what it added up to
+  function dayCalendar(h) {
+    if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
+    try { return Daybook.render(h.daybook); } catch (e) { return null; }
+  }
+  const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
+  function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
+  function mountArt(m, scale) {
+    const MA = window.MountArt;
+    if (!MA || !m) return null;
+    try { return MA.mountSprite(m.kind, m.colour, scale); } catch (e) { return null; }
+  }
+  function wagonArt(w, scale) {
+    const MA = window.MountArt;
+    if (!MA || !w) return null;
+    try {
+      const g = MA.wagonGrid(w.kind, w.puller ? { kind: w.puller.kind, colour: w.puller.colour } : null, 0);
+      const c = el("canvas", { class: "mount-px" });
+      c.width = g.width * scale; c.height = g.height * scale;
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(g, 0, 0, c.width, c.height);
+      return c;
+    } catch (e) { return null; }
+  }
+  function mountPanel(m) {
+    const status = m.lame ? el("div", { class: "small red" }, `Lame: resting ${plural(m.lame, "more day")}.`)
+      : m.hitched ? el("div", { class: "small gold" }, "Pulling the crew's wagon, not ridden.") : null;
+    return panel(m.rare ? "Mount ✦ rare" : "Mount", el("div", { class: "row wrap mount-row" },
+      el("div", { class: "mount-art" }, mountArt(m, 4)),
+      el("div", { style: { flex: 1, minWidth: "180px" } },
+        el("h3", { style: { margin: 0 } }, m.name),
+        el("div", { class: "small muted" }, cap(`${m.colour} ${m.label}`) + (m.since != null ? ` · since day ${m.since}` : "")),
+        el("p", { class: "small", style: { margin: "4px 0" } }, m.desc),
+        m.does ? el("div", { class: "tiny dim" }, cap(m.does) + ".") : null, status)));
+  }
+  function gettingAbout(p) {
+    const ms = p.members.map((m) => heroes[m]).filter((h) => h && h.alive);
+    const riders = ms.filter((h) => h.mount && !h.mount.hitched && !h.mount.lame);
+    const w = p.wagon;
+    if (!w && !riders.length) return null;
+    const walkers = ms.filter((h) => !riders.includes(h));
+    const seats = w && w.moves ? w.seats : 0;
+    const who = el("div", { class: "small" },
+      riders.length ? ["Riding: ", riders.map((h, i) => [i ? ", " : "", A.heroLink(h.id), ` (${h.mount.name})`])] : "",
+      riders.length && walkers.length ? el("br") : null,
+      walkers.length ? [w && w.moves ? "In the wagon" + (walkers.length > seats ? " or walking" : "") + ": " : "On foot: ", walkers.map((h, i) => [i ? ", " : "", A.heroLink(h.id)])] : "");
+    const gap = riders.length && walkers.length > seats ? el("p", { class: "small muted", style: { fontStyle: "italic" } },
+      "Some ride and some walk, so the crew goes at walking pace and the riders keep waiting.") : null;
+    if (!w) return panel("Getting about", who, gap);
+    const comfort = w.comfort > 0 ? "a bumpy ride" : w.comfort < -1 ? "a soft ride" : w.comfort < 0 ? "a fair ride" : "a plain ride";
+    return panel("The wagon", el("div", { class: "row wrap mount-row" },
+      el("div", { class: "mount-art" }, wagonArt(w, 3)),
+      el("div", { style: { flex: 1, minWidth: "200px" } },
+        el("h3", { style: { margin: 0 } }, w.name),
+        el("div", { class: "small muted" }, `${cap(w.label)} · seats ${w.seats} · hauls ${w.haul} · ${comfort}` + (w.since != null ? ` · since day ${w.since}` : "")),
+        el("p", { class: "small", style: { margin: "4px 0" } }, w.desc),
+        w.puller ? el("div", { class: "small" }, `Pulled by ${w.puller.name} the ${w.puller.label}` + (w.puller.owner ? `, ${w.puller.owner}'s` : "") + ".")
+          : w.kind === "handcart" ? el("div", { class: "small" }, "Pushed by whoever lost the argument.")
+          : el("div", { class: "small red" }, "Nothing to pull it: the crew needs a new animal in the next town."),
+        w.paid && w.paid.length ? el("div", { class: "tiny dim" }, "Paid for by " + w.paid.map(([n, v]) => `${n} (${v}s)`).join(", ") + ".") : null)),
+      who, gap);
+  }
+  function stablesBlock(id) {
+    const st = (L.stables || {})[id];
+    if (!st) return null;
+    const MA = window.MountArt;
+    let pen = null;
+    if (MA) {
+      // the stable's own stock stands in the yard too, so even a quiet town has horses to look at
+      const forSale = st.sells.filter(([k]) => k !== "ox" || st.sells.length < 4).slice(-3).map(([k], i) => ({ kind: k, colour: S.mounts[k].colours[(Art.hash(id) + i) % S.mounts[k].colours.length], name: "for sale" }));
+      try { pen = MA.stablePen(st.yard.map((m) => ({ kind: m.kind, colour: m.colour, name: m.name })).concat(forSale.slice(0, Math.max(1, 4 - st.yard.length))), { seed: id, wagons: st.carts.map((c) => ({ kind: c.kind, name: c.name, puller: c.puller ? { kind: c.puller.kind, colour: c.puller.colour } : null })) }); } catch (e) { pen = null; }
+      if (pen) { pen.style.width = "100%"; pen.style.imageRendering = "pixelated"; }
+    }
+    return el("div", { class: "stables" },
+      pen,
+      st.yard.length ? el("p", { class: "small" }, "In the yard tonight: ", st.yard.map((m, i) => [i ? ", " : "", `${m.name} the ${m.label} (`, A.heroLink(m.hero), ")"])) : el("p", { class: "small dim" }, "No adventurers' horses in the yard tonight."),
+      st.carts.length ? el("p", { class: "small" }, "Wagons: ", st.carts.map((c, i) => [i ? ", " : "", `${c.name}, `, A.partyLink(c.party), `'s ${c.label}`])) : null,
+      el("p", { class: "small gold" }, "For sale: " + st.sells.map(([k, v]) => `${S.mounts[k].name} ${v}s`).join(", ")),
+      el("p", { class: "small dim" }, "Wagons for sale: " + st.wagons_for_sale.map(([k, v]) => `${S.wagons[k].name} ${v}s`).join(", ")));
+  }
   function partyCard(p) {
     const ms = el("div", { class: "row", style: { gap: "0" } });
     for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
@@ -1051,6 +1139,13 @@
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
       ms, p.disbanded ? null : moraleBar(p), lastNews(p));
   }
+  function todayBox(route, today, label) {
+    if (!route && !(today || []).length) return null;
+    return el("div", { class: "today-box small" },
+      el("div", { class: "tiny gold" }, label || (route ? route.split(":")[0] : "Today")),
+      route ? el("div", null, cap(route.replace(/^Day \d+: /, ""))) : null,
+      ...(today || []).map((t) => el("div", { class: "muted" }, "· " + t)));
+  }
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);
     head.appendChild(el("div", { class: "row wrap party-head", style: { gap: "16px" } }, A.bannerSprite(p.banner, 6),
@@ -1059,8 +1154,10 @@
         el("p", null, S.dispositions[p.disposition]),
         p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
           el("div", { class: "tiny dim" }, "The party's mood. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.")),
-        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, p.doing ? [cap(p.doing), p.doing.includes(p.loc_name) ? "" : ` · in ${p.loc_name}`] : `In ${p.loc_name}`),
+        p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, p.doing ? [cap(p.doing), p.doing.includes(p.loc_name) ? "" : ` · in ${p.loc_name}`] : `In ${p.loc_name}`,
+          p.progress ? el("span", { class: "dim" }, ` · ${p.progress}`) : null),
         p.why && !p.disbanded && !p.quest ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${p.why}.`) : null,
+        p.disbanded ? null : todayBox(null, p.today, "The crew's day"),
         goalLine(p.goal), ...(p.vows || []).map((v) => vowLine(v))),
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
     v.appendChild(head);
@@ -1071,10 +1168,11 @@
     const quest = q ? panel("Current quest", el("div", { class: "row wrap", style: { gap: "14px" } },
       el("div", { class: "quest-seal" }, q.what),
       el("div", { style: { flex: 1, minWidth: "200px" } },
-        el("h3", { style: { margin: 0 } }, q.where ? `${q.what}: ${q.where}` : q.what),
+        el("h3", { style: { margin: 0 } }, q.where ? `${q.what}: ${q.where}` : q.what, p.progress ? el("span", { class: "small dim" }, ` · ${p.progress}`) : null),
         q.floors ? el("div", { class: "small" }, `Floor ${Math.min(q.floors, (q.floor || 0) + 1)} of ${q.floors}`, A.bar((q.floor || 0) + 1, q.floors, "gold")) : null,
         q.why ? el("p", { class: "small muted", style: { fontStyle: "italic", marginTop: "4px" } }, `Why: ${q.why}.`) : null))) : null;
     if (quest) v.appendChild(quest);
+    if (!p.disbanded) { const gp = gettingAbout(p); if (gp) v.appendChild(gp); }
     const tac = p.disbanded ? null : tacticsPanel(p);
     v.appendChild(panel("Members", mem,
       p.fallen.length ? el("p", { class: "small red", style: { marginTop: "8px" } }, "Fallen: ", p.fallen.map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null,
@@ -1138,26 +1236,65 @@
     for (const h of L.heroes) if (h.alive && !h.travel) c[h.loc] = (c[h.loc] || 0) + 1;
     return Object.entries(c).sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || "ironhaven";
   }
+  // a town's own page: its colours, motto, people, what it's known for, today's mood and deals, and what's been happening
+  const TOWN_ROLE = { barkeep: "Barkeep", priest: "Priest", smith: "Smith", merchant: "Merchant", guard: "Guard", special: "" };
+  function townIdentity(p, id, t) {
+    const idn = t.identity || {};
+    const th = (window.TownScenes && TownScenes.THEME && TownScenes.THEME[id]) || null;
+    p.classList.add("town-panel");
+    p.dataset.town = id;
+    if (th) for (const [k, v] of Object.entries(th)) p.style.setProperty(`--town-${k}`, v);
+    if (idn.tagline) p.appendChild(el("p", { class: "town-tagline" }, idn.tagline));
+    if (idn.motto) p.appendChild(el("div", { class: "town-motto" }, `“${idn.motto}”`));
+    p.appendChild(el("p", { class: "small muted" }, `${cap(t.size)} · ${t.services.join(", ")}`));
+    if ((idn.known_for || []).length) p.appendChild(el("div", { class: "town-chips" }, el("span", { class: "tiny dim" }, "Known for "), idn.known_for.map((k) => el("span", { class: "town-chip" }, k))));
+    p.appendChild(el("p", null, t.desc));
+    if (idn.landmark) p.appendChild(el("p", { class: "small" }, el("b", null, idn.landmark + ". "), idn.landmark_line || ""));
+    const md = (L.town_mood || {})[id];
+    if (md) {
+      const deals = (md.deals || []).map((x) => x.good ? `${S.goods[x.good].name.toLowerCase()} ${Math.round(x.off * 100)}% off` : x.text);
+      p.appendChild(el("div", { class: "town-mood" }, el("span", { class: `mood-badge mood-${md.word}` }, cap(md.word)), " ",
+        el("span", { class: "small" }, (idn.mood_words || {})[md.word] || ""),
+        deals.length ? el("div", { class: "town-chips", style: { marginTop: "4px" } }, el("span", { class: "tiny dim" }, "Today's deals "), deals.map((x) => el("span", { class: "town-chip deal" }, x))) : null));
+    }
+    const folk = t.folk || {};
+    const who = Object.entries(TOWN_ROLE).filter(([r]) => folk[r]).map(([r, lab]) => {
+      const name = r === "special" ? folk.special[0] : folk[r];
+      const where = r === "special" ? ` (${folk.special[1]})` : "";
+      return el("li", null, el("b", null, name), lab ? el("span", { class: "tiny dim" }, ` · ${lab}`) : el("span", { class: "tiny dim" }, where),
+        (idn.folk || {})[r] ? el("div", { class: "tiny" }, idn.folk[r]) : null);
+    });
+    const buys = Object.entries(t.buyers).filter(([, m]) => m > 1).map(([g]) => S.goods[g].name.toLowerCase());
+    const around = [
+      el("li", null, el("b", null, "Tavern: "), `${t.tavern}`),
+      t.trainer ? el("li", null, el("b", null, "Trainer: "), `${t.trainer[0]}, at ${t.trainer[1]}`) : null,
+      t.dish ? el("li", null, el("b", null, "To eat: "), t.dish) : null,
+      buys.length ? el("li", { class: "gold" }, el("b", null, "Pays well for: "), buys.join(", ")) : null,
+      el("li", { class: "dim" }, el("b", null, "Odd jobs: "), t.jobs.join(", ").replace(/_/g, " ")),
+    ].filter(Boolean);
+    p.appendChild(el("div", { class: "town-grid" }, el("div", null, el("h4", null, "Who's who"), el("ul", { class: "town-list" }, who)),
+      el("div", null, el("h4", null, "Around town"), el("ul", { class: "town-list" }, around))));
+    const lately = L.events.filter((e) => e.loc === id && ["town_life", "town", "errand", "festival", "world", "civic", "busk", "donation", "craft", "town_rep", "folk"].includes(e.kind))
+      .sort(byDayDesc).slice(0, 4);
+    if (lately.length) p.appendChild(el("div", null, el("h4", null, "Lately in " + t.name), A.feed(lately, {})));
+    const maps = (L.map_stock || {})[id] || [];
+    if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
+      el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
+  }
   function showNode(side, id) {
     side.innerHTML = "";
     const t = S.towns[id], d = S.dungeons[id], w = S.wilds[id];
     const here = L.heroes.filter((h) => h.alive && h.loc === id && !h.travel);
     const p = panel(A.nodeName(id));
     const kind = Scenes.locKind(id);
-    const bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
+    const TS = window.TownScenes;
+    let bd = null;
+    if (TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
-    if (t) {
-      p.appendChild(el("p", { class: "small muted" }, `${cap(t.size)} · ${t.services.join(", ")}`));
-      p.appendChild(el("p", null, t.desc));
-      p.appendChild(el("p", { class: "small" }, `Tavern: ${t.tavern}, kept by ${t.folk.barkeep}.`, t.folk.special ? ` Also: ${t.folk.special[0]} at ${t.folk.special[1]}.` : ""));
-      const buys = Object.entries(t.buyers).filter(([, m]) => m > 1).map(([g]) => S.goods[g].name.toLowerCase());
-      if (buys.length) p.appendChild(el("p", { class: "small gold" }, "Pays well for: " + buys.join(", ")));
-      p.appendChild(el("p", { class: "small dim" }, "Odd jobs: " + t.jobs.join(", ").replace(/_/g, " ")));
-      const maps = (L.map_stock || {})[id] || [];
-      if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
-        el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
-    }
+    if (window.TownMusic) { try { t ? TownMusic.play(id) : TownMusic.stop(); } catch (e) { /* sound is optional */ } }
+    if (t) townIdentity(p, id, t);
     if (d) {
       const st = L.dungeons[id] || {};
       p.appendChild(el("p", { class: "small muted" }, `Level ${d.level} dungeon · ${d.floors} floors · ${dangerWord(st.danger)}`));
@@ -1175,16 +1312,21 @@
     if (w) p.appendChild(el("p", { class: "small muted" }, `Wilderness · roughly level ${w.level}`));
     const bodies = (L.remains || {})[id] || [];
     if (bodies.length) p.appendChild(el("p", { class: "small red" }, "Unburied here: ", bodies.map((r, i) => [i ? ", " : "", A.heroLink(r.hero)])));
-    side.appendChild(p);
-    if (t) side.appendChild(boardPanel(id));
-    if (t) side.appendChild(townLedger(id));
-    if (t) side.appendChild(civicPanel(id));
     const who = panel(here.length ? `Here now (${here.length})` : "Nobody here right now");
     const grid = el("div", { class: "stack" });
     for (const h of here) grid.appendChild(A.heroCard(h));
     who.appendChild(grid);
-    side.appendChild(who);
+    if (!t) {
+      side.append(p, who);
+      return;
+    }
+    // two columns that stack independently: the town's long story on the left, the short practical panels on the right
+    const stb = stablesBlock(id);
+    side.append(el("div", { class: "town-col" }, p, townLedger(id)),
+      el("div", { class: "town-col" }, boardPanel(id), stb ? panel("The stables", stb) : null, civicPanel(id), who));
   }
+
+  window.addEventListener("hashchange", () => { if (!/^#\/map/.test(location.hash) && window.TownMusic) { try { TownMusic.stop(); } catch (e) { /* optional */ } } });
 
   // ================= DIGEST =================
   A.route(/^\/digest(?:\/(\d+)\/(\d+))?$/, (v, s, w) => {
@@ -1268,6 +1410,10 @@
     v.appendChild(el("h1", null, "The World"));
     v.appendChild(factionsPanel());
     v.appendChild(legendsPanel());
+    const moods = Object.entries(L.town_mood || {});
+    if (moods.length || L.pip) v.appendChild(panel("Town life",
+      moods.length ? el("p", { class: "small" }, moods.map(([t, m], i) => [i ? " · " : "", el("a", { href: `#/map/${t}` }, S.towns[t].name), `: ${m.word}` + ((m.deals || []).length ? " (deals)" : "")])) : null,
+      L.pip && L.pip[0] + L.pip[1] ? el("p", { class: "small" }, el("b", null, "Pip the Unstoppable Lutist: "), `${plural(L.pip[0], "win")}, ${plural(L.pip[1], "loss", "losses")} against the league's buskers.`) : null));
     const dt = el("table");
     dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num" }, "Floors"), el("th", null, "Boss"), el("th", null, "Monsters"), el("th", null, "Explored"), el("th", { class: "num" }, "Delves")));
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
@@ -1362,6 +1508,7 @@
       ["Keystones ✦", "At levels 10 and 20 every hero earns a keystone: a big, one-of-a-kind gift. Only one living hero holds each one. Some change how a hero always fights or lives; others spring at a moment (a killing blow, a friend falling). They stay for good. Tap a ✦ badge to read what it does."],
       ["Front row and back row", "Blades, axes, maces and daggers stand in front and take the hits. Bows, crossbows, staffs and wands fight from the back, where foes have a harder time reaching. Spears hold the front for fighters and the back for everyone else."],
       ["Gear", "Weapon and armour come in tiers, from battered to masterwork. The Kit shows what each piece adds: more power on every blow, more armour against every hit. Hats, cloaks and off-hands add a little protection or a knack. Plain rings and necklaces are worn for show."],
+      ["Horses and wagons", "Horses aren't pets: they're how heroes get about. Mounts and wagons make the road quicker, from about a tenth for a donkey cart to about 40% for the fastest horses (short hops still take a day, but the time saved adds up: ride in by midday and the afternoon in town is yours) and carry more; a warhorse charges in a fight (on the road, never underground). Crews can chip in for a wagon: a donkey cart, an ox wagon that carries a house, or a carriage with cushions that every bandit notices. If some ride and some walk, the crew goes at walking pace, and the riders say so. Luxury-lovers hate a bumpy cart; misers hate a carriage. Every town has stables on the Map. Very rarely, someone finds a unicorn, a giant eagle or a skeleton horse."],
       ["Magic items", "Rare finds from deep floors, bosses and odd deals, each with its own name, look and story. They can be lost, sold, stolen or handed down. The History page lists every one found this age."],
       ["How a fight ends", "Each side has resolve: its nerve, the bar over each team in a replay. Hits, fallen friends and fear wear it down. When it breaks, that side runs; some are cut down as they go, and strong friends carry the fallen out. Between heroes, the losers may surrender instead. If one side is all down, it's a wipe. If nobody breaks for many rounds, both sides back off."],
     ]],
