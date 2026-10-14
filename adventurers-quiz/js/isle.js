@@ -451,7 +451,7 @@
       const bx = Math.round(x * k + 16 * k), by = Math.round(y * k - 30 * k);
       ctx.fillStyle = "#2a1b11"; ctx.fillRect(bx - 1, by - 1, 12 * k + 2, 8 * k + 2);
       ctx.fillStyle = "#8e2a22"; ctx.fillRect(bx, by, 12 * k, 8 * k);
-      ctx.fillStyle = "#ffe9b8"; ctx.font = `600 ${7 * k}px "Pixelify Sans", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffe9b8"; ctx.font = `600 ${7 * k}px "League Five", "Pixelify Sans", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("+" + c, bx + 6 * k, by + 4 * k + 1);
     }
     const L = App.L, WXI = { clear: "☀", cloudy: "☁", rain: "🌧", fog: "🌫", storm: "⛈", snow: "❄", heat: "🔥" };
@@ -488,13 +488,19 @@
       if (xy) { const [x, y] = project(xy[0], xy[1]); ctx.font = "bold 18px sans-serif"; ctx.fillStyle = "#b02a1a"; ctx.textAlign = "center"; ctx.fillText("✖", x * k, (y - 10) * k); }
     }
     const phone = !opts.small && window.innerWidth < 700;
-    const fs = opts.small ? 11 : phone ? 30 : 13;
+    // on a phone the map is shrunk to the screen, so labels are sized for the screen: about 11px tall where they land
+    const shrink = phone && cv.clientWidth ? cv.width / cv.clientWidth : 0;
+    const fs = opts.small ? 11 : phone ? (shrink ? Math.round(10 * shrink) : 30) : 13;
+    const taken = [];
     const busy = new Set(App.L.heroes.filter((h) => h.alive && !h.travel).map((h) => h.loc));
     const plaque = (txt, x, y, kind) => {
-      ctx.font = `${kind === "town" ? 600 : 400} ${kind === "town" ? fs + 2 : fs}px "Pixelify Sans", monospace`;
+      ctx.font = `${kind === "town" ? 600 : 400} ${kind === "town" ? fs + 2 : fs}px "League Five", "Pixelify Sans", monospace`;
       const w = Math.ceil(ctx.measureText(txt).width) + 10, h = fs + 6;
       x = Math.max(w / 2 + 2, Math.min(cv.width - w / 2 - 2, x));
       const x0 = Math.round(x - w / 2), y0 = Math.round(y);
+      // a crowded phone map keeps the towns and drops whatever would sit on top of them; the panel below names every place
+      if (phone && taken.some((r) => x0 < r[0] + r[2] + 4 && r[0] < x0 + w + 4 && y0 < r[1] + r[3] + 2 && r[1] < y0 + h + 2)) return;
+      taken.push([x0, y0, w, h]);
       ctx.fillStyle = "#2a1b11"; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
       ctx.fillStyle = kind === "town" ? "#f1e3c2" : kind === "dungeon" ? "#e8cfc0" : "#dfe6c4"; ctx.fillRect(x0, y0, w, h);
       ctx.fillStyle = kind === "town" ? "#c8963e" : "rgba(0,0,0,0)"; ctx.fillRect(x0, y0 + h - 2, w, 2);
@@ -502,7 +508,8 @@
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(txt, x0 + w / 2, y0 + h / 2 + 1);
     };
-    for (const d of T.N) {
+    const rank = { town: 0, dungeon: 1, wild: 2 };
+    for (const d of phone ? T.N.slice().sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3)) : T.N) {
       if (opts.small && d.kind !== "town") continue;
       if (d.kind === "wild" && !busy.has(d.id)) continue;
       const [x, y] = project(d.xy[0], d.xy[1]);
