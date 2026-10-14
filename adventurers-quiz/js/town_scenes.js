@@ -1211,10 +1211,256 @@
     for (let i = 0; i < 3; i++) { const x = k.rnd(W * 0.15, W * 0.85); add(A.villager({ x0: x, x1: x + k.rnd(10, 22), y: 80 + i * 3, speed: k.rnd(2, 4), look: { hood: k.pick(["#8a5a34", "#e8e0d0", "#6a4426", "#7a7a84"]), shirt: k.pick(["#6a4426", "#8a5a34", "#5a6a8a"]), hat: null }, seed: 170 + i })); }
   }
 
+  // ---------- dungeons with a header of their own ----------
+  const GOB = { s: "#8cbc4a", d: "#5e8e36", e: "#ffe04a", h: "#74747e", c: "#8a6440", b: "#4a3020", p: "#5a4430", f: "#2a1e14", w: "#8a6a40", t: "#d4d8de", a: "#f4f0e6", A: "#c4bcae" };
+  const GOB_LEGS = [["..p..p..w", ".ff..ff.w"], ["...pp...w", "...ff...w"]];
+  function goblinFrames(cook) {
+    const A = window.Anim;
+    if (cook) return GOB_LEGS.map((l) => A.sprite(["..aaa....", ".aaaaa...", "s.AAA....", "ssssess..", "..ssss...", ".daaaa...", "..aaaa...", "..aaaa...", l[0].slice(0, 8), l[1].slice(0, 8)], GOB));
+    return GOB_LEGS.map((l) => A.sprite(["........t", "...hhh..t", "s.hhhhh.w", "ssssess.w", "..ssss..w", "..cccc.sw", ".dcccc..w", "..cbbc..w", l[0], l[1]], GOB));
+  }
+  // walks a stretch and back, stopping at each end to look both ways; `clip` hides it behind whatever is in front of it
+  function patrol(o) {
+    const A = window.Anim, fr = goblinFrames(), ph = (o.seed || 0) * 0.37;
+    const span = o.x1 - o.x0, speed = o.speed || 4, rest = 0.2, per = (2 * span / speed) / (1 - 2 * rest), a = 0.5 - rest;
+    return { z: o.y, draw(ctx, t) {
+      const f = frac(t / per + ph);
+      let u, moving = true, left;
+      if (f < a) { u = f / a; left = false; } else if (f < 0.5) { u = 1; moving = false; left = (f - a) / rest > 0.55; }
+      else if (f < 0.5 + a) { u = 1 - (f - 0.5) / a; left = true; } else { u = 0; moving = false; left = (f - 0.5 - a) / rest < 0.55; }
+      const step = moving ? Math.floor(t * 5 + ph * 7) % 2 : 1;
+      if (o.clip) { ctx.save(); ctx.beginPath(); for (let x = o.x0 - 6; x <= o.x1 + 6; x++) ctx.rect(x, 0, 1, o.clip(x)); ctx.clip(); }
+      A.put(ctx, fr[step], o.x0 + u * span, o.y - (moving && step === 0 ? 1 : 0), left);
+      if (o.clip) ctx.restore();
+    } };
+  }
+  function lookout(o) {
+    const A = window.Anim, fr = goblinFrames(), ph = (o.seed || 0) * 0.21;
+    return { z: o.y, draw(ctx, t) {
+      const f = frac(t / 11 + ph), left = f < 0.42 || (f > 0.62 && f < 0.7);
+      A.put(ctx, fr[1], o.x, o.y + (frac(t / 2.6 + ph) < 0.12 ? 1 : 0), left);
+    } };
+  }
+  function bonfire(o) {
+    const A = window.Anim, cols = ["#b83a20", "#ec6a2a", "#ffac3e", "#ffe27a", "#fff8d8"];
+    return { z: o.y, draw(ctx, t) {
+      A.light(ctx, o.x, o.y - 2, 24, "255,150,60", 0.1 + 0.05 * Math.sin(t * 7.3));
+      for (let i = -4; i <= 4; i++) {
+        const ph = i * 2.3, base = 11 - Math.abs(i) * 1.8, hgt = Math.max(1, R(base * (0.72 + 0.2 * Math.sin(t * 8.7 + ph) + 0.12 * Math.sin(t * 21 + ph * 1.7))));
+        for (let j = 0; j < hgt; j++) {
+          const u = j / hgt, sway = R(Math.sin(t * 4.1 + i + j * 0.5) * u * 1.2);
+          const c = u > 0.78 ? cols[0] : u > 0.5 ? cols[1] : u > 0.22 || Math.abs(i) > 2 ? cols[2] : Math.abs(i) < 1 && j < 2 ? cols[4] : cols[3];
+          rect(ctx, o.x + i + sway, o.y - 1 - j, 1, 1, c);
+        }
+        if (Math.abs(i) < 3 && frac(t * 1.3 + i * 0.37) < 0.18) rect(ctx, o.x + i + R(Math.sin(t * 5 + i)), o.y - hgt - 2 - R(frac(t * 4 + i) * 2), 1, 1, cols[1]);
+      }
+    } };
+  }
+  // the spit turns as the cook cranks it: the roast's crackling and its fat shine roll round with the crank
+  function roast(o) {
+    const A = window.Anim, cook = goblinFrames(true)[1], rx = o.rx || 6, ry = 3, om = o.speed || 2.2;
+    const MEAT = ["#4a1e10", "#7a3418", "#a8522a", "#cc7434", "#f0b26a"];
+    const ex = o.x + o.reach;
+    return { z: o.z, draw(ctx, t) {
+      const ang = t * om, mx = o.x, my = o.y, hy = my + R(Math.sin(ang) * 2.4), hx = ex + R(Math.cos(ang) * 0.6);
+      A.put(ctx, cook, ex + 6, o.feet + (Math.sin(ang) > 0.5 ? 1 : 0), true);
+      rect(ctx, o.x - rx - 6, my, 2 * rx + 7 + o.reach - rx, 1, "#3a3440");
+      rect(ctx, ex, Math.min(my, hy), 1, Math.abs(hy - my) + 1, "#3a3440"); rect(ctx, hx + 1, hy, 1, 1, "#8a6a40");
+      ln(ctx, ex + 4, o.feet - 5, hx + 2, hy, "#1e1a14"); ln(ctx, ex + 4, o.feet - 6, hx + 2, hy, GOB.s); rect(ctx, hx + 2, hy, 1, 1, GOB.d);
+      for (let dy = -ry - 1; dy <= ry + 1; dy++) {
+        const v = dy / (ry + 1), half = R((rx + 1) * Math.sqrt(Math.max(0, 1 - v * v)));
+        rect(ctx, mx - half, my + dy, 2 * half + 1, 1, "#2a140c");
+      }
+      for (let dy = -ry; dy <= ry; dy++) {
+        const v = dy / (ry + 0.5), half = R(rx * Math.sqrt(Math.max(0, 1 - v * v))), th = Math.asin(Math.max(-1, Math.min(1, v)));
+        for (let dx = -half; dx <= half; dx++) {
+          const phi = th - ang;
+          let s = 2.4 - v * 1.3 - (Math.abs(dx) >= half ? 0.8 : 0);
+          if (Math.sin(phi * 3 + dx * 0.45) > 0.72) s -= 1.5;
+          if (v < 0.2 && Math.sin(phi * 2 + 1.1) > 0.9) s += 1.4;
+          rect(ctx, mx + dx, my + dy, 1, 1, MEAT[Math.max(0, Math.min(4, R(s)))]);
+        }
+      }
+      for (const sx of [-1, 1]) { rect(ctx, mx + sx * (rx + 1) - (sx < 0 ? 1 : 0), my - 1, 2, 2, "#f0e8d6"); rect(ctx, mx + sx * (rx + 2) - (sx < 0 ? 1 : 0), my - 2, 1, 1, "#f0e8d6"); }
+      const dr = frac(t / 2.3 + 0.3);
+      if (dr < 0.35) rect(ctx, mx + 1 - R(dr * 6) % 3, my + ry + 1 + R(dr * 14), 1, 1, dr < 0.25 ? "#f4c46a" : "#ffe27a");
+    } };
+  }
+
+  function goblin_camp(k, A) {
+    const { W, F, P } = k, add = k.add, o = k.o;
+    const OL = "#2a1c14", WD = ["#c8935a", "#a06e40", "#7a5230", "#563820"], ROPE = "#d4b474", BURNT = "#5a3c24";
+    const HIDE = ["#e2c690", "#c49e66", "#96723f", "#664a2a"], BONE = "#f0e8d6", RED = ["#d85a3a", "#b03a2a", "#7a2420"];
+    k.grad(0, 60, ["#4e8cc8", "#72a8d4", "#a2c4d8", "#dcd2a8", "#f0bc78"]);
+    k.cloud(W * 0.2, 9, 30, ["#fff6e8", "#f6e6d0", "#e0c4a4"]); k.cloud(W * 0.72, 15, 24, ["#fff6e8", "#f6e6d0", "#e0c4a4"]); k.cloud(W * 0.95, 6, 14, ["#fff6e8", "#f6e6d0", "#e0c4a4"]);
+    k.ridge(50, 9, 36, "#93aaa2", 31, "#a8beb2");
+    const mid = k.ridge(57, 5, 18, "#6a8c4e", 32, "#82a25c");
+    for (let i = 0; i < W / 16; i++) { const x = k.ri(0, W - 1); k.tree(x, mid[x] + 4, k.ri(2, 4), ["#2e5a2a", "#477a34", "#5e9440", "#8cbc5a"]); }
+    const gx = R(W * 0.5), wy = 64, fy = 79;
+    k.grad(60, 90, ["#9a8456", "#8c7448", "#7c663e"]);
+    for (let y = 61; y < 90; y++) { const hw = 7 + R((y - 61) * 0.7); for (let x = gx - hw - 2; x < gx + hw + 2; x++) if (Math.abs(x - gx) < hw || k.on(x, y, 0.5)) P(x, y, "#ac9664"); }
+    for (let i = 0; i < W * 1.4; i++) { const x = k.ri(0, W), y = k.ri(63, 89); P(x, y, k.r() < 0.5 ? "#a8925e" : "#6e5a36"); }
+    for (let i = 0; i < W / 7; i++) { const x = k.ri(0, W), y = k.ri(64, 89); if (Math.abs(x - gx) < 16) continue; P(x, y, "#6a8a3a"); P(x + 1, y - 1, "#8aa84a"); P(x - 1, y - 1, "#6a8a3a"); }
+    const tops = new Array(W).fill(wy);
+    const stake = (kk, x, base, h, w, fence, rec) => {
+      const top = base - h, n = (w + 1) >> 1;
+      kk.F(x - 1, top + n, w + 2, h - n, OL);
+      if (fence) {
+        kk.F(x - 1, top + n - 1, w + 2, 1, OL);
+        kk.F(x, top + n, w, h - n, "#e6dece"); kk.F(x + w - 1, top + n, 1, h - n, "#b4aa98"); kk.F(x, top + n + 3, w, 1, RED[1]);
+        if (rec) for (let i = -1; i <= w; i++) if (x + i >= 0 && x + i < W) tops[x + i] = Math.min(tops[x + i], top + n - 1);
+        return;
+      }
+      kk.F(x, top + n, 1, h - n, WD[0]); kk.F(x + 1, top + n, w - 2, h - n, WD[1]); kk.F(x + w - 1, top + n, 1, h - n, WD[2]);
+      for (let i = 0; i < n; i++) {
+        const ww = Math.min(w, 1 + 2 * i), xx = x + ((w - ww) >> 1), y = top + i;
+        kk.F(xx - 1, y, 1, 1, OL); kk.F(xx + ww, y, 1, 1, OL);
+        kk.F(xx, y, ww, 1, i < n - 1 ? BURNT : "#7a5636");
+        if (rec) for (let j = xx - 1; j <= xx + ww; j++) if (j >= 0 && j < W) tops[j] = Math.min(tops[j], y);
+      }
+      kk.P(x + (w >> 1), top - 1, OL);
+      if (rec && x + (w >> 1) < W) tops[x + (w >> 1)] = Math.min(tops[x + (w >> 1)], top - 1);
+      for (let j = 0; j < (h >> 3); j++) kk.P(x + 1, top + n + 2 + k.ri(0, h - n - 4), WD[2]);
+    };
+    const wall = [];
+    for (let x = 0; x < W; x += 4) {
+      if (Math.abs(x + 1 - gx) < 14) continue;
+      const h = 15 + ((x * 7 + (x >> 3)) % 5), fence = k.r() < 0.08;
+      wall.push([x, h]);
+      stake(k, x, wy, h, 3, fence, true);
+    }
+    for (const y of [wy - 5, wy - 11]) for (let x = 0; x < W; x++) {
+      if (Math.abs(x - gx) < 13) continue;
+      P(x, y, x % 4 === 2 ? "#8a6a3a" : ROPE);
+    }
+    F(0, wy, W, 1, "#5e4a2c"); F(0, wy + 1, W, 1, "#7a6440");
+    const post = (x, top) => { F(x - 1, top, 6, wy - top + 1, OL); F(x, top + 1, 1, wy - top, WD[0]); F(x + 1, top + 1, 2, wy - top, WD[1]); F(x + 3, top + 1, 1, wy - top, WD[2]); P(x + 1, top, BURNT); P(x + 2, top, BURNT); P(x + 1, top - 1, OL); P(x + 2, top - 1, OL); };
+    post(gx - 14, 30); post(gx + 10, 30);
+    F(gx - 16, 34, 32, 4, OL); F(gx - 15, 35, 30, 2, WD[1]); F(gx - 15, 35, 30, 1, WD[0]);
+    for (const x of [gx - 14, gx + 10]) { F(x - 1, 38, 6, 1, ROPE); F(x - 1, 33, 6, 1, ROPE); }
+    for (const s of [-1, 1]) {
+      k.line(gx + s * 3, 30, gx + s * 6, 27, OL); k.line(gx + s * 6, 27, gx + s * 8, 24, OL); k.line(gx + s * 8, 24, gx + s * 8, 22, OL);
+      k.line(gx + s * 3, 29, gx + s * 6, 26, BONE); k.line(gx + s * 6, 26, gx + s * 7, 24, "#d8ccb4"); P(gx + s * 7, 23, "#d8ccb4");
+    }
+    k.blob(gx, 31, 4, 3, OL); k.blob(gx, 31, 3, 2, BONE); F(gx - 1, 33, 3, 3, OL); F(gx - 1, 33, 3, 2, "#e0d6c0");
+    P(gx - 1, 31, OL); P(gx + 1, 31, OL); P(gx - 2, 30, "#d8ccb4"); P(gx, 34, "#8a7a62");
+    const banner = (x, y, h) => {
+      F(x - 1, y - 1, 7, h + 1, OL); F(x, y, 5, h, RED[1]); F(x, y, 1, h, RED[0]); F(x + 4, y, 1, h, RED[2]);
+      for (let i = 0; i < 5; i += 2) P(x + i, y + h, RED[1]);
+      P(x + 1, y + 3, BONE); P(x + 3, y + 3, BONE); F(x + 1, y + 2, 3, 1, BONE); P(x + 2, y + 4, BONE); P(x + 1, y + 6, BONE); P(x + 3, y + 6, BONE); P(x + 2, y + 7, BONE);
+    };
+    banner(gx - 11, 38, 9); banner(gx + 6, 38, 9);
+    add(pennant({ x: gx - 13, y: 26, len: 7, h: 3, c1: RED[1], c2: RED[0], c3: RED[2], fork: true, seed: 2 }));
+    add(pennant({ x: gx + 11, y: 26, len: 7, h: 3, c1: RED[1], c2: RED[0], c3: RED[2], fork: true, seed: 5 }));
+    F(gx - 13, 26, 1, 4, OL); F(gx + 11, 26, 1, 4, OL);
+    for (const x of [gx - 17, gx + 15]) { F(x, 46, 3, 1, OL); F(x + 1, 44, 1, 2, "#3a3440"); add(A.torch({ x, y: 43, r: 16, seed: x })); }
+
+    const tx = R(W * 0.12), py = 30, ty = 75;
+    for (const lx of [tx - 9, tx + 7]) { F(lx - 1, py, 4, ty - py, OL); F(lx, py, 1, ty - py, WD[0]); F(lx + 1, py, 1, ty - py, WD[2]); }
+    for (let y = py + 5; y < ty - 8; y += 13) for (const s of [-1, 1]) {
+      const x0 = s < 0 ? tx - 7 : tx + 6, x1 = s < 0 ? tx + 6 : tx - 7;
+      k.line(x0, y, x1, y + 11, OL); k.line(x0, y + 1, x1, y + 12, WD[2]);
+    }
+    F(tx - 13, py - 1, 27, 4, OL); F(tx - 12, py, 25, 2, WD[1]); F(tx - 12, py, 25, 1, WD[0]);
+    for (let x = tx - 10; x < tx + 13; x += 4) P(x, py + 1, WD[3]);
+    for (let y = ty - 2; y > py + 2; y -= 3) { F(tx + 11, y, 4, 1, WD[2]); }
+    k.line(tx + 10, ty, tx + 10, py + 2, OL); k.line(tx + 15, ty, tx + 15, py + 2, OL);
+    for (const x of [tx - 11, tx + 10]) { F(x - 1, py - 18, 3, 18, OL); F(x, py - 17, 1, 17, WD[1]); }
+    k.tri(tx - 16, py - 27, 33, 10, OL);
+    for (let i = 0; i < 9; i++) {
+      const ins = 16 * (8 - i) / 9, l = R(tx - 15 + ins), r2 = R(tx + 16 - ins), y = py - 26 + i;
+      F(l, y, r2 - l, 1, HIDE[1]); F(l, y, Math.max(1, R((r2 - l) * 0.42)), 1, HIDE[0]); P(r2 - 1, y, HIDE[2]);
+    }
+    for (let x = tx - 15; x < tx + 16; x += 3) P(x, py - 17, x % 2 ? HIDE[2] : OL);
+    F(tx + 4, py - 22, 4, 3, "#8a5a3a"); P(tx + 4, py - 21, HIDE[3]); P(tx + 7, py - 21, HIDE[3]);
+    k.line(tx - 2, py - 29, tx + 2, py - 25, OL); k.line(tx + 2, py - 29, tx - 2, py - 25, OL);
+    for (let x = tx - 13; x < tx + 13; x += 4) stake(o, x, py, 5, 3, false, false);
+    o.F(tx - 13, py - 3, 27, 1, ROPE);
+    add(lookout({ x: tx - 1, y: py - 1, seed: 3 }));
+    add(pennant({ x: tx, y: py - 30, len: 6, h: 2, c1: RED[1], c2: RED[0], seed: 8 }));
+    F(tx, py - 30, 1, 4, OL);
+
+    const lx = R(W * 0.3);
+    const barrel = (x, y) => { F(x - 1, y - 8, 7, 9, OL); F(x, y - 7, 5, 7, "#9a6a3a"); F(x, y - 7, 1, 7, "#b8844a"); F(x + 4, y - 7, 1, 7, "#6e4a28"); F(x, y - 6, 5, 1, "#5a5a62"); F(x, y - 2, 5, 1, "#5a5a62"); F(x, y - 7, 5, 1, "#c89a5a"); };
+    const crate = (x, y) => { F(x - 1, y - 7, 9, 8, OL); F(x, y - 6, 7, 6, "#b08a50"); F(x, y - 6, 7, 1, "#cca46a"); k.line(x, y - 5, x + 6, y - 1, "#7a5a30"); F(x, y - 1, 7, 1, "#7a5a30"); };
+    const wr = 5, wcx = lx + 22, wcy = wy - 4;
+    for (let a = 0; a < 40; a++) { const t = a / 40 * Math.PI * 2; P(wcx + R(Math.cos(t) * (wr + 1)), wcy + R(Math.sin(t) * (wr + 1)), OL); }
+    for (let a = 0; a < 32; a++) { const t = a / 32 * Math.PI * 2; P(wcx + R(Math.cos(t) * wr), wcy + R(Math.sin(t) * wr), Math.sin(t) < 0 ? "#b07a44" : "#7a5230"); }
+    for (let q = 0; q < 4; q++) { const t = q * Math.PI / 4 + 0.3; k.line(wcx - R(Math.cos(t) * (wr - 1)), wcy - R(Math.sin(t) * (wr - 1)), wcx + R(Math.cos(t) * (wr - 1)), wcy + R(Math.sin(t) * (wr - 1)), "#7a5230"); }
+    F(wcx - 1, wcy - 1, 2, 2, "#3a3440");
+    barrel(lx, 70); barrel(lx + 6, 71); crate(lx + 12, 72); barrel(lx + 3, 63);
+    k.blob(lx - 6, 69, 4, 3, OL); k.blob(lx - 6, 69, 3, 2, "#d8c08a"); P(lx - 7, 67, "#f0dca8"); F(lx - 7, 66, 2, 1, "#a8884a");
+    for (const [bx, by] of [[gx - 22, 84], [gx + 26, 80], [R(W * 0.42), 87], [R(W * 0.6), 74]]) { F(bx, by, 3, 1, BONE); P(bx - 1, by - 1, BONE); P(bx + 3, by + 1, BONE); }
+
+    const tent = (x, g, w, h, chief) => {
+      k.tri(x - 1, g - h - 1, w + 2, h + 1, OL);
+      for (let i = 0; i < h; i++) {
+        const ins = (w / 2) * (h - 1 - i) / h, l = R(x + ins), r2 = R(x + w - ins), y = g - h + i;
+        F(l, y, r2 - l, 1, HIDE[1]); F(l, y, Math.max(1, R((r2 - l) * 0.4)), 1, HIDE[0]); P(r2 - 1, y, HIDE[2]);
+      }
+      const ax = x + (w >> 1), ay = g - h;
+      k.line(ax, ay, R(x + w * 0.22), g - 1, HIDE[2]); k.line(ax, ay, R(x + w * 0.8), g - 1, HIDE[3]);
+      F(R(x + w * 0.62), R(g - h * 0.45), 4, 3, chief ? RED[1] : "#8a5a3a"); P(R(x + w * 0.62) - 1, R(g - h * 0.45) + 1, HIDE[3]);
+      const dw = chief ? 9 : 7;
+      k.tri(ax - (dw >> 1), g - dw, dw, dw, "#22160e"); k.line(ax - 1, g - dw + 1, ax - (dw >> 1) - 1, g - 1, HIDE[0]);
+      k.line(ax - 2, ay - 3, ax + 1, ay, OL); k.line(ax + 2, ay - 3, ax - 1, ay, OL); P(ax - 2, ay - 3, WD[1]); P(ax + 2, ay - 3, WD[1]);
+      F(x - 1, g, w + 2, 1, "#5e4a2c");
+      return [ax, ay];
+    };
+    tent(R(W * 0.66), 70, 22, 13, false);
+    const [cx, cy] = tent(R(W * 0.8), 73, 30, 18, true);
+    add(A.smoke({ x: cx, y: cy - 3, n: 4, rise: 12, wind: 3, col: "#c8c0b8", seed: 11 }));
+    k.blob(cx, cy + 9, 2, 2, OL); k.blob(cx, cy + 9, 2, 1, BONE); P(cx - 1, cy + 9, OL); P(cx + 1, cy + 9, OL);
+    for (const s of [-1, 1]) { P(cx + s * 3, cy + 8, BONE); P(cx + s * 4, cy + 7, BONE); P(cx + s * 4, cy + 6, "#d8ccb4"); }
+    const sx = R(W * 0.8) + 34;
+    F(sx - 1, 46, 3, 28, OL); F(sx, 47, 1, 27, WD[1]);
+    k.blob(sx, 45, 2, 2, OL); k.blob(sx, 45, 1, 1, BONE); P(sx, 45, OL);
+    F(sx - 8, 48, 8, 12, OL); F(sx - 7, 49, 7, 10, RED[1]); F(sx - 7, 49, 7, 1, RED[0]); F(sx - 7, 49, 1, 10, RED[0]);
+    for (let i = 0; i < 7; i += 2) P(sx - 7 + i, 59, RED[1]);
+    F(sx - 5, 51, 3, 2, BONE); P(sx - 5, 52, OL); P(sx - 3, 52, OL); P(sx - 4, 53, BONE); P(sx - 6, 55, BONE); P(sx - 2, 55, BONE); P(sx - 5, 56, BONE); P(sx - 3, 56, BONE); P(sx - 4, 57, BONE);
+
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2, x = gx + R(Math.cos(a) * 7), y = fy + R(Math.sin(a) * 2);
+      if (y < fy) continue;
+      F(x - 1, y, 3, 2, OL); F(x, y, 2, 1, "#a8a4a0"); P(x, y + 1, "#6e6a68");
+    }
+    F(gx - 5, fy - 1, 11, 2, "#2a1a10"); k.line(gx - 5, fy - 2, gx + 4, fy, "#5a3a22"); k.line(gx + 5, fy - 2, gx - 4, fy, "#4a3020");
+    P(gx - 2, fy - 1, "#ff8a3a"); P(gx + 2, fy, "#ffb84a"); P(gx + 4, fy - 1, "#ff6a2a");
+    const my = fy - 11, rx = 5, cxr = gx + rx + 8;
+    F(cxr - 1, fy - 4, 9, 5, OL); F(cxr, fy - 3, 7, 3, "#b08a50"); F(cxr, fy - 3, 7, 1, "#cca46a"); F(cxr, fy, 7, 1, "#7a5a30"); k.line(cxr, fy - 2, cxr + 6, fy - 1, "#8a6a3a");
+    for (const s of [-1, 1]) {
+      const px = gx + s * (rx + 5);
+      F(px - 1, my - 2, 3, fy - my + 3, OL); F(px, my - 1, 1, fy - my + 2, WD[2]);
+      P(px - 1, my - 3, OL); P(px + 1, my - 3, OL); P(px - 1, my - 2, WD[1]); P(px + 1, my - 2, WD[1]);
+    }
+    add(bonfire({ x: gx, y: fy - 1 }));
+    add(A.embers({ x0: gx - 4, x1: gx + 4, y: fy - 6, n: 6, rise: 24, z: fy, seed: 90731 }));
+    add(A.smoke({ x: gx, y: my - 4, n: 7, rise: 30, life: 4.4, wind: 6, col: "#c4bcb4", seed: 21 }));
+    add(A.glow({ x: gx, y: fy - 3, r: 46, rgb: "255,150,60", a: 0.07, amp: 0.25, speed: 1.4, seed: 6 }));
+    add(roast({ x: gx, y: my, rx, reach: rx + 5, feet: fy - 4, z: fy + 1 }));
+
+    const pk = gx - 25;
+    F(pk - 1, 72, 3, 16, OL); F(pk, 73, 1, 15, WD[1]);
+    k.blob(pk, 70, 3, 3, OL); k.blob(pk, 70, 2, 2, BONE); P(pk - 1, 70, OL); P(pk + 1, 70, OL); F(pk - 1, 72, 3, 1, "#d8ccb4"); P(pk, 72, OL);
+    add(chicken({ x: R(W * 0.71), y: 81, seed: 2 })); add(chicken({ x: R(W * 0.75), y: 83, seed: 5, col: "#c87a3a" }));
+    const clip = (x) => (x >= 0 && x < W ? tops[x] : 0);
+    add(patrol({ x0: R(W * 0.2), x1: R(W * 0.43), y: wy - 13, speed: 3, clip, seed: 2 }));
+    add(patrol({ x0: R(W * 0.2), x1: R(W * 0.4), y: 77, speed: 4, seed: 5 }));
+    add(patrol({ x0: R(W * 0.6), x1: R(W * 0.88), y: 86, speed: 4.5, seed: 9 }));
+    const perch = wall.find(([x]) => x > W * 0.58);
+    if (perch) add(raven({ x: perch[0] + 1, y: wy - perch[1] - 2, seed: 4 }));
+    add(A.bird({ W, y: 12, flock: 3, col: "#1e1a20", speed: 6, gap: 14, seed: 3 }));
+
+    const front = (x, h) => stake(o, x, 92, h, 5, false, false);
+    for (const [x, h] of [[-2, 46], [4, 40], [W - 9, 42], [W - 3, 47]]) front(x, h);
+    for (const [x0, x1] of [[-2, 9], [W - 10, W]]) { o.F(x0, 70, x1 - x0, 1, ROPE); o.F(x0, 78, x1 - x0, 1, ROPE); }
+  }
+
   const SCENES = { ironhaven, thornwall, veldrock, carrbridge, ashfen, hollowood, saltmarrow, frosthold };
+  const DUNGEON_SCENES = { goblin_camp };
 
   function header(townId, w, h, opts) {
-    const fn = SCENES[townId];
+    const fn = SCENES[townId] || DUNGEON_SCENES[townId];
     if (!fn || !window.Art || !window.Anim) return null;
     opts = opts || {};
     w = Math.max(40, R(w || 600)); h = Math.max(30, R(h || 180));
@@ -1236,5 +1482,5 @@
     return cv;
   }
 
-  window.TownScenes = { header, THEME, TOWNS: Object.keys(SCENES) };
+  window.TownScenes = { header, THEME, TOWNS: Object.keys(SCENES), DUNGEONS: Object.keys(DUNGEON_SCENES) };
 })();

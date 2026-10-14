@@ -1122,7 +1122,6 @@
       if (pen) { pen.style.width = "100%"; pen.style.imageRendering = "pixelated"; }
     }
     return el("div", { class: "stables" },
-      el("h3", { style: { margin: "10px 0 4px" } }, "The stables"),
       pen,
       st.yard.length ? el("p", { class: "small" }, "In the yard tonight: ", st.yard.map((m, i) => [i ? ", " : "", `${m.name} the ${m.label} (`, A.heroLink(m.hero), ")"])) : el("p", { class: "small dim" }, "No adventurers' horses in the yard tonight."),
       st.carts.length ? el("p", { class: "small" }, "Wagons: ", st.carts.map((c, i) => [i ? ", " : "", `${c.name}, `, A.partyLink(c.party), `'s ${c.label}`])) : null,
@@ -1278,8 +1277,6 @@
     const lately = L.events.filter((e) => e.loc === id && ["town_life", "town", "errand", "festival", "world", "civic", "busk", "donation", "craft", "town_rep", "folk"].includes(e.kind))
       .sort(byDayDesc).slice(0, 4);
     if (lately.length) p.appendChild(el("div", null, el("h4", null, "Lately in " + t.name), A.feed(lately, {})));
-    const stb = stablesBlock(id);
-    if (stb) p.appendChild(stb);
     const maps = (L.map_stock || {})[id] || [];
     if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
       el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
@@ -1292,7 +1289,7 @@
     const kind = Scenes.locKind(id);
     const TS = window.TownScenes;
     let bd = null;
-    if (t && TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    if (TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
     if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
@@ -1315,15 +1312,18 @@
     if (w) p.appendChild(el("p", { class: "small muted" }, `Wilderness · roughly level ${w.level}`));
     const bodies = (L.remains || {})[id] || [];
     if (bodies.length) p.appendChild(el("p", { class: "small red" }, "Unburied here: ", bodies.map((r, i) => [i ? ", " : "", A.heroLink(r.hero)])));
-    side.appendChild(p);
-    if (t) side.appendChild(boardPanel(id));
-    if (t) side.appendChild(townLedger(id));
-    if (t) side.appendChild(civicPanel(id));
     const who = panel(here.length ? `Here now (${here.length})` : "Nobody here right now");
     const grid = el("div", { class: "stack" });
     for (const h of here) grid.appendChild(A.heroCard(h));
     who.appendChild(grid);
-    side.appendChild(who);
+    if (!t) {
+      side.append(p, who);
+      return;
+    }
+    // two columns that stack independently: the town's long story on the left, the short practical panels on the right
+    const stb = stablesBlock(id);
+    side.append(el("div", { class: "town-col" }, p, townLedger(id)),
+      el("div", { class: "town-col" }, boardPanel(id), stb ? panel("The stables", stb) : null, civicPanel(id), who));
   }
 
   window.addEventListener("hashchange", () => { if (!/^#\/map/.test(location.hash) && window.TownMusic) { try { TownMusic.stop(); } catch (e) { /* optional */ } } });

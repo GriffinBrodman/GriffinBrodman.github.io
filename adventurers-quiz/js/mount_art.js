@@ -14,13 +14,16 @@
   const { Grid, ramp, mix, hash, rng, OUTLINE } = Art;
 
   const COLOURS = {
-    donkey: ["grey", "dun", "brown"], pony: ["bay", "piebald", "chestnut"], ox: ["red", "black", "cream"],
-    horse: ["bay", "chestnut", "grey", "black", "dun"], courser: ["grey", "black", "chestnut"], destrier: ["black", "grey", "bay"],
+    donkey: ["grey", "dun", "brown", "black", "cream"], pony: ["bay", "piebald", "chestnut", "palomino", "buckskin", "appaloosa", "roan"],
+    ox: ["red", "black", "cream"],
+    horse: ["bay", "chestnut", "grey", "black", "dun", "palomino", "buckskin", "pinto", "appaloosa", "roan", "white-socked"],
+    courser: ["grey", "black", "chestnut", "palomino", "white-socked"], destrier: ["black", "grey", "bay", "roan", "pinto"],
     camel: ["sand"], unicorn: ["white"], eagle: ["golden"], skeleton: ["bone"],
   };
   const WAGONS = ["handcart", "donkey_cart", "horse_cart", "ox_wagon", "covered_wagon", "carriage"];
 
-  // coat, mane/tail, hoof; points = dark lower legs
+  // coat, mane/tail, hoof; points = dark lower legs, socks = four white feet, patches = big splashes of another colour,
+  // blanket = a white rump with dark spots (appaloosa), roan = pale hairs flecked through the body
   const COAT = {
     bay: { coat: "#8e4c2a", mane: "#2c2220", points: true, star: true },
     chestnut: { coat: "#b4642e", mane: "#8a3c1c", blaze: true, sock: true },
@@ -31,8 +34,14 @@
     brown: { coat: "#6a4a36", mane: "#2e2220" },
     sand: { coat: "#c8a064", mane: "#9a7444" },
     white: { coat: "#eceef0", mane: "#f2e2a8", hoof: "#c8a050" },
+    palomino: { coat: "#d8a850", mane: "#f4ecd4", blaze: true },
+    buckskin: { coat: "#c89c5c", mane: "#2a2220", points: true },
+    pinto: { coat: "#94502a", mane: "#3a2620", patches: "#f0eae0", socks: true },
+    appaloosa: { coat: "#7a4a30", mane: "#2c2220", blanket: true, sock: true },
+    roan: { coat: "#6a6c7a", mane: "#26222a", roan: "#c4c8d4", points: true },
+    "white-socked": { coat: "#7a4026", mane: "#2c2220", blaze: true, socks: true },
   };
-  const DONKEY = { grey: "#8e8984", dun: "#b09270", brown: "#6c4c38" };
+  const DONKEY = { grey: "#8e8984", dun: "#b09270", brown: "#6c4c38", black: "#3e3634", cream: "#d8ccb4" };
   const OX = { red: "#9c4c2c", black: "#3a3434", cream: "#dccaa2" };
   const HOOF = "#3a2c28";
   const BONE = "#e4dccb", GLOW = "#8af0a0";
@@ -141,6 +150,13 @@
       const P = ramp(co.patches), spots = [[bodyX - 1, cy - 0.5, 2.6, 2], [rumpX, cy + 0.6, 2, 2.2], [nt[0] - 0.5, nt[1] + 0.8, 1.8, 1.6], [chestX, cy + 2.5, 1.6, 1]];
       recolor(g, C, P, (x, y) => spots.some(([sx, sy, rx, ry]) => ((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1));
     }
+    if (co.socks) recolor(g, C, ramp("#ece6da"), (x, y) => y >= G - 2);
+    if (co.blanket) {
+      const Wb = ramp("#ece6da"), inBlanket = (x, y) => ((x + 0.5 - rumpX - 0.6) / (rumpR + 1.4)) ** 2 + ((y + 0.5 - cy + 0.8) / (B * 0.95)) ** 2 <= 1;
+      recolor(g, C, Wb, inBlanket);
+      recolor(g, Wb, M, (x, y) => inBlanket(x, y) && y % 2 === 0 && (x + y * 1.5) % 3 === 0);
+    }
+    if (co.roan) recolor(g, C, ramp(co.roan), (x, y) => y < legTop + 1 && hash(x + ":" + y) % 5 < 2);
     if (co.dapple) for (let y = 0; y < q.H; y++) for (let x = 0; x < q.W; x++) if (g.get(x, y) === C[2] && (x * 3 + y * 5) % 7 === 0 && y < legTop + 1) g.set(x, y, C[3]);
     if (co.donkey) {
       const P = ramp(mix(co.coat, "#f2ece0", 0.7));

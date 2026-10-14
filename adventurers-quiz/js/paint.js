@@ -183,6 +183,9 @@
   const COVERS = new Set(["great_helm", "skull_helm", "hood", "skull_hood", "beast_hood", "helm", "top_hat", "mitre", "tricorn", "bandana", "feather_cap", "leather_cap"]);
   const HAIRY = new Set(["helm", "bandana", "feather_cap", "leather_cap"]);
   const FULL = new Set(["great_helm", "skull_helm"]);
+  const HOODS = new Set(["hood", "skull_hood", "beast_hood"]);
+  const FRINGE = ["thin", "full", "thin", "mohawk", null, "full", "full", "thin", "full", "full", "thin", "sweep", "thin", "full", "thin", "full", "full", "full", "thin", "sweep", "full", "thin"];
+  const FRINGE_LOCKS = new Set([1, 5, 6, 8, 9, 16, 17, 20]);
   // where a crown sits on top of each kind of headgear (portrait space)
   const CROWN_Y = { none: 10, hood: 7.2, skull_hood: 7.2, beast_hood: 7.2, leather_cap: 8.2, helm: 7.2, horns: 8.6, great_helm: 6.6, skull_helm: 6.6, wizard_hat: 9.4,
     mitre: 10.4, wide_hat: 7.6, top_hat: 6.8, tricorn: 8.2, bandana: 8.6, feather_cap: 8.2, circlet: 10.6, crown: 10.6, mask: 10 };
@@ -334,8 +337,8 @@
     for (const side of [-1, 1]) {
       const ex = cx + side * (faceW + 0.4);
       if (c.pointy) P.poly([[ex - side * 1.2, 14.5], [ex + side * 3.8, 11.5], [ex + side * 0.8, 19.5], [ex - side * 1.2, 19]], "skin", side < 0 ? 0.1 : -0.35);
-      else P.ell(ex, 17, 1.6, 2.4, "skin", { s: side < 0 ? 0 : -0.3, k: 0.5 });
-      if (features) P.px(ex + side * 0.2, 17, "skin", -0.8);
+      else if (!HOODS.has(c.head)) P.ell(ex, 17, 1.6, 2.4, "skin", { s: side < 0 ? 0 : -0.3, k: 0.5 });
+      if (features && (c.pointy || !HOODS.has(c.head))) P.px(ex + side * 0.2, 17, "skin", -0.8);
     }
     P.layer = 4;
     for (let y = 6; y < 28; y++) for (let x = 10; x < 30; x++) {
@@ -952,16 +955,41 @@
   function headgear(P, head, cx, fw, look, inHead, c) {
     c = c || { v: 0, ht: 1 };
     const t = c.ht == null ? 1 : c.ht, v = c.v || 0;
-    const open = (x, y) => ((x + 0.5 - cx) / (fw - 0.2)) ** 2 + ((y + 0.5 - 18.6) / 7.9) ** 2 <= 1;
-    const hoodShape = (m, s0) => {
-      P.poly([[cx - fw - 2.6, 15], [cx - fw - 7, 34], [cx + fw + 7, 34], [cx + fw + 2.6, 15]], m, (x, y) => (open(x, y) ? false : s0 - (x + 0.5 - cx) * 0.05 - (y - 15) * 0.015));
-      P.ell(cx, 15.5, fw + 2.6, 9.6, m, { s: s0, fn: (x, y, s) => (open(x, y) ? false : s) });
-      for (let x = cx - 9; x <= cx + 9; x++) for (let y = 9; y < 26; y++) if (open(x, y) && !open(x, y - 1)) P.px(x, y, m, s0 - 0.45);
+    const at = (x, y) => { const [X, Y] = P.T(x + 0.5, y + 0.5); return P.matAt(Math.floor(X), Math.floor(Y)); };
+    // hair peeking under a hood's front edge, so hooded heroes aren't all shaved; kept above the brows
+    const fringe = () => {
+      const st = c.st, kind = FRINGE[st];
+      if (st == null || !kind) return;
+      const small = P.tf && P.tf.s < 1, maxY = c.browUp ? 12 : 13, tex = c.hairTex || (() => 0);
+      for (let x = cx - 8; x <= cx + 8; x++) {
+        let top = -1;
+        for (let y = 7; y < 16; y++) if (open(x, y)) { top = y; break; }
+        if (top < 0) continue;
+        const dx = x - cx, jag = (x * 7 + (v >> 2)) % 3 === 0;
+        let d = kind === "full" ? 2 + (jag ? 1 : 0) : kind === "sweep" ? (dx < 0 ? 3 : 1) - (jag ? 1 : 0) : kind === "mohawk" ? (dx >= -1 && dx <= 0 ? 2 : 0) : jag ? 0 : 1 + ((x + v) % 4 === 0 ? 1 : 0);
+        if (small) { if (top + 1 > 11 || Math.abs(dx + 0.5) > (kind === "full" || kind === "sweep" ? 4 : 2) || d < 1 || (kind === "thin" && x % 2)) continue; d = 1; }
+        for (let y = top + 1; y <= Math.min(maxY, top + d); y++) P.px(x, y, "hair", -0.12 + tex(x, y) - (y - top) * 0.1);
+      }
+      if (FRINGE_LOCKS.has(st) && !small) for (const side of [-1, 1]) for (let y = 11; y <= maxY + 1; y++) {
+        let x = side < 0 ? cx - 9 : cx + 8;
+        while (x !== cx && !open(x, y)) x -= side;
+        P.px(x - side, y, "hair", -0.2 + tex(x, y) - (y % 2) * 0.12);
+      }
+    };
+    const open = (x, y) => ((x + 0.5 - cx) / (fw - 0.2)) ** 2 + ((y + 0.5 - 17.6) / 9) ** 2 <= 1 || (y >= 25 && Math.abs(x + 0.5 - cx) < 3.2 - (y - 26) * 0.75);
+    const hoodShape = (m, s0, peak) => {
+      const sh = (x, y) => (open(x, y) ? false : s0 + 0.04 - Math.max(-0.1, (x + 0.5 - cx) / 10 - 0.15) * 0.5 - (y - 24) * 0.03);
+      P.poly([[cx - 5, 26.4], [cx - 9.4, 29.6], [cx - 10.6, 31.6], [cx - 9.4, 32], [cx - 5, 30], [cx, 30.6], [cx + 5, 30], [cx + 9.4, 32], [cx + 10.6, 31.6], [cx + 9.4, 29.6], [cx + 5, 26.4]], m, sh);
+      P.poly([[cx - fw - 1.3, 15], [cx - fw - 0.9, 23], [cx - 5.4, 27.6], [cx + 5.4, 27.6], [cx + fw + 0.9, 23], [cx + fw + 1.3, 15]], m, sh);
+      P.ell(cx, 15.2, fw + 1.3, 9, m, { s: s0 + 0.08, k: 0.8, fn: (x, y, s) => (open(x, y) || y > 22 ? false : s) });
+      if (peak) P.poly([[cx - 2.2, 6.8], [cx - 0.4, peak], [cx + 1.6, 6.8]], m, (x) => s0 + 0.1 - (x - cx) * 0.08);
+      for (let x = cx - 9; x <= cx + 9; x++) for (let y = 8; y < 26; y++) if (open(x, y) && !open(x, y - 1)) P.px(x, y, m, s0 - 0.45);
+      for (let x = cx - 11; x <= cx + 11; x++) for (let y = 33; y > 26; y--) if (at(x, y) === m) { P.px(x, y, m, s0 - 0.5 - (x + 0.5 - cx) * 0.03); break; }
     };
     const hoodRing = () => {
       const ring = [];
-      for (let y = 9; y < 28; y++) for (let x = cx - 10; x <= cx + 10; x++) {
-        if (open(x, y)) continue;
+      for (let y = 9; y < 31; y++) for (let x = cx - 10; x <= cx + 10; x++) {
+        if (open(x, y) || at(x, y) !== "hd") continue;
         if (open(x - 1, y) || open(x + 1, y) || open(x, y - 1) || open(x, y + 1)) ring.push([x, y]);
       }
       return ring;
@@ -1011,29 +1039,30 @@
       }
       case "hood": case "skull_hood": {
         const isS = head === "skull_hood";
-        if (t >= 1) { const L = t === 1 ? 3 : 6; P.poly([[cx + 1, 8], [cx + fw + L, 6 - L * 0.5], [cx + fw + L - 1.5, 9 - L * 0.5], [cx + fw + 1.5, 12]], "hd", -0.15); }
-        if (t === 3) P.poly([[cx - 4, 8], [cx - 0.5, 1.5], [cx + 3, 8]], "hd", (x) => 0.35 - (x - cx) * 0.1);
-        hoodShape("hd", isS ? -0.1 : 0.05);
+        if (t >= 1) { const L = [0, 2, 4.5, 9][t]; P.poly([[cx + fw - 1, 14], [cx + fw + 1.6, 16], [cx + fw + 2.2, 21 + L], [cx + fw + 0.4, 20 + L * 0.8]], "hd", -0.3); }
+        hoodShape("hd", isS ? -0.1 : 0.05, t === 3 ? 3.8 : 5.4);
         const trim = isS ? (t >= 1 ? "bone" : null) : [null, "leather", ["gold", "fav", "leather", "metal", "fur"][v % 5], "silver"][t];
-        if (trim) hoodRing().forEach(([x, y], k) => { if (y < 27) P.px(x, y, trim, (v >> 3) % 2 && k % 2 ? -0.4 : 0.15 - (x - cx) * 0.04); });
-        if (t === 0 && !isS) { P.rect(cx + fw - 1, 26, 3, 3, "patch", 0); P.px(cx - fw - 3, 30, "hd", -0.8); }
+        if (trim) hoodRing().forEach(([x, y], k) => { if (y < 31) P.px(x, y, trim, (v >> 3) % 2 && k % 2 ? -0.4 : 0.15 - (x - cx) * 0.04); });
+        if (t === 0 && !isS) for (const [x, y, m2, s2] of [[cx + 6, 29, "patch", 0], [cx + 7, 29, "patch", 0], [cx + 6, 30, "patch", -0.2], [cx - 8, 30, "hd", -0.8]]) if (at(x, y) === "hd") P.px(x, y, m2, s2);
         if (!isS && t === 2) {
           const pat = (v >> 6) % 3;
-          if (pat === 0) for (let y = 10; y < 34; y++) for (let x = cx - fw - 7; x <= cx + fw + 7; x++) { if (!open(x, y) && P.matAt(x, y) === "hd" && ((x + y) % 6 === 0 || (x - y + 60) % 6 === 0)) P.px(x, y, "hd", -0.45); }
-          if (pat === 1) for (const sx of [cx - fw - 3, cx + fw + 2]) for (let y = 12; y < 34; y += 2) P.px(sx, y, trim, -0.1);
-          if (pat === 2) for (let x = cx - fw - 6; x <= cx + fw + 6; x += 2) P.px(x, 31, trim, 0.1 - (x - cx) * 0.03);
+          if (pat === 0) for (let y = 6; y < 35; y++) for (let x = cx - 12; x <= cx + 12; x++) { if (!open(x, y) && at(x, y) === "hd" && ((x + y) % 6 === 0 || (x - y + 60) % 6 === 0)) P.px(x, y, "hd", -0.45); }
+          if (pat === 1) for (const sx of [cx - fw - 1, cx + fw]) for (let y = 11; y < 24; y += 2) if (at(sx, y) === "hd") P.px(sx, y, trim, -0.1);
+          if (pat === 2) for (let x = cx - 10; x <= cx + 10; x += 2) if (at(x, 29) === "hd") P.px(x, 29, trim, 0.1 - (x - cx) * 0.03);
         }
-        if (!isS && t === 3) for (let y = 8; y < 30; y += 3) P.px(cx - fw - 1 + (y % 2), y, "hd", 0.9);
+        if (!isS && t === 3) for (let y = 9; y < 22; y += 3) if (at(cx - fw - 1, y) === "hd") P.px(cx - fw - 1, y, "hd", 0.9);
+        fringe();
         for (let y = 11; y < 24; y++) for (let x = cx - 9; x <= cx + 9; x++) {
-          if (open(x, y) && (!open(x - 1, y) || !open(x + 1, y)) && y < 21) P.px(x, y, "favd", -0.3);
+          if (open(x, y) && (!open(x - 1, y) || !open(x + 1, y)) && y < 16) P.px(x, y, "favd", -0.3);
         }
         if (c.aura === "shadow" && c.k && c.k.legacy) for (let y = 20; y < 27; y++) for (let x = cx - 9; x <= cx + 9; x++) if (open(x, y)) P.px(x, y, "favd", (y === 20 ? 0.3 : -0.1) - (x - cx) * 0.05);
-        if (isS && t >= 2) { P.ell(cx, 6.2, 2.6, 2.4, "bone", { s: 0.2 }); P.px(cx - 1, 6, "#16121a"); P.px(cx + 1, 6, "#16121a"); }
-        if (t >= 1) P.ell(cx, 28.6, 1.6, 1.4, t === 3 || (v >> 8) % 2 ? "gold" : "metal", { s: 0.3 });
+        if (isS && t >= 2) { const sy = t === 3 ? 5.2 : 6.2; P.ell(cx, sy, t === 3 ? 3 : 2.6, t === 3 ? 2.9 : 2.4, "bone", { s: 0.2 }); P.px(cx - 1, Math.round(sy), "#16121a"); P.px(cx + 1, Math.round(sy), "#16121a"); }
+        if (t >= 1) P.ell(cx, 30.4, 1.4, 1.1, t === 3 || (v >> 8) % 2 ? "gold" : "metal", { s: 0.3 });
         break;
       }
       case "beast_hood": {
-        hoodShape("hd", 0.05);
+        hoodShape("hd", 0.05, 0);
+        fringe();
         const ear = [0.6, 1, 1.6, 2.1][t];
         for (const s of [-1, 1]) P.poly([[cx + s * 3, 7], [cx + s * (5 + 3 * ear), 1 + (1 - ear) * 3], [cx + s * (5.5 + 3 * ear), 9]], "hd", s < 0 ? 0.3 : -0.2);
         if (t >= 1) { P.px(cx - 3, 8, t === 3 ? "#e04a3a" : "#f0d040"); P.px(cx + 2, 8, t === 3 ? "#e04a3a" : "#f0d040"); }
@@ -1148,7 +1177,7 @@
         break;
     }
     if (c.hglow) {
-      const spot = { helm: [cx, 13], great_helm: [cx, 14], skull_helm: [cx, 9], hood: [cx, 28], skull_hood: [cx, 9], beast_hood: [cx - 3, 8], wizard_hat: [cx, 8], mitre: [cx, 4], wide_hat: [cx, 8],
+      const spot = { helm: [cx, 13], great_helm: [cx, 14], skull_helm: [cx, 9], hood: [cx, 30], skull_hood: [cx, 9], beast_hood: [cx - 3, 8], wizard_hat: [cx, 8], mitre: [cx, 4], wide_hat: [cx, 8],
         top_hat: [cx, 7], tricorn: [cx + 3, 8], circlet: [cx, 12], crown: [cx, 6], mask: [cx, 14], bandana: [cx, 10], feather_cap: [cx, 10], leather_cap: [cx, 13], horns: [cx, 13] }[head];
       if (spot) { P.px(spot[0], spot[1], c.hglow); P.px(spot[0] - 1, spot[1], mix(c.hglow, "#ffffff", 0.5)); }
     }

@@ -115,6 +115,10 @@ main { max-width: 1240px; margin: 18px auto; padding: 20px 20px 28px; background
 .wrap { flex-wrap: wrap; }
 .between { justify-content: space-between; }
 .stack > * + * { margin-top: 8px; }
+.town-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.town-col > .panel { margin: 0; }
+ul.board { margin: 4px 0; padding-left: 18px; font-size: 15px; }
+ul.board li + li { margin-top: 3px; }
 .pill { display: inline-block; padding: 0 7px; border-radius: 3px; background: rgba(120, 85, 40, 0.12); color: var(--muted); font-size: 15px; border: 1px solid var(--edge); white-space: nowrap; }
 .pill.gold { color: #2a1a0b; background: var(--brass); border-color: var(--brass0); }
 .pill.red { color: #fbe6c8; background: var(--crimson); border-color: #5a1410; }

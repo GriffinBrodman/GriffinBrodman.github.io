@@ -2,17 +2,17 @@
 
 | File | Purpose |
 |------|---------|
-| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets, party banners, class-path emblems, items, gear icons (`gearIcon`), graves, the party-page target dummy (`dummyGrid`) |
+| `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets (dogs, cats and lizards wear a named coat from `PET_COATS`: `pet.coat`, else picked by the pet's name), party banners, class-path emblems, items, gear icons (`gearIcon`), graves, the party-page target dummy (`dummyGrid`) |
 | `mount_art.js` | Mounts and wagons: side-view sprites for every mount kind and colour in `league/content/mounts.py` (2-frame idle), wagons alone or hitched to a puller, and `stablePen`, a live stables-yard canvas |
 | `daybook.js` | The daybook: `Daybook.render(h.daybook)` draws a hero's day as an almanac strip (sky with the sun's arc, one block per activity sized by its hours with a pixel icon, an hour ruler, a night cap with the moon, and a caption list); a column of hours when narrower than 520px. `Daybook.ICONS` holds the 16x16 activity icons |
 | `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines), hero sprites and bust portraits drawn from the worn kit (all nine slots, tiers, magic glows), and the gear pieces `Paint.Gear` shares with the icons |
-| `beasts.js` | Shaded monster sprites for the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) |
+| `beasts.js` | Shaded monster sprites painted at their own size: the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...) and Gruk the goblin warchief (`warchief`) |
 | `anim.js` | Ambient pixel animation: one shared, visibility-gated ticker (`Anim.stage`) and small looping actors (villagers, birds, bats, skeletons, torches, smoke, snow, waves...) that any scene can reuse; API listed at the top of the file |
 | `scenes.js` | Daylight backdrops by biome and story vignettes, brought to life with `Anim` actors chosen per place |
-| `town_scenes.js` | One hand-built animated pixel header per town (`TownScenes.header(id, w, h, opts)`) and each town's panel colours (`TownScenes.THEME`) |
-| `tavern.js` | Isometric pixel rooms: the shared stage, actor, speech-bubble and loop helpers; `Tavern.inn` (the common room for any cast) and `Tavern.scene`, the preseason tavern on the Crier (lines from `league.voice.tavern_chatter`) |
+| `town_scenes.js` | One hand-built animated pixel header per town, plus the Goblin Camp's (`TownScenes.header(id, w, h, opts)`), and each town's panel colours (`TownScenes.THEME`) |
+| `tavern.js` | Isometric pixel rooms: the shared stage, actor, speech-bubble and loop helpers, shaded furniture pieces and the night `lighting` overlay; `Tavern.inn` (the common room for any cast, with sleepers on pallets at night) and `Tavern.scene`, the preseason tavern on the Crier (lines from `league.voice.tavern_chatter`) |
 | `camp.js` | Tonight, on the hero page: the hero at the end of today by a campfire, on a dungeon floor, in a cell, the stables, a rented room, a home or the inn's common room, with partymates and pets talking (lines from `league.voice.night_lines` via the `tonight` export) |
-| `isle.js` | World map: terraced island in oblique view with cliffs, river and falls, towns, dungeons, labels, heroes |
+| `isle.js` | World map: terraced island in oblique view with cliffs, river and falls, towns in their own styles (house types and landmarks matching each town header), dungeons, labels, heroes |
 | `app.js` | Data access, DOM helpers, sprite helpers, event feed, router, "my hero" pinning |
 | `views.js` | Pages: Crier, roster, hero, parties, party, map, digest, world, history, guide, finale, songs |
 | `replay.js` | Animated fight replays: a camera framed on the fighters, marked fighters with a live hp roster, and highlights |
@@ -37,16 +37,16 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 |--------|-----------|------------|
 | `LD` | `data/*.js` | Exported game data: `LD.static` (map, goods, monsters, classes, factions, quiz) and `LD.league` (current state). Never written by the site |
 | `App` | `app.js` | `el`, `esc`, `plural`, `cap`, sprite helpers (`heroSprite`, `heroPortrait`, ...), `heroLink`/`partyLink`, `eventRow`/`feed`, `load` (fetch a detail file), `mine` (pinned hero), `route`, `start`. Also `App.L`, `App.S`, and `heroes`/`parties`/`events` lookup tables by id |
-| `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites; `gearIcon(item, look)` is a 16x16 icon for any kit item (`{slot, art, tier, gem, tint, glow}`) or curio |
+| `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites (`petGrid(pet, frame)`, `PET_COATS`); `gearIcon(item, look)` is a 16x16 icon for any kit item (`{slot, art, tier, gem, tint, glow}`) or curio |
 | `MountArt` | `mount_art.js` | `mountGrid(kind, colour, frame)` and `wagonGrid(kind, puller, frame)` (cached 1x canvases), `mountSprite(kind, colour, scale, opts)` (an idling page canvas), `drawMount`/`drawWagon` (onto a canvas: x left edge, y ground), `stablePen(mounts, opts)` (live yard canvas with `.spots` for labels), `COLOURS`, `WAGONS` |
 | `Daybook` | `daybook.js` | `render(daybook, opts)` (a `<figure>` or `null`; `opts.title`, `opts.captions`), `icon(act, scale)` (a fresh page canvas, compass-rose fallback), `ICONS` (act -> cached 16x16 canvas), `NIGHT` (evening kind -> canvas), `LABELS`, `KINDS`, `clock` |
 | `Paint` | `paint.js` | Shaded painter, `fullBody` (28x34 sprite) and `portraitGrid` (bust portraits), both drawn from `h.kit` when present and from the class look otherwise; `Gear` holds the shared piece painters (`headgear`, `offhand`, `weapon`, `axis`, `backSprite`, `makeMats`, `glowUp`) and `soften` (reins in the saturation of quiz colours for cloth and hair) |
 | `Beasts` | `beasts.js` | `draw(body, pal, frame, boss, palette)` for non-humanoid monsters; called from `Art.monsterGrid` |
 | `Anim` | `anim.js` | `stage(canvas, base, actors, opts)` plus actor factories (`villager`, `bat`, `torch`, `snow`...); every actor is a pure function of time. Respects `prefers-reduced-motion` |
 | `Scenes` | `scenes.js` | `backdrop`, `vignette`, `locKind`, plus `drawMap` and `nearestNode` that forward to `Isle`. The canvases it returns animate themselves once on screen (the place is recognised from the seed `Art.hash(id)`) |
-| `TownScenes` | `town_scenes.js` | `header(townId, w, h, opts)`: an animated canvas sized w x h CSS px (`opts.fluid` for 100% width), rendered 90px tall and scaled pixelated; `null` for an unknown town. `THEME[townId]` = `{primary, accent, dark, light}` |
+| `TownScenes` | `town_scenes.js` | `header(id, w, h, opts)`: an animated canvas sized w x h CSS px (`opts.fluid` for 100% width), rendered 90px tall and scaled pixelated, for a town or a dungeon listed in `DUNGEONS`; `null` otherwise (the map then falls back to `Scenes.backdrop`). `TOWNS`, `DUNGEONS`, `THEME[townId]` = `{primary, accent, dark, light}` |
 | `Isle` | `isle.js` | The map renderer: `drawMap`, `nearestNode`, `project`, terrain props |
-| `Tavern` | `tavern.js` | `scene` (preseason), `inn`, and the shared `stage`, `actor`, `talk`, `loop` helpers used by `camp.js` |
+| `Tavern` | `tavern.js` | `scene` (preseason), `inn`, and the shared `stage`, `actor`, `talk`, `loop`, furniture (`slab`, `table`, `pallet`, `hearth`, `windowR`...) and `lighting` helpers used by `camp.js` |
 | `Night` | `camp.js` | `scene(h, L)`: the hero page's tonight panel from `h.tonight`, or `null` |
 | `TownMusic` | `town_music.js` | `play(townId)`, `stop()`, `current`, `towns`, `loopSeconds(id)`, `render(id, secs)` (offline, for the preview page) |
 | `Sound` | `audio.js` | `sfx`, `setPage` (ambience per route), `scene` (a visible scene's own ambience: camp, inn, room, stable, dungeon, cell), `playSong`/`stopSong`, `syllables`, settings |
