@@ -1009,6 +1009,18 @@
     return cached(key + (h.id || h.name || ""), () => drawHero({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
       armorTier: h.armor_tier || h.weapon_tier || 1, legend: h.legend, kit: h.kit || null, frame: frame || 0 }));
   }
+  // the same hero asleep in bed (q: Paint.sleeper's quilt spec), and the helm or hat they took off for the night
+  function heroLying(h, frame, cls, q) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    const key = "lie:" + JSON.stringify([h.id || h.name, h.look, clsLook, h.kit || null, frame || 0, q]);
+    return cached(key, () => Paint.sleeper({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
+      armorTier: h.armor_tier || h.weapon_tier || 1, kit: h.kit || null, frame: frame || 0 }, q));
+  }
+  function heroAside(h, cls) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    return cached("aside:" + JSON.stringify([h.id || h.name, h.look, clsLook, h.kit || null]), () => Paint.setAside({ id: h.id, name: h.name, look: h.look, clsLook,
+      weapon: h.weapon, weaponTier: h.weapon_tier || 1, armorTier: h.armor_tier || h.weapon_tier || 1, kit: h.kit || null }));
+  }
   function heroCanvas(h, scale, frame, cls) { return heroGrid(h, frame, cls).toCanvas(scale); }
   function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : ""), () => drawMonster(m.body, m.pal, frame, m.boss)); }
   function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (pet.coat || "") + (frame || 0), () => drawPet(pet.kind, pet.name, frame, pet.coat)); }
@@ -1051,5 +1063,5 @@
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroLying, heroAside, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

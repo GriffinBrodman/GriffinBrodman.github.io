@@ -436,13 +436,13 @@
     ctx.fillStyle = "#d8a07a"; ctx.fillRect(x + 1, y - 2, 2, 3); ctx.fillStyle = "#b07a58"; ctx.fillRect(x + 1, y, 2, 1);
     return [x + 2, y - 6, (u * 1.7) % 3];
   }
-  const ZED = ["xxx", ".x.", "xxx"];
+  const ZED = ["xxxx", "..x.", ".x..", "xxxx"];
   function zzz(ctx, x, y, now) {
     for (let i = 0; i < 2; i++) {
       const t = ((now / 3.2) + i * 0.5) % 1;
       ctx.globalAlpha = t < 0.15 ? t / 0.15 : t > 0.7 ? (1 - t) / 0.3 : 1;
       const zx = Math.round(x + t * 6 + Math.sin(t * 7) * 1.5), zy = Math.round(y - t * 14);
-      ZED.forEach((row, j) => { for (let k = 0; k < 3; k++) if (row[k] === "x") { ctx.fillStyle = "#e8e2d4"; ctx.fillRect(zx + k, zy + j, 1, 1); } });
+      ZED.forEach((row, j) => { for (let k = 0; k < row.length; k++) if (row[k] === "x") { ctx.fillStyle = "#e8e2d4"; ctx.fillRect(zx + k, zy + j, 1, 1); } });
     }
     ctx.globalAlpha = 1;
   }
@@ -454,7 +454,7 @@
     const g = Art.heroGrid(hs, 0, o.look || App.heroLook(hs));
     const pet = h.pet ? { g0: Art.petGrid(h.pet, 0), g1: Art.petGrid(h.pet, 1) } : null;
     return { h, name: o.name || h.name, lines: (o.lines || []).slice(), u, v, tu: u, tv: v, face: o.face || 1, mode: "idle", wait: o.wait || 1, mug: 0, said: [],
-      right: g.toCanvas(1), left: g.flipX().toCanvas(1), focus: !!o.focus, keeper: !!o.keeper,
+      right: g.toCanvas(1), left: g.flipX().toCanvas(1), cls: o.look || App.heroLook(hs), focus: !!o.focus, keeper: !!o.keeper,
       pet: pet && { name: h.pet.name, lines: o.petLines || [], right: [pet.g0.toCanvas(1), pet.g1.toCanvas(1)], left: [pet.g0.flipX().toCanvas(1), pet.g1.flipX().toCanvas(1)],
         u: u - 0.6, v: v + 0.4, tu: u - 0.6, tv: v + 0.4, face: 1, pet: true, said: [] } };
   }
@@ -482,14 +482,36 @@
     if (Math.abs(sx) > 0.02) a.face = sx > 0 ? 1 : -1;
     return false;
   }
-  // st.bed = { has(u, v), z, cut, fold }: the page's hero, idle in that bed, sits up under the covers instead of standing
+  // the same figure with the hat, hood or helm off, for someone sitting up in bed
+  function bare(a) {
+    if (!a.bare) {
+      const look = Object.assign({}, (a.cls || {}).look);
+      if (!(window.Paint && Paint.MARKS.has(look.head))) look.head = "none";
+      const g = Art.heroGrid(Object.assign({}, a.h, { alive: true }, a.h.kit ? { kit: Object.assign({}, a.h.kit, { head: null }) } : {}), 0, Object.assign({}, a.cls, { look }));
+      a.bare = [g.toCanvas(1), g.flipX().toCanvas(1)];
+    }
+    return a.face > 0 ? a.bare[0] : a.bare[1];
+  }
+  // st.bed = { has(u, v), z, cut, fold, lie, pet }: the page's hero, idle in that bed, lies asleep under the covers (lie: Paint.sleeper's
+  // quilt spec), breathing, and sits up bareheaded for a few seconds after a click (a.wake) to answer.
+  // a.rest is the same shape for anyone on a bedroll at camp, plus pad (the roll, a canvas layer) and lie.awake for lying awake.
   function drawActor(ctx, st, a, bob, now) {
     const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0), y = Math.round(y0);
-    const bed = st.bed && a.focus && a.mode === "idle" && st.bed.has(a.u, a.v) ? st.bed : null;
+    const bed = st.bed && a.focus && a.mode === "idle" && st.bed.has(a.u, a.v) ? st.bed : a.rest && a.mode === "idle" ? a.rest : null;
     if (bed) {
       // tucked in for the night, so gather() never walks them off (it skips actors that stay)
-      a.stay = true;
-      const img = a.face > 0 ? a.right : a.left, top = y - bed.z - bed.cut;
+      a.stay = true; a.abed = !a.rest;
+      const t = now || 0, up = a.wake != null && t - a.wake < 4.5, ph = a.rest ? (a.u * 2.3 + a.v * 1.7) % 6 : 0;
+      bed.awake = up;
+      if (bed.pad) ctx.drawImage(bed.pad, 0, 0);
+      if (bed.helm && !up) ctx.drawImage(bed.helm.cv, x - 12 - bed.helm.w / 2, y + 6 - bed.helm.foot);
+      if (bed.lie && !up) {
+        a.lie = a.lie || [0, 1].map((f) => Art.heroLying(a.h, f, a.cls, bed.lie).toCanvas(1));
+        ctx.drawImage(a.lie[Math.sin(t * 1.7 + ph) > 0.35 ? 1 : 0], x - 18, y - bed.z - 24);
+        if (!reduced() && !bed.lie.awake) zzz(ctx, x - 1, y - bed.z - 22, t + ph);
+        return;
+      }
+      const img = bed.lie ? bare(a) : a.face > 0 ? a.right : a.left, top = y - bed.z - bed.cut;
       ctx.drawImage(img, 0, 0, img.width, bed.cut, x - 14, top, img.width, bed.cut);
       ctx.fillStyle = bed.fold; ctx.fillRect(x - 8, y - bed.z - 1, 16, 2);
       ctx.fillStyle = "rgba(255,248,230,0.5)"; ctx.fillRect(x - 8, y - bed.z - 1, 16, 1);
@@ -502,7 +524,8 @@
   }
   // the page's hero gets a small bobbing gold marker, like a game cursor; drawn last so no light or bars cover it
   function drawMarker(ctx, st, a, now) {
-    const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0), my = Math.round(y0) - 40 - (Math.floor((now || 0) * 2.5) % 2);
+    const lie = a.rest && a.mode === "idle" && !(a.wake != null && now - a.wake < 4.5);
+    const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0) - (lie ? 3 : 0), my = Math.round(y0) - (lie ? 31 : 40) - (Math.floor((now || 0) * 2.5) % 2);
     ctx.fillStyle = "#3a2410"; ctx.fillRect(x - 3, my - 1, 7, 1); ctx.fillRect(x - 3, my, 1, 1); ctx.fillRect(x + 3, my, 1, 1); ctx.fillRect(x - 2, my + 1, 1, 1); ctx.fillRect(x + 2, my + 1, 1, 1); ctx.fillRect(x - 1, my + 2, 1, 1); ctx.fillRect(x + 1, my + 2, 1, 1);
     ctx.fillStyle = "#f0c850"; ctx.fillRect(x - 2, my, 5, 1); ctx.fillRect(x - 1, my + 1, 3, 1); ctx.fillStyle = "#c8902a"; ctx.fillRect(x, my + 2, 1, 1);
   }
@@ -513,7 +536,10 @@
     const [x0, y0] = st.iso(p.u, p.v), x = Math.round(x0), y = Math.round(y0) - lift, age = p.pat != null && now != null ? now - p.pat : 9;
     const hop = age < 0.45 ? Math.round(Math.sin((age / 0.45) * Math.PI) * 3) : 0, wag = age < 1 && Math.floor(age * 9) % 2 ? 1 : 0;
     ctx.fillStyle = "rgba(20,10,4,0.3)"; ctx.fillRect(x - 5, y - 1, 10, 2);
-    ctx.drawImage((p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame], x - 7, y - 10 - hop);
+    const img = (p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame];
+    // curled up by a sleeping owner: legs tucked under, belly on the ground, until a pat stands it up
+    if (p.curl && age > 1.2) ctx.drawImage(img, 0, 0, img.width, img.height - 3, x - 7, y - img.height + 3, img.width, img.height - 3);
+    else ctx.drawImage(img, x - 7, y - 10 - hop);
     for (let i = 0; i < 3; i++) {
       const t = age - i * 0.18;
       if (t < 0 || t > 0.95) continue;
@@ -557,7 +583,7 @@
       place() {
         const k = cv.clientWidth / st.W, cw = cv.clientWidth;
         for (const b of bubbles) {
-          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? 12 : 36;
+          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? 12 : b.a.h && b.a.h.look && b.a.h.look.child ? 26 : 36;
           const bw = b.el.offsetWidth / 2;
           b.el.style.left = `${Math.max(bw + 4, Math.min(cw - bw - 4, x * k))}px`;
           b.el.style.top = `${Math.max(b.el.offsetHeight + 4, (y - lift) * k)}px`;

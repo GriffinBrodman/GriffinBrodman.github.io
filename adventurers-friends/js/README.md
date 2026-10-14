@@ -5,7 +5,7 @@
 | `art.js` | Pixel-art engine: paper-doll heroes, monsters, pets (dogs, cats and lizards wear a named coat from `PET_COATS`: `pet.coat`, else picked by the pet's name), party banners, class-path emblems, items, gear icons (`gearIcon`), graves, the party-page target dummy (`dummyGrid`) |
 | `mount_art.js` | Mounts and wagons: side-view sprites for every mount kind and colour in `league/content/mounts.py` (2-frame idle), wagons alone or hitched to a puller, and `stablePen`, a live stables-yard canvas |
 | `daybook.js` | The daybook: `Daybook.render(h.daybook)` draws a hero's day as an almanac strip (sky with the sun's arc, one block per activity sized by its hours with a pixel icon, an hour ruler, a night cap with the moon, and a caption list); a column of hours when narrower than 520px. `Daybook.ICONS` holds the 16x16 activity icons |
-| `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines), hero sprites and bust portraits drawn from the worn kit (all nine slots, tiers, magic glows), and the gear pieces `Paint.Gear` shares with the icons |
+| `paint.js` | Shaded pixel painter (material/shade/layer buffers, hue-shifted ramps, dither, inner outlines), hero sprites and bust portraits drawn from the worn kit (all nine slots, tiers, magic glows), the three-quarter sleeper for beds and bedrolls (`sleeper`, its head drawn natively at the lying angle), and the gear pieces `Paint.Gear` shares with the icons |
 | `beasts.js` | Shaded monster sprites painted at their own size, never resampled: the non-humanoid bodies (quadrupeds, spiders, dragons, golems, kraken...), the goblin tribe (`goblin`: spear grunt, archer, masked shaman; Gruk the warchief is `warchief`) and kobolds (`kobold`: pickaxe miner, slinger) |
 | `anim.js` | Ambient pixel animation: one shared, visibility-gated ticker (`Anim.stage`) and small looping actors (villagers, birds, bats, skeletons, torches, smoke, snow, waves...) that any scene can reuse; API listed at the top of the file |
 | `scenes.js` | Daylight backdrops by biome and story vignettes, brought to life with `Anim` actors chosen per place (the map falls back to them only for a place without a header; replays use `battlefield.js`) |
@@ -16,7 +16,14 @@
 | `camp.js` | Tonight, on the hero page: the hero at the end of today by a campfire, on a dungeon floor, in a cell, the stables, a rented room, a home or the inn's common room, with partymates and pets talking (lines from `league.voice.night_lines` via the `tonight` export) |
 | `isle.js` | World map: terraced island in oblique view with cliffs, river and falls, towns in their own styles (house types and landmarks matching each town header), dungeons, labels, heroes |
 | `app.js` | Data access, DOM helpers, sprite helpers, event feed, router, "my hero" pinning |
-| `views.js` | Pages: Crier, roster, hero, parties, party, map, digest, world, history, guide, finale, songs |
+| `views.js` | Pages: Crier, back issues, hero, parties, party, songs, annals; the shared page helpers, published as `Views` for the route files below |
+| `views_roster.js` | `#/roster`: the roster tabs |
+| `views_map.js` | `#/map`: the island and the side panel for a town, wild or dungeon |
+| `views_digest.js` | `#/digest`: the weekly digest |
+| `views_world.js` | `#/world`: dungeons, factions and legends |
+| `views_history.js` | `#/history`: seasons, memorial, treasures, artifacts |
+| `views_guide.js` | `#/guide`: the guide |
+| `views_finale.js` | `#/finale`: the season finale ceremony |
 | `replay.js` | Animated fight replays: a camera framed on the fighters, marked fighters with a live hp roster, and highlights; the backdrop comes from `Battlefield` |
 | `quiz.js` | Join quiz with live preview and hero-code output |
 | `audio.js` | All sound, synthesised with WebAudio: page ambience, scene ambience for the hero page's tonight scene, UI and fight effects, the bard's sung songs, sound settings |
@@ -28,7 +35,7 @@ Plain `<script>` tags, no modules and no build step, so everything works from `f
 
 1. `data/static.js`, `data/league.js` (written by `league/export.py`): fill `window.LD.static` and `window.LD.league`. Per-hero, per-party and per-fight files (`data/hero/<id>.js` and so on) are loaded on demand by `App.load`.
 2. `audio.js` (defines `Sound`; uses only WebAudio), `town_music.js` (`TownMusic`; its own WebAudio context, reads the `al.sound` settings, needs nothing else), `art.js` (`Art`), `mount_art.js` (`MountArt`, right after `art.js`, which it needs at load), `daybook.js` (`Daybook`, also needs `art.js` at load), `paint.js` (`Paint`), `beasts.js` (`Beasts`), `anim.js` (`Anim`), `scenes.js` (`Scenes`), `town_scenes.js` (`TownScenes`), `wild_scenes.js` (adds to `TownScenes`, so right after it), `battlefield.js` (`Battlefield`, needs both), `tavern.js` (`Tavern`), `camp.js` (`Night`, after `tavern.js`), `isle.js` (`Isle`). These reference each other only inside functions (`Art` calls `Paint` and `Beasts` when drawing, `Scenes` calls `Isle` and `Anim`, `Night` calls `Tavern` and, when present, `Anim`), so the order among them is not load-critical, but all must load before `app.js`.
-3. `app.js` (`App`; reads `LD`, builds lookup tables, registers nothing yet), `views.js` (registers the main routes with `App.route`), `replay.js` (`#/fight/<id>`), `quiz.js` (`#/join`).
+3. `app.js` (`App`; reads `LD`, builds lookup tables, registers nothing yet), `views.js` (registers the main routes with `App.route` and publishes `Views`, its shared helpers), the `views_<page>.js` route files (each registers one route and reads `Views`), `replay.js` (`#/fight/<id>`), `quiz.js` (`#/join`).
 4. The inline `App.start()` runs the router, so every route must be registered before it.
 
 Each file is one IIFE that publishes one global. Files only use globals defined above them, except `Sound`, which `app.js` and `replay.js` guard with `window.Sound`.
@@ -39,6 +46,7 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 |--------|-----------|------------|
 | `LD` | `data/*.js` | Exported game data: `LD.static` (map, goods, monsters, classes, factions, quiz) and `LD.league` (current state). Never written by the site |
 | `App` | `app.js` | `el`, `esc`, `plural`, `cap`, sprite helpers (`heroSprite`, `heroPortrait`, ...), `heroLink`/`partyLink`, `eventRow`/`feed`, `load` (fetch a detail file), `mine` (pinned hero), `route`, `start`. Also `App.L`, `App.S`, and `heroes`/`parties`/`events` lookup tables by id |
+| `Views` | `views.js` | The page helpers the `views_<page>.js` route files share (`panel`, `headline`, `tip`, `runnerUp`, `rivalryPanel`, the town and party panels...) |
 | `Art` | `art.js` | Low-level `Grid`, colour ramps, `hash`/`rng` for deterministic art, hero/monster/pet/banner/item sprites (`petGrid(pet, frame)`, `PET_COATS`); `gearIcon(item, look)` is a 16x16 icon for any kit item (`{slot, art, tier, gem, tint, glow}`) or curio |
 | `MountArt` | `mount_art.js` | `mountGrid(kind, colour, frame)` and `wagonGrid(kind, puller, frame)` (cached 1x canvases), `mountSprite(kind, colour, scale, opts)` (an idling page canvas), `drawMount`/`drawWagon` (onto a canvas: x left edge, y ground), `stablePen(mounts, opts)` (live yard canvas with `.spots` for labels), `COLOURS`, `WAGONS` |
 | `Daybook` | `daybook.js` | `render(daybook, opts)` (a `<figure>` or `null`; `opts.title`, `opts.captions`), `icon(act, scale)` (a fresh page canvas, compass-rose fallback), `ICONS` (act -> cached 16x16 canvas), `NIGHT` (evening kind -> canvas), `LABELS`, `KINDS`, `clock` |
@@ -59,15 +67,15 @@ Each file is one IIFE that publishes one global. Files only use globals defined 
 | Route | File | Notes |
 |-------|------|-------|
 | `#/` (Crier) | `views.js` | Weather strip, hyper-event banner, headline, finale panel, tables of heroes/parties/bonds, songs panel, mini map. Keystone events always make the lead or Also today; three or more in a day share one "Reaching new heights" box |
-| `#/roster`, `#/hero/<id>/<tab>` | `views.js` + `camp.js` | Tonight scene above the tabs; hero page tabs: story (with dirge for the dead), diary, character (keystone badges by the title, a "what they're wearing" strip, the Kit paper doll from `kit`, `kit_items` (with each item's `history`), `curios`, `relics`; keystone cards first in Skills, out-of-combat skills folded into one line), people, record; reputation, artifact and faction panels |
+| `#/roster`, `#/hero/<id>/<tab>` | `views_roster.js`; `views.js` + `camp.js` | Tonight scene above the tabs; hero page tabs: story (with dirge for the dead), diary, character (keystone badges by the title, a "what they're wearing" strip, the Kit paper doll from `kit`, `kit_items` (with each item's `history`), `curios`, `relics`; keystone cards first in Skills, out-of-combat skills folded into one line), people, record; reputation, artifact and faction panels |
 | `#/parties`, `#/party/<id>` | `views.js` | |
-| `#/map/<node>` | `views.js` + `isle.js` | Side panel: town ledger, civic panel (ruler, edict, Watch), node details |
-| `#/digest/<season>/<week>` | `views.js` | Weekly digest |
+| `#/map/<node>` | `views_map.js` + `isle.js` | Side panel: town ledger, civic panel (ruler, edict, Watch), node details |
+| `#/digest/<season>/<week>` | `views_digest.js` | Weekly digest |
 | `#/days`, `#/day/<n>` | `views.js` | Back issues: any past day's front page (lead, also today, that day's feed), from `data/day/<n>.js` |
-| `#/world` | `views.js` | Factions and legendary figures |
-| `#/history` | `views.js` | Seasons, memorial, treasures of the age (`L.treasures`, every magic item with its timeline), artifacts panel |
+| `#/world` | `views_world.js` | Factions and legendary figures |
+| `#/history` | `views_history.js` | Seasons, memorial, treasures of the age (`L.treasures`, every magic item with its timeline), artifacts panel |
 | `#/songs/<id>` | `views.js` | Songbook and the bard's karaoke stage (uses `Sound.playSong`) |
-| `#/guide`, `#/finale/<season>` | `views.js` | |
+| `#/guide`, `#/finale/<season>` | `views_guide.js`, `views_finale.js` | |
 | `#/fight/<id>` | `replay.js` | Animated replay of a stored fight log |
 | `#/join` | `quiz.js` | Quiz; its output is the hero code that `league/heroes.py` decodes |
 
