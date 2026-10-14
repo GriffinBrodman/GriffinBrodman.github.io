@@ -23,15 +23,40 @@
     return Art.graveGrid();
   }
 
+  function measure(u) {
+    const g = unitGrid(u, 0);
+    let l = g.w, r = -1, top = g.h;
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (g.px[y * g.w + x]) { if (x < l) l = x; if (x > r) r = x; if (y < top) top = y; }
+    u.sw = r < l ? g.w : r - l + 1;
+    u.sh = r < l ? g.h : g.h - top;
+  }
+  // how far apart two neighbours must stand: lookalikes may overlap a lot (the stagger keeps them readable), but a short
+  // sprite next to a tall one is swallowed by any overlap, so the allowance shrinks with the square of the height ratio
+  function need(a, b) {
+    const hr = Math.min(a.sh, b.sh) / Math.max(a.sh, b.sh);
+    return (a.sw + b.sw) / 2 - 0.7 * Math.min(a.sw, b.sw) * hr * hr;
+  }
   // the two sides meet in the middle; a crowded side packs tighter so the camera can come in close
   function layout(units) {
     for (const side of [0, 1]) {
       const mine = units.filter((u) => u && u.side === side);
+      mine.forEach(measure);
       const step = Math.max(12, Math.min(20, 64 / Math.max(1, mine.length)));
       const front = mine.filter((u) => u.row === "front"), back = mine.filter((u) => u.row !== "front");
-      [...front, ...back].forEach((u, i) => {
-        const dist = 115 - i * step - (u.row !== "front" && front.length ? 4 : 0);
-        u.x = side === 0 ? dist : W - dist;
+      const line = [...front, ...back], shift = back.length && front.length ? 4 : 0;
+      const extra = line.slice(1).map((u, i) => Math.max(0, need(line[i], u) - step));
+      // a side too wide for its half of the stage gives up the extra room first, then packs tighter than usual
+      const base = step * extra.length, more = extra.reduce((a, b) => a + b, 0);
+      const room0 = 113 - shift - (line.length ? line[line.length - 1].sw / 2 : 0);
+      // a broad front fighter steps back, if there's room, so it doesn't stand on top of the other side's front
+      const lead = line.length ? Math.max(0, Math.min(10, line[0].sw / 2 - 14, room0 - base - more)) : 0;
+      const room = room0 - lead;
+      const squeeze = base + more <= room ? 1 : Math.max(0, (room - base) / more);
+      const pack = base > room ? room / base : 1;
+      let dist = 115 - lead;
+      line.forEach((u, i) => {
+        if (i) dist -= (step + extra[i - 1] * squeeze) * pack;
+        u.x = side === 0 ? dist - (u.row !== "front" ? shift : 0) : W - dist + (u.row !== "front" ? shift : 0);
         u.y = GROUND - 2 - (i % 2) * 7 + (u.row !== "front" ? -3 : 0);
       });
     }
@@ -160,7 +185,7 @@
     let shake = 0;
 
     const kind = Scenes.locKind(f.place);
-    const bg = Scenes.backdrop(kind === "town" ? "plains" : kind, W, H, Art.hash(f.id), { battle: true });
+    const bg = window.Battlefield ? Battlefield.backdrop(f) : Scenes.backdrop(kind === "town" ? "plains" : kind, W, H, Art.hash(f.id), { battle: true });
     const ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     const off = document.createElement("canvas");
@@ -248,8 +273,13 @@
     function draw() {
       o.clearRect(0, 0, W, H);
       o.drawImage(bg, 0, 0);
+      if (bg.life) bg.life(o, performance.now() / 1000);
       const cur = f.log[idx];
-      const order = units.filter((u) => u && !u.hidden).sort((a, b) => a.y - b.y);
+      // sprites shorter than the tallest on stage draw over taller ones that stand a little nearer, so a lunging troll
+      // never swallows a slime; a line of lookalikes keeps plain depth order
+      const tallest = Math.max(...units.map((u) => (u ? u.sh : 0)));
+      const depth = (u) => u.y + (tallest - u.sh) * 0.6;
+      const order = units.filter((u) => u && !u.hidden).sort((a, b) => depth(a) - depth(b));
       o.fillStyle = "rgba(0,0,0,0.28)";
       for (const u of order) if (!u.fled && !u.down) o.fillRect(Math.round(u.x - 8), Math.round(u.y - 1), 16, 2);
       for (const u of order) {

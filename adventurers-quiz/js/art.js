@@ -372,7 +372,7 @@
 
   function drawMonster(body, pal, frame, boss) {
     const p = MPAL[pal] || MPAL.grey;
-    const A = ramp(p[0]), B = ramp(p[1]), E = p[2];
+    const E = p[2];
     let g;
     const f = frame || 0;
     const humanoid = (skin, cloth, opts) => drawHero({
@@ -382,17 +382,6 @@
     });
     switch (body) {
       case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p);
-      case "goblin": case "kobold": {
-        g = humanoid(p[0], p[1], { style: 4, outfit: "leather", head: pal === "green_shaman" ? "antlers" : "none",
-          weapon: pal.includes("archer") || pal.includes("sling") ? "bow" : pal === "green_shaman" ? "staff" : "daggers" });
-        for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
-          if (g.get(x, y) === "#1a1220" && y > 8 && y < 12 && x > 9 && x < 16) g.set(x, y, E);
-        }
-        g.set(8, 8, A[2]); g.set(7, 7, A[2]); g.set(6, 6, A[3]); g.set(19, 8, A[1]); g.set(20, 7, A[1]); g.set(21, 6, A[2]);
-        if (body === "kobold") { g.set(12, 14, A[3]); g.set(13, 14, A[3]); g.set(14, 15, A[1]); }
-        g = shrink(g, 0.82);
-        break;
-      }
       case "human": {
         if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p);
         const map = { bandit: ["hood", "leather", "sword"], bandit_archer: ["hood", "leather", "bow"], bandit_captain: ["tricorn", "fancy", "sword"],
@@ -413,14 +402,6 @@
       default: return Beasts.draw(body, pal, f, boss, p);
     }
     return g;
-  }
-
-  function shrink(g, f) { return f === 1 ? g : scaleGrid(g, f); }
-  function scaleGrid(g, f) {
-    const w = Math.round(g.w * f), h = Math.round(g.h * f);
-    const n = new Grid(w, h);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) n.px[y * w + x] = g.get(Math.floor(x / f), Math.floor(y / f));
-    return n;
   }
 
   // ---------- banners ----------

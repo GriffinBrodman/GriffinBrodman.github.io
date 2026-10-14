@@ -1782,7 +1782,7 @@
       const left = Math.max(0, c.expires - day);
       const what = {
         escort: `Guard ${c.cargo} to ${to}`,
-        bounty: `${c.name}, ${c.what}, last seen in ${to}`,
+        bounty: `${c.name}, ${aOrAn(c.what.replace(/^an? /, ""))}, last seen in ${to}`,
         clear: `Clear ${c.need} ${c.mon ? (S.monsters[c.mon] || {}).name || "beasts" : "beasts"} out of ${to} by day ${c.deadline}`,
         retrieve: `Fetch ${c.item} from floor ${c.floor} of ${to}`,
         defend: `Raiders expected on day ${c.night}. Hold the walls`,
@@ -1811,7 +1811,7 @@
     if (loved.length) p.appendChild(el("p", { class: "small" }, el("b", null, "Local favourites: "), loved.map((h, i) => [i ? ", " : "", A.heroLink(h.id), el("span", { class: "dim" }, ` (${repTier(h.rep[id], id).toLowerCase()})`)])));
     if (hated.length) p.appendChild(el("p", { class: "small red" }, el("b", null, "Not welcome: "), hated.map((h, i) => [i ? ", " : "", A.heroLink(h.id), ` (${repTier(h.rep[id], id).toLowerCase()})`])));
     const hist = (ts.history || []).slice().reverse().slice(0, 8);
-    if (hist.length) p.appendChild(el("ol", { class: "timeline small" }, hist.map((x) => el("li", null, el("span", { class: "when" }, `S${x.season} · Day ${x.sday || "?"}`), el("div", null, A.richText(`${A.nodeName(id)} ${x.text}.`, Object.keys(heroes), []))))));
+    if (hist.length) p.appendChild(el("ol", { class: "timeline small" }, hist.map((x) => el("li", null, el("span", { class: "when" }, `S${x.season} · Day ${x.sday || "?"}`), el("div", null, A.richText(endDot(`${A.nodeName(id)} ${x.text}`), Object.keys(heroes), []))))));
     else p.appendChild(el("p", { class: "empty" }, "Nothing worth remembering has happened here yet."));
     return p;
   }
@@ -1938,7 +1938,7 @@
         el("div", { class: "tiny dim" }, f.hq ? `Based in ${A.nodeName(f.hq, true)}${f.mobile && s.loc && s.loc !== f.hq ? ` · now in ${A.nodeName(s.loc, true)}` : ""}` : "Everywhere and nowhere"),
         el("p", { class: "small" }, f.blurb),
         el("div", { class: "small" }, "Strength", A.bar(Math.min(100, s.power), 100, f.kind === "cult" ? "red" : "gold")),
-        last ? el("p", { class: "small muted" }, `Lately: ${last.text}.`) : null,
+        last ? el("p", { class: "small muted" }, `Lately: ${endDot(last.text)}`) : null,
         (s.members || []).length ? el("p", { class: "small" }, "Sworn: ", s.members.map((m, i) => [i ? ", " : "", A.heroLink(m)])) : f.secret ? el("p", { class: "small dim" }, "Members unknown.") : null,
         fans.length ? el("p", { class: "small dim" }, "Well regarded: ", fans.map((h, i) => [i ? ", " : "", A.heroLink(h.id)])) : null));
     }
