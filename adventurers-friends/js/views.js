@@ -576,9 +576,11 @@
     page.appendChild(v);
     const head = el("section", { class: "panel hero-panel" });
     head.appendChild(el("div", { class: "path-mark" }, classIcon(basePath(h.cls), 8)));
-    const portrait = el("div", { class: "portrait" }, A.heroPortrait(h, 5, { cls: "main" }), A.heroSprite(h, 3, { cls: "full" }));
-    if (h.pet) portrait.appendChild(A.petSprite(h.pet, 4));
-    if (h.mount && !h.mount.hitched) { const ma = mountArt(h.mount, 3); if (ma) { ma.classList.add("portrait-mount"); portrait.classList.add("has-mount"); ma.title = `${h.mount.name} the ${h.mount.label}`; portrait.appendChild(ma); } }
+    // the full figure, pet and mount are drawn at 1x and share one whole-number CSS scale (--k), so they stand at true sizes
+    const k1 = (cv) => { cv.style.setProperty("--sw", cv.width + "px"); cv.style.setProperty("--sh", cv.height + "px"); return cv; };
+    const portrait = el("div", { class: "portrait" }, A.heroPortrait(h, 5, { cls: "main" }), k1(A.heroSprite(h, 1, { cls: "full" })));
+    if (h.pet) portrait.appendChild(k1(A.petSprite(h.pet, 1)));
+    if (h.mount && !h.mount.hitched) { const ma = mountArt(h.mount, 1, true); if (ma) { k1(ma); ma.classList.add("portrait-mount"); portrait.classList.add("has-mount"); ma.title = `${h.mount.name} the ${h.mount.label}`; portrait.appendChild(ma); } }
     const isMine = A.mine().includes(h.id);
     const followBtn = el("button", { class: "btn " + (isMine ? "primary" : ""), onclick: () => { const on = A.toggleMine(h.id); followBtn.textContent = on ? "★ Yours" : "☆ This is mine"; followBtn.classList.toggle("primary", on); A.toast(on ? `${h.name} pinned to your Crier` : "Unpinned"); } }, isMine ? "★ Yours" : "☆ This is mine");
     const shareBtn = el("button", { class: "btn", onclick: () => A.copy(`${shareBlurb(h)}\n${A.shareUrl("#/hero/" + h.id)}`, "Link & blurb copied. Go brag.") }, "Share");
@@ -1037,10 +1039,10 @@
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
-  function mountArt(m, scale) {
+  function mountArt(m, scale, scene) {
     const MA = window.MountArt;
     if (!MA || !m) return null;
-    try { return MA.mountSprite(m.kind, m.colour, scale); } catch (e) { return null; }
+    try { return MA.mountSprite(m.kind, m.colour, scale, { scene }); } catch (e) { return null; }
   }
   function wagonArt(w, scale) {
     const MA = window.MountArt;

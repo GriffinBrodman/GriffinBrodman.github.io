@@ -1700,7 +1700,7 @@
     if (h.kit) h.kit.head = null;
     if (cl.head && !MARKS.has(cl.head)) cl.head = "none";
     const c = setup(h, cl), P = new Paint(44, 36), M = Object.assign({}, c.mats), [q0, q1] = q.quilt, len = q.len || 1.6, AX = 18, AY = 24;
-    M.bl = ramp(q0); M.bl2 = ramp(q1 || q0); M.sheet = ramp(q.pillow || "#ece2cc");
+    M.bl = ramp(q0); M.bl2 = ramp(q1 || q0); M.sheet = ramp(q.roll && q.pillow ? mix(q.pillow, "#e8dcc0", 0.2) : q.pillow || "#ece2cc");
     PATCHES.forEach((p, i) => { M["bp" + i] = ramp(p); });
     c.hglow = null;
     const coat = c.outfit === "chain" || c.outfit === "plate" ? "cloth" : BASE[c.outfit] || "cloth";
@@ -1727,11 +1727,11 @@
       if (Math.abs(t) > 1 || u < u0 || u > len) return null;
       return top(u) * Math.sqrt(1 - t * t) * Math.min(1, (len - u) / 0.12 + 0.35) * Math.min(1, (u - u0) / 0.1 + 0.55);
     };
-    const mound = (pts, shade) => {
+    const mound = (pts, shade, side) => {
       pts.sort((p, r) => p[0] + p[1] - r[0] - r[1]);
       for (const [u, v, t, hh, m] of pts) {
         const [sx, base] = iso(u, v, 0), sy = base - hh;
-        for (let y = Math.floor(sy) + 1; y <= Math.floor(base); y++) P.px(sx, y, m, t > 0 ? -0.15 : -0.45);
+        for (let y = Math.floor(sy) + 1; y <= Math.floor(base); y++) P.px(sx, y, m, side ? side(y - sy, t) : t > 0 ? -0.15 : -0.45);
         P.px(sx, sy, m, shade(u, t));
       }
     };
@@ -1739,11 +1739,12 @@
     if (q.roll) {
       P.layer = 0;
       const pts = [];
-      for (let u = -0.7; u <= -0.26; u += 0.04) for (let v = -0.14; v <= 0.46; v += 0.04) { const t = (u + 0.48) / 0.22; pts.push([u, v, -(v - 0.16) / 0.3, 2.0 * Math.sqrt(Math.max(0, 1 - t * t)) + 0.4, "sheet"]); }
-      mound(pts, (u, t) => 0.2 - (u + 0.48) * 1.2 + t * 0.2);
+      // big enough to show past the cheek, softly shaded down its sides so it reads as cloth, not a stone
+      for (let u = -0.92; u <= -0.24; u += 0.04) for (let v = -0.3; v <= 0.86; v += 0.04) { const t = (u + 0.58) / 0.34; pts.push([u, v, -(v - 0.28) / 0.58, 3.0 * Math.sqrt(Math.max(0, 1 - t * t)) + 0.5, "sheet"]); }
+      mound(pts, (u, t) => 0.3 - (u + 0.58) * 0.9 + t * 0.15, (d, t) => (t > 0 ? 0.05 : -0.1) - d * 0.12);
     }
     const after = [];
-    lyingHead(P, c, 12, 17, q.awake, after);
+    lyingHead(P, c, q.roll ? 11 : 12, 17, q.awake, after);
     P.layer = 2;
     const body = [];
     for (let u = u0; u <= len; u += 0.04) for (let v = -0.42; v <= 0.42; v += 0.04) {

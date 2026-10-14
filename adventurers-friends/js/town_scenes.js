@@ -405,7 +405,8 @@
   function chicken(o) {
     const A = window.Anim, ph = (o.seed || 0) * 0.71;
     const pal = { w: o.col || "#f4ece0", r: "#d83a2a", y: "#e8a830", k: "#1a1220" };
-    const stand = A.sprite(["..rw", ".wwky", "www w".replace(" ", "w"), ".y.y"], pal), peck = A.sprite(["....", "www.", "wwwwr", ".y.yy"], pal);
+    // three pixels tall: a hen comes up to a villager's knee, not their chest
+    const stand = A.sprite(["...r.", "wwwky", ".y.y."], pal), peck = A.sprite([".....", "wwww.", ".y.wr"], pal);
     return { z: o.y, draw(ctx, t) {
       const f = frac(t / 5 + ph), x = o.x + R(Math.sin(f * Math.PI * 2) * (o.range || 4));
       A.put(ctx, Math.floor(t * 2.5 + ph * 5) % 3 === 0 ? peck : stand, x, o.y, Math.cos(f * Math.PI * 2) < 0);
