@@ -17,7 +17,7 @@
   function unitGrid(u, frame) {
     const look = u.look || {};
     if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroes[u.ref], frame, A.heroLook(heroes[u.ref]));
-    if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name }, frame);
+    if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name, coat: look.coat }, frame);
     const m = S.monsters[u.ref];
     if (m) return Art.monsterGrid(Object.assign({}, m, { boss: u.boss }), frame);
     return Art.graveGrid();
@@ -38,8 +38,8 @@
   }
   // the view: just wide enough for everyone, ground at the bottom, sky cropped away
   function camera(units) {
-    const xs = units.filter(Boolean).map((u) => u.x);
-    const lo = Math.min(...xs) - 26, hi = Math.max(...xs) + 26;
+    const live = units.filter(Boolean), pad = (u) => Math.max(26, Math.ceil(unitGrid(u, 0).w / 2) + 4);
+    const lo = Math.min(...live.map((u) => u.x - pad(u))), hi = Math.max(...live.map((u) => u.x + pad(u)));
     const vw = Math.round(Math.min(W, Math.max(150, hi - lo))), vh = Math.round(vw * ASPECT);
     const vx = Math.round(Math.max(0, Math.min(W - vw, (lo + hi) / 2 - vw / 2)));
     const vy = Math.max(0, Math.min(H - vh, GROUND + 12 - vh));
@@ -166,6 +166,7 @@
     const off = document.createElement("canvas");
     off.width = W; off.height = H;
     const o = off.getContext("2d");
+    o.imageSmoothingEnabled = false;
 
     let idx = 0, t = 0, last = performance.now(), frame = 0, frameT = 0;
     let res = [100, 100];
@@ -265,9 +266,9 @@
         o.save();
         if (u.down) {
           o.globalAlpha = 0.75;
-          o.translate(u.x, u.y - 3);
+          o.translate(Math.round(u.x), Math.round(u.y) - 3);
           o.rotate((u.side === 0 ? -1 : 1) * Math.PI / 2);
-          o.drawImage(img, -g.w / 2, -g.h / 2);
+          o.drawImage(img, -(g.w >> 1), -(g.h >> 1));
         } else {
           if (u.ghost) o.globalAlpha = 0.5;
           o.drawImage(img, x, y);

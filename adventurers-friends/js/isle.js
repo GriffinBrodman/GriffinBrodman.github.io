@@ -1,4 +1,4 @@
-/* The world map: a bright terraced island in oblique view (cliff faces, beaches, a river with falls, red-roofed towns),
+/* The world map: a bright terraced island in oblique view (cliff faces, beaches, a river with falls, towns built like their header scenes),
    rendered once per page from the static map data. Map data uses 320x200 units; the terrain is drawn at U px per unit. */
 (function () {
   "use strict";
@@ -240,17 +240,69 @@
     return ((c.x + c.speed * t + c.cv.width) % span + span) % span - c.cv.width;
   }
 
-  function castle(ctx, x, y) {
-    F(ctx, x - 5, y - 28, 10, 17, "#3a2a2a"); F(ctx, x - 4, y - 27, 8, 16, "#d0ccdc"); F(ctx, x + 1, y - 27, 3, 16, "#a09cb4");
-    for (let k = -4; k < 4; k += 2) F(ctx, x + k, y - 30, 1, 2, "#d0ccdc");
-    F(ctx, x - 1, y - 23, 2, 3, "#2a2030"); F(ctx, x, y - 38, 1, 9, "#5a4a3a"); F(ctx, x + 1, y - 38, 5, 3, "#c8463a"); F(ctx, x + 1, y - 38, 5, 1, "#ec7a5c");
-    F(ctx, x - 14, y - 13, 28, 14, "#3a2a2a"); F(ctx, x - 13, y - 12, 26, 12, "#b8b4c4"); F(ctx, x + 4, y - 12, 9, 12, "#8c88a0");
-    for (let k = -13; k < 13; k += 3) F(ctx, x + k, y - 15, 2, 3, k > 3 ? "#8c88a0" : "#b8b4c4");
-    F(ctx, x - 2, y - 7, 4, 7, "#2a1a12"); F(ctx, x - 1, y - 8, 2, 1, "#2a1a12");
-    for (const tx of [x - 17, x + 12]) {
-      F(ctx, tx - 1, y - 21, 7, 22, "#3a2a2a"); F(ctx, tx, y - 20, 5, 20, "#c4c0d0"); F(ctx, tx + 3, y - 20, 2, 20, "#9894ac");
-      F(ctx, tx - 1, y - 23, 7, 3, "#7a2a22"); F(ctx, tx, y - 25, 5, 2, "#c8463a"); F(ctx, tx + 1, y - 27, 3, 2, "#c8463a"); F(ctx, tx + 2, y - 28, 1, 1, "#ec7a5c"); F(ctx, tx, y - 25, 2, 1, "#ec7a5c");
-      F(ctx, tx + 2, y - 15, 1, 2, "#2a2030");
+  const MAR = ["#ffffff", "#eeeae2", "#c8c2b8", "#968e86"], GOLD = ["#fff2a8", "#f0c050", "#b07a28", "#7a5018"];
+  const CRIM = ["#ec6a54", "#c03c32", "#7e2228"], SLATE = ["#8a9ab8", "#5e6e90", "#3e4a68"], WALLST = ["#dcd8d0", "#b2aea8", "#8a8884", "#5e5c60"];
+  const blob = (ctx, cx, cy, rx, ry, c) => { for (let yy = -ry; yy <= ry; yy++) { const w = Math.round(rx * Math.sqrt(1 - (yy / ry) ** 2)); F(ctx, cx - w, cy + yy, w * 2 + 1, 1, c); } };
+  function pennant(ctx, x, y, c) { F(ctx, x, y, 1, 5, "#3a2a1e"); F(ctx, x + 1, y, 4, 2, c[1]); F(ctx, x + 1, y, 4, 1, c[0]); F(ctx, x + 5, y, 1, 1, c[1]); }
+  function cone(ctx, x, y, w, R, ol) {
+    let i = 0;
+    for (; w - (i >> 1) * 2 >= 1; i++) F(ctx, x - 1 + (i >> 1), y - i, w + 2 - (i >> 1) * 2, 1, ol);
+    F(ctx, x + ((i - 1) >> 1), y - i, w - ((i - 1) >> 1) * 2, 1, ol);
+    for (let j = 0; j < i; j++) { const a = x + (j >> 1), n = w - (j >> 1) * 2; F(ctx, a, y - j, n, 1, R[1]); F(ctx, a, y - j, Math.min(2, n), 1, R[0]); if (n > 2) F(ctx, a + n - 1, y - j, 1, 1, R[2]); }
+  }
+  function citadel(ctx, x, y) {
+    const OL = "#2a2430";
+    for (const tx of [x - 16, x + 12]) {
+      F(ctx, tx - 1, y - 23, 6, 24, OL); F(ctx, tx, y - 22, 4, 22, MAR[1]); F(ctx, tx, y - 22, 1, 22, MAR[0]); F(ctx, tx + 3, y - 22, 1, 22, MAR[2]);
+      F(ctx, tx + 1, y - 18, 2, 3, "#3a3444"); F(ctx, tx + 1, y - 11, 2, 3, "#3a3444");
+      cone(ctx, tx, y - 24, 4, [SLATE[0], SLATE[1], SLATE[2]], OL); F(ctx, tx - 1, y - 24, 6, 1, OL); F(ctx, tx, y - 24, 4, 1, SLATE[2]);
+      pennant(ctx, tx + 2, y - 33, [CRIM[0], CRIM[1]]);
+    }
+    F(ctx, x - 12, y - 13, 24, 14, OL); F(ctx, x - 11, y - 12, 22, 12, MAR[1]); F(ctx, x + 5, y - 12, 6, 12, MAR[2]);
+    for (let xx = x - 10; xx < x + 11; xx += 3) { F(ctx, xx, y - 10, 1, 10, xx > x + 4 ? MAR[3] : MAR[2]); F(ctx, xx - 1, y - 10, 1, 10, xx > x + 4 ? MAR[2] : MAR[0]); }
+    for (const bx of [x - 8, x + 6]) { F(ctx, bx, y - 10, 2, 6, CRIM[1]); F(ctx, bx, y - 10, 1, 6, CRIM[0]); F(ctx, bx, y - 8, 2, 1, GOLD[1]); }
+    F(ctx, x - 2, y - 7, 5, 7, "#3a2e2e"); F(ctx, x - 1, y - 8, 3, 1, "#3a2e2e"); F(ctx, x, y - 6, 1, 6, "#6a5a4a");
+    F(ctx, x - 13, y - 15, 26, 3, OL); F(ctx, x - 12, y - 14, 24, 1, MAR[0]); F(ctx, x - 12, y - 13, 24, 1, CRIM[1]);
+    for (let xx = x - 11; xx < x + 12; xx += 3) F(ctx, xx, y - 13, 1, 1, GOLD[1]);
+    F(ctx, x - 7, y - 20, 14, 6, OL); F(ctx, x - 6, y - 19, 12, 5, MAR[1]); F(ctx, x - 6, y - 19, 2, 5, MAR[0]); F(ctx, x + 3, y - 19, 3, 5, MAR[2]);
+    for (const wx of [x - 3, x, x + 3]) F(ctx, wx, y - 18, 1, 2, "#3a3444");
+    const r = 7.5;
+    for (let yy = -8; yy <= 0; yy++) { const hw = Math.round((r + 1) * Math.sqrt(Math.max(0, 1 - (yy / (r + 1)) ** 2))); F(ctx, x - hw, y - 20 + yy, hw * 2 + 1, 1, OL); }
+    for (let yy = -7; yy <= 0; yy++) {
+      const hw = Math.round(r * Math.sqrt(Math.max(0, 1 - (yy / r) ** 2)));
+      for (let xx = -hw; xx <= hw; xx++) {
+        const u = xx / (hw + 0.01);
+        let c = u < -0.5 ? GOLD[0] : u < 0.15 ? GOLD[1] : u < 0.65 ? GOLD[2] : GOLD[3];
+        if ((xx === -3 || xx === 3) && yy > -6) c = u < 0 ? GOLD[2] : GOLD[3];
+        F(ctx, x + xx, y - 20 + yy, 1, 1, c);
+      }
+    }
+    F(ctx, x - 4, y - 24, 1, 2, "#ffffff"); F(ctx, x - 7, y - 20, 15, 1, GOLD[3]);
+    F(ctx, x - 2, y - 31, 5, 4, OL); F(ctx, x - 1, y - 30, 3, 3, GOLD[1]); F(ctx, x - 1, y - 30, 1, 3, GOLD[0]); F(ctx, x, y - 29, 1, 1, "#3a3444");
+    F(ctx, x, y - 34, 1, 3, GOLD[2]); F(ctx, x, y - 35, 1, 1, GOLD[0]); pennant(ctx, x, y - 40, [CRIM[0], CRIM[1]]);
+  }
+  // Ironhaven's curtain wall rings the whole city; each block is placed on the ground under it, and the river runs through a water gate
+  function ramparts(ctx, sprites, d) {
+    const cx = d.xy[0] * U, cy = d.xy[1] * U, rx = 31, ry = 19, OL = "#2a2430", N = 44, TOWERS = new Set([0, 5, 17, 22, 33]);
+    const wet = (x, y) => { for (let dx = -3; dx <= 3; dx++) { const i = Math.round(y) * TW + Math.round(x) + dx; if (!T.lev[i] || T.river[i]) return true; } return false; };
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * Math.PI * 2, gx = cx + Math.cos(a) * rx, gy = cy + Math.sin(a) * ry;
+      if (wet(gx, gy)) continue;
+      const px = Math.round(gx), py = Math.round(gy - T.lev[Math.round(gy) * TW + Math.round(gx)] * CH), tower = TOWERS.has(k), gate = k === 11;
+      sprites.push({ y: py, draw: () => {
+        if (gate) {
+          for (const dx of [-6, 3]) { F(ctx, px + dx - 1, py - 12, 6, 13, OL); F(ctx, px + dx, py - 11, 4, 11, WALLST[1]); F(ctx, px + dx, py - 11, 1, 11, WALLST[0]); F(ctx, px + dx + 3, py - 11, 1, 11, WALLST[2]); cone(ctx, px + dx, py - 13, 4, [CRIM[0], CRIM[1], CRIM[2]], OL); }
+          F(ctx, px - 2, py - 9, 5, 10, OL); F(ctx, px - 2, py - 10, 5, 1, WALLST[1]); F(ctx, px - 1, py - 7, 3, 7, "#4a3a32"); F(ctx, px - 1, py - 8, 3, 1, CRIM[1]); F(ctx, px, py - 8, 1, 1, GOLD[1]);
+          return;
+        }
+        F(ctx, px - 2, py - 7, 5, 8, OL); F(ctx, px - 2, py - 6, 5, 6, WALLST[1]); F(ctx, px - 2, py - 6, 5, 1, WALLST[0]); F(ctx, px - 2, py - 1, 5, 1, WALLST[2]);
+        F(ctx, px - 1 + (k % 2) * 2, py - 4, 1, 1, WALLST[2]);
+        if (k % 2) { F(ctx, px - 1, py - 9, 3, 2, OL); F(ctx, px, py - 8, 1, 1, WALLST[0]); }
+        if (!tower) return;
+        F(ctx, px - 4, py - 12, 9, 13, OL); F(ctx, px - 3, py - 11, 7, 11, WALLST[1]); F(ctx, px - 3, py - 11, 2, 11, WALLST[0]); F(ctx, px + 2, py - 11, 2, 11, WALLST[2]); F(ctx, px, py - 8, 1, 2, "#2a2228");
+        cone(ctx, px - 3, py - 13, 7, [CRIM[0], CRIM[1], CRIM[2]], OL);
+        if (k === 0 || k === 22 || k === 33) pennant(ctx, px, py - 26, [CRIM[0], CRIM[1]]);
+      } });
     }
   }
   function headframe(ctx, x, y) {
@@ -259,11 +311,17 @@
     Ln(ctx, x - 4, y - 12, x + 5, y - 12, "#7a5232"); Ln(ctx, x - 5, y - 8, x + 5, y - 16, "#5a3a22");
     for (let a = 0; a < 16; a++) F(ctx, x + Math.round(Math.cos(a / 16 * 6.283) * 3.5), y - 23 + Math.round(Math.sin(a / 16 * 6.283) * 3.5), 1, 1, "#2a1a10");
     F(ctx, x, y - 23, 1, 1, "#c8963e"); Ln(ctx, x + 3, y - 23, x + 3, y - 6, "#c8c0b0");
-    F(ctx, x + 6, y - 9, 9, 7, "#3a2626"); F(ctx, x + 7, y - 8, 7, 6, "#8a6a42"); F(ctx, x + 5, y - 11, 11, 2, "#6a4a3a"); F(ctx, x + 9, y - 6, 2, 4, "#2a1a12");
-    F(ctx, x - 14, y - 7, 5, 3, "#4a4450"); F(ctx, x - 13, y - 8, 3, 1, "#e0c45a"); F(ctx, x - 14, y - 4, 1, 1, "#1a1416"); F(ctx, x - 10, y - 4, 1, 1, "#1a1416");
+    F(ctx, x + 5, y - 10, 11, 9, "#1c1c22"); F(ctx, x + 6, y - 9, 9, 7, "#96948e"); F(ctx, x + 6, y - 9, 2, 7, "#b8b6b0"); F(ctx, x + 12, y - 9, 3, 7, "#6e6c6a");
+    F(ctx, x + 4, y - 12, 13, 3, "#1c1c22"); F(ctx, x + 5, y - 11, 11, 1, "#7a8494"); F(ctx, x + 5, y - 10, 11, 1, "#58606e"); F(ctx, x + 9, y - 6, 2, 4, "#2a1a12"); F(ctx, x + 13, y - 7, 1, 1, "#ffc860");
+    F(ctx, x + 14, y - 15, 3, 4, "#1c1c22"); F(ctx, x + 15, y - 14, 1, 3, "#6a5a54");
+    puffs(ctx, x + 15, y - 15, "#8a8c90");
+    blob(ctx, x - 20, y - 2, 6, 3, "#2e2c2c"); blob(ctx, x - 21, y - 3, 4, 2, "#3e3a3a"); F(ctx, x - 22, y - 5, 2, 1, "#4e4a48");
+    for (const [dx, dy] of [[-24, -1], [-19, -3], [-17, 0], [-22, -2]]) F(ctx, x + dx, y + dy, 1, 1, "#a8542a");
+    F(ctx, x - 14, y - 7, 5, 3, "#4a4450"); F(ctx, x - 13, y - 8, 3, 1, "#d07a3a"); F(ctx, x - 12, y - 8, 1, 1, "#6a3018"); F(ctx, x - 14, y - 4, 1, 1, "#1a1416"); F(ctx, x - 10, y - 4, 1, 1, "#1a1416");
   }
   function lighthouse(ctx, x, y) {
-    F(ctx, x - 7, y - 2, 14, 4, "#5e6298"); F(ctx, x - 6, y - 3, 12, 2, "#8890c4");
+    F(ctx, x - 8, y - 4, 16, 7, "#1a2230"); F(ctx, x - 7, y - 3, 14, 5, "#e4e0d2"); F(ctx, x - 7, y - 3, 4, 5, "#fbf8ee"); F(ctx, x + 3, y - 3, 4, 5, "#bcb8aa"); F(ctx, x - 4, y, 1, 2, "#8a8a84"); F(ctx, x + 4, y - 1, 1, 2, "#8a8a84");
+    F(ctx, x - 7, y - 4, 14, 1, "#6ab040"); F(ctx, x - 6, y - 4, 3, 1, "#8ad04a");
     for (let j = 0; j < 24; j++) {
       const w = Math.round(7 - j / 6), x0 = x - Math.floor(w / 2);
       F(ctx, x0 - 1, y - 3 - j, w + 2, 1, "#3a2626");
@@ -282,26 +340,83 @@
     F(ctx, x - 7, y - 16, 15, 3, "#3a2414"); F(ctx, x - 6, y - 16, 13, 1, "#9a6a3a");
     F(ctx, x - 5, y - 23, 11, 7, "#3a2414"); F(ctx, x - 4, y - 22, 9, 6, "#8a6a42"); F(ctx, x + 2, y - 22, 3, 6, "#6a4a30"); F(ctx, x - 1, y - 20, 2, 2, "#ffd46a");
     F(ctx, x - 7, y - 25, 15, 3, "#9ca8d2"); F(ctx, x - 6, y - 26, 13, 2, "#f4f8ff"); F(ctx, x - 4, y - 28, 9, 2, "#f4f8ff"); F(ctx, x - 2, y - 29, 5, 1, "#ffffff");
-    F(ctx, x, y - 33, 1, 4, "#5a4a3a"); F(ctx, x + 1, y - 33, 4, 2, "#3e5ab0");
+    F(ctx, x + 7, y - 21, 1, 4, "#3a2414"); F(ctx, x + 7, y - 22, 1, 1, "#ff9a3a"); F(ctx, x + 7, y - 23, 1, 1, "#ffe08a");
+    ctx.globalAlpha = 0.22; blob(ctx, x + 7, y - 22, 5, 4, "#ffb04a"); ctx.globalAlpha = 1;
   }
   function tollhouse(ctx, x, y) {
-    F(ctx, x - 9, y - 13, 18, 14, "#3a2a2a"); F(ctx, x - 8, y - 12, 16, 12, "#c4b8a4"); F(ctx, x + 3, y - 12, 5, 12, "#a0947e");
-    F(ctx, x - 3, y - 7, 6, 7, "#2a1a12"); F(ctx, x - 2, y - 8, 4, 1, "#2a1a12");
-    F(ctx, x - 10, y - 16, 20, 3, "#2c3e7a"); F(ctx, x - 8, y - 18, 16, 2, "#3e5ab0"); F(ctx, x - 6, y - 19, 12, 1, "#6a88d8");
-    F(ctx, x - 6, y - 11, 2, 2, "#4a6a9a"); F(ctx, x + 4, y - 11, 2, 2, "#4a6a9a");
-    F(ctx, x + 10, y - 5, 1, 6, "#5a3a22");
-    for (let k = 0; k < 12; k++) F(ctx, x + 10 + k, y - 5, 1, 1, (k >> 1) % 2 ? "#c8463a" : "#f2ead8");
-    F(ctx, x - 3, y - 15, 6, 1, "#e0c45a");
+    const ST = ["#d0ccb6", "#aca892", "#86826e", "#5c5a4a"], OL = "#22262a";
+    F(ctx, x - 7, y - 17, 14, 18, OL); F(ctx, x - 6, y - 16, 12, 16, ST[1]); F(ctx, x - 6, y - 16, 3, 16, ST[0]); F(ctx, x + 3, y - 16, 3, 16, ST[2]);
+    for (let yy = y - 14; yy < y; yy += 3) for (let xx = x - 5 + ((yy >> 1) % 2) * 2; xx < x + 6; xx += 4) F(ctx, xx, yy, 2, 1, ST[3]);
+    F(ctx, x - 3, y - 13, 2, 3, OL); F(ctx, x + 1, y - 13, 2, 3, OL); F(ctx, x - 3, y - 12, 2, 2, "#ffd46a"); F(ctx, x + 1, y - 12, 2, 2, "#e8b84a");
+    F(ctx, x - 3, y - 8, 6, 8, OL); F(ctx, x - 2, y - 9, 4, 1, OL); F(ctx, x - 2, y - 7, 4, 7, "#7a4a24"); F(ctx, x, y - 7, 1, 7, "#5a3418");
+    F(ctx, x - 8, y - 19, 16, 3, OL); F(ctx, x - 7, y - 18, 14, 1, ST[0]);
+    cone(ctx, x - 5, y - 20, 10, ["#5a7ab8", "#3e5a94", "#2a3e6a"], OL);
+    pennant(ctx, x, y - 35, ["#fff0a0", "#e8b84a"]);
+    F(ctx, x + 9, y - 5, 1, 6, "#5a3a22");
+    for (let k = 0; k < 12; k++) F(ctx, x + 9 + k, y - 5, 1, 1, (k >> 1) % 2 ? "#c8463a" : "#f2ead8");
   }
   function treehouse(ctx, x, y) {
     F(ctx, x - 3, y - 18, 6, 19, "#3a2414"); F(ctx, x - 2, y - 18, 4, 18, "#7a5232"); F(ctx, x + 1, y - 18, 1, 18, "#5a3a22");
     F(ctx, x - 5, y - 1, 3, 1, "#5a3a22"); F(ctx, x + 2, y - 1, 3, 1, "#5a3a22");
-    const blob = (cx, cy, rx, ry, c) => { for (let yy = -ry; yy <= ry; yy++) { const w = Math.round(rx * Math.sqrt(1 - (yy / ry) ** 2)); F(ctx, cx - w, cy + yy, w * 2 + 1, 1, c); } };
-    blob(x, y - 28, 15, 10, "#1e4a24"); blob(x - 1, y - 29, 14, 9, "#3a8a34"); blob(x - 4, y - 32, 8, 5, "#5cb046"); blob(x - 6, y - 34, 3, 2, "#94d862");
-    F(ctx, x - 9, y - 20, 18, 2, "#5a3a22"); F(ctx, x - 8, y - 20, 16, 1, "#9a6a3a");
-    house(ctx, x - 4, y - 20, "red", false);
-    Ln(ctx, x + 6, y - 19, x + 8, y - 1, "#c8a46a");
-    for (const [dx, dy] of [[-12, -24], [11, -26], [-2, -38]]) F(ctx, x + dx, y + dy, 3, 2, "#3a8a34");
+    blob(ctx, x, y - 28, 15, 10, "#163a1e"); blob(ctx, x - 1, y - 29, 14, 9, "#2e6a32"); blob(ctx, x - 4, y - 32, 8, 5, "#4a8a3a"); blob(ctx, x - 6, y - 34, 3, 2, "#7ab84a");
+    F(ctx, x - 10, y - 20, 20, 3, "#14100c"); F(ctx, x - 9, y - 20, 18, 1, "#c8a064"); F(ctx, x - 9, y - 19, 18, 1, "#a8804a");
+    for (let k = -9; k < 9; k += 3) F(ctx, x + k, y - 23, 1, 3, "#5a3c22");
+    F(ctx, x - 9, y - 23, 18, 1, "#c8a46a");
+    home(ctx, x - 5, y - 20, STYLE.hollowood, true, 11);
+    for (let k = 0; k < 7; k++) F(ctx, x + 7, y - 17 + k * 3, 3, 1, "#c8a46a");
+    F(ctx, x + 7, y - 18, 1, 18, "#5a3c22"); F(ctx, x + 9, y - 18, 1, 18, "#5a3c22");
+    for (const [dx, dy] of [[-12, -24], [11, -26], [-2, -38]]) F(ctx, x + dx, y + dy, 3, 2, "#2e6a32");
+    for (const [dx, dy] of [[-9, -25], [9, -27]]) { F(ctx, x + dx, y + dy - 2, 1, 2, "#14100c"); F(ctx, x + dx, y + dy, 1, 1, "#ffd870"); ctx.globalAlpha = 0.25; blob(ctx, x + dx, y + dy, 3, 2, "#ffe8a0"); ctx.globalAlpha = 1; }
+  }
+  function guildhall(ctx, x, y) {
+    const c = document.createElement("canvas"), PL = ["#f8e2a8", "#c0925a"], BM = "#5a3a22", OL = "#2e1e14", TILE = ["#d8784a", "#b05634", "#7a3420"];
+    c.width = 44; c.height = 40;
+    const g = c.getContext("2d"), o = 10, gy = 38, w = 22;
+    F(g, o - 1, gy - 11, w + 2, 12, OL); F(g, o, gy - 10, w, 10, PL[0]); F(g, o + w - 5, gy - 10, 5, 10, PL[1]);
+    F(g, o, gy - 10, w, 1, BM); F(g, o, gy - 5, w, 1, BM);
+    for (const bx of [0, 5, 16, w - 1]) F(g, o + bx, gy - 10, 1, 10, BM);
+    Ln(g, o + 1, gy - 6, o + 4, gy - 9, BM); Ln(g, o + 17, gy - 9, o + 20, gy - 6, BM);
+    F(g, o + 2, gy - 4, 2, 2, "#ffd46a"); F(g, o + 18, gy - 4, 2, 2, "#e8b84a"); F(g, o + 2, gy - 9, 2, 2, "#ffd46a");
+    F(g, o + 8, gy - 6, 6, 6, OL); F(g, o + 9, gy - 5, 4, 5, "#7a4a24"); F(g, o + 11, gy - 5, 1, 5, OL);
+    F(g, o + 8, gy - 10, 6, 4, OL); F(g, o + 9, gy - 9, 4, 2, "#a83a2a"); F(g, o + 10, gy - 9, 2, 1, "#f0c040");
+    const rh = 12;
+    for (let j = 0; j < rh; j++) { const ins = Math.round(j * (w / 2) / rh); F(g, o - 2 + ins, gy - 11 - j, w + 4 - ins * 2, 1, OL); }
+    for (let j = 0; j < rh - 1; j++) {
+      const ins = Math.round(j * (w / 2) / rh), a = o - 1 + ins, n = w + 2 - ins * 2;
+      F(g, a, gy - 11 - j, n, 1, TILE[1]); F(g, a, gy - 11 - j, Math.min(3, n), 1, TILE[0]); F(g, a + n - 2, gy - 11 - j, 2, 1, TILE[2]);
+      if (j % 2) for (let xx = a + 1 + (j % 4 === 1 ? 1 : 0); xx < a + n - 1; xx += 3) F(g, xx, gy - 11 - j, 1, 1, TILE[2]);
+    }
+    F(g, o + 9, gy - 18, 4, 3, OL); F(g, o + 10, gy - 17, 2, 2, "#e0b47a");
+    F(g, o + 8, gy - 27, 6, 5, OL); F(g, o + 9, gy - 26, 4, 4, PL[1]); F(g, o + 10, gy - 25, 2, 2, "#2a1e14"); F(g, o + 10, gy - 24, 1, 1, "#e8b84a");
+    cone(g, o + 9, gy - 28, 4, TILE, OL);
+    pennant(g, o + 11, gy - 37, ["#ec7a5c", "#c8463a"]);
+    for (let row = 0; row < c.height; row++) ctx.drawImage(c, 0, row, c.width, 1, x - o - w / 2 + Math.round((gy - row) * 0.17), y - gy + row, c.width, 1);
+    Ln(ctx, x + w / 2 + 6, y, x + w / 2 + 1, y - 8, OL); Ln(ctx, x + w / 2 + 5, y, x + w / 2, y - 8, "#8a5a30"); F(ctx, x + w / 2 + 3, y, 5, 1, "#5a3a22");
+  }
+  function undertaker(ctx, x, y) {
+    const OL = "#100e10", WL = ["#6a6866", "#4e4c4a", "#363432"], RF = ["#4a4846", "#2e2c2c", "#1c1a1a"];
+    blob(ctx, x, y, 11, 3, "#3e4a3a"); blob(ctx, x - 1, y - 1, 9, 2, "#56604a"); F(ctx, x - 5, y - 3, 6, 1, "#6a7458");
+    F(ctx, x - 5, y - 13, 11, 13, OL); F(ctx, x - 4, y - 12, 9, 12, WL[1]); F(ctx, x - 4, y - 12, 2, 12, WL[0]); F(ctx, x + 2, y - 12, 3, 12, WL[2]);
+    for (let xx = x - 3; xx < x + 4; xx += 2) F(ctx, xx, y - 12, 1, 12, WL[2]);
+    F(ctx, x - 1, y - 5, 3, 5, "#1e1a1a");
+    for (let j = 0; j < 9; j++) { const ins = j >> 1; F(ctx, x - 6 + ins, y - 14 - j, 13 - ins * 2, 1, OL); if (j < 8) { F(ctx, x - 5 + ins, y - 14 - j, 11 - ins * 2, 1, RF[1]); F(ctx, x - 5 + ins, y - 14 - j, 2, 1, RF[0]); } }
+    F(ctx, x - 1, y - 18, 3, 3, OL); F(ctx, x, y - 17, 1, 1, "#c8d4a0");
+    for (const [dx, t] of [[-9, 0], [8, 1], [11, 0]]) { F(ctx, x + dx - 1, y - 6 + t, 3, 5, OL); F(ctx, x + dx, y - 5 + t, 1, 4, "#9a9a92"); }
+    F(ctx, x - 12, y - 10, 1, 9, "#2a2620"); F(ctx, x - 13, y - 12, 3, 3, "#2a2620"); F(ctx, x - 12, y - 11, 1, 1, "#ffc860");
+    ctx.globalAlpha = 0.25; blob(ctx, x - 12, y - 11, 5, 4, "#ffc860"); ctx.globalAlpha = 1;
+    Ln(ctx, x + 15, y, x + 14, y - 16, "#2a2620"); Ln(ctx, x + 14, y - 9, x + 19, y - 14, "#2a2620"); Ln(ctx, x + 14, y - 12, x + 10, y - 17, "#2a2620");
+    F(ctx, x + 18, y - 16, 2, 1, "#14141a"); F(ctx, x + 19, y - 17, 1, 1, "#14141a");
+  }
+  function windmill(ctx, x, y) {
+    F(ctx, x - 3, y - 11, 7, 12, "#2e1e14"); F(ctx, x - 2, y - 10, 5, 10, "#e8dcc4"); F(ctx, x - 2, y - 10, 2, 10, "#fff4dc"); F(ctx, x + 2, y - 10, 1, 10, "#b8a888"); F(ctx, x, y - 4, 1, 4, "#5a3a22");
+    cone(ctx, x - 2, y - 11, 5, ["#d8784a", "#b05634", "#7a3420"], "#2e1e14");
+    for (const [ex, ey] of [[-7, -7], [7, -7], [-7, 7], [7, 7]]) {
+      for (let t = 1; t <= 7; t++) { const px = x + Math.round(ex * t / 7), py = y - 13 + Math.round(ey * t / 7); F(ctx, px - 1, py - 1, 3, 3, "#2e1e14"); }
+    }
+    for (const [ex, ey] of [[-7, -7], [7, -7], [-7, 7], [7, 7]]) {
+      for (let t = 2; t <= 6; t++) { const px = x + Math.round(ex * t / 7), py = y - 13 + Math.round(ey * t / 7); F(ctx, px, py, 1, 1, "#f8eedc"); F(ctx, px + Math.sign(ex), py, 1, 1, t % 2 ? "#d0c0a0" : "#f8eedc"); }
+    }
+    F(ctx, x - 1, y - 14, 3, 3, "#2e1e14"); F(ctx, x, y - 13, 1, 1, "#c0925a");
   }
   function palisade(ctx, sprites, sx, sy, spread) {
     for (let a = 0.15; a < Math.PI - 0.1; a += 0.16) {
@@ -312,7 +427,147 @@
     const gx = Math.round(sx), gy = Math.round(sy + 2 + (spread + 7) * 0.6);
     sprites.push({ y: gy + 1, draw: () => { for (const dx of [-5, 4]) { F(ctx, gx + dx - 1, gy - 11, 3, 12, "#3a2414"); F(ctx, gx + dx, gy - 11, 1, 11, "#9a6a3a"); } F(ctx, gx - 5, gy - 12, 10, 2, "#5a3a22"); } });
   }
-  const LANDMARK = { ironhaven: castle, veldrock: headframe, saltmarrow: lighthouse, frosthold: watchtower, carrbridge: tollhouse, hollowood: treehouse };
+  const LANDMARK = { ironhaven: citadel, thornwall: guildhall, veldrock: headframe, saltmarrow: lighthouse, frosthold: watchtower, carrbridge: tollhouse, hollowood: treehouse, ashfen: undertaker };
+  // each town's houses follow its header scene (town_scenes.js): the same walls, roofs and trim, cut down to map scale
+  const STYLE = {
+    ironhaven: { ol: "#2a2430", wall: ["#f0e6d4", "#c8b89c"], roofs: [[["#7e2228", "#c03c32", "#ec6a54"], 0.55], [["#3e4a68", "#5e6e90", "#8a9ab8"], 1, "slate"]], roof: "hip", tall: 2, door: "#5a3a2a", win: "#4a5a7a", chim: "#a09a94" },
+    thornwall: { ol: "#2e1e14", wall: ["#f8e2a8", "#c0925a"], frame: "#5a3a22", roofs: [[["#94682c", "#d0a44c", "#f4d27a"], 0.5, "thatch"], [["#7a3420", "#b05634", "#d8784a"], 1, "slate"]], roof: "hip", door: "#6a3a1c", win: "#ffd46a", chim: "#9a7a5a" },
+    veldrock: { ol: "#24242a", wall: ["#c4c2bc", "#7e7c78"], stone: "#96948e", found: "#5a5a54", roofs: [[["#46505e", "#6a7484", "#929cac"], 1]], roof: "slate", door: "#a8542a", win: "#ffc860", chim: "#6a5a54", chimOdds: 0.7, smoke: "#8a8c90" },
+    carrbridge: { ol: "#22262a", walls: [["#f4ecd8", "#b8a888"], ["#e8d8c0", "#a89070"], ["#dce4e8", "#9aa4b0"]], roofs: [[["#2a3e6a", "#3e5a94", "#5a7ab8"], 0.4], [["#7a3020", "#b04a34", "#d86a4a"], 0.75], [["#344a36", "#4e6e50", "#6a8a6a"], 1]], roof: "hip", door: "#7a4a24", win: "#4a6a9a", chim: "#9a8a7a" },
+    ashfen: { ol: "#1a1e1c", wall: ["#9a8462", "#4a3c2c"], planks: "#6a5640", roofs: [[["#56643e", "#8a9a62", "#b4c08a"], 1]], roof: "hip", stilts: true, door: "#3e3024", win: "#ffd060" },
+    hollowood: { ol: "#14100c", wall: ["#c8a068", "#7a5a38"], planks: "#9a7648", roofs: [[["#2e5420", "#78b040", "#b0dc5c"], 1]], roof: "steep", moss: true, perch: 0.5, door: "#5a7a3a", win: "#ffd870" },
+    saltmarrow: { ol: "#1a2230", wall: ["#fbf8ee", "#bcb8aa"], roofs: [[["#222e48", "#34466a", "#4e6488"], 0.7, "slate"], [["#6a2c1a", "#a04428", "#c8603a"], 1]], roof: "hip", door: "#3a5a8a", win: "#4a6a9a", chim: "#d0ccc0", chimOdds: 0.5 },
+    frosthold: { ol: "#0e1424", wall: ["#8a6448", "#4e3626"], logs: "#6a4a34", roofs: [[["#3e2c20", "#5a4232", "#7a5a44"], 1]], roof: "steep", snow: true, door: "#4a3020", win: "#ffd46a", chim: "#5a5a66", chimOdds: 0.8, smoke: "#c8d0dc" },
+  };
+  const PROFILE = { hip: [0, 0, 1, 1, 2], steep: [0, 1, 1, 2, 2, 3, 4], steepW: [0, 1, 1, 2, 2, 3, 3, 4, 5], thatch: [0, 0, 1, 1, 2, 3] };
+  function home(ctx, x, y, s, wide, seed, perch) {
+    const r = rng(seed), w = wide ? 9 : 7, OL = s.ol;
+    x = Math.round(x); y = Math.round(y);
+    const pick = r(), opt = s.roofs.find((o) => pick < o[1]) || s.roofs[0], R = opt[0], kind = opt[2] || s.roof;
+    const wall = s.walls ? s.walls[Math.floor(r() * s.walls.length)] : s.wall;
+    const wh = 4 + (s.tall && r() < 0.6 ? s.tall : 0), chim = s.chim && r() < (s.chimOdds || 0.35);
+    const prof = kind === "steep" ? (wide ? PROFILE.steepW : PROFILE.steep) : kind === "thatch" ? PROFILE.thatch : PROFILE.hip, n = prof.length;
+    if (s.stilts) {
+      F(ctx, x - 1, y + 1, w + 2, 2, "#6aa0a0"); F(ctx, x, y + 2, w, 1, "#88b8b4");
+      for (const px of [x, x + w - 1, x + (w >> 1)]) F(ctx, px, y - 3, 1, 5, "#2e2a24");
+      F(ctx, x - 2, y - 4, w + 4, 2, OL); F(ctx, x - 1, y - 4, w + 2, 1, "#9a8466");
+      y -= 4;
+    }
+    if (perch) {
+      const tx = x + (w >> 1);
+      blob(ctx, tx, y - 8 - wh - n, 9, 5, "#163a1e"); blob(ctx, tx - 1, y - 9 - wh - n, 8, 4, "#2e6a32"); blob(ctx, tx - 3, y - 11 - wh - n, 4, 2, "#4a8a3a");
+      F(ctx, tx - 2, y - 7, 4, 8, OL); F(ctx, tx - 1, y - 7, 2, 7, "#7e5e3e"); F(ctx, tx - 1, y - 7, 1, 7, "#a0805a");
+      F(ctx, tx - 4, y, 3, 1, "#5e4430"); F(ctx, tx + 2, y, 3, 1, "#5e4430");
+      F(ctx, x - 2, y - 9, w + 4, 3, OL); F(ctx, x - 1, y - 8, w + 2, 1, "#c8a064");
+      F(ctx, x - 2, y - 12, 1, 3, OL); F(ctx, x - 2, y - 13, 1, 1, "#ffd870");
+      ctx.globalAlpha = 0.3; blob(ctx, x - 2, y - 13, 3, 2, "#ffe8a0"); ctx.globalAlpha = 1;
+      y -= 8;
+    }
+    const top = y - wh;
+    if (s.found) { F(ctx, x - 2, y, w + 4, 2, OL); F(ctx, x - 1, y, w + 2, 1, s.found); }
+    F(ctx, x - 1, top - 1, w + 2, wh + 2, OL);
+    F(ctx, x, top, w, wh, wall[0]); F(ctx, x + w - 2, top, 2, wh, wall[1]);
+    if (s.logs) for (let yy = top + 1; yy < y; yy += 2) F(ctx, x, yy, w, 1, s.logs);
+    if (s.planks) for (let xx = x + 1; xx < x + w - 2; xx += 2) F(ctx, xx, top, 1, wh, s.planks);
+    if (s.stone) for (let yy = top + 1; yy < y; yy += 2) for (let xx = x + 1 + ((yy - top) & 2); xx < x + w - 1; xx += 4) F(ctx, xx, yy, 1, 1, s.stone);
+    if (s.frame) { F(ctx, x, top, w, 1, s.frame); F(ctx, x, top, 1, wh, s.frame); F(ctx, x + w - 3, top, 1, wh, s.frame); F(ctx, x + 1, top + 2, 1, 1, s.frame); }
+    F(ctx, x + 2, y - 2, wide ? 2 : 1, 2, s.door); F(ctx, x + w - 4, top + 1, 1, 1, s.win);
+    if (wh > 4) { F(ctx, x + 2, top + 1, 1, 1, s.win); F(ctx, x + w - 4, top + 3, 1, 1, s.win); }
+    for (let i = 0; i < n; i++) F(ctx, x - 2 + prof[i], top - 1 - i, w + 4 - prof[i] * 2, 1, OL);
+    F(ctx, x - 1 + prof[n - 1], top - 1 - n, w + 2 - prof[n - 1] * 2, 1, OL);
+    for (let i = 0; i < n; i++) {
+      const a = x - 1 + prof[i], m = w + 2 - prof[i] * 2, yy = top - 1 - i;
+      if (s.snow) {
+        F(ctx, a, yy, m, 1, i ? "#e6eef8" : R[1]);
+        if (i) { F(ctx, a, yy, Math.min(2, m), 1, "#ffffff"); if (m > 3) F(ctx, a + m - 1, yy, 1, 1, "#b4c4e0"); }
+        continue;
+      }
+      F(ctx, a, yy, m, 1, i ? R[1] : R[0]);
+      if (!i) continue;
+      F(ctx, a, yy, Math.min(2, m), 1, R[2]);
+      if (m > 3) F(ctx, a + m - 1, yy, 1, 1, R[0]);
+      if (kind === "slate" && i % 2 === 0) for (let xx = a + 2; xx < a + m - 1; xx += 2) F(ctx, xx, yy, 1, 1, R[0]);
+      if (kind === "thatch" && i % 2) for (let xx = a + 2 + (i % 4 === 1 ? 0 : 1); xx < a + m - 1; xx += 2) F(ctx, xx, yy, 1, 1, R[0]);
+      if (s.moss && m > 3 && r() < 0.7) F(ctx, a + 2 + Math.floor(r() * (m - 3)), yy, 1, 1, "#94d862");
+    }
+    if (s.snow) for (let xx = x; xx < x + w; xx += 2) F(ctx, xx, top, 1, 1, "#cce4ff");
+    if (kind === "thatch") for (let xx = x - 1; xx < x + w + 1; xx += 2) F(ctx, xx, top, 1, 1, R[0]);
+    if (chim) {
+      const cx = x + w - 3, ct = top - n - 2;
+      F(ctx, cx - 1, ct, 3, 5, OL); F(ctx, cx, ct + 1, 1, 4, s.chim);
+      if (s.snow) F(ctx, cx - 1, ct - 1, 3, 1, "#ffffff");
+      if (s.smoke) puffs(ctx, cx, ct, s.smoke);
+    }
+  }
+  function puffs(ctx, x, y, c) {
+    for (const [dx, dy, w, a] of [[0, -3, 2, 0.8], [1, -6, 3, 0.6], [3, -9, 2, 0.4]]) { ctx.globalAlpha = a; F(ctx, x + dx, y + dy, w, 2, c); F(ctx, x + dx + 1, y + dy - 1, w - 1, 1, c); }
+    ctx.globalAlpha = 1;
+  }
+  function field(ctx, fx, fy) { F(ctx, fx - 1, fy - 1, 12, 8, "#8a6a3a"); for (let k = 0; k < 6; k += 2) { F(ctx, fx, fy + k, 10, 1, "#e0c45a"); F(ctx, fx, fy + k + 1, 10, 1, "#b8983a"); } }
+  // what sits beside each town in place of a plain field: the trade its header scene shows
+  const YARD = {
+    thornwall: (ctx, x, y) => { windmill(ctx, x + 8, y - 1); field(ctx, x, y + 1); },
+    frosthold: (ctx, x, y) => {
+      F(ctx, x, y - 8, 1, 10, "#3a2414"); F(ctx, x + 11, y - 8, 1, 10, "#3a2414"); F(ctx, x - 1, y - 8, 14, 1, "#6a4a34"); F(ctx, x - 1, y - 9, 14, 1, "#ffffff");
+      [["#8a5a34", "#6a4426"], ["#e8e0d0", "#c8beb0"], ["#7a7a84", "#5a5a64"]].forEach(([a, b], i) => { const px = x + 2 + i * 3; F(ctx, px, y - 7, 2, 6, a); F(ctx, px + 1, y - 7, 1, 6, b); F(ctx, px, y - 1, 1, 1, a); });
+      for (let i = 0; i < 4; i++) { F(ctx, x + i * 3, y + 3, 3, 3, "#3a2414"); F(ctx, x + 1 + i * 3, y + 4, 1, 1, "#c8a07a"); }
+      F(ctx, x, y + 2, 12, 1, "#f4f8ff");
+    },
+    veldrock: (ctx, x, y) => {
+      F(ctx, x - 1, y + 4, 14, 1, "#3a2a20"); for (let k = 0; k < 14; k += 3) F(ctx, x - 1 + k, y + 5, 1, 1, "#5a4028");
+      for (const [cx, ore, dk] of [[x, "#d07a3a", "#6a3018"], [x + 7, "#9a9a9e", "#4a4a52"]]) {
+        F(ctx, cx, y - 1, 6, 5, "#1c1c22"); F(ctx, cx + 1, y, 4, 3, "#5a5a62"); F(ctx, cx + 1, y, 4, 1, "#7a7a84");
+        F(ctx, cx + 1, y - 2, 4, 2, ore); F(ctx, cx + 2, y - 3, 2, 1, ore); F(ctx, cx + 3, y - 1, 1, 1, dk);
+        F(ctx, cx + 1, y + 3, 1, 1, "#141414"); F(ctx, cx + 4, y + 3, 1, 1, "#141414");
+      }
+    },
+    carrbridge: (ctx, x, y) => {
+      for (const [sx, c] of [[x, "#c8463a"], [x + 7, "#3a6ab0"]]) {
+        F(ctx, sx, y - 5, 1, 7, "#5a3a22"); F(ctx, sx + 5, y - 5, 1, 7, "#5a3a22"); F(ctx, sx - 1, y - 7, 8, 1, "#22262a");
+        for (let j = 0; j < 8; j++) F(ctx, sx - 1 + j, y - 6, 1, 2, (j >> 1) % 2 ? "#f4ecd8" : c);
+        F(ctx, sx, y - 1, 6, 3, "#22262a"); F(ctx, sx + 1, y - 1, 4, 2, "#7a5a34"); F(ctx, sx + 1, y - 1, 4, 1, "#a07a48");
+        F(ctx, sx + 1, y - 2, 1, 1, "#e8c040"); F(ctx, sx + 3, y - 2, 1, 1, sx === x ? "#7ac0e8" : "#c84a3a");
+      }
+    },
+    ashfen: (ctx, x, y) => {
+      F(ctx, x - 2, y + 3, 15, 3, "#6aa0a0"); F(ctx, x - 1, y + 4, 12, 1, "#88b8b4");
+      F(ctx, x - 2, y + 1, 15, 3, "#1a1e1c"); F(ctx, x - 1, y + 2, 13, 1, "#9a8466"); for (let k = 0; k < 13; k += 4) F(ctx, x + k, y + 4, 1, 2, "#2e2a24");
+      F(ctx, x + 1, y - 6, 1, 7, "#2e2a24"); F(ctx, x + 8, y - 6, 1, 7, "#2e2a24"); F(ctx, x + 1, y - 6, 8, 1, "#5a4834");
+      for (let k = 0; k < 3; k++) { F(ctx, x + 3 + k * 2, y - 5, 1, 4, "#3a4a3a"); F(ctx, x + 3 + k * 2, y - 5, 1, 1, "#6a7a5a"); }
+      F(ctx, x + 11, y - 7, 1, 8, "#1a1e1c"); F(ctx, x + 10, y - 9, 3, 3, "#1a1e1c"); F(ctx, x + 11, y - 8, 1, 1, "#ffd060");
+      ctx.globalAlpha = 0.25; blob(ctx, x + 11, y - 8, 4, 3, "#ffc860"); ctx.globalAlpha = 1;
+    },
+    hollowood: (ctx, x, y) => {
+      for (let k = 0; k < 3; k++) { F(ctx, x, y + 1 + k * 2, 11, 1, "#4a3420"); for (let j = 0; j < 11; j += 2) F(ctx, x + j + (k % 2), y + k * 2, 1, 1, k === 1 ? "#a8c858" : "#5a9a3a"); }
+      for (const [dx, dy, c] of [[1, -2, "#e04a3a"], [5, -1, "#d8b070"], [9, -3, "#e04a3a"], [12, 1, "#e04a3a"]]) {
+        F(ctx, x + dx, y + dy, 1, 2, "#f0e8d8"); F(ctx, x + dx - 1, y + dy - 1, 3, 1, c); F(ctx, x + dx, y + dy - 2, 1, 1, c); F(ctx, x + dx - 1, y + dy - 1, 1, 1, "#ffffff");
+      }
+    },
+    saltmarrow: (ctx, x, y) => {
+      F(ctx, x - 1, y - 1, 9, 4, "#1a2230"); F(ctx, x, y - 2, 7, 1, "#1a2230"); F(ctx, x, y - 1, 7, 2, "#c84a3a"); F(ctx, x, y - 1, 7, 1, "#e86a5a"); F(ctx, x, y + 1, 7, 1, "#6a2a20");
+      F(ctx, x + 9, y - 6, 1, 8, "#5a3a22"); F(ctx, x + 13, y - 6, 1, 8, "#5a3a22"); F(ctx, x + 9, y - 6, 5, 1, "#4a3a2a");
+      for (let yy = y - 5; yy < y; yy++) for (let xx = x + 10; xx < x + 13; xx++) if ((xx + yy) % 2 === 0) F(ctx, xx, yy, 1, 1, "#7a6a50");
+    },
+  };
+  function townSprites(ctx, sprites, sx, sy, d) {
+    const n = d.size === "city" ? 17 : d.size === "town" ? 10 : 6, r = rng(hash(d.id)), spread = d.size === "city" ? 22 : d.size === "town" ? 15 : 11;
+    const lm = LANDMARK[d.id], s = STYLE[d.id], mid = d.id === "ironhaven" || d.id === "thornwall";
+    const hole = lm ? (d.size === "city" ? 0.75 : mid ? 0.7 : 0.5) : 0;
+    const lx = mid ? sx : sx - spread - 5, ly = mid ? sy : sy - 3;
+    if (lm) sprites.push({ y: ly - 1, draw: () => lm(ctx, lx, ly) });
+    if (d.id === "thornwall") palisade(ctx, sprites, sx, sy, spread);
+    if (d.id === "ironhaven") ramparts(ctx, sprites, d);
+    if (d.size !== "city") {
+      const left = r() < 0.5 && !(lm && !mid), fx = sx + (left ? -spread - 12 : spread + 2), fy = sy + 2, yard = YARD[d.id] || field;
+      sprites.push({ y: fy - 6, draw: () => yard(ctx, fx, fy) });
+    }
+    for (let k = 0; k < n; k++) {
+      const a = r() * Math.PI * 2, rr = (hole + (1 - hole) * Math.sqrt(r())) * spread;
+      const hx = sx + Math.cos(a) * rr - 3, hy = sy + Math.sin(a) * rr * 0.6 + 2;
+      const roof = r() < 0.18 ? "blue" : "red", wide = r() < 0.3, st = d.id === "ashfen", seed = hash(d.id + ":" + k);
+      sprites.push({ y: hy, draw: () => s ? home(ctx, hx, hy, s, wide, seed, s.perch && (seed % 100) < s.perch * 100) : house(ctx, hx, hy, roof, wide, st) });
+    }
+  }
   function tree(ctx, x, y, h) {
     const big = (h >> 5) & 1;
     F(ctx, x - 1, y - 1, 2, 2, "#5a3a22");
@@ -348,23 +603,6 @@
     F(ctx, x - 1, y - 6, w + 2, 2, R[1]); F(ctx, x, y - 8, w, 2, R[1]); F(ctx, x + 1, y - 9, w - 2, 1, R[1]);
     F(ctx, x, y - 8, 3, 1, R[2]); F(ctx, x - 1, y - 5, w + 2, 1, R[0]);
     F(ctx, x + w - 3, y - 11, 1, 2, "#6a5a5a");
-  }
-  function townSprites(ctx, sprites, sx, sy, d) {
-    const n = d.size === "city" ? 17 : d.size === "town" ? 10 : 6, r = rng(hash(d.id)), spread = d.size === "city" ? 22 : d.size === "town" ? 15 : 11;
-    const lm = LANDMARK[d.id], hole = lm ? (d.size === "city" ? 0.75 : 0.5) : 0;
-    const lx = d.id === "ironhaven" ? sx : sx - spread - 5, ly = d.id === "ironhaven" ? sy : sy - 3;
-    if (lm) sprites.push({ y: ly - 1, draw: () => lm(ctx, lx, ly) });
-    if (d.id === "thornwall") palisade(ctx, sprites, sx, sy, spread);
-    if (d.size !== "city") {
-      const fx = sx + (r() < 0.5 ? -spread - 12 : spread + 2), fy = sy + 2;
-      sprites.push({ y: fy - 6, draw: () => { F(ctx, fx - 1, fy - 1, 12, 8, "#8a6a3a"); for (let k = 0; k < 6; k += 2) { F(ctx, fx, fy + k, 10, 1, "#e0c45a"); F(ctx, fx, fy + k + 1, 10, 1, "#b8983a"); } } });
-    }
-    for (let k = 0; k < n; k++) {
-      const a = r() * Math.PI * 2, rr = (hole + (1 - hole) * Math.sqrt(r())) * spread;
-      const hx = sx + Math.cos(a) * rr - 3, hy = sy + Math.sin(a) * rr * 0.6 + 2;
-      const roof = r() < 0.18 ? "blue" : "red", wide = r() < 0.3, st = d.id === "ashfen";
-      sprites.push({ y: hy, draw: () => house(ctx, hx, hy, roof, wide, st) });
-    }
   }
   function dungeon(ctx, x, y, theme) {
     switch (theme) {

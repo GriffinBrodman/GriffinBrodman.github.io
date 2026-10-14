@@ -1289,7 +1289,7 @@
     const kind = Scenes.locKind(id);
     const TS = window.TownScenes;
     let bd = null;
-    if (t && TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    if (TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
     if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
