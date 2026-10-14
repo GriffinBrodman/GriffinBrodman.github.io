@@ -215,9 +215,18 @@
     ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root), sc.tick);
   }
 
+  // while a town's own tune plays on the Map (town_music.js), the map's generic wind and lute step aside
+  let townOn = false, lastKind = null;
+  function townAmbience(on) {
+    townOn = on;
+    if (on && lastKind === "map") stopAmb();
+    else if (!on && lastKind === "map") ambience("map");
+  }
   function ambience(kind) {
+    lastKind = kind;
     stopAmb();
     if (!ctx || !prefs.on) return;
+    if (kind === "map" && townOn) return;
     if (SCENES[kind]) { sceneAmbience(kind); return; }
     const root = 50 + Math.floor(Math.random() * 5);
     if (kind === "map") {
@@ -366,5 +375,5 @@
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
 
-  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, get on() { return prefs.on; } };
+  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, townAmbience, get on() { return prefs.on; } };
 })();

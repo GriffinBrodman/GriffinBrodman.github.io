@@ -321,7 +321,7 @@
     const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
     if (main.length < 5 && snips.length) {
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
-      p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(x.text + ".", Object.keys(heroes), []) : [A.heroLink(x.hero), " " + x.text + "."]))));
+      p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.richText(endDot(x.text), Object.keys(heroes), []) : [A.heroLink(x.hero), " " + endDot(x.text)]))));
     }
     smallerHappenings(p, small);
     left.appendChild(p);
@@ -620,7 +620,7 @@
         el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
           h.progress ? el("span", { class: "dim" }, ` · ${h.progress}`) : null),
         h.why ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${h.why}.`) : null,
-        todayBox(h.route, h.today),
+        todayBox(h.daybook && window.Daybook ? null : h.route, h.today),
         goalLine(h.goal, h.party),
         ...(h.vows || []).map((v) => vowLine(v, h.party)),
         h.alive ? el("div", { class: "row wrap small", style: { gap: "14px" } },
@@ -638,6 +638,8 @@
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
+    const cal = dayCalendar(h);
+    if (cal) v.appendChild(el("section", { class: "panel daybook-panel" }, cal));
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
     if (night) v.appendChild(panel(null, night));
 
@@ -772,7 +774,7 @@
     right.appendChild(gearPanel(h));
   }
   function traitRow(t, v, big) {
-    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", { class: big ? "" : "small" }, TRAIT_LABEL[t]),
+    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", null, TRAIT_LABEL[t]),
       el("div", { class: "tbar" }, el("i", { style: { left: ((v + 1) / 2) * 100 + "%" } })), el("span", { class: "word" }, traitWord(t, v)));
   }
   function affinityPanel(h) {
@@ -1045,6 +1047,12 @@
     pn.appendChild(g);
     return pn;
   }
+  // the hero's day as a little almanac strip (web/js/daybook.js); the plain day box below still lists what it added up to
+  function dayCalendar(h) {
+    if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
+    try { return Daybook.render(h.daybook); } catch (e) { return null; }
+  }
+  const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
   function mountArt(m, scale) {
     const MA = window.MountArt;
@@ -1229,28 +1237,67 @@
     for (const h of L.heroes) if (h.alive && !h.travel) c[h.loc] = (c[h.loc] || 0) + 1;
     return Object.entries(c).sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || "ironhaven";
   }
+  // a town's own page: its colours, motto, people, what it's known for, today's mood and deals, and what's been happening
+  const TOWN_ROLE = { barkeep: "Barkeep", priest: "Priest", smith: "Smith", merchant: "Merchant", guard: "Guard", special: "" };
+  function townIdentity(p, id, t) {
+    const idn = t.identity || {};
+    const th = (window.TownScenes && TownScenes.THEME && TownScenes.THEME[id]) || null;
+    p.classList.add("town-panel");
+    p.dataset.town = id;
+    if (th) for (const [k, v] of Object.entries(th)) p.style.setProperty(`--town-${k}`, v);
+    if (idn.tagline) p.appendChild(el("p", { class: "town-tagline" }, idn.tagline));
+    if (idn.motto) p.appendChild(el("div", { class: "town-motto" }, `“${idn.motto}”`));
+    p.appendChild(el("p", { class: "small muted" }, `${cap(t.size)} · ${t.services.join(", ")}`));
+    if ((idn.known_for || []).length) p.appendChild(el("div", { class: "town-chips" }, el("span", { class: "tiny dim" }, "Known for "), idn.known_for.map((k) => el("span", { class: "town-chip" }, k))));
+    p.appendChild(el("p", null, t.desc));
+    if (idn.landmark) p.appendChild(el("p", { class: "small" }, el("b", null, idn.landmark + ". "), idn.landmark_line || ""));
+    const md = (L.town_mood || {})[id];
+    if (md) {
+      const deals = (md.deals || []).map((x) => x.good ? `${S.goods[x.good].name.toLowerCase()} ${Math.round(x.off * 100)}% off` : x.text);
+      p.appendChild(el("div", { class: "town-mood" }, el("span", { class: `mood-badge mood-${md.word}` }, cap(md.word)), " ",
+        el("span", { class: "small" }, (idn.mood_words || {})[md.word] || ""),
+        deals.length ? el("div", { class: "town-chips", style: { marginTop: "4px" } }, el("span", { class: "tiny dim" }, "Today's deals "), deals.map((x) => el("span", { class: "town-chip deal" }, x))) : null));
+    }
+    const folk = t.folk || {};
+    const who = Object.entries(TOWN_ROLE).filter(([r]) => folk[r]).map(([r, lab]) => {
+      const name = r === "special" ? folk.special[0] : folk[r];
+      const where = r === "special" ? ` (${folk.special[1]})` : "";
+      return el("li", null, el("b", null, name), lab ? el("span", { class: "tiny dim" }, ` · ${lab}`) : el("span", { class: "tiny dim" }, where),
+        (idn.folk || {})[r] ? el("div", { class: "tiny" }, idn.folk[r]) : null);
+    });
+    const buys = Object.entries(t.buyers).filter(([, m]) => m > 1).map(([g]) => S.goods[g].name.toLowerCase());
+    const around = [
+      el("li", null, el("b", null, "Tavern: "), `${t.tavern}`),
+      t.trainer ? el("li", null, el("b", null, "Trainer: "), `${t.trainer[0]}, at ${t.trainer[1]}`) : null,
+      t.dish ? el("li", null, el("b", null, "To eat: "), t.dish) : null,
+      buys.length ? el("li", { class: "gold" }, el("b", null, "Pays well for: "), buys.join(", ")) : null,
+      el("li", { class: "dim" }, el("b", null, "Odd jobs: "), t.jobs.join(", ").replace(/_/g, " ")),
+    ].filter(Boolean);
+    p.appendChild(el("div", { class: "town-grid" }, el("div", null, el("h4", null, "Who's who"), el("ul", { class: "town-list" }, who)),
+      el("div", null, el("h4", null, "Around town"), el("ul", { class: "town-list" }, around))));
+    const lately = L.events.filter((e) => e.loc === id && ["town_life", "town", "errand", "festival", "world", "civic", "busk", "donation", "craft", "town_rep", "folk"].includes(e.kind))
+      .sort(byDayDesc).slice(0, 4);
+    if (lately.length) p.appendChild(el("div", null, el("h4", null, "Lately in " + t.name), A.feed(lately, {})));
+    const stb = stablesBlock(id);
+    if (stb) p.appendChild(stb);
+    const maps = (L.map_stock || {})[id] || [];
+    if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
+      el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
+  }
   function showNode(side, id) {
     side.innerHTML = "";
     const t = S.towns[id], d = S.dungeons[id], w = S.wilds[id];
     const here = L.heroes.filter((h) => h.alive && h.loc === id && !h.travel);
     const p = panel(A.nodeName(id));
     const kind = Scenes.locKind(id);
-    const bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
+    const TS = window.TownScenes;
+    let bd = null;
+    if (t && TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
-    if (t) {
-      p.appendChild(el("p", { class: "small muted" }, `${cap(t.size)} · ${t.services.join(", ")}`));
-      p.appendChild(el("p", null, t.desc));
-      p.appendChild(el("p", { class: "small" }, `Tavern: ${t.tavern}, kept by ${t.folk.barkeep}.`, t.folk.special ? ` Also: ${t.folk.special[0]} at ${t.folk.special[1]}.` : ""));
-      const buys = Object.entries(t.buyers).filter(([, m]) => m > 1).map(([g]) => S.goods[g].name.toLowerCase());
-      if (buys.length) p.appendChild(el("p", { class: "small gold" }, "Pays well for: " + buys.join(", ")));
-      p.appendChild(el("p", { class: "small dim" }, "Odd jobs: " + t.jobs.join(", ").replace(/_/g, " ")));
-      const stb = stablesBlock(id);
-      if (stb) p.appendChild(stb);
-      const maps = (L.map_stock || {})[id] || [];
-      if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
-        el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
-    }
+    if (window.TownMusic) { try { t ? TownMusic.play(id) : TownMusic.stop(); } catch (e) { /* sound is optional */ } }
+    if (t) townIdentity(p, id, t);
     if (d) {
       const st = L.dungeons[id] || {};
       p.appendChild(el("p", { class: "small muted" }, `Level ${d.level} dungeon · ${d.floors} floors · ${dangerWord(st.danger)}`));
@@ -1278,6 +1325,8 @@
     who.appendChild(grid);
     side.appendChild(who);
   }
+
+  window.addEventListener("hashchange", () => { if (!/^#\/map/.test(location.hash) && window.TownMusic) { try { TownMusic.stop(); } catch (e) { /* optional */ } } });
 
   // ================= DIGEST =================
   A.route(/^\/digest(?:\/(\d+)\/(\d+))?$/, (v, s, w) => {
@@ -1361,6 +1410,10 @@
     v.appendChild(el("h1", null, "The World"));
     v.appendChild(factionsPanel());
     v.appendChild(legendsPanel());
+    const moods = Object.entries(L.town_mood || {});
+    if (moods.length || L.pip) v.appendChild(panel("Town life",
+      moods.length ? el("p", { class: "small" }, moods.map(([t, m], i) => [i ? " · " : "", el("a", { href: `#/map/${t}` }, S.towns[t].name), `: ${m.word}` + ((m.deals || []).length ? " (deals)" : "")])) : null,
+      L.pip && L.pip[0] + L.pip[1] ? el("p", { class: "small" }, el("b", null, "Pip the Unstoppable Lutist: "), `${plural(L.pip[0], "win")}, ${plural(L.pip[1], "loss", "losses")} against the league's buskers.`) : null));
     const dt = el("table");
     dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num" }, "Floors"), el("th", null, "Boss"), el("th", null, "Monsters"), el("th", null, "Explored"), el("th", { class: "num" }, "Delves")));
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {

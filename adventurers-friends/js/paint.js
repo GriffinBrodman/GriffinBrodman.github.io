@@ -318,11 +318,12 @@
     const { cx, covered, st, hairTex } = c;
     P.layer = 1;
     if (c.mark === "halo") {
-      const hy = (HEAD_TOP[c.head] == null ? 6 : HEAD_TOP[c.head]) - (c.head === "none" && (st === 5 || st === 7) ? 3.5 : 2);
+      const hy = (HEAD_TOP[c.head] == null ? 6 : HEAD_TOP[c.head]) - (c.head === "none" && HAIR_LIFT[st] ? HAIR_LIFT[st] : 2);
       for (let a = 0; a < 48; a++) { const t = (a / 48) * Math.PI * 2; P.px(cx + Math.cos(t) * 7, hy + Math.sin(t) * 2, "#ffe88a", 0); }
     }
     if (!covered && (st === 1 || st === 6)) P.poly([[cx - 8, 10], [cx + 8, 10], [cx + 10, st === 1 ? 33 : 26], [cx - 10, st === 1 ? 33 : 26]], "hair", (x, y) => -0.3 + hairTex(x, y) - (y - 10) * 0.02);
     if (!covered && st === 2) P.ell(cx + 8.5, 19, 2.6, 6.5, "hair", { s: -0.25, fn: (x, y, s) => s + hairTex(x, y) });
+    if (!covered && st >= 8) hairBackNew(P, st, cx, hairTex);
   }
 
   // layers 3-7: neck, ears, head, facial hair, hair, headgear; features=false skips the 1px face details (drawn natively when scaled)
@@ -1445,6 +1446,7 @@
     };
     const capS = (x, y, s) => s + tex(x, y);
     if (st === 4) return;
+    if (st >= 8) return hairNew(P, st, cx, fw, part, tex, covered);
     if (st === 3) {
       P.ell(cx, 11, 1.8, 7.8, "hair", { s: 0.1, fn: (x, y, s) => (y > 12 ? false : capS(x, y, s)) });
       for (let y = 8; y < 14; y++) for (let x = cx - 6; x <= cx + 6; x++) if ((x + y) % 2 === 0 && Math.abs(x + 0.5 - cx) > 2 && P.matAt(x, y) === "skin") P.px(x, y, "hair", -0.55);
@@ -1468,6 +1470,163 @@
     }
     if (st === 2) P.rect(cx + 6, 11, 2, 2, "fav", 0.2);
     if (st === 7) P.ell(cx + 0.5, 5.6, 3.4, 2.8, "hair", { s: 0.1, fn: (x, y, s) => s + tex(x, y) });
+  }
+
+  const HAIR_LIFT = { 5: 3.5, 7: 3.5, 8: 5.5, 12: 5, 14: 5, 18: 4 };
+  function hairBackNew(P, st, cx, tex) {
+    const sheet = (top, w0, w1, bot, sfn) => P.poly([[cx - w0, top], [cx + w0, top], [cx + w1, bot], [cx - w1, bot]], "hair", sfn);
+    const dark = (x, y) => -0.35 + tex(x, y) - (y - 10) * 0.02;
+    if (st === 9) for (let i = -4; i <= 4; i++) P.rect(cx + i * 2.1 - 0.8, 10, 1.6, 30 - Math.abs(i) * 0.8, "hair", (x, y) => (i % 2 ? -0.6 : -0.25) + ((y + i) % 3 === 0 ? -0.3 : 0));
+    if (st === 13) sheet(13, 8, 9.5, 28, (x, y) => dark(x, y) - (y > 26 ? 0.2 : 0));
+    if (st === 15) sheet(12, 9, 9.3, 23.6, (x, y) => dark(x, y) - (y > 22.5 ? 0.25 : 0));
+    if (st === 16) {
+      const pts = [[cx - 9, 10], [cx + 9, 10]];
+      for (let y = 12; y <= 37; y += 1.5) pts.push([cx + 10 + (y - 12) * 0.1 + Math.sin(y * 0.7) * 1.3, y]);
+      for (let y = 37; y >= 12; y -= 1.5) pts.push([cx - 10 - (y - 12) * 0.1 - Math.sin(y * 0.7 + 1) * 1.3, y]);
+      P.poly(pts, "hair", (x, y) => dark(x, y) + Math.sin((y + x * 0.5) * 0.7) * 0.2);
+    }
+    if (st === 20) sheet(10, 8, 10.5, 33, dark);
+  }
+
+  function hairNew(P, st, cx, fw, part, tex, covered) {
+    const lineAt = (pt, side, top) => (x) => {
+      const dx = x + 0.5 - cx;
+      if (Math.abs(dx) > fw - 1.6) return side;
+      return top + (pt == null ? 0 : (Math.abs(dx - pt) < 1.2 ? -1 : 0) + (dx > pt ? 0.6 : 0)) + Math.abs(dx) * 0.12;
+    };
+    const cap = (puff, line, fn) => P.ell(cx, 13, fw + puff, 7.4 + puff * 0.6, "hair", { fn: (x, y, s) => (y + 0.5 > line(x) || y > 19 ? false : fn ? fn(x, y, s) : s + tex(x, y)) });
+    const comb = (x, y, s) => s + ((x - cx + 40) % 3 === 0 && y < 12 ? -0.3 : 0);
+    const curl = (x, y, s) => s + ((x * 3 + y * 5) % 7 === 0 ? -0.45 : (x * 5 + y * 3) % 9 === 0 ? 0.35 : 0);
+    const braid = (pts, rad, tie) => {
+      pts.forEach(([x, y], i) => {
+        const [ax, ay] = pts[Math.max(0, i - 1)], [bx, by] = pts[Math.min(pts.length - 1, i + 1)], d = Math.hypot(bx - ax, by - ay) || 1, o = i % 2 ? 0.45 : -0.45;
+        P.ell(x - ((by - ay) / d) * o, y + ((bx - ax) / d) * o, rad, rad * 0.8, "hair", { s: i % 2 ? -0.4 : 0.15, k: 0.5 });
+      });
+      if (tie) { const [x, y] = pts[pts.length - 1]; P.rect(x - 1, y + 0.8, 2, 1, "fav", 0.2); P.ell(x, y + 2.8, rad * 0.75, 1.5, "hair", { s: -0.15, k: 0.6 }); }
+    };
+    switch (st) {
+      case 8:
+        if (covered) {
+          cap(1, lineAt(part, 18.5, 11.6));
+          for (const side of [-1, 1]) P.ell(cx + side * (fw + 1.8), 16, 2.6, 3.4, "hair", { s: side < 0 ? 0 : -0.35, fn: curl });
+          break;
+        }
+        P.ell(cx, 11.2, fw + 4.2, 9.2, "hair", { fn: (x, y, s) => ((y + 0.5 > 11.2 + Math.abs(x + 0.5 - cx) * 0.15 && Math.abs(x + 0.5 - cx) < fw - 1.2) || y > 18.5 ? false : curl(x, y, s)) });
+        for (let a = 0; a < 20; a++) {
+          const t = Math.PI * 0.92 + (a / 19) * Math.PI * 1.16;
+          P.ell(cx + Math.cos(t) * (fw + 4), 11.6 + Math.sin(t) * 9, 1.6, 1.6, "hair", { s: -0.1 + (a % 3 === 0 ? 0.3 : 0) - Math.cos(t) * 0.25, k: 0.6 });
+        }
+        break;
+      case 9: {
+        cap(0.9, lineAt(part, 18.5, 11.6), curl);
+        for (const side of [-1, 1]) for (let k = 0; k < 3; k++) {
+          const x0 = cx + side * (fw - 0.8 + k * 2.2) - (side > 0 ? 1 : 0), end = 26 + k * 2;
+          for (let y = 12; y < end; y++) for (let j = 0; j < 2; j++) P.px(x0 + j + side * (y - 12) * 0.03, y, "hair", ((y + k) % 3 === 0 ? -0.55 : 0.1) - (side > 0 ? 0.3 : 0) - k * 0.12 - (j === (side > 0 ? 1 : 0) ? 0.3 : 0));
+          if (k === 1) P.rect(x0, end - 3, 2, 1, "gold", 0.3);
+        }
+        break;
+      }
+      case 10:
+        cap(0.8, lineAt(0, 18.5, 11.6));
+        for (const side of [-1, 1]) {
+          const pts = [];
+          for (let i = 0; i <= 9; i++) { const q = i / 9; pts.push([cx + side * (fw + 2 + q * 1.6 + Math.sin(q * 3) * 0.7), 14 + q * 12]); }
+          P.tube(pts, 2.3, 1, "hair", side < 0 ? 0.05 : -0.35);
+          P.ell(cx + side * (fw + 1.5), 13.4, 1.4, 1.4, "fav", { s: 0.2, k: 0.6 });
+        }
+        break;
+      case 11:
+        for (let y = 10; y < 17; y++) for (let x = cx - fw - 1; x <= cx + fw + 1; x++) if ((x + y) % 2 === 0 && Math.abs(x + 0.5 - cx) > fw - 2.6 && P.matAt(x, y) === "skin") P.px(x, y, "hair", -0.55);
+        P.ell(cx + 0.5, 9.6, fw - 0.2, 4.4, "hair", { s: 0.1, fn: (x, y, s) => (y > 11 ? false : s + tex(x, y)) });
+        P.poly([[cx - fw + 1.2, 9], [cx + 1, 5.6], [cx + fw + 0.8, 8.6], [cx + fw + 0.6, 14.6], [cx + fw - 1.6, 13], [cx + 1.5, 11.8], [cx - fw + 1.2, 11.6]], "hair",
+          (x, y) => 0.15 - (x - cx) * 0.06 + (Math.floor(x - y * 0.8 + 40) % 3 === 0 ? -0.4 : 0));
+        break;
+      case 12:
+        cap(0.2, lineAt(null, 17.5, 10.8), comb);
+        if (!covered) {
+          P.rect(cx - 1, 4.6, 2, 2.4, "hair", (x) => (x < cx ? 0 : -0.4));
+          P.ell(cx, 3.2, 2.4, 2.1, "hair", { s: 0.15, fn: curl });
+          P.rect(cx - 1.5, 5.4, 3, 1, "fav", (x) => 0.3 - (x - cx) * 0.2);
+        }
+        break;
+      case 13:
+        cap(0.6, lineAt(part, 15, 11.6));
+        for (const side of [-1, 1]) P.poly([[cx + side * (fw - 0.4), 20], [cx + side * (fw + 1.6), 19.2], [cx + side * (fw + 3), 27.6], [cx + side * (fw + 1.4), 26.4], [cx + side * (fw + 0.2), 27.8], [cx + side * (fw - 0.6), 23]], "hair",
+          (x, y) => (side < 0 ? -0.1 : -0.45) + tex(x, y) - (y > 25 ? 0.2 : 0));
+        break;
+      case 14:
+        cap(0.4, lineAt(null, 17.5, 11.4));
+        for (const x of [-3.5, -0.5, 2.5]) P.poly([[cx + x - 1.4, 11], [cx + x + 1.4, 11], [cx + x + 0.6, 14]], "hair", 0.05 - x * 0.06);
+        if (!covered) for (let i = 0; i < 9; i++) {
+          const t = Math.PI * 1.08 + (i / 8) * Math.PI * 0.84, ux = Math.cos(t), uy = Math.sin(t);
+          const bx = cx + ux * (fw - 0.2), by = 13 + uy * 7, len = 3.6 + (i % 2) * 1.6;
+          P.poly([[bx - uy * 1.7, by + ux * 1.7], [bx + ux * len, by + uy * len * 1.1], [bx + uy * 1.7, by - ux * 1.7]], "hair", (i % 2 ? 0.35 : 0.05) - ux * 0.3);
+        }
+        break;
+      case 15: {
+        cap(0.9, (x) => (Math.abs(x + 0.5 - cx) > fw - 1.6 ? 19 : 12.6));
+        for (const side of [-1, 1]) P.poly([[cx + side * (fw - 1.8), 11], [cx + side * (fw + 1.8), 11], [cx + side * (fw + 2.3), 22.6], [cx + side * (fw + 1.4), 23.6], [cx + side * (fw - 1.2), 23.6], [cx + side * (fw - 1.6), 20]], "hair",
+          (x, y) => (side < 0 ? 0 : -0.4) + tex(x, y) - (y > 22.5 ? 0.3 : 0));
+        P.rect(cx - fw + 1.4, 12, (fw - 1.4) * 2, 1, "hair", (x) => -0.3 - (x - cx) * 0.03);
+        break;
+      }
+      case 16:
+        cap(1.2, lineAt(part, 18.5, 11.6));
+        for (const side of [-1, 1]) {
+          const pts = [[cx + side * (fw - 1.6), 12], [cx + side * (fw + 1.8), 12]];
+          for (let y = 14; y <= 37; y += 1.5) pts.push([cx + side * (fw + 2.4 + (y - 12) * 0.12 + Math.sin(y * 0.7 + (side > 0 ? 1 : 0)) * 1.3), y]);
+          pts.push([cx + side * (fw + 1.2), 36], [cx + side * (fw - 0.2), 37]);
+          for (let y = 34; y >= 16; y -= 2) pts.push([cx + side * (fw - 1.2 + Math.sin(y * 0.7 + (side > 0 ? 1 : 0)) * 0.6), y]);
+          P.poly(pts, "hair", (x, y) => (side < 0 ? -0.05 : -0.4) + tex(x, y) + Math.sin((y - side * x * 0.4) * 0.7) * 0.3 - (y > 33 ? 0.2 : 0));
+        }
+        break;
+      case 17: {
+        cap(0.9, lineAt(-2, 18.5, 11.6));
+        const pts = [];
+        for (let i = 0; i <= 11; i++) { const q = i / 11; pts.push([cx + fw + 1.4 - q * 3 + Math.sin(q * 3) * 1.2, 14.5 + q * 19]); }
+        braid(pts, 2.1, true);
+        break;
+      }
+      case 18:
+        cap(0.7, lineAt(0, 18.5, 11.6));
+        if (!covered) for (const side of [-1, 1]) {
+          const bx = cx + side * 4.4;
+          P.ell(bx, 5, 3.1, 2.9, "hair", { s: side < 0 ? 0.15 : -0.1, fn: (x, y, s) => s + ((Math.round(Math.hypot(x + 0.5 - bx, y + 0.5 - 5) * 1.4 + Math.atan2(y + 0.5 - 5, x + 0.5 - bx) * side) % 3 === 0) ? -0.35 : 0) });
+        }
+        break;
+      case 19: {
+        cap(0.2, (x) => (Math.abs(x + 0.5 - cx) > fw - 1.6 ? 15 : 11 + Math.abs(x + 0.5 - cx) * 0.1));
+        for (let k = 0; k < 5; k++) { const x = cx - 4.5 + k * 2.2; P.poly([[x - 1.2, 10.6], [x + 1.4, 10.6], [x - 0.6 + (k % 2) * 0.4, 13.6 + (k % 2)]], "hair", (k % 2 ? -0.2 : 0.2) - (x - cx) * 0.04); }
+        for (const side of [-1, 1]) P.poly([[cx + side * (fw - 1.8), 12.5], [cx + side * (fw + 0.6), 12.5], [cx + side * (fw - 1.4), 17.6]], "hair", side < 0 ? 0 : -0.4);
+        for (let a = 0; a < 7; a++) { const t = Math.PI * 1.15 + (a / 6) * Math.PI * 0.7; P.ell(cx + Math.cos(t) * (fw + 0.2), 13 + Math.sin(t) * 7.4, 1.2, 1.2, "hair", { s: (a % 2 ? 0.35 : 0) - Math.cos(t) * 0.25, k: 0.6 }); }
+        break;
+      }
+      case 20:
+        cap(0.5, lineAt(null, 18.5, 10.9), comb);
+        for (const side of [-1, 1]) P.poly([[cx + side * (fw + 0.4), 18], [cx + side * (fw + 2.2), 16.8], [cx + side * (fw + 3.4), 31], [cx + side * (fw + 1.8), 31.5], [cx + side * (fw + 0.6), 21]], "hair",
+          (x, y) => (side < 0 ? -0.05 : -0.4) + tex(x, y) - (y > 28 ? 0.2 : 0));
+        if (!covered) {
+          P.ell(cx, 6.2, 2.1, 1.7, "hair", { s: 0.1, k: 0.6 });
+          for (const side of [-1, 1]) P.poly([[cx + side * 1.2, 6.2], [cx + side * 5, 3.6], [cx + side * 5, 8.8]], "fav", side < 0 ? 0.3 : -0.1);
+          P.rect(cx - 1, 5.6, 2, 2, "fav", 0.4);
+        }
+        break;
+      case 21: {
+        cap(0.3, lineAt(null, 18.5, 11.8), (x, y) => comb(x, y, -0.3 - (x - cx) * 0.04));
+        const rx = fw + 0.5, ry = 5.2, by = 15;
+        for (let y = 6; y < 16; y++) for (let x = cx - fw - 3; x <= cx + fw + 3; x++) {
+          const dx = x + 0.5 - cx, dy = y + 0.5 - by, v = (Math.hypot(dx / rx, dy / ry) - 1) * rx;
+          if (Math.abs(v) <= 1.5 && dy <= 0.5) P.px(x, y, "hair", -0.75);
+        }
+        for (let i = 0; i < 11; i++) {
+          const t = Math.PI * 1.04 + (i / 10) * Math.PI * 0.92, c = Math.cos(t), sn = Math.sin(t);
+          const tl = Math.hypot(sn * rx, c * ry), Tx = (-sn * rx) / tl, Ty = (c * ry) / tl, Nx = Ty, Ny = -Tx;
+          const px0 = cx + c * rx, py0 = by + sn * ry, o = i % 2 ? 0.7 : -0.7;
+          P.ell(px0 + Nx * o * 0.6, py0 + Ny * o * 0.6, 1.3, 1, "hair", { s: 0.55 - c * 0.2 - (i % 2 ? 0.3 : 0), k: 0.3 });
+        }
+        break;
+      }
+    }
   }
 
   function torso(P, outfit, cx, r, c) {
