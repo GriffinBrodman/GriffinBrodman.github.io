@@ -1458,9 +1458,10 @@
 
   const SCENES = { ironhaven, thornwall, veldrock, carrbridge, ashfen, hollowood, saltmarrow, frosthold };
   const DUNGEON_SCENES = { goblin_camp };
+  const WILD_SCENES = {};
 
   function header(townId, w, h, opts) {
-    const fn = SCENES[townId] || DUNGEON_SCENES[townId];
+    const fn = SCENES[townId] || DUNGEON_SCENES[townId] || WILD_SCENES[townId];
     if (!fn || !window.Art || !window.Anim) return null;
     opts = opts || {};
     w = Math.max(40, R(w || 600)); h = Math.max(30, R(h || 180));
@@ -1482,5 +1483,13 @@
     return cv;
   }
 
-  window.TownScenes = { header, THEME, TOWNS: Object.keys(SCENES), DUNGEONS: Object.keys(DUNGEON_SCENES) };
+  const DUNGEONS = Object.keys(DUNGEON_SCENES), WILDS = [];
+  // wild_scenes.js adds the wilds and the other dungeons, drawn with the same kit and actors
+  function register(id, fn, group) {
+    (group === "dungeons" ? DUNGEON_SCENES : WILD_SCENES)[id] = fn;
+    const list = group === "dungeons" ? DUNGEONS : WILDS;
+    if (!list.includes(id)) list.push(id);
+  }
+  const actors = { pennant, sails, wheel, swing, rowboat, eel, surf, shore, beam, aurora, leaves, shafts, rope, chicken, ship, plume, walker, sparkle, raven, bonfire };
+  window.TownScenes = { header, THEME, TOWNS: Object.keys(SCENES), DUNGEONS, WILDS, register, kit, rect, ln, actors };
 })();
