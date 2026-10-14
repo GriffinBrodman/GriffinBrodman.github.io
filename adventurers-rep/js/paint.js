@@ -45,9 +45,41 @@
       this.lay = new Uint8Array(w * h);
       this.layer = 1; this.bias = 0; this.tf = null;
     }
-    // optional design-space transform: X = ox + (x - cx) * s
-    T(x, y) { const t = this.tf; return t ? [t.ox + (x - t.cx) * t.s, t.oy + (y - t.cy) * t.s] : [x, y]; }
-    inv(X, Y) { const t = this.tf; return t ? [Math.round(t.cx + (X + 0.5 - t.ox) / t.s - 0.5), Math.round(t.cy + (Y + 0.5 - t.oy) / t.s - 0.5)] : [X, Y]; }
+    // optional design-space transform: X = ox + (x - cx) * s; a tilts it (radians), so a head can be drawn natively tilted on a pillow
+    T(x, y) {
+      const t = this.tf;
+      if (!t) return [x, y];
+      if (!t.a) return [t.ox + (x - t.cx) * t.s, t.oy + (y - t.cy) * t.s];
+      const u = x - t.cx, v = y - t.cy, c = Math.cos(t.a), n = Math.sin(t.a);
+      return [t.ox + (u * c - v * n) * t.s, t.oy + (u * n + v * c) * t.s];
+    }
+    invF(X, Y, t) {
+      t = t || this.tf;
+      const c = Math.cos(t.a), n = Math.sin(t.a), p = (X - t.ox) / t.s, q = (Y - t.oy) / t.s;
+      return [t.cx + p * c + q * n, t.cy - p * n + q * c];
+    }
+    inv(X, Y) {
+      const t = this.tf;
+      if (t && t.a) { const [a, b] = this.invF(X + 0.5, Y + 0.5); return [Math.floor(a), Math.floor(b)]; }
+      return t ? [Math.round(t.cx + (X + 0.5 - t.ox) / t.s - 0.5), Math.round(t.cy + (Y + 0.5 - t.oy) / t.s - 0.5)] : [X, Y];
+    }
+    warped() { const t = this.tf; return !!(t && t.a); }
+    // under a tilted transform every shape is filled screen pixel by screen pixel, tested back in design space;
+    // at(x, y) gives the shade there or false, and a shape too small to cover any pixel centre still marks its own
+    fillWarped(x0, y0, x1, y1, m, at) {
+      const tf = this.tf, cs = [];
+      for (const a of [0, 0.5, 1]) for (const b of [0, 0.5, 1]) cs.push(this.T(x0 + (x1 - x0) * a, y0 + (y1 - y0) * b));
+      const xs = cs.map((p) => p[0]), ys = cs.map((p) => p[1]);
+      let hit = false;
+      this.tf = null;
+      for (let Y = Math.floor(Math.min(...ys)) - 1; Y <= Math.ceil(Math.max(...ys)); Y++) for (let X = Math.floor(Math.min(...xs)) - 1; X <= Math.ceil(Math.max(...xs)); X++) {
+        const [lx, ly] = this.invF(X + 0.5, Y + 0.5, tf), s = at(lx, ly);
+        if (s === false) continue;
+        this.px(X, Y, m, s); hit = true;
+      }
+      this.tf = tf;
+      if (!hit) { const [lx, ly] = [(x0 + x1) / 2, (y0 + y1) / 2], s = at(lx, ly, true); this.px(lx - 0.5, ly - 0.5, m, s === false ? 0 : s); }
+    }
     px(x, y, m, s) {
       if (this.tf) { [x, y] = this.T(x + 0.5, y + 0.5); }
       x = Math.floor(x); y = Math.floor(y);
@@ -62,6 +94,14 @@
     ell(cx, cy, rx, ry, m, o) {
       o = o || {};
       const k = o.k == null ? 1 : o.k, s0 = o.s || 0, tf = this.tf;
+      if (this.warped()) return this.fillWarped(cx - rx, cy - ry, cx + rx, cy + ry, m, (x, y, any) => {
+        const nx = (x - cx) / rx, ny = (y - cy) / ry, d = nx * nx + ny * ny;
+        if (d > 1 && !any) return false;
+        const s = s0 + k * (0.15 - nx * 0.55 - ny * 0.6 + (1 - Math.min(1, d)) * 0.25);
+        if (!o.fn) return s;
+        const r = o.fn(Math.floor(x), Math.floor(y), s, nx, ny);
+        return r === false ? false : typeof r === "number" ? r : s;
+      });
       if (tf) { [cx, cy] = this.T(cx, cy); rx *= tf.s; ry *= tf.s; this.tf = null; }
       for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx); x++) {
         const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry, d = nx * nx + ny * ny;
@@ -77,6 +117,18 @@
     }
     poly(pts, m, sfn) {
       const tf = this.tf;
+      if (this.warped()) {
+        const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+        return this.fillWarped(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), m, (x, y, any) => {
+          let inside = !!any;
+          for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            const [xi, yi] = pts[i], [xj, yj] = pts[j];
+            if ((yi > y) !== (yj > y) && x < xi + ((y - yi) / (yj - yi)) * (xj - xi)) inside = !inside;
+          }
+          if (!inside) return false;
+          return typeof sfn === "function" ? sfn(Math.floor(x), Math.floor(y)) : sfn || 0;
+        });
+      }
       if (tf) {
         pts = pts.map((p) => this.T(p[0], p[1]));
         if (typeof sfn === "function") { const f = sfn; sfn = (x, y) => { this.tf = tf; const [a, b] = this.inv(x, y); this.tf = null; return f(a, b); }; }
@@ -98,6 +150,7 @@
       }
     }
     rect(x, y, w, h, m, s) {
+      if (this.warped()) return this.fillWarped(x, y, x + w, y + h, m, (a, b, any) => (any || (a >= x && a < x + w && b >= y && b < y + h) ? (typeof s === "function" ? s(Math.floor(a), Math.floor(b)) : s || 0) : false));
       if (this.tf) {
         const tf = this.tf, [x0, y0] = this.T(x, y), [x1, y1] = this.T(x + w, y + h);
         this.tf = null;
@@ -111,7 +164,7 @@
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.px(x + i, y + j, m, typeof s === "function" ? s(x + i, y + j) : s || 0);
     }
     line(x0, y0, x1, y1, m, s, r) {
-      if (this.tf) {
+      if (this.tf && !this.warped()) {
         const tf = this.tf;
         [x0, y0] = this.T(x0, y0); [x1, y1] = this.T(x1, y1);
         this.tf = null;
@@ -1014,6 +1067,7 @@
         P.rect(cx - fw - 0.5, 14, fw * 2 + 1, 1, head === "great_helm" && t === 3 ? "gold" : m, (x) => 0.55 - (x - cx) * 0.05);
         P.rect(cx - fw + 0.5, 15, fw * 2 - 1, 3, "#100c12");
         for (const ex of [cx - 4, cx + 2]) {
+          if (c.empty) continue;
           if (c.glint) { P.px(ex, 16, c.glint); P.px(ex + 1, 16, mix(c.glint, "#100c12", 0.4)); }
           else { P.px(ex, 16, "#d8cfc0"); P.px(ex + (c.gaze > 0 ? 1 : 0), 16, c.eye || "#3a3a40"); P.px(ex, 15, "#2a2228"); }
         }
@@ -1085,7 +1139,7 @@
           "hd", (x, y) => 0.25 - (x - cx) * 0.06 - (y < 3 ? 0.2 : 0));
         P.ell(cx, 10.5, fw + [4, 5, 6.2, 7.6][t], 2.2, "hd", { s: -0.1 });
         if (t >= 2) P.rect(cx - 6, 8, 12, 1, "gold", 0.2);
-        if (t === 1 || t === 3) for (const [x, y] of [[cx - 3, 5], [cx + 2, 3], [cx + 1, 7], [cx - 4, 8]]) if (P.matAt(x, y) === "hd") P.px(x, y, t === 3 ? "gold" : "cream", 0.6);
+        if (t === 1 || t === 3) for (const [x, y] of [[cx - 3, 5], [cx + 2, 3], [cx + 1, 7], [cx - 4, 8]]) if (at(x, y) === "hd") P.px(x, y, t === 3 ? "gold" : "cream", 0.6);
         if (t === 3) { P.px(cx, 8, "ice", 0.6); P.px(cx - 1, 8, "ice", 0.2); }
         break;
       }
@@ -1335,6 +1389,7 @@
   const TWO_GRIP = (f, t) => (f === "axe" && t >= 4) || (f === "mace" && t === 5) || f === "spear";
   const HOLD_TILT = { axe: -0.22, mace: -0.26, frying_pan: -0.3, wand: -0.45, daggers: -0.55, lute: -0.35 };
   function fullBody(o) {
+    if (o.look && o.look.child) return childBody(o);
     const h = { id: o.id, name: o.name, look: o.look, weapon: o.weapon, weapon_tier: o.weaponTier, armor_tier: o.armorTier, legend: o.legend, kit: o.kit };
     const cl = o.clsLook || {}, c = setup(h, cl), P = new Paint(28, 34), M = c.mats, outfit = c.outfit, K = c.k;
     const base = BASE[outfit] || "hide";
@@ -1466,6 +1521,265 @@
     return g;
   }
 
+  // a child (look.child) is painted natively on a body two-thirds of an adult's; the head shrinks less than the body, as a child's does
+  function childBody(o) {
+    const h = { id: o.id, name: o.name, look: o.look, weapon: o.weapon, weapon_tier: o.weaponTier, armor_tier: o.armorTier, legend: o.legend, kit: o.kit };
+    const c = setup(h, o.clsLook || {}), P = new Paint(28, 34), outfit = c.outfit, base = BASE[outfit] || "hide";
+    const HT = { ox: 14, oy: 18.4, cx: 20, cy: 15.5, s: 0.56 };
+    P.tf = HT; headBack(P, c); P.tf = null;
+    P.layer = 2;
+    if (!ROBES.has(outfit)) {
+      P.rect(11, 27, 2, 4, "pants", (x) => 0.15 - (x - 11) * 0.15);
+      P.rect(15, 27, 2, 4, "pants", (x) => -0.2 - (x - 15) * 0.15);
+      P.rect(10, 31, 3, 2, "boot", (x, y) => (y === 31 ? 0.3 : -0.1) - (x - 10) * 0.08);
+      P.rect(15, 31, 3, 2, "boot", (x, y) => (y === 31 ? 0.1 : -0.3) - (x - 15) * 0.08);
+    } else {
+      P.poly([[10, 26], [18, 26], [19.5, 32.5], [8.5, 32.5]], base, (x) => 0.15 - (x - 14) * 0.07);
+      P.rect(9, 32, 3, 1, "boot", -0.2); P.rect(16, 32, 3, 1, "boot", -0.4);
+    }
+    P.rect(10, 22, 8, 6, base, (x, y) => 0.25 - (x - 13) * 0.09 - (y - 22) * 0.03);
+    if (outfit === "vest") { P.rect(10, 22, 3, 6, "fav", 0.15); P.rect(15, 22, 3, 6, "fav", -0.3); }
+    else if (!ROBES.has(outfit)) P.rect(10, 27, 8, 1, outfit === "fancy" ? "gold" : "dleather", -0.1);
+    P.layer = 3;
+    const sleeve = outfit === "vest" || outfit === "fancy" ? "shirt" : base;
+    P.rect(8, 22, 2, 5, sleeve, (x, y) => 0.35 - (y - 22) * 0.05 - (x - 8) * 0.25);
+    P.rect(18, 22, 2, 5, sleeve, (x, y) => -0.15 - (y - 22) * 0.05 - (x - 18) * 0.25);
+    P.rect(8, 27, 2, 1, "skin", (x) => 0.2 - (x - 8) * 0.3);
+    P.rect(18, 27, 2, 1, "skin", (x) => -0.2 - (x - 18) * 0.3);
+    P.tf = HT; headFront(P, c, false); P.tf = null;
+    // the head's neck is an adult's length, so below the chin the shirt takes it back
+    for (let y = 23; y < 28; y++) for (let x = 10; x < 18; x++) {
+      const i = y * 28 + x;
+      if (P.lay[i] === 3 && P.mat[i] === "skin") { P.mat[i] = outfit === "vest" && (x < 13 || x > 14) ? "fav" : base; P.sh[i] = 0.1 - (x - 13) * 0.09; }
+    }
+    P.layer = 7;
+    if (!c.full) {
+      const ec = c.pale ? "#b8c8e8" : mix(c.eye, "#100c10", 0.55);
+      P.px(12, 20, ec); P.px(15, 20, ec);
+      if (c.look.face !== 2) P.px(13, 22, "lip", -0.6);
+    }
+    let g = P.render(c.mats, { outline: "#16121a", flat: FLAT });
+    if (o.frame === 1) { const n = new Grid(28, 34); for (let y = 0; y < 33; y++) for (let x = 0; x < 28; x++) n.px[(y + 1) * 28 + x] = g.px[y * 28 + x]; g = n; }
+    return g;
+  }
+
+  // asleep in bed, three-quarter: the head rolled toward us on the pillow (drawn natively tilted, see Paint.T), the shoulders
+  // above the fold of the covers, the near arm out over the blanket, and the body a mound under the quilt that rises on frame 1.
+  // q: { quilt: [base, alt, trim], len: tiles from the chin to the toes, patch, roll, pillow, awake }. The floor spot lands at (18, 24), at quilt height.
+  // roll: on a bedroll on the ground, its rolled end for a pillow; awake: the same pose with the eyes open.
+  // Every hat, hood, helm and crown is off for the night; marks like a halo stay.
+  const PATCHES = ["#a84a32", "#d8b860", "#5a7a4a", "#c88a5a", "#4a6a8a", "#e0d4b8", "#8a3a2a"];
+  // the head on the pillow, drawn at the lying angle in screen pixels: x runs across the face, y down it to the chin, tilted so the crown
+  // points up the bed and turned toward us, so the face sits low on the near side and the back of the head shows above and behind it
+  const LIE_TILT = -0.5;
+  // hair that spreads on the pillow, grouped from the old lying table: [past the crown, past the back, falling down the far side, wave, texture: 0 straight, 1 curls, 2 locs, 3 waves]
+  const LIE_HAIR = { 1: [2.4, 3.6, 7, 0.5, 0], 5: [1.4, 1.8, 2.5, 0.5, 1], 8: [2.4, 2.8, 3, 0.6, 1], 9: [2.2, 3.4, 7, 0, 2], 13: [0.3, 2.4, 6, 0.3, 0], 15: [0.6, 1.4, 3.5, 0.2, 0],
+    16: [2.8, 4, 7.5, 0.5, 3], 20: [1.6, 2.8, 6, 0.4, 0] };
+  const BARE_EARS = new Set([0, 2, 3, 4, 6, 7, 10, 11, 12, 14, 17, 18, 19, 21]);
+  function lyingHead(P, c, X, Y, awake, after) {
+    const { st, look, scars } = c, tex = c.hairTex, tf = { ox: X, oy: Y, cx: 0, cy: 0, s: 1, a: LIE_TILT };
+    const field = (x0, y0, x1, y1, m, fn) => { P.tf = tf; P.fillWarped(x0, y0, x1, y1, m, fn); P.tf = null; };
+    const draw = (fn) => { P.tf = tf; fn(); P.tf = null; };
+    const skull = (x, y, g) => ((x - 0.5) / (5.1 + (g || 0))) ** 2 + ((y + 0.3) / (5.3 + (g || 0))) ** 2 <= 1;
+    const face = (x, y) => ((x + 0.9) / 3.9) ** 2 + ((y - 0.5) / 3.9) ** 2 <= 1 || ((x + 0.9) / 3.2) ** 2 + ((y - 2.3) / 3.1) ** 2 <= 1;
+    const fr = FRINGE[st], bald = st === 4 || st === 3;
+    const hairline = (x) => (fr === "full" ? -1.5 : fr === "sweep" ? -1.3 - (x + 4) * 0.25 : -2.2) + Math.abs(x + 0.9) * 0.12;
+    const curl = (x, y, s) => s + ((x * 3 + y * 5) % 7 === 0 ? -0.45 : (x * 5 + y * 3) % 9 === 0 ? 0.35 : 0);
+    const lit = (x, y, rx, ry) => 0.2 - (x / rx) * 0.25 - (y / ry) * 0.5;
+    const f = LIE_HAIR[st];
+    P.layer = 1;
+    const hy = st === 18 || st === 12 ? -9.6 : -7.6;
+    if (c.mark === "halo") draw(() => { for (let a = 0; a < 40; a++) { const t = (a / 40) * Math.PI * 2; P.px(0.2 + Math.cos(t) * 3.6 - 0.5, hy + Math.sin(t) * 1.1 - 0.5, "#ffe88a", 0); } });
+    if (f) {
+      const [top, back, fall, wav, kind] = f;
+      field(-9, -12, 16, 14, "hair", (x, y) => {
+        const dx = x - 0.5, dy = y + 0.3, t = Math.atan2(dy, dx), d = Math.hypot(dx / 5.1, dy / 5.3) * 5.2;
+        const up = Math.max(0, -Math.sin(t)), bk = Math.max(0, Math.cos(t)), dn = Math.max(0, Math.sin(t));
+        let e = Math.max(top * up * (1 - 0.35 * Math.max(0, -Math.cos(t))), back * bk * (1 - dn) ** 0.5, fall * Math.min(1, dn * 1.6) * bk ** 0.7);
+        if (dx < -1.5 && dy > -1) e = 0;
+        e += wav * Math.sin(t * 9 + d * 0.4) * Math.min(1, e);
+        if (d > 5.2 + e || e < 0.6) return false;
+        const k = Math.max(0, (d - 5.2) / Math.max(1, e));
+        let s = 0.05 - k * 0.35 + up * 0.15;
+        if (kind === 0) s += 0.2 * Math.sin(t * 8) + tex(Math.floor(x), Math.floor(y)) * 0.5;
+        if (kind === 1) s = curl(Math.floor(x), Math.floor(y), s);
+        if (kind === 2) { const rope = Math.sin(t * 11); if (rope < -0.7 && k > 0.3) return false; s += rope * 0.3 - (rope < -0.3 ? 0.3 : 0); }
+        if (kind === 3) s += 0.22 * Math.sin(t * 8 + d * 0.9);
+        return s;
+      });
+    }
+    if (st === 8) field(-8, -10, 10, 7, "hair", (x, y) => (Math.hypot((x - 0.8) / 6.6, (y + 1.2) / 6.3) + 0.06 * Math.sin(Math.atan2(y + 1.2, x - 0.8) * 9) > 1 ? false : curl(Math.floor(x), Math.floor(y), lit(x - 0.8, y + 1.2, 6.6, 6.3))));
+    if (st === 5) field(-7, -9, 9, 5, "hair", (x, y) => (Math.hypot((x - 0.6) / 5.9, (y + 0.9) / 5.9) + 0.08 * Math.sin(Math.atan2(y + 0.9, x - 0.6) * 8) > 1 ? false : curl(Math.floor(x), Math.floor(y), lit(x, y, 6, 6))));
+    const along = (x0, y0, x1, y1, n, bend) => Array.from({ length: n + 1 }, (_, i) => { const q = i / n; return [x0 + (x1 - x0) * q, y0 + (y1 - y0) * q + bend * Math.sin(q * Math.PI)]; });
+    const bun = (bx, by, rx, ry, sh) => draw(() => P.ell(bx, by, rx, ry, "hair", { s: sh, fn: (x, y, v) => v + ((Math.round(Math.hypot(x + 0.5 - bx, (y + 0.5 - by) * 1.4) * 1.4) % 3 === 0) ? -0.35 : 0) }));
+    const tie = (x, y) => draw(() => P.ell(x, y, 0.8, 0.8, "fav", { s: 0.25, k: 0.5 }));
+    if (st === 2) { const t = along(4.6, -1.2, 9.5, 3.5, 6, -1.4); draw(() => P.tube(t, 1.7, 1.2, "hair", -0.1)); tie(4.8, -1.5); }
+    if (st === 6 || st === 10) { const t = along(4.8, -0.5, 8.6, 4.5, 6, -1); draw(() => (st === 6 ? plait(P, t, 1.2, true) : P.tube(t, 1.5, 0.8, "hair", -0.2))); if (st === 10) tie(5, -0.5); }
+    if (st === 10) { const t = along(-4.2, -2.4, -8, 0.6, 5, -0.8); draw(() => P.tube(t, 1.5, 0.8, "hair", 0.1)); tie(-4.2, -2.4); }
+    if (st === 7) bun(5.4, -2.2, 2.4, 2.0, -0.1);
+    if (st === 12) { bun(1.2, -6.4, 2.0, 1.6, 0.1); draw(() => P.rect(0.6, -5, 1.4, 1, "fav", 0.2)); }
+    if (st === 20) bun(3.6, -4.4, 1.7, 1.4, 0);
+    // the head itself: the back of the skull in hair, the face in skin, the fringe, an ear where the two meet
+    P.layer = 4;
+    const shaved = (x, y) => (st === 3 || st === 11) && (x + y * 0.3 > 1.5 || y > -1.5 || st === 3) && !(st === 3 && Math.abs(x + 0.7) < 1.3 && y < -1.8);
+    field(-6, -7, 7, 6, "skin", (x, y) => {
+      if (!skull(x, y) && !face(x, y)) return false;
+      if (face(x, y)) { const nx = (x + 0.9) / 3.9, ny = (y - 1.2) / 4.4; return 0.2 - nx * 0.3 - ny * 0.4 - Math.max(0, nx - 0.6) * 1.2 - Math.max(0, ny - 0.85) * 0.6; }
+      return bald ? lit(x - 0.5, y + 0.3, 5.1, 5.3) : false;
+    });
+    if (st === 3 || st === 11) field(-6, -7, 7, 6, "stub", (x, y) => (skull(x, y) && !face(x, y) && shaved(x, y) && (Math.floor(x) + Math.floor(y)) % 2 === 0 ? -0.2 : false));
+    if (!bald || st === 3) field(-6.5, -7.5, 7.5, 6.5, "hair", (x, y) => {
+      const sk = skull(x, y, st === 19 ? -0.2 : st === 14 ? 0.3 : 0.2), fc = face(x, y);
+      if (st === 3) return Math.abs(x + 0.7) < 1.3 && skull(x, y, 0.6) && y < -1.8 ? lit(x + 0.7, y, 2, 6) + tex(Math.floor(x), Math.floor(y)) : false;
+      if (!sk || shaved(x, y)) return false;
+      if (fc && y > hairline(x)) return false;
+      if (st === 15 && fc && x > 0.4 && y > 3.2) return false;
+      return lit(x - 0.5, y + 0.3, 5.3, 5.5) + tex(Math.floor(x), Math.floor(y)) + (st === 19 && (Math.floor(x) * 3 + Math.floor(y)) % 5 === 0 ? -0.3 : 0);
+    });
+    if (st === 15) field(1, -2, 6, 5, "hair", (x, y) => (skull(x, y, 0.4) && !face(x, y) && y < 4.4 ? -0.25 + tex(Math.floor(x), Math.floor(y)) : false));
+    if (st === 14) draw(() => {
+      // curved locks of uneven length swept toward the pillow, a few jutting over the brow and off the back, so the points never read as a crown
+      const tuft = (a, r, l, w, b, sh) => {
+        const ex = 0.5 + Math.cos(a) * r, ey = -0.3 + Math.sin(a) * r * 1.04, ma = a + b * 0.35, ta = a + b, mx = ex + Math.cos(ma) * l * 0.55, my = ey + Math.sin(ma) * l * 0.55;
+        P.poly([[ex - Math.sin(a) * w, ey + Math.cos(a) * w], [mx - Math.sin(ma) * w * 0.6, my + Math.cos(ma) * w * 0.6], [mx + Math.cos(ta) * l * 0.45, my + Math.sin(ta) * l * 0.45],
+          [mx + Math.sin(ma) * w * 0.6, my - Math.cos(ma) * w * 0.6], [ex + Math.sin(a) * w, ey - Math.cos(a) * w]], "hair", (x, y) => sh + tex(x, y));
+        if (l > 3.5) P.line(ex, ey, mx, my, "hair", -0.45);
+      };
+      for (const [a, l, w, b, sh] of [[-2.5, 2.6, 1.3, 0.6, 0.1], [-1.95, 4.6, 1.6, 0.75, 0.15], [-1.35, 2.2, 1.0, 0.5, -0.15], [-0.85, 3.7, 1.4, 0.7, -0.05], [-0.2, 2.8, 1.2, 0.6, -0.25], [0.5, 2.3, 1.1, 0.5, -0.35]]) tuft(a, 5.0, l, w, b, sh);
+      for (const [a, l, b] of [[-2.85, 2.6, -0.9], [-3.15, 2.0, -1.0]]) tuft(a, 4.8, l, 1.0, b, 0.2);
+    });
+    if (st === 3) draw(() => { for (const a of [-2.0, -1.75, -1.5]) { const ex = 0.5 + Math.cos(a) * 5.4, ey = -0.3 + Math.sin(a) * 5.6; P.poly([[ex - Math.sin(a) * 1.1, ey + Math.cos(a) * 1.1], [ex + Math.cos(a) * 2.4, ey + Math.sin(a) * 2.4], [ex + Math.sin(a) * 1.1, ey - Math.cos(a) * 1.1]], "hair", 0.2); } });
+    if (st === 18) for (const [bx, by, sh] of [[-3.5, -5.2, 0.15], [5.0, -4.4, -0.15]]) { draw(() => P.ell(bx, by, 2.8, 2.5, "hair", { s: -0.75, k: 0.4 })); bun(bx, by, 2.2, 1.9, sh); }
+    if (st === 21) draw(() => { const pts = []; for (let a = -2.9; a <= 0.1; a += 0.32) pts.push([0.5 + Math.cos(a) * 4.4, -0.3 + Math.sin(a) * 4.6]); plait(P, pts, 1.1, false); });
+    P.layer = 5;
+    if (c.pointy) draw(() => P.poly([[2.4, 0.2], [6.6, -2.6], [3.6, 2.6]], "skin", -0.15));
+    else if (BARE_EARS.has(st)) draw(() => P.ell(3.3, 1.1, 0.9, 1.4, "skin", { s: -0.2, k: 0.5 }));
+    if (look.face === 2) field(-5, 1.5, 3, 7, "hair", (x, y) => {
+      if (!face(x, y) && ((x + 0.9) / 3.4) ** 2 + ((y - 2.8) / 3.4) ** 2 > 1) return false;
+      if (y < 2.6 || (y < 3.6 && Math.abs(x + 1.2) < 1.6)) return false;
+      return 0.05 - (y - 3) * 0.12 + tex(Math.floor(x), Math.floor(y));
+    });
+    // a braid laid forward over the near shoulder, and the face's 1px features, go on last, over the covers
+    after.push(() => {
+      P.layer = 8;
+      if (st === 6 || st === 17) { const t = along(-4.2, 2.2, -6.5, 10.5, 7, st === 17 ? -1.2 : -0.8); draw(() => plait(P, t, st === 17 ? 1.4 : 1.15, true)); }
+      P.layer = 7;
+      const at = (x, y) => { P.tf = tf; const p = P.T(x, y); P.tf = null; return [Math.round(p[0] - 0.5), Math.round(p[1] - 0.5)]; };
+      const dot = (x, y, m, s) => { const [a, b] = at(x, y); P.px(a, b, m, s); };
+      const dim = !c.pale && toHsv(look.skinHex || look.skin)[2] < 0.6;
+      const shut = c.pale ? "#8a98b0" : mix(look.skinHex || look.skin, "#140c0c", dim ? 0.8 : 0.66), ec = c.pale ? "#b8c8e8" : mix(c.eye, "#100c10", 0.45);
+      [[-2.7, 0.7], [0.7, 0.7]].forEach(([ex, ey], i) => {
+        const [x, y] = at(ex, ey);
+        if (scars.includes("eyepatch") && i === 1) { for (const [a, b] of [[-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [0, -1], [-1, -1]]) P.px(x + a, y + b, "#16121a"); P.px(x, y, "#3a3036"); return; }
+        if (awake) { P.px(x - 1, y, c.gaze > 0 ? "#ece6da" : ec); P.px(x, y, c.gaze > 0 ? ec : "#ece6da"); }
+        else { P.px(x - 1, y, shut); P.px(x, y, shut); if (dim) { P.px(x - 1, y - 1, "skin", 0.6); P.px(x, y - 1, "skin", 0.6); } }
+      });
+      if (scars.includes("eyepatch")) draw(() => P.line(-4.6, -1.8, 4.4, -1.0, "#16121a"));
+      dot(-1.0, 2.6, "skin", -0.7);
+      if (look.face !== 2) { dot(-1.6, 3.9, "lip", -0.6); dot(-0.6, 3.9, "lip", -0.6); }
+      else dot(-1.1, 3.9, "lip", -0.75);
+      if (look.face === 3) for (const [x, y] of [[-2.6, 3.4], [-1.6, 3.4], [-0.6, 3.4], [0.4, 3.4]]) dot(x, y, "hair", x < -1 ? 0.1 : -0.25);
+      if (look.face === 1) for (const [x, y] of [[-3.6, 3.6], [-2.6, 4.8], [-1.6, 5.4], [-0.4, 5.4], [0.6, 4.8], [1.6, 3.8]]) dot(x, y, "stub", 0);
+      if (c.tusks) { dot(-2.6, 4.0, "#efe8d4"); dot(0.4, 4.0, "#efe8d4"); }
+      if (c.freckles) for (const [x, y] of [[-3.2, 2.2], [-2.2, 2.6], [0.4, 2.2], [1.2, 2.0]]) dot(x, y, "skin", -0.6);
+      if (scars.includes("scar")) for (let i = 0; i < 4; i++) dot(-3.4 + i * 0.5, -1 + i * 1.1, "#a85048");
+      if (scars.includes("burn")) for (const [x, y] of [[1.0, 2.2], [1.8, 2.4], [1.4, 3.2], [2.2, 3.0]]) dot(x, y, (Math.round(x * 2) + Math.round(y)) % 2 ? "#b8685a" : "#9a4a44");
+      if (c.mark && c.mark !== "halo") {
+        P.layer = 8;
+        const rim = (a, r) => [0.5 + Math.cos(a) * r * 5.1 / 5.2, -0.3 + Math.sin(a) * r];
+        if (c.mark === "antlers") draw(() => { for (const a of [-2.3, -1.2]) { const [x0, y0] = rim(a, 5), [x1, y1] = rim(a, 10), [x2, y2] = rim(a + (a < -2 ? -0.35 : 0.35), 8.4); P.line(x0, y0, x1, y1, "antler", 0.1); P.line((x0 + x1) / 2, (y0 + y1) / 2, x2, y2, "antler", -0.1); } });
+        else draw(() => { for (let i = 0; i < 7; i++) { const a = -2.7 + i * 0.4, [x, y] = rim(a, 5.4), [x1, y1] = rim(a, i % 2 ? 6.8 : 7.8);
+          if (c.mark === "leaf_crown") P.ell(x, y, 1.2, 0.9, "leaf", { s: i % 2 ? 0.3 : -0.1, k: 0.6 });
+          else P.poly([[x - Math.sin(a) * 0.9, y + Math.cos(a) * 0.9], [x1, y1], [x + Math.sin(a) * 0.9, y - Math.cos(a) * 0.9]], c.mark === "ice_crown" ? "ice" : "flame", i % 2 ? 0.1 : 0.45); } });
+      }
+    });
+  }
+  function sleeper(o, q) {
+    const h = { id: o.id, name: o.name, look: o.look, weapon: o.weapon, weapon_tier: o.weaponTier, armor_tier: o.armorTier, legend: o.legend, kit: o.kit && Object.assign({}, o.kit) };
+    const cl = Object.assign({}, o.clsLook || {});
+    if (h.kit) h.kit.head = null;
+    if (cl.head && !MARKS.has(cl.head)) cl.head = "none";
+    const c = setup(h, cl), P = new Paint(44, 36), M = Object.assign({}, c.mats), [q0, q1] = q.quilt, len = q.len || 1.6, AX = 18, AY = 24;
+    M.bl = ramp(q0); M.bl2 = ramp(q1 || q0); M.sheet = ramp(q.pillow || "#ece2cc");
+    PATCHES.forEach((p, i) => { M["bp" + i] = ramp(p); });
+    c.hglow = null;
+    const coat = c.outfit === "chain" || c.outfit === "plate" ? "cloth" : BASE[c.outfit] || "cloth";
+    const iso = (u, v, z) => [AX + (u - v) * 8, AY + (u + v) * 4 - z];
+    const bump = (u, at, w) => Math.max(0, 1 - ((u - at) / w) ** 2), u0 = -0.24, FOLD = q.roll ? 0.3 : 0.24;
+    const breath = (u) => (o.frame ? 1.5 * bump(u, 0.22, 0.34) : 0);
+    const top = q.roll ? (u) => (u < FOLD ? 2.4 + 0.9 * bump(u, 0.1, 0.3) + breath(u) : 1.6 + 0.5 * bump(u, 0.75, 0.25) + 1.0 * bump(u, len - 0.15, 0.17) + (u < FOLD + 0.08 ? 0.5 : 0))
+      : (u) => 3.0 + 1.4 * bump(u, 0.3, 0.55) + 1.1 * bump(u, len - 0.18, 0.2) + breath(u) + (u >= FOLD && u < FOLD + 0.08 ? 0.5 : 0);
+    const half = (u) => (u < FOLD ? 0.3 + 0.08 * Math.min(1, (u - u0) / 0.12) : q.roll ? 0.37 - 0.08 * Math.min(1, (u - FOLD) / 0.8) : 0.4 - 0.12 * Math.min(1, Math.max(0, (u - 0.5) / 0.8)));
+    const mat = (u, v) => {
+      if (u < FOLD) return coat;
+      if (u < FOLD + 0.08) return q.roll ? "bl2" : "sheet";
+      if (q.roll) return Math.abs(u - len + 0.3) < 0.04 ? "bl2" : "bl";
+      if (q.patch) {
+        const a = u * 2.6 + 0.5, b = v * 2.6 + 0.5;
+        if (Math.abs(a - Math.round(a)) < 0.08 || Math.abs(b - Math.round(b)) < 0.08) return "bp5";
+        return "bp" + ((Math.floor(a) * 5 + Math.floor(b) * 3 + 70) % 7);
+      }
+      const da = u * 3 - Math.floor(u * 3) - 0.5, db = v * 3 - Math.floor(v * 3) - 0.5;
+      return Math.abs(Math.abs(da) + Math.abs(db) - 0.45) < 0.08 ? "bl2" : "bl";
+    };
+    const height = (u, v) => {
+      const w = half(u), t = v / w;
+      if (Math.abs(t) > 1 || u < u0 || u > len) return null;
+      return top(u) * Math.sqrt(1 - t * t) * Math.min(1, (len - u) / 0.12 + 0.35) * Math.min(1, (u - u0) / 0.1 + 0.55);
+    };
+    const mound = (pts, shade) => {
+      pts.sort((p, r) => p[0] + p[1] - r[0] - r[1]);
+      for (const [u, v, t, hh, m] of pts) {
+        const [sx, base] = iso(u, v, 0), sy = base - hh;
+        for (let y = Math.floor(sy) + 1; y <= Math.floor(base); y++) P.px(sx, y, m, t > 0 ? -0.15 : -0.45);
+        P.px(sx, sy, m, shade(u, t));
+      }
+    };
+    // the rolled end of a bedroll under the head; in a bed the bed's own pillow is there already
+    if (q.roll) {
+      P.layer = 0;
+      const pts = [];
+      for (let u = -0.7; u <= -0.26; u += 0.04) for (let v = -0.14; v <= 0.46; v += 0.04) { const t = (u + 0.48) / 0.22; pts.push([u, v, -(v - 0.16) / 0.3, 2.0 * Math.sqrt(Math.max(0, 1 - t * t)) + 0.4, "sheet"]); }
+      mound(pts, (u, t) => 0.2 - (u + 0.48) * 1.2 + t * 0.2);
+    }
+    const after = [];
+    lyingHead(P, c, 12, 17, q.awake, after);
+    P.layer = 2;
+    const body = [];
+    for (let u = u0; u <= len; u += 0.04) for (let v = -0.42; v <= 0.42; v += 0.04) {
+      const hh = height(u, v);
+      if (hh != null) body.push([u, v, v / half(u), hh, mat(u, v)]);
+    }
+    mound(body, (u, t) => 0.2 + 0.35 * t - (u > len - 0.25 ? 0.2 : 0) + (u >= FOLD && u < FOLD + 0.08 ? 0.3 : 0) + (u < u0 + 0.06 ? 0.2 : 0));
+    // the near arm, out over the covers: the sleeve from under the chin along the flank, the hand resting on the quilt
+    P.layer = 9;
+    const arm = (u) => { const v = 0.33 - u * 0.04; return iso(u, v, (height(u, v) || 1.5) + 1.1); };
+    const [sx0, sy0] = arm(0.04), [sx1, sy1] = arm(0.7), [hx, hy] = arm(0.84);
+    P.line(sx0, sy0, sx1, sy1, coat, (t) => -0.05 - t * 0.1, 1.15);
+    P.ell(hx, hy + 0.3, 1.5, 1.1, "skin", { s: 0.05, k: 0.6 });
+    for (const fn of after) fn();
+    const g = P.render(M, { outline: "#16121a", flat: FLAT }), soft = mix(q0, "#16121a", 0.6);
+    // where the quilt meets the bed's own quilt, a soft crease instead of the hard ink line
+    for (let y = 0; y < P.h; y++) for (let x = 0; x < P.w; x++) {
+      if (P.mat[y * P.w + x] !== null) continue;
+      const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => (P.has(x + a, y + b) ? P.lay[(y + b) * P.w + x + a] : 0)).filter((l) => l);
+      if (near.length && near.every((l) => l === 2) && y > AY - 6) g.px[y * P.w + x] = soft;
+    }
+    return g;
+  }
+  // a helm taken off for the night, to stand by the bed; null for anything else (hats just come off, hoods stay up)
+  function setAside(o) {
+    const h = { id: o.id, name: o.name, look: o.look, weapon: o.weapon, weapon_tier: o.weaponTier, armor_tier: o.armorTier, legend: o.legend, kit: o.kit };
+    const c = setup(h, o.clsLook || {});
+    if (!["helm", "great_helm", "skull_helm", "horns"].includes(c.head)) return null;
+    const P = new Paint(26, 22);
+    c.empty = true; c.glint = null; c.hglow = null;
+    P.tf = { ox: 13, oy: 13, cx: 20, cy: 15.5, s: 0.66 }; P.layer = 7;
+    headgear(P, c.head, c.cx, c.faceW, c.look, () => false, c);
+    P.tf = null;
+    return P.render(c.mats, { flat: FLAT });
+  }
+
   function hairTop(P, st, cx, fw, r, tex, covered) {
     const part = r() < 0.5 ? -2 : 2;
     const line = (x) => {
@@ -1517,6 +1831,14 @@
     if (st === 20) sheet(10, 8, 10.5, 33, dark);
   }
 
+  function plait(P, pts, rad, tie) {
+    pts.forEach(([x, y], i) => {
+      const [ax, ay] = pts[Math.max(0, i - 1)], [bx, by] = pts[Math.min(pts.length - 1, i + 1)], d = Math.hypot(bx - ax, by - ay) || 1, o = i % 2 ? 0.45 : -0.45;
+      P.ell(x - ((by - ay) / d) * o, y + ((bx - ax) / d) * o, rad, rad * 0.8, "hair", { s: i % 2 ? -0.4 : 0.15, k: 0.5 });
+    });
+    if (tie) { const [x, y] = pts[pts.length - 1]; P.rect(x - 1, y + 0.8, 2, 1, "fav", 0.2); P.ell(x, y + 2.8, rad * 0.75, 1.5, "hair", { s: -0.15, k: 0.6 }); }
+  }
+
   function hairNew(P, st, cx, fw, part, tex, covered) {
     const lineAt = (pt, side, top) => (x) => {
       const dx = x + 0.5 - cx;
@@ -1526,13 +1848,6 @@
     const cap = (puff, line, fn) => P.ell(cx, 13, fw + puff, 7.4 + puff * 0.6, "hair", { fn: (x, y, s) => (y + 0.5 > line(x) || y > 19 ? false : fn ? fn(x, y, s) : s + tex(x, y)) });
     const comb = (x, y, s) => s + ((x - cx + 40) % 3 === 0 && y < 12 ? -0.3 : 0);
     const curl = (x, y, s) => s + ((x * 3 + y * 5) % 7 === 0 ? -0.45 : (x * 5 + y * 3) % 9 === 0 ? 0.35 : 0);
-    const braid = (pts, rad, tie) => {
-      pts.forEach(([x, y], i) => {
-        const [ax, ay] = pts[Math.max(0, i - 1)], [bx, by] = pts[Math.min(pts.length - 1, i + 1)], d = Math.hypot(bx - ax, by - ay) || 1, o = i % 2 ? 0.45 : -0.45;
-        P.ell(x - ((by - ay) / d) * o, y + ((bx - ax) / d) * o, rad, rad * 0.8, "hair", { s: i % 2 ? -0.4 : 0.15, k: 0.5 });
-      });
-      if (tie) { const [x, y] = pts[pts.length - 1]; P.rect(x - 1, y + 0.8, 2, 1, "fav", 0.2); P.ell(x, y + 2.8, rad * 0.75, 1.5, "hair", { s: -0.15, k: 0.6 }); }
-    };
     switch (st) {
       case 8:
         if (covered) {
@@ -1613,7 +1928,7 @@
         cap(0.9, lineAt(-2, 18.5, 11.6));
         const pts = [];
         for (let i = 0; i <= 11; i++) { const q = i / 11; pts.push([cx + fw + 1.4 - q * 3 + Math.sin(q * 3) * 1.2, 14.5 + q * 19]); }
-        braid(pts, 2.1, true);
+        plait(P, pts, 2.1, true);
         break;
       }
       case 18:
@@ -1749,5 +2064,5 @@
 
   // shared with Art.gearIcon: the same pieces, drawn alone
   const Gear = { soften, makeMats, headgear, offhand, OFF_C, axis, weapon, backSprite, neckSprite, track, glowUp, TMETAL, METAL, CROWN_Y };
-  window.Paint = { Paint, ramp, hsv, toHsv, portraitGrid, fullBody, PW, PH, Gear };
+  window.Paint = { Paint, ramp, hsv, toHsv, portraitGrid, fullBody, sleeper, setAside, MARKS, PW, PH, Gear };
 })();

@@ -1212,12 +1212,18 @@
   }
 
   // ---------- dungeons with a header of their own ----------
-  const GOB = { s: "#8cbc4a", d: "#5e8e36", e: "#ffe04a", h: "#74747e", c: "#8a6440", b: "#4a3020", p: "#5a4430", f: "#2a1e14", w: "#8a6a40", t: "#d4d8de", a: "#f4f0e6", A: "#c4bcae" };
-  const GOB_LEGS = [["..p..p..w", ".ff..ff.w"], ["...pp...w", "...ff...w"]];
+  // header-scale cut of the battle grunt (beasts.js goblin): dented pot helm, swept ears, red-striped hide shield on the back arm, spear
+  const GOB = { s: "#8cbc4a", g: "#74a63e", d: "#5e8e36", P: "#d88a8a", e: "#ffe04a", H: "#a8a8b4", h: "#74747e", k: "#4a4656", r: "#a8643a",
+    c: "#9a6e44", C: "#6e4c2e", b: "#4a3020", Y: "#d8a838", F: "#d4b47c", f: "#9a7c50", R: "#b83828", w: "#8a6a40", t: "#e4e8ee", T: "#9aa2aa",
+    p: "#5a4430", o: "#2a1e14", a: "#f4f0e6", A: "#c4bcae" };
+  const GOB_HEAD = ["..........t.", ".........ttT", ".....HHh..T.", "....HrHhh.R.", "ss.kkkkkkkw.", ".Pgssses..w.", "..dssssss.w."];
+  const GOB_BODY = [".FRFcccgssw.", ".FRFbbYbC.w.", ".fRfcCcCc.w."];
+  const GOB_LEGS = [["..f.g..g..w.", "...dd..dd.w."], ["..f..gg...w.", ".....dd...w."]];
+  const COOK = ["...aaa...", "..aaaaa..", "...AAAA..", "ss.sssss.", ".Pgssesd.", "..ddsssss", "..caaaac.", "...aaaa..", "...aaaa.."];
   function goblinFrames(cook) {
     const A = window.Anim;
-    if (cook) return GOB_LEGS.map((l) => A.sprite(["..aaa....", ".aaaaa...", "s.AAA....", "ssssess..", "..ssss...", ".daaaa...", "..aaaa...", "..aaaa...", l[0].slice(0, 8), l[1].slice(0, 8)], GOB));
-    return GOB_LEGS.map((l) => A.sprite(["........t", "...hhh..t", "s.hhhhh.w", "ssssess.w", "..ssss..w", "..cccc.sw", ".dcccc..w", "..cbbc..w", l[0], l[1]], GOB));
+    if (cook) return GOB_LEGS.map((l) => A.sprite(COOK.concat(l.map((r) => r.slice(0, 9).replace(/[fw]/g, "."))), GOB));
+    return GOB_LEGS.map((l) => A.sprite(GOB_HEAD.concat(GOB_BODY, l), GOB));
   }
   // walks a stretch and back, stopping at each end to look both ways; `clip` hides it behind whatever is in front of it
   function patrol(o) {
@@ -1229,7 +1235,7 @@
       if (f < a) { u = f / a; left = false; } else if (f < 0.5) { u = 1; moving = false; left = (f - a) / rest > 0.55; }
       else if (f < 0.5 + a) { u = 1 - (f - 0.5) / a; left = true; } else { u = 0; moving = false; left = (f - 0.5 - a) / rest < 0.55; }
       const step = moving ? Math.floor(t * 5 + ph * 7) % 2 : 1;
-      if (o.clip) { ctx.save(); ctx.beginPath(); for (let x = o.x0 - 6; x <= o.x1 + 6; x++) ctx.rect(x, 0, 1, o.clip(x)); ctx.clip(); }
+      if (o.clip) { ctx.save(); ctx.beginPath(); for (let x = o.x0 - 8; x <= o.x1 + 8; x++) ctx.rect(x, 0, 1, o.clip(x)); ctx.clip(); }
       A.put(ctx, fr[step], o.x0 + u * span, o.y - (moving && step === 0 ? 1 : 0), left);
       if (o.clip) ctx.restore();
     } };
@@ -1376,7 +1382,7 @@
     k.line(tx - 2, py - 29, tx + 2, py - 25, OL); k.line(tx + 2, py - 29, tx - 2, py - 25, OL);
     for (let x = tx - 13; x < tx + 13; x += 4) stake(o, x, py, 5, 3, false, false);
     o.F(tx - 13, py - 3, 27, 1, ROPE);
-    add(lookout({ x: tx - 1, y: py - 1, seed: 3 }));
+    add(lookout({ x: tx - 1, y: py - 3, seed: 3 }));
     add(pennant({ x: tx, y: py - 30, len: 6, h: 2, c1: RED[1], c2: RED[0], seed: 8 }));
     F(tx, py - 30, 1, 4, OL);
 
