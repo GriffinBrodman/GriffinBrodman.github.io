@@ -1,9 +1,9 @@
 /* TownMusic: each town's own looping theme and ambience bed on its Map panel, synthesised with WebAudio (no files). */
 (function () {
   "use strict";
-  // audio.js keeps its context private, so this file follows the same rules on its own: the shared "al.sound"
-  // settings (mute and the Volume/Ambience/Music sliders), nothing before the first pointerdown, modest levels
-  const KEY = "al.sound", FADE = 2.2, AHEAD = 1.2, TICK = 150, AMB_STEP = 0.25;
+  // audio.js keeps its context private, so this file follows the same rules on its own: the shared Settings
+  // (mute and the Volume/Ambience/Music sliders), nothing before the first pointerdown, modest levels
+  const FADE = 2.2, AHEAD = 1.2, TICK = 150, AMB_STEP = 0.25;
   const MAJOR = [0, 2, 4, 5, 7, 9, 11], MINOR = [0, 2, 3, 5, 7, 8, 10], DORIAN = [0, 2, 3, 5, 7, 9, 10], PHRYGIAN = [0, 1, 3, 5, 7, 8, 10];
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
   const R = Math.random, pick = (a) => a[Math.floor(R() * a.length)];
@@ -11,8 +11,8 @@
   let ctx = null, master = null, musBus = null, ambBus = null, noiseBuf = null, prefs = readPrefs(), unlocked = false, want = null, cur = null, timer = null;
 
   function readPrefs() {
-    const def = { on: true, master: 0.7, amb: 0.5, music: 0.7 };
-    try { return Object.assign(def, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return def; }
+    const S = window.Settings;
+    return S ? { on: S.get("sound"), master: S.get("master"), amb: S.get("amb"), music: S.get("music") } : { on: true, master: 0.7, amb: 0.5, music: 0.7 };
   }
   function levels() {
     prefs = readPrefs();
@@ -501,7 +501,6 @@
     if (cur) { release(cur); cur = null; }
     if (timer) { clearInterval(timer); timer = null; }
   }
-  // the sound panel's mute and sliders save to localStorage before the click bubbles here
   function refresh() {
     levels();
     if (!prefs.on && cur) { const w = want; release(cur); cur = null; want = w; }
@@ -529,8 +528,7 @@
     unlocked = true;
     if (want) play(want);
   }, { capture: true });
-  document.addEventListener("click", () => setTimeout(refresh, 0));
-  document.addEventListener("input", () => setTimeout(refresh, 0));
+  if (window.Settings) Settings.watch(refresh);
   window.addEventListener("hashchange", () => { if (!/^#\/map/.test(location.hash)) stop(); });
   document.addEventListener("visibilitychange", () => {
     if (!ctx) return;

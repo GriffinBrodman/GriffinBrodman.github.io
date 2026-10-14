@@ -41,11 +41,14 @@
     }
     // the moon, a crescent high on the right
     const mx = 160 + Math.floor(r() * 20), my = 10 + Math.floor(r() * 6);
+    moonAt(ctx, mx, my);
+    return [mx, my];
+  }
+  function moonAt(ctx, mx, my, open) {
     for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) {
       const d = x * x + y * y, cut = (x + 2.5) ** 2 + (y - 1.5) ** 2;
-      if (d <= 26 && cut > 18) { ctx.fillStyle = d > 18 ? "#c8c0a0" : "#f0e8c8"; ctx.fillRect(mx + x, my + y, 1, 1); }
+      if (d <= 26 && cut > 18 && (!open || open(mx + x, my + y))) { ctx.fillStyle = d > 18 ? "#c8c0a0" : "#f0e8c8"; ctx.fillRect(mx + x, my + y, 1, 1); }
     }
-    return [mx, my];
   }
   function stars(r, n) {
     const out = [];
@@ -201,7 +204,6 @@
     wrap.appendChild(cv);
     const ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
-    const still = T().reduced();
     const center = cfg.center;
     // a pet sits a little behind its owner's back and a step nearer the viewer
     const petSpot = (a) => {
@@ -221,9 +223,9 @@
       return a;
     });
     // a solo hero's road companion: a fixed spot by the fire, a share of the chatter, never wanders off
-    if (cfg.npc) {
-      const n = cfg.npc, [u, v] = cfg.spots[n.spot];
-      const a = T().actor({ id: "npc:" + n.name, name: n.name, look: n.look, kit: n.kit, weapon: n.kit.weapon.family, weapon_tier: 1, armor_tier: n.kit.armor.tier }, u, v,
+    for (const n of [cfg.npc].filter((x) => x && cfg.spots[x.spot])) {
+      const [u, v] = cfg.spots[n.spot];
+      const a = T().actor({ id: "npc:" + n.name, name: n.name, look: n.look, kit: n.kit, weapon: n.kit.weapon.family, weapon_tier: n.kit.weapon.tier || 1, armor_tier: n.kit.armor.tier }, u, v,
         { lines: n.lines, look: { name: "npc", look: { outfit: n.kit.armor.outfit, head: "none", aura: null, offhand: "none" } } });
       Object.assign(a, { spot: n.spot, stay: true, keeper: true, npc: n, rest: n.rest || null });
       if (a.rest && a.rest.at) [a.u, a.v] = [a.tu, a.tv] = a.rest.at;
@@ -231,37 +233,45 @@
       actors.push(a);
     }
     const focus = actors[0];
-    const host = cfg.host && cfg.host.lines && cfg.host.lines.length ? { name: cfg.host.name, lines: cfg.host.lines.slice(), keeper: true, at: cfg.host.at, said: [] } : null;
+    const host = cfg.host && cfg.host.lines && cfg.host.lines.length ? { name: cfg.host.name, lines: cfg.host.lines.slice(), keeper: !cfg.host.beast, beast: cfg.host.beast, at: cfg.host.at, said: [] } : null;
+    const herd = (cfg.herd || []).filter((m) => m.lines && m.lines.length).map((m) => ({ name: m.name, lines: m.lines.slice(), beast: m.kind, at: m.at, said: [] }));
     const Talk = T().talk(wrap, cv, st);
-    const say = (a, t, s) => Talk.say(a, t, s);
+    let saying = 0;
+    const say = (a, t, s, done) => { saying++; Talk.say(a, t, s, () => { saying--; if (done) done(); }); };
     const up = (a) => a.wake != null && Talk.now - a.wake < 4.5;
     const asleep = (a) => !!(a.rest && !a.rest.lie.awake && !up(a));
     // a sleeper sits up to say anything
     const rouse = (a) => { if (asleep(a)) a.wake = Talk.now; };
     const later = (ms, fn) => setTimeout(() => { if (wrap.isConnected) fn(); }, ms);
     const fx = { sparks: [], now: 0 };
-    let chatAt = 0.9, moveAt = 8 + r() * 6, petAt = 7 + r() * 8, hostAt = 5 + r() * 8, first = true;
+    let chatAt = 0.9, moveAt = 8 + r() * 6, petAt = 7 + r() * 8, hostAt = 5 + r() * 8, herdAt = 16 + r() * 10, first = true;
 
     // real exchanges between the people here (league.voice.night_talk) take turns with the idle chatter
     const talks = (cfg.talks || []).map((ex) => ex.map((l) => [actors.find((a) => a.h.id === l.id), l.text])).filter((ex) => ex.every(([a]) => a));
     let talkAt = 0;
+    // each turn waits for the last to be said, then the idle chatter picks up again
     function exchange() {
       const ex = talks.shift();
       talks.push(ex);
-      ex.forEach(([a, t], i) => later(i * 2900, () => { faceTo(a); rouse(a); say(a, t, 3.4); }));
-      chatAt = Talk.now + ex.length * 2.9 + 1.5;
-      talkAt = Talk.now + ex.length * 2.9 + 9 + r() * 6;
+      chatAt = talkAt = Infinity;
+      const next = (i) => {
+        if (i >= ex.length) { chatAt = Talk.now + 1.5; talkAt = Talk.now + 9 + r() * 6; return; }
+        const [a, t] = ex[i];
+        faceTo(a); rouse(a);
+        say(a, t, 3.4, () => later(450, () => next(i + 1)));
+      };
+      next(0);
     }
     function talkTurn() {
-      if (Talk.count >= 2) { chatAt = Talk.now + 1.5; return; }
+      if (saying > 0 || Talk.count >= 2) { chatAt = Talk.now + 1; return; }
       if (first) { first = false; rouse(focus); say(focus, focus.lines[0]); focus.said.push(focus.lines[0]); chatAt = Talk.now + 4 + r() * 2; talkAt = chatAt; return; }
       if (talks.length && Talk.now >= talkAt && actors.every((a) => a.mode === "idle")) return exchange();
       const others = actors.filter((a) => a !== focus && a.mode === "idle" && !asleep(a));
       const sp = !others.length || r() < 0.45 ? focus : others[Math.floor(r() * others.length)];
       if (sp.mode !== "idle" || asleep(sp)) { chatAt = Talk.now + 1; return; }
-      say(sp, T().pick(sp, r, cfg.pred));
       const listener = actors.filter((a) => a !== sp && a.mode === "idle" && !asleep(a))[Math.floor(r() * (actors.length - 1))];
-      if (listener && r() < 0.45) later(2600, () => { if (listener.mode === "idle") say(listener, T().pick(listener, r, cfg.pred)); });
+      const answer = listener && r() < 0.45;
+      say(sp, T().pick(sp, r, cfg.pred), undefined, () => { if (answer) later(500, () => { if (listener.mode === "idle") say(listener, T().pick(listener, r, cfg.pred)); }); });
       chatAt = Talk.now + 3.6 + r() * 3.2;
     }
     function wander() {
@@ -297,11 +307,12 @@
         petAt = now + 11 + r() * 10;
       }
       if (host && now > hostAt) { if (Talk.count < 3) say(host, T().pick(host, r, () => true), 3); hostAt = now + 14 + r() * 12; }
+      if (herd.length && now > herdAt) { if (Talk.count < 2) { const m = herd[Math.floor(r() * herd.length)]; say(m, T().pick(m, r, () => true), 2.4); } herdAt = now + 18 + r() * 14; }
       if (cfg.update) cfg.update(dt, fx);
       Talk.prune();
     }
     function draw() {
-      const now = Talk.now, flick = 0.78 + Math.sin(now * 13) * 0.08 + Math.sin(now * 7.3) * 0.08;
+      const still = T().reduced(), now = Talk.now, flick = 0.78 + Math.sin(now * 13) * 0.08 + Math.sin(now * 7.3) * 0.08;
       ctx.drawImage(cfg.bg, 0, 0);
       if (cfg.under) cfg.under(ctx, now, flick, still, fx);
       const things = cfg.props.map((p) => ({ key: p.key, draw: () => (p.cv ? ctx.drawImage(p.cv, 0, 0) : p.draw(ctx, now, flick, still, fx)) }));
@@ -321,15 +332,19 @@
       Talk.place();
     }
     const L = T().loop(wrap, (dt) => { if (dt) update(dt); draw(); }, cfg.onVisible);
-    if (still) { say(focus, focus.lines[0], 999); L.redraw(); }
+    if (T().reduced()) { say(focus, focus.lines[0], 999); L.redraw(); }
     cv.addEventListener("click", (ev) => {
-      const k = cv.clientWidth / W, rect = cv.getBoundingClientRect();
+      const still = T().reduced(), k = cv.clientWidth / W, rect = cv.getBoundingClientRect();
       const mx = (ev.clientX - rect.left) / k, my = (ev.clientY - rect.top) / k;
       const hit = actors.filter((a) => { const [x, y] = st.iso(a.u, a.v); return a.rest ? Math.abs(mx - x - 3) < 13 && my < y + 8 && my > y - 26 : Math.abs(mx - x) < 9 && my < y && my > y - 34; }).sort((p, q) => q.u + q.v - (p.u + p.v))[0];
       const pet = !hit && actors.map((a) => a.pet).filter((p) => p).find((p) => { const [x, y] = st.iso(p.u, p.v); return T().petHit(p, mx - x, my - y); });
       if (hit) { if (!hit.rest || asleep(hit)) hit.wake = Talk.now; say(hit, T().pick(hit, r, cfg.pred), still ? 999 : 3.4); }
-      else if (pet) { pet.pat = Talk.now; if (pet.lines.length) say(pet, T().pick(pet, r, () => true), still ? 999 : 2.2); }
+      else if (pet) { pet.pat = Talk.now; say(pet, window.Speech ? Speech.pat(pet) : T().pick(pet, r, () => true), still ? 999 : 2.2); }
       else if (host && host.at && Math.abs(mx - host.at[0]) < 14 && Math.abs(my - host.at[1]) < 18) say(host, T().pick(host, r, () => true), still ? 999 : 3);
+      else {
+        const m = herd.find((b) => Math.abs(mx - b.at[0]) < 14 && my > b.at[1] - 4 && my < b.at[1] + 24);
+        if (m) say(m, T().pick(m, r, () => true), still ? 999 : 2.4);
+      }
       L.redraw();
     });
     return wrap;
@@ -468,9 +483,27 @@
     const st = T().stage(W, H, 100, 60);
     const r = Art.rng(Art.hash(seed + "camp"));
     const biome = t.biome || "plains";
-    const starList = stars(r, biome === "forest" ? 34 : 56);
+    let starList = stars(r, biome === "forest" ? 34 : 56);
     let moon;
-    const bg = layer(st, (ctx) => { moon = sky(ctx, r, biome); const g = GROUND[biome] || GROUND.plains; horizon(ctx, r, biome, g); ground(ctx, st, r, biome, t.road); });
+    // the night before a delve: the dungeon's way in, from its map header by night, stands on the horizon
+    const TS = window.TownScenes, gate = t.gate && TS && TS.frame && TS.FOOT[t.gate] ? TS.frame(t.gate, W, HZ + 2, { night: true, y0: TS.FOOT[t.gate] - HZ - 2 }) : null;
+    const bg = layer(st, (ctx) => {
+      moon = sky(ctx, r, biome); const g = GROUND[biome] || GROUND.plains;
+      if (!gate) horizon(ctx, r, biome, g);
+      ground(ctx, st, r, biome, t.road);
+      if (gate) {
+        // the scene's last rows are dithered away into the camp's own ground
+        const gc = gate.base.getContext("2d"), im = gc.getImageData(0, 0, W, HZ + 2);
+        for (let y = HZ - 3; y < HZ + 2; y++) for (let x = 0; x < W; x++) if ((y - HZ + 4) / 5 > ((x * 5 + y * 3) % 8 + 0.5) / 8) im.data[(y * W + x) * 4 + 3] = 0;
+        gc.putImageData(im, 0, 0);
+        // the ground darkens toward the far side, where it meets the scene's moonlit edge
+        for (let y = HZ - 3; y < HZ + 26; y++) { ctx.fillStyle = `rgba(8,10,26,${(0.62 * (1 - (y - HZ + 3) / 29)).toFixed(3)})`; ctx.fillRect(0, y, W, 1); }
+        ctx.drawImage(gate.base, 0, 0);
+        moonAt(ctx, moon[0], moon[1], gate.sky);
+        if (!gate.sky(moon[0], moon[1])) moon = null;
+      }
+    });
+    if (gate) starList = starList.filter((s) => gate.sky(s.x, s.y));
     const props = [{ key: 10, cv: firepit(st, 5, 5) }];
     const cols = [["#8a6a4a", "#6a4e36", "#7a5c40"], ["#5a6a4a", "#46543a", "#50603f"], ["#8a4a3a", "#6a362a", "#7a4232"]];
     // a crew with a covered wagon or a carriage sleeps under its roof, so it stands where the tent would; an open cart is
@@ -521,7 +554,7 @@
     // the crew's horses tethered at the edge of the firelight, and the wagon parked behind them with its puller let out of the
     // shafts; all of them drawn at people scale (MountArt's scene sprites), so a horse stands taller at the back than a person's chest
     const MA = window.MountArt;
-    const herd = (t.mounts || []).slice(0, t.wagon && t.wagon.puller ? 3 : 4).map((m) => ({ kind: m.kind, colour: m.colour, name: m.name }));
+    const herd = (t.mounts || []).slice(0, t.wagon && t.wagon.puller ? 3 : 4).map((m) => ({ kind: m.kind, colour: m.colour, name: m.name, lines: m.lines }));
     if (MA && t.wagon) {
       const [wu, wv] = roofed ? [-2.2, 4.4] : [1.0, 8.8], [wx, wy] = st.iso(wu, wv), cv = MA.wagonGrid(t.wagon.kind, null, 0, true);
       props.push({ key: wu + wv + (roofed ? 3.0 : 0), draw: (ctx) => ctx.drawImage(cv, Math.max(2, Math.round(wx) - Math.round(cv.width / 2)), Math.round(wy) - cv.height + 2) });
@@ -532,6 +565,7 @@
       const [dx, dy] = [[54, 32], [-46, 40], [6, 47], [-92, 28]][i], [u, v] = fromScreen(5, 5, [[dx, dy]])[0];
       const ph = Art.hash(m.name || String(i)) % 7, cv = MA.mountGrid(m.kind, m.colour, 0, true), fx = 100 + dx, fy = 100 + dy;
       const x = Math.max(2, Math.min(W - 2 - cv.width, fx - Math.round(cv.width / 2)));
+      m.at = [x + Math.round(cv.width / 2), fy - cv.height + 2];
       props.push({ key: u + v, draw: (ctx, now, flick, still) => { MA.drawMount(ctx, m.kind, m.colour, x, fy, still ? 0 : (Math.floor(now * 0.8 + ph) % 4 === 0 ? 1 : 0), 1, true); } });
     });
     const night = [];
@@ -546,7 +580,7 @@
       const x = Math.round(x0 + dx * f), y = Math.round(y0 + dy);
       props.push({ key: pu + pv, draw: (ctx, now, flick, still) => draw(ctx, x, y, f, still ? 0 : now, x0, y0, comp.look.child) });
     }
-    return gather({ talks: t.talk, kind: "camp", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible, npc: comp && Object.assign({ spot: 1, rest: rest(null, cast.length, spots[1][0], spots[1][1]) }, comp), rest,
+    return gather({ talks: t.talk, kind: "camp", st, bg, props, cast, seed, center: [5, 5], spots, pred: notOrder, onVisible, herd: MA ? herd : [], npc: comp && Object.assign({ spot: 1, rest: rest(null, cast.length, spots[1][0], spots[1][1]) }, comp), rest,
       update(dt, f) {
         const [x, y] = st.iso(5, 5);
         if (!embers) sparks(f.sparks, x, y - 10, dt, false);
@@ -554,6 +588,7 @@
         if (shoot) { shoot.t += dt; if (shoot.t > 0.7) shoot = null; }
       },
       under(ctx, now, flick, still) {
+        if (gate) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, HZ + 2); ctx.clip(); drawAll(ctx, gate.acts, still ? 2 : now); ctx.drawImage(gate.over, 0, 0); ctx.restore(); }
         for (const s of starList) {
           const tw = still || sky2[0] ? s.b : (Math.sin(now * s.sp + s.ph) + 1) / 2 * s.b;
           if (tw < 0.15) continue;
@@ -1071,6 +1106,20 @@
       }
     }) });
     let inBed = null;
+    // a crew sharing a room at the inn gets a bed each, down the left wall below the page's hero's own; each mate is asleep,
+    // lying awake or still up (and their bed made) by the same roll as a bedroll at camp
+    const crewBeds = [], bedRects = [];
+    const crewBedsAt = (u0, v0, gap, o) => {
+      const quilts = [["#3a5a7a", "#2e4a66"], ["#4a6a3a", "#3a5630"], ["#8a6a3a", "#6e5430"], ["#6a3a5a", "#542e48"]].filter((q) => q[0] !== bl[0]);
+      for (let i = 1; i < Math.min(4, cast.length); i++) {
+        const v = v0 + (i - 1) * gap, c = o && o.quilt ? o.quilt[(i - 1) % o.quilt.length] : null, q = c ? [c, shade(c, -0.15)] : quilts[(i - 1) % quilts.length];
+        const p = bedPiece(st, u0, v, 2.4, 1.2, Object.assign({ wood: "#6a4226", head: 12, foot: 8 }, o, { quilt: q }));
+        props.push({ key: 0.5, cv: p.back });
+        const g = Art.rng(Art.hash(seed + ":bed:" + cast[i].h.id)); g(); const x = g();
+        crewBeds[i] = x < 0.25 ? null : { z: 11, cut: 20, fold: "#f2e8d4", lie: { quilt: q, len: 1.3, awake: x < 0.5 }, at: [u0 + 0.85, v + 0.6] };
+        bedRects.push([u0 - 0.3, v - 0.3, u0 + 2.7, v + 1.5]);
+      }
+    };
     const bedAt = (u, v, du, dv, o) => {
       const p = bedPiece(st, u, v, du, dv, o);
       props.push({ key: 0.5, cv: p.back });
@@ -1164,10 +1213,11 @@
         bedAt(0.4, 0.3, 2.4, 1.3, { wood: "#6a4226", quilt: [bl[0], bl[1]], head: 15, foot: 9, aside: [3.3, 0.9, 7.5] });
         tableAt(0.3, 1.85, 0.6, 0.55, 9, "#6a4226", [["book", 0.6, 0.3]]);
         candleOn(0.55, 2.2, 9, null, 74);
+        crewBedsAt(0.4, 2.65, 1.6);
         props.push({ key: 3.0 + 1.5, cv: chest(st, 3.0, 0.35, 0.6, 1.1, "#5e3a1e", "#3a3a40") });
         tableAt(5.2, 0.1, 0.8, 0.6, 11, "#6a4226", [["basin", 0.5, 0.5], ["jug", 0.15, 0.3]]);
         props.push({ key: 7.4 + 1.4, cv: layer(st, (ctx) => S.stool(ctx, st, 7.0, 1.0, "#6a4226")) });
-        packAt(3.4, 2.1); bootsAt(2.3, 2.3);
+        packAt(3.4, 2.1); if (cast.length < 2) bootsAt(2.3, 2.3); else bootsAt(3.3, 3.2);
         hostAt = (() => { const d = st.lwall(7.85, 32); return [d[0] + 4, d[1] - 2]; })();
       } else if (kind === "suite") {
         amb = 0.42;
@@ -1180,11 +1230,12 @@
         bedAt(0.4, 0.3, 2.8, 2.0, { wood: "#5a3018", quilt: ["#7a2420", "#6a1e1a", "#c8a040"], head: 22, foot: 13, posts: true, canopy: ["#8a2a24", "#6a1e1a"], arch: true, aside: [3.67, 1.25, 7.5] });
         tableAt(0.3, 2.55, 0.6, 0.55, 10, "#5a3018");
         candleOn(0.6, 2.85, 10, "gold");
+        crewBedsAt(5.6, 2.9, 1.6, { wood: "#5a3018", head: 14, foot: 9, quilt: ["#7a2420", "#2e4a5a", "#8a6a2a"] });
         props.push({ key: 3.4 + 2.1, cv: chest(st, 3.4, 0.5, 0.55, 1.5, "#5a3018", "#c8a040") });
         props.push({ key: 4.4 + 0.8, cv: cabinet(st, 4.3, 0.05, 1.4, 0.75, 36, "#5a3018", doors(4.3, 5.7, 36, "#6a3a1e")) });
         tableAt(9.4, 1.6, 0.9, 0.9, 10, "#5a3018", [["wine", 0.3, 0.6], ["fruit", 0.7, 0.3]]);
         candleOn(9.75, 1.85, 10, "three");
-        props.push({ key: 1.2 + 3.6 + 0.7, cv: chair(st, 1.3, 3.4, "#5a3018", "#2e4a5a", true) });
+        if (cast.length < 2) props.push({ key: 1.2 + 3.6 + 0.7, cv: chair(st, 1.3, 3.4, "#5a3018", "#2e4a5a", true) });
         { const [x, y] = st.iso(10.5, 0.45); props.push({ key: 11, cv: layer(st, (ctx) => { ctx.fillStyle = "#8a4a2a"; ctx.fillRect(Math.round(x) - 3, Math.round(y) - 6, 7, 6); ctx.fillStyle = "#a85e36"; ctx.fillRect(Math.round(x) - 3, Math.round(y) - 6, 2, 6); for (let i = 0; i < 14; i++) { ctx.fillStyle = i % 3 ? "#4a7a3a" : "#6a9a4a"; ctx.fillRect(Math.round(x) - 5 + (i * 7) % 11, Math.round(y) - 8 - ((i * 5) % 12), 2, 2); } }) }); }
         packAt(3.6, 2.4); bootsAt(2.6, 2.6);
         hostAt = (() => { const d = st.lwall(8.1, 34); return [d[0] + 4, d[1] - 2]; })();
@@ -1297,10 +1348,11 @@
       while (foot > 0 && !aside.px.slice(foot * aside.w, (foot + 1) * aside.w).some((c) => c)) foot--;
       props.push({ key: au + av + (az ? 1 : 0), draw: (ctx) => { if (!st.bed.awake) ctx.drawImage(cv, Math.round(x - aside.w / 2), Math.round(y) - foot); } });
     }
-    const host = t.host && t.host.lines && Object.assign({}, t.host, { at: hostAt || [W / 2, 20] });
-    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46]]));
+    const host = t.host && t.host.lines && Object.assign({}, t.host, { at: hostAt || [W / 2, 20], beast: kind === "stables" ? (t.host.mount || {}).kind || "horse" : null });
+    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46], [-56, 40]]).filter(([u, v]) => !bedRects.some(([a, b, c, d]) => u > a && u < c && v > b && v < d)));
     const inside = S.inRoom(st, NU, NV, WH), shine = S.lighting(W, H, (x, y) => inside(x, y) && !views.some((v) => v && v.glass(x, y)));
     return gather({ talks: t.talk, kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
+      rest: crewBeds.length ? (h, i) => crewBeds[i] || null : null,
       under(ctx, now, flick, still) {
         for (const v of views) if (v) v.draw(ctx, now, still);
         if (fire) S.flames(ctx, st, now, fire[0], fire[1], flick, 1, true);

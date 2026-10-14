@@ -37,15 +37,31 @@
 
   // ---------- sprites ----------
   const animated = new Set();
-  let frame = 0;
-  setInterval(() => {
+  let frame = 0, idleTimer = 0;
+  function idle() {
     frame ^= 1;
     for (const a of animated) {
       if (!a.canvas.isConnected) { animated.delete(a); continue; }
       a.draw(frame);
     }
-  }, 650);
+  }
+  // static scenes (and reduced motion) stop the idle beat outright, not just its drawing
+  function idling() {
+    const on = !(window.Settings && Settings.calm());
+    if (on && !idleTimer) idleTimer = setInterval(idle, 650);
+    else if (!on && idleTimer) { clearInterval(idleTimer); idleTimer = 0; }
+  }
+  idling();
+  if (window.Settings) Settings.watch(idling);
   function heroLook(h) { return S.classes[h.cls] || S.classes.warrior; }
+  // a legendary figure (L.legends[].art, from league/export.py legend_art) as a hero-like figure for any scene: { h, cls, lines }
+  function legendFigure(name) {
+    const art = ((L.legends || []).find((x) => x.name === name) || {}).art;
+    if (!art) return null;
+    const k = art.kit;
+    return { h: { id: "legend:" + name, name, look: art.look, kit: k, weapon: k.weapon.family, weapon_tier: k.weapon.tier, armor_tier: k.armor.tier, legend: true, alive: true },
+      cls: { name: "legend", look: { outfit: k.armor.outfit, head: "none", aura: null, offhand: "none" } }, lines: art.lines || [] };
+  }
   function spriteCanvas(gridFn, scale, cls, animate) {
     const g0 = gridFn(0);
     const cv = el("canvas", { width: g0.w * scale, height: g0.h * scale, class: cls || "" });
@@ -90,6 +106,21 @@
   function itemSprite(id, scale) { return Art.itemGrid(id).toCanvas(scale || 2); }
 
   // ---------- names & links ----------
+  // the site's one money formatter (league/town.py money is the sim's): wealth in silver, small sums in copper, gold only as flavour
+  function money(copper, gold) {
+    copper = Math.round(Math.abs(copper || 0));
+    const s = Math.floor(copper / 10), c = copper % 10;
+    if (!s) return `${c} copper`;
+    if (gold && copper >= 1000 && copper % 100 === 0) return `${copper / 100} gold piece${copper > 100 ? "s" : ""}`;
+    if (c && s < 10) return `${s} silver ${c} copper`;
+    return `${s.toLocaleString("en-US")} silver`;
+  }
+  // a sitting at a town table, as the day box and the calendar show it: "Lost 3 silver at Liar's Dice ▸ watch"
+  function tableLink(x) {
+    if (!x || !x.table) return null;
+    return el("span", { class: "table-line" }, x.table, x.game ? [" ", el("a", { href: `#/${x.route || "table"}/${x.game}` }, "▸ watch")] : null);
+  }
+
   function heroLink(id, opts) {
     const h = heroes[id];
     if (!h) return el("span", null, "someone");
@@ -348,7 +379,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, spriteCanvas, when,
-    animated,
+    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, tableLink,
   };
 })();

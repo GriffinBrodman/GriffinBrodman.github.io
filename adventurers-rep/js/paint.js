@@ -840,11 +840,12 @@
         }
         break;
       case "quiver":
-        if (!front) {
-          P.poly([[21, 10.5], [24.5, 9.5], [25.5, 19], [22, 20]], "bk", (x) => 0.25 - (x - 21) * 0.15);
-          if (t >= 1) P.line(21.2, 12, 24.8, 11, t === 3 ? "gold" : "dleather", 0.2);
-          if (t === 3) P.line(21.8, 18, 25.2, 17.2, "gold", 0);
-        } else P.line(19.5, 17, 9.5, 25, "strap", 0.1);
+        // the arrows sit behind the head too, so a hat brim or a hood stays in front of them
+        if (!front) { quiverBody(P, QS, t); quiverArrows(P, QS, t); }
+        else {
+          P.line(19.5, 16.6, 9, 25, t ? "dleather" : "strap", 0.15);
+          if (t >= 2) { P.px(14, 21, t === 3 ? "gold" : "omet", 0.4); P.px(15, 20, t === 3 ? "gold" : "omet", 0); }
+        }
         break;
       case "backpack":
         if (!front) {
@@ -876,16 +877,42 @@
     }
   }
 
-  function backTop(P, art, t) {
-    if (art === "quiver") {
-      const n = [2, 3, 4, 5][t];
-      for (let i = 0; i < n; i++) {
-        const x = 21.5 + i * (3.4 / n), up = i % 2;
-        P.line(x + 0.6, 10, x, 7.6 - up, "dwood", 0);
-        const m = up && t >= 2 ? "fav" : "feather";
-        dot(P, x, 7 - up, m, 0.35); dot(P, x, 8 - up, m, -0.1);
+  // the quiver is slung across the back: the strap runs over the right shoulder to the left hip, so the mouth rides up behind
+  // the right shoulder with the fletchings showing past it, and the tip peeks out low on the left; QS = sprite, QP = portrait
+  const QS = { b: [7.6, 27.6], m: [21.6, 10.6], hw: 1.75, arrow: 3.6, fl: 1.6 };
+  const QP = { b: [24, 42], m: [33.6, 15], hw: 3.1, arrow: 6, fl: 3 };
+  function quiverFrame(q) {
+    const [bx, by] = q.b, [mx, my] = q.m, L = Math.hypot(mx - bx, my - by), dx = (mx - bx) / L, dy = (my - by) / L;
+    const at = (u, v) => [bx + dx * u - dy * v, by + dy * u + dx * v];
+    const side = (x, y) => (x - bx) * -dy + (y - by) * dx;
+    return { L, dx, dy, at, side };
+  }
+  function quiverBody(P, q, t) {
+    const F = quiverFrame(q), { L, at, side } = F, w = q.hw;
+    const shade = (x, y) => 0.3 - (side(x + 0.5, y + 0.5) / w + 1) * 0.28;
+    P.poly([at(0.8, -w * 0.7), at(L, -w), at(L, w), at(0.8, w * 0.7), at(0, 0)], "bk", shade);
+    const band = (u, m, s) => P.poly([at(u, -w - 0.15), at(u + (q.hw > 2 ? 1.2 : 0.9), -w - 0.15), at(u + (q.hw > 2 ? 1.2 : 0.9), w + 0.15), at(u, w + 0.15)], m, (x, y) => s - (side(x + 0.5, y + 0.5) / w) * 0.25);
+    band(L - (q.hw > 2 ? 1.2 : 0.9), t === 3 ? "gold" : t ? "dleather" : "bk", t ? 0.25 : -0.35);
+    if (t >= 1) band(L * 0.62, t === 3 ? "gold" : "dleather", 0.1);
+    if (t === 3) band(L * 0.25, "gold", 0);
+  }
+  function quiverArrows(P, q, t) {
+    const F = quiverFrame(q), { L, dx, dy, at } = F, n = [2, 3, 4, 5][t], w = q.hw * 0.75;
+    for (let i = 0; i < n; i++) {
+      const v = n === 1 ? 0 : -w + (2 * w * i) / (n - 1), up = (i % 2 ? 0.5 : 1.3) * (q.hw > 2 ? 1.4 : 1);
+      const [x0, y0] = at(L - 0.4, v), [x1, y1] = at(L + q.arrow - q.fl + up, v + (q.hw > 2 ? 0.6 : 0.3));
+      P.line(x0, y0, x1, y1, "dwood", 0);
+      const m = i % 2 && t >= 2 ? "fav" : "feather";
+      for (let k = 0; k <= q.fl * 2; k++) {
+        const u = L + q.arrow - q.fl + up + k * 0.5, vv = v + (q.hw > 2 ? 0.6 : 0.3) + (k / (q.fl * 2)) * (q.hw > 2 ? 0.4 : 0.2);
+        const [x, y] = at(u, vv);
+        P.px(x, y, m, 0.35 - (k / (q.fl * 2)) * 0.3 - (i % 2 ? 0.15 : 0));
+        if (q.hw > 2) { const [x2, y2] = at(u, vv + 0.9); P.px(x2, y2, m, -0.15); }
       }
-    } else if (t >= 1) {
+    }
+  }
+  function backTop(P, art, t) {
+    if (art !== "quiver" && t >= 1) {
       for (const [x, sh] of [[4.5, 0.3], [21.5, -0.2]]) P.rect(x, 13, 2, 3, "bk", sh);
       if (t >= 2) for (const [x, sh] of [[5.5, 0.35], [22.5, 0]]) P.ell(x, 12.6, 1.5, 1.5, t === 3 ? "fav" : "cream", { s: sh });
     }
@@ -1350,13 +1377,8 @@
         }
         break;
       case "quiver":
-        if (!front) {
-          const n = [2, 3, 4, 5][t];
-          P.rect(29, 14, 4, 16, "bk", (x) => 0.1 - (x - 29) * 0.15);
-          for (let i = 0; i < n; i++) { const x = 28.5 + i * (5 / n); P.line(x + 0.5, 9 + (i % 2), x, 14, "feather", 0.2); P.px(x + 0.5, 9 + (i % 2), i % 2 && t >= 2 ? "fav" : "feather", 0.4); }
-          if (t >= 1) P.rect(29, 17, 4, 1, t === 3 ? "gold" : "dleather", 0.2);
-          if (t === 3) P.rect(29, 25, 4, 1, "gold", 0);
-        } else if (t) { P.line(cx + 12, 29, cx - 8, 40, "dleather", 0); P.line(cx + 13, 29.5, cx - 7, 40.5, "dleather", -0.3); }
+        if (!front) { quiverBody(P, QP, t); quiverArrows(P, QP, t); }
+        else { const m = t ? "dleather" : "strap"; P.line(cx + 12, 28.5, cx - 8, 40, m, 0.1); P.line(cx + 13, 29, cx - 7, 40.5, m, -0.3); if (t >= 2) P.rect(cx + 1, 34, 2, 2, t === 3 ? "gold" : "omet", (x) => 0.4 - (x - cx - 1) * 0.3); }
         break;
       case "backpack":
         if (!front) {

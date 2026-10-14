@@ -477,15 +477,24 @@
     const kind = locKind(e.loc), seed = hash(e.id);
     const indoors = S.towns[e.loc] && TAVERN_KINDS.has(e.kind) ? "tavern" : S.towns[e.loc] && e.kind === "crime" ? "jail" : null;
     const place = indoors ? null : placeAt(e.loc);
-    const bg = paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, place);
-    const info = bg.info;
     const ground = Math.round(H * 0.62) + 14;
+    // a dungeon is framed from its own map header, cut so its way in stands just behind the heroes
+    const TS = window.TownScenes, hdr = !indoors && S.dungeons[e.loc] && TS && TS.frame && TS.DUNGEONS.includes(e.loc) ? TS.frame(e.loc, W, H, { y0: (TS.FOOT[e.loc] || 70) - (ground - 9) }) : null;
+    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, place);
+    const info = hdr ? { kind, W, H, horizon: ground - 14, bk: S.dungeons[e.loc].biome } : bg.info;
     if (e.wx && !indoors) weatherOverlay(bg.getContext("2d"), W, H, e.wx, seed);
     // heroes, foes and props sit on their own layer so the place's ambient life can pass behind them
     const over = document.createElement("canvas");
     over.width = W; over.height = H;
     const ctx = over.getContext("2d");
-    const actors = A ? ambient(info, place, seed, true, true) : [];
+    if (hdr) ctx.drawImage(hdr.over, 0, 0);
+    // with heroes in front, the scene's patrols and chickens are moved back to the ground behind their feet
+    const back = (a, i) => {
+      const z = a.z - hdr.y0, to = ground - 9 - (i % 3) * 2;
+      if (!a.walker || !(e.heroes || []).length || z < ground - 8) return a;
+      return { z: to + hdr.y0, draw(c, t) { c.save(); c.translate(0, to - z); a.draw(c, t); c.restore(); } };
+    };
+    const actors = hdr ? hdr.acts.map(back) : A ? ambient(info, place, seed, true, true) : [];
     const sprite = (a, b, x, y, i) => {
       if (A) actors.push(A.flip({ a: a.toCanvas(1), b: b.toCanvas(1), x, y, z: 5e3, rate: 0.8, seed: i * 3 + 1, front: true }));
       else ctx.drawImage(a.toCanvas(1), x, y);
@@ -505,7 +514,16 @@
     });
     const px = Math.round(W * 0.66);
     const prop = (grid, sx, sy) => ctx.drawImage(grid.toCanvas(1), sx, sy);
-    if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
+    const lg = e.kind === "legend" && e.legend && App.legendFigure ? App.legendFigure(e.legend) : null;
+    if (lg) {
+      // the legend stands facing whoever they came to see, a little apart, with a faint shimmer about them
+      const g = Art.heroGrid(lg.h, 0, lg.cls), lx = hs.length ? Math.max(px, startX + hs.length * 30 + 8) : Math.round(W * 0.5 - 14), ly = ground - g.h;
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(lx + 8, ground - 1, 12, 2);
+      sprite(hs.length ? g.flipX() : g, hs.length ? Art.heroGrid(lg.h, 1, lg.cls).flipX() : Art.heroGrid(lg.h, 1, lg.cls), lx, ly, 7);
+      const pts = [];
+      for (let i = 0; i < 7; i++) { const q = rng(seed + i * 13); pts.push([lx + 2 + Math.floor(q() * 24), ly + Math.floor(q() * 30)]); }
+      if (A) actors.push(A.twinkle({ pts, col: "#fff4c8", arm: "#e8b84a", seed, z: 9e4, front: true }));
+    } else if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
       const m = S.monsters[S.dungeons[e.loc].boss];
       const g = Art.monsterGrid(m, 0);
       // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid

@@ -253,6 +253,16 @@
     });
   });
 
+  // the Yeti Society's correspondence board: a tiny corner box in the paper, never a feed story
+  function yetiCorner() {
+    const y = L.yeti;
+    if (!y || !window.ChessReplay) return null;
+    let board = null;
+    try { board = ChessReplay.player(y, { scale: 1 }); } catch (e) { return null; }
+    const done = y.result ? (y.result === "draw" ? "Drawn." : y.players[y.winner].yeti ? "The footprint won." : "The Society won!") : `Move ${y.move}.`;
+    return el("a", { class: "yeti-corner", href: "#/map/frosthold" }, board, el("div", { class: "tiny dim yeti-note" }, `Yeti Society, day ${y.yeti.day}. ${done}`));
+  }
+
   A.route(/^\/$/, (v) => {
     const meta = L.meta;
     const parch = el("section", { class: "panel parch" });
@@ -278,6 +288,8 @@
     if (picker) v.appendChild(picker);
     const wxs = weatherStrip();
     if (wxs) parch.appendChild(wxs);
+    const yb = yetiCorner();
+    if (yb) parch.appendChild(yb);
     const hb = hyperBanner();
     if (hb) v.appendChild(hb);
 
@@ -366,7 +378,7 @@
       case "trait": return `${h0} is not the same hero`;
       case "poached": return `Transfer scandal: ${h0}`;
       case "crime": return `${h0} in trouble with the law`;
-      case "legend": return `${h0} becomes a legend`;
+      case "legend": return e.legend ? ((e.heroes || []).length ? `${e.legend} seeks out ${h0}` : `${e.legend} is spotted`) : `${h0} meets a legend`;
       case "join": return `${h0} joins the league`;
       case "relic": return `${h0}'s mystery relic identified`;
       case "keystone": if (e.ks) return `${h0}: ${e.ks}`;
@@ -605,7 +617,7 @@
         el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
           h.progress ? el("span", { class: "dim" }, ` · ${h.progress}`) : null),
         h.why ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${h.why}.`) : null,
-        todayBox(h.daybook && window.Daybook ? null : h.route, h.today),
+        todayBox(h.daybook && window.Daybook ? null : h.route, h.today, null, h.tables_today),
         goalLine(h.goal, h.party),
         ...(h.vows || []).map((v) => vowLine(v, h.party)),
         h.alive ? el("div", { class: "row wrap small", style: { gap: "14px" } },
@@ -613,7 +625,7 @@
           el("div", { style: { minWidth: "150px" } }, `XP ${h.xp}/${h.xp_next} (to level ${h.level + 1})`, A.bar(h.xp, h.xp_next, "gold")),
           el("div", { style: { minWidth: "150px" } }, `Stress ${h.stress} (${h.stress >= 70 ? "frayed" : h.stress >= 40 ? "tense" : "calm"})`, A.bar(h.stress, 100, "red"),
             (h.stress_why || []).length ? el("div", { class: "tiny dim" }, "This week: " + h.stress_why.map(([k, v]) => `${k} ${v > 0 ? "+" : "−"}${Math.abs(v)}`).join(", ")) : null),
-          el("div", null, el("b", { class: "gold" }, String(h.gold)), " silver"),
+          el("div", null, el("b", { class: "gold" }, A.money(h.gold * 10 + (h.copper || 0)))),
           h.joined ? el("div", { style: { minWidth: "150px" } }, el("b", { class: "gold" }, h.renown), " renown",
             el("div", { class: "tiny dim" }, renownCaption(h)),
             (h.renown_parts || []).length ? el("div", { class: "tiny" }, "Renown from: ", h.renown_parts.slice(0, 4).map(([k, v], i) => {
@@ -846,6 +858,43 @@
       }
       p.append(el("h4", { style: { marginTop: "10px" } }, "Also carrying"), row);
     }
+    if ((h.sets || []).length) {
+      const row = el("div", { class: "kit-curios" });
+      for (const s of h.sets) {
+        const b = el("button", { class: "it curio", type: "button" }, Art.gearIcon({ slot: "pocket", art: s.art, name: s.name }, h.look).toCanvas(2), s.name);
+        const go = () => {
+          tiles.forEach((t) => t.classList.remove("on")); info.innerHTML = "";
+          const lost = s.missing ? ` · ${s.missing} piece${s.missing > 1 ? "s" : ""} missing` : "";
+          info.append(el("div", { class: "nm" }, s.name), el("div", { class: "tiny dim" }, `Game set (${s.kind}) · ${s.condition}${lost} · ${s.games} game${s.games === 1 ? "" : "s"}`),
+            el("p", { class: "small" }, s.desc));
+          const hl = historyList(s.history);
+          if (hl) info.appendChild(hl); else if (s.story) info.appendChild(el("p", { class: "tiny muted story" }, cap(s.story) + "."));
+        };
+        b.addEventListener("mouseenter", go); b.addEventListener("focus", go); b.addEventListener("click", go);
+        row.appendChild(b);
+      }
+      p.append(el("h4", { style: { marginTop: "10px" } }, "Game sets"), row);
+    }
+    return p;
+  }
+  // head-to-head at the fire: the running record against each crewmate, per game, and the camp nicknames earned
+  function firePanel(h) {
+    const x = h.h2h || {};
+    const rows = (x.rows || []).filter((r) => heroes[r.vs]);
+    const nicks = Object.entries(x.nicks || {});
+    const prefs = Object.entries(x.prefs || {}).sort((a, b) => b[1] - a[1]);
+    if (!rows.length && !nicks.length && !(h.sets || []).length) return null;
+    const p = panel("At the fire");
+    if (prefs.length) p.appendChild(el("p", { class: "small" }, "Would rather play ", el("b", null, prefs[0][0]), prefs[1] ? [", then ", prefs[1][0]] : null, "."));
+    if (nicks.length) p.appendChild(el("p", { class: "small gold" }, "Called ", nicks.map(([k, n], i) => [i ? ", " : "", el("b", null, n), ` at ${k}`]), " by the camp."));
+    for (const r of rows) {
+      const lead = r.won > r.lost ? "green" : r.won < r.lost ? "red" : "dim";
+      const run = r.run && r.run[1] >= 2 ? (r.run[0] === h.id ? ` · won the last ${r.run[1]}` : ` · lost the last ${r.run[1]}`) : "";
+      p.appendChild(el("div", { class: "row", style: { marginBottom: "4px" } }, A.heroPortrait(heroes[r.vs], 1),
+        el("div", { style: { flex: 1 } }, A.heroLink(r.vs), el("span", { class: "small dim" }, ` · ${r.kind}`),
+          el("span", { class: "small " + lead }, `  ${r.won}–${r.lost}${r.drawn ? `, ${r.drawn} drawn` : ""}`), el("span", { class: "small dim" }, run))));
+    }
+    if (!rows.length) p.appendChild(el("p", { class: "empty" }, "No games played against anyone yet."));
     return p;
   }
   function gearPanel(h) {
@@ -853,7 +902,7 @@
     if (!h.kit) p.appendChild(el("p", null, el("b", null, h.gear.weapon.name), el("span", { class: "dim small" }, ` (tier ${h.gear.weapon.tier} ${h.gear.weapon.family.replace("_", " ")})`), " · ",
       el("b", null, h.gear.armor.name), el("span", { class: "dim small" }, ` (tier ${h.gear.armor.tier})`)));
     const inv = el("div", { class: "inv" });
-    inv.appendChild(el("span", { class: "it" }, A.itemSprite("gold", 2), `${h.gold} silver`));
+    inv.appendChild(el("span", { class: "it" }, A.itemSprite("gold", 2), A.money(h.gold * 10 + (h.copper || 0))));
     const one = { "Fangs & Claws": "fang", "Remains": "set of remains", "Stolen Goods": "bag of stolen goods" };
     const goodName = (g, q) => { const n = S.goods[g].name; return (q === 1 ? one[n] || n.replace(/s$/, "") : n).toLowerCase(); };
     for (const [g, q] of Object.entries(h.inv)) inv.appendChild(el("span", { class: "it" }, A.itemSprite(g, 2), `${q} ${goodName(g, q)}`));
@@ -881,6 +930,8 @@
           el("div", { style: { maxWidth: "240px" } }, el("div", { class: "trait", style: { gridTemplateColumns: "1fr" } }, el("div", { class: "tbar" }, el("i", { style: { left: ((r.score + 100) / 200) * 100 + "%" } })))))));
     }
     b.appendChild(p);
+    const fire = firePanel(h);
+    if (fire) b.appendChild(fire);
     if (h.debts.length) {
       const d = panel("Debts");
       for (const x of h.debts) d.appendChild(el("p", null, x.owes ? ["Owes ", A.heroLink(x.owes), ` ${x.amount} silver.`] : [A.heroLink(x.owed_by), ` owes them ${x.amount} silver.`]));
@@ -1124,12 +1175,13 @@
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
       ms, p.disbanded ? null : moraleBar(p), lastNews(p));
   }
-  function todayBox(route, today, label) {
-    if (!route && !(today || []).length) return null;
+  function todayBox(route, today, label, tables) {
+    if (!route && !(today || []).length && !(tables || []).length) return null;
     return el("div", { class: "today-box small" },
       el("div", { class: "tiny gold" }, label || (route ? route.split(":")[0] : "Today")),
       route ? el("div", null, cap(route.replace(/^Day \d+: /, ""))) : null,
-      ...(today || []).map((t) => el("div", { class: "muted" }, "· " + t)));
+      ...(today || []).map((t) => el("div", { class: "muted" }, "· " + t)),
+      ...(tables || []).map((x) => el("div", { class: "muted" }, "· ", A.tableLink(x))));
   }
   A.route(/^\/party\/(\w+)$/, (v, id) => A.load(`party/${id}`).then((p) => {
     const head = panel(null);

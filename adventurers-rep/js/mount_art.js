@@ -23,7 +23,7 @@
     ox: ["red", "black", "cream"],
     horse: ["bay", "chestnut", "grey", "black", "dun", "palomino", "buckskin", "pinto", "appaloosa", "roan", "white-socked"],
     courser: ["grey", "black", "chestnut", "palomino", "white-socked"], destrier: ["black", "grey", "bay", "roan", "pinto"],
-    camel: ["sand"], unicorn: ["white"], eagle: ["golden"], skeleton: ["bone"],
+    camel: ["sand"], unicorn: ["white"], eagle: ["golden"], skeleton: ["bone"], kelpie: ["sea-green", "black"], stag: ["white"],
   };
   const WAGONS = ["handcart", "donkey_cart", "horse_cart", "ox_wagon", "covered_wagon", "carriage"];
 
@@ -50,6 +50,10 @@
   const OX = { red: "#9c4c2c", black: "#3a3434", cream: "#dccaa2" }, COW = "#ece6d8";
   const HOOF = "#3a2c28";
   const BONE = "#e4dccb", GLOW = "#8af0a0";
+  // the kelpie: a wet dark coat, a mane of river weed with pond-light in it, and water running off; the white stag: grey-blue shade, ivory antlers
+  const KELPIE = { "sea-green": { coat: "#2e5852", mane: "#4f7a34", hoof: "#1e3430" }, black: { coat: "#22272c", mane: "#3a6034", hoof: "#16201e" } };
+  const WATER = ["#3a7aa8", "#6ab8dc", "#b0e8f6"], SEAGLOW = "#8af0c8";
+  const STAG = { coat: "#e2e5ea", mane: "#c4c8d0", hoof: "#4a4448" }, ANTLER = "#cdb68a", MOTE = "#e4f4ff";
 
   // ---------- shaded primitives (lit from the top-left, like Grid.blob) ----------
   function lit(nx, ny, d, bias) {
@@ -110,10 +114,12 @@
     pony: { L: 5.0, B: 3.1, leg: 4.4, neck: 4.0, neckA: 56, head: 3.8, headA: 44, ear: 1.5, mane: 1.3, tail: 1.6, shaggy: true },
     donkey: { L: 5.2, B: 2.9, leg: 5.4, neck: 3.4, neckA: 40, head: 4.6, headA: 52, ear: 4.2, mane: 0.6, tail: 0.6, donkey: true },
     skeleton: { L: 6.2, B: 3.2, leg: 6.5, neck: 5.4, neckA: 58, head: 4.4, headA: 42, ear: 2, mane: 0, tail: 0.7, bones: true },
+    kelpie: { L: 6.3, B: 3.0, leg: 7.0, neck: 5.8, neckA: 62, head: 4.4, headA: 40, ear: 2, mane: 1.3, tail: 1.5, kelpie: true },
+    stag: { L: 5.8, B: 2.7, leg: 7.6, neck: 5.4, neckA: 56, head: 4.0, headA: 46, ear: 2, mane: 0, tail: 0.9, slim: true, stag: true },
   };
   // beside a ~30px hero: a horse's back stands above a person's chest and it is longer than a person is tall; a pony comes
   // up to the hip, a donkey a little lower, a camel's head well over a person's
-  const SCENE_K = { horse: 1.7, courser: 1.7, destrier: 1.75, unicorn: 1.7, skeleton: 1.7, pony: 1.5, donkey: 1.4, ox: 1.65, camel: 1.6, eagle: 1.6 };
+  const SCENE_K = { horse: 1.7, courser: 1.7, destrier: 1.75, unicorn: 1.7, skeleton: 1.7, kelpie: 1.7, stag: 1.7, pony: 1.5, donkey: 1.4, ox: 1.65, camel: 1.6, eagle: 1.6 };
   const WAGON_K = 1.7;
   // a pony drawn at people scale stands a little longer in the leg than the pen's stocky one
   const SCENE_SHAPE = { pony: { leg: 1.15 } };
@@ -124,7 +130,7 @@
     return o;
   }
   function geometry(p, frame, k) {
-    const G = Math.round(p.leg + p.B * 2 + p.neck + 6 * k), legTop = G - p.leg, cy = legTop - p.B * 0.45;
+    const G = Math.round(p.leg + p.B * 2 + p.neck + (p.stag ? 10 : 6) * k), legTop = G - p.leg, cy = legTop - p.B * 0.45;
     const rumpR = p.B * 1.02, rumpX = 3.4 * k + rumpR, bodyX = rumpX + p.L * 0.72, chestX = bodyX + p.L - 1.8 * k;
     const na = p.neckA * Math.PI / 180, ha = p.headA * Math.PI / 180, bob = frame ? 1 : 0;
     const nb = [chestX + 0.4 * k, cy - p.B * 0.35];
@@ -136,14 +142,16 @@
     k = k || 1;
     const p = sized(Object.assign({ kind }, EQUINE[kind]), k), q = geometry(p, frame, k), big = k > 1;
     if (p.bones) return drawSkeletonHorse(new Grid(q.W, q.H), p, q, frame, k);
-    const co = kind === "donkey" ? { coat: DONKEY[colour], mane: "#2e2624", donkey: true } : COAT[colour];
+    const co = kind === "donkey" ? { coat: DONKEY[colour], mane: "#2e2624", donkey: true } : kind === "kelpie" ? KELPIE[colour] : kind === "stag" ? STAG : COAT[colour];
     const C = ramp(co.coat), M = ramp(co.mane), F = ramp(co.hoof || HOOF);
     const g = new Grid(q.W, q.H);
     const { G, legTop, cy, rumpR, rumpX, bodyX, chestX, nb, nt, muzzle } = q;
     const B = p.B;
     const fl = frame ? 1 : 0;
     const tb = [rumpX - rumpR + 0.6 * k, cy - B * 0.7];
-    const tail = p.donkey
+    const tail = p.stag ? [tb, [tb[0] - 1.1 * k, tb[1] + 1.2 * k + fl * 0.4 * k]]
+      : p.kelpie ? [tb, [tb[0] - 2.2 * k - fl * 0.6, tb[1] + 2.6 * k], [tb[0] - 1.4 * k - fl * 1.2, tb[1] + 3 * k + p.leg * 0.55], [tb[0] - 2.4 * k - fl, G - 1 * k]]
+      : p.donkey
       ? [tb, [tb[0] - 1.2 * k - fl * 0.6, tb[1] + 3 * k], [tb[0] - 1.2 * k - fl, tb[1] + 6 * k]]
       : p.shaggy ? [tb, [tb[0] - 2 * k - fl * 0.5, tb[1] + 2.5 * k], [tb[0] - 2 * k - fl, G - 3 * k]]
         : [tb, [tb[0] - 1.8 * k - fl * 0.6, tb[1] + 2.4 * k], [tb[0] - 1.6 * k - fl * 1.2, tb[1] + 3 * k + p.leg * 0.85]];
@@ -210,6 +218,10 @@
       cap(g, [[ex + 0.6 * k, ey + 0.8 * k], [ex + 0.2 * k, ey - p.ear + 1 * k]], 0.8 * k, 0.65 * k, C, -1);
       g.set(Math.round(ex - 1.2 * k), Math.round(ey - p.ear + 1.5 * k), M[1]);
       if (big) g.set(Math.round(ex - 1.3 * k), Math.round(ey - p.ear + 1.5 * k) + 1, M[1]);
+    } else if (p.stag) {
+      // a deer's ears stand out sideways, under the antlers
+      cap(g, [[ex - 0.1 * k, ey + 0.8 * k], [ex - 2 * k, ey - 0.1 * k]], 0.8 * k, 0.45 * k, C, -1);
+      if (!big) g.set(ex - 2, ey, C[3]);
     } else if (big) {
       cap(g, [[ex, ey + 1], [ex + 0.3 * k, ey - p.ear + 1.2]], 0.95 * k, 0.45 * k, C);
       g.set(ex, ey, C[1]);
@@ -241,7 +253,15 @@
     if (big) g.set(eye[0] - 1, eye[1] - 1, C[1]);
     g.set(Math.round(muzzle[0] + 0.3 * k), Math.round(muzzle[1] - 0.2 * k), C[0]);
     if (p.barding) barding(g, p, q, frame, [C, co.patches && ramp(co.patches), co.roan && ramp(co.roan)].filter(Boolean), k);
+    if (p.kelpie) kelpieWeed(g, p, q, C, M, frame, k, off);
+    if (p.stag) { g.set(Math.round(muzzle[0] + 0.3 * k), Math.round(muzzle[1] - 0.2 * k), "#3a3036"); }
     g.outline(OUTLINE);
+    if (p.kelpie) kelpieWater(g, p, q, frame, k, foreX, hindX, eye);
+    if (p.stag) antlers(g, ex, ey, k);
+    if (p.stag) for (const [dx, dy] of frame ? [[-5, -3], [1.5, -9], [-6.5, -8]] : [[-4, -6], [2.5, -7], [-7, -4.5]]) {
+      const x = Math.round(ex + dx * k), y = Math.round(ey + dy * k);
+      if (y >= 0 && !g.get(x, y)) g.set(x, y, MOTE);
+    }
     if (p.horn) {
       const sp = frame ? [[nt[0] + 6 * k, nt[1] - 6 * k], [rumpX - 3 * k, cy - 3 * k], [bodyX + 1 * k, cy - B - 3 * k]] : [[nt[0] + 5 * k, nt[1] - 3 * k], [rumpX - 2 * k, cy + 3 * k], [bodyX - 2 * k, cy - B - 2 * k]];
       for (const [sx, sy] of sp) { const x = Math.round(sx), y = Math.round(sy); if (!g.get(x, y)) g.set(x, y, "#fff6c8"); }
@@ -250,6 +270,58 @@
     }
     g.hitch = [Math.round(nb[0] + 0.5), Math.round(nb[1] + 0.5)];
     return g;
+  }
+  // weed hanging from the crest and over the face, and a wet sheen along the back
+  function kelpieWeed(g, p, q, C, M, frame, k, off) {
+    const { nb, nt, rumpX, chestX } = q, big = k > 1, len = Math.hypot(nt[0] - nb[0], nt[1] - nb[1]), fl = frame ? 1 : 0;
+    for (let i = 0; i < 5; i++) {
+      const [sx, sy] = off(len * (0.12 + i * 0.2), p.B * 0.8 - 0.5 * k), drop = (i % 2 ? 2.2 : 3.4) * k;
+      if (big) cap(g, [[sx, sy], [sx - 0.7 * k, sy + drop * 0.6], [sx - 0.4 * k - fl * 0.3 * k, sy + drop]], 0.5 * k, 0.3 * k, M, i % 2 ? 0 : -1);
+      else for (let j = 0; j <= Math.round(drop); j++) g.set(Math.round(sx - (j > 1 ? 1 : 0)), Math.round(sy + j), M[j % 2 ? 1 : 2]);
+    }
+    if (big) cap(g, [[nt[0] + 0.7 * k, nt[1] - 1.1 * k], [nt[0] + 1.7 * k, nt[1] + 0.9 * k]], 0.55 * k, 0.35 * k, M, 0);
+    else g.set(Math.round(nt[0] + 1.3), Math.round(nt[1] - 0.6), M[2]);
+    for (let x = Math.floor(rumpX - 1 * k); x <= chestX; x += big ? 2 : 3) for (let y = 0; y < g.h; y++) if (C.includes(g.get(x, y))) { g.set(x, y + 1, C[4]); break; }
+  }
+  // drawn after the outline, so the water hangs free: drops off the belly and the weed, a ripple round the hooves, pond-light in the mane
+  function kelpieWater(g, p, q, frame, k, foreX, hindX, eye) {
+    const { G, cy, bodyX, chestX, nb } = q, big = k > 1, B = p.B, fall = frame ? 1.4 * k : 0;
+    const drops = [[bodyX - 2.2 * k, cy + B + 2.4 * k + fall], [bodyX + 1.4 * k, cy + B + 3.6 * k - fall * 0.6], [bodyX - 0.4 * k, cy + B + 5 * k - fall],
+      [q.rumpX - q.rumpR - 3.4 * k, G - 3 * k + fall * 0.5], [chestX + 2.4 * k, cy + B + 2.2 * k + fall * 0.8]];
+    for (const [dx, dy] of drops) {
+      const x = Math.round(dx), y = Math.round(dy);
+      if (g.get(x, y) || g.get(x, y + 1)) continue;
+      g.set(x, y, WATER[2]);
+      g.set(x, y + 1, WATER[1]);
+      if (big && !g.get(x, y + 2)) g.set(x, y + 2, WATER[0]);
+    }
+    const y = g.h - 1, x0 = Math.floor(hindX - 4 * k), x1 = Math.ceil(foreX + 4 * k);
+    for (let x = x0; x <= x1; x++) if (!g.get(x, y) && (x + (frame ? 1 : 0)) % 3 !== 0) g.set(x, y, (x + (frame ? 1 : 0)) % 3 === 1 ? WATER[1] : WATER[0]);
+    const mane = [];
+    for (let yy = 0; yy < g.h; yy++) for (let x = 0; x < g.w; x++) { const c = g.get(x, yy); if (c && c !== OUTLINE && ramp(KELPIE.black.mane).concat(ramp(KELPIE["sea-green"].mane)).includes(c)) mane.push([x, yy]); }
+    const n = big ? 7 : 4;
+    mane.filter(([x, yy]) => hash(x + "~" + yy) % 5 === (frame ? 1 : 0)).slice(0, n).forEach(([x, yy]) => g.set(x, yy, SEAGLOW));
+    g.set(eye[0], eye[1], "#4ad8b0");
+  }
+  // at pen size the antlers are placed by hand, the far one (F) behind the near one (N), and go on after the outline with a shadow on
+  // their lower right, since a full outline would close every gap between the tines
+  const ANTLER_PEN = ["F.F...N.N", ".FF...NN.", "..F...N..", "F.F...N.N", ".FF...NN.", "..F...N..", "...F.N...", "....N...."];
+  // people scale: each half is one antler from the middle of the head outward, the far one mirrored on the left
+  const ANTLER_HALF = ["....N..N", "....N.N.", "..N.NN..", "..N.N...", "...NN..N", "...N..N.", "...N.N..", "...NN...", "..NN....", ".NN.....", "NN......", "N......."];
+  const ANTLER_SCENE = ANTLER_HALF.map((r) => [...r].reverse().join("").replace(/N/g, "F") + r);
+  function antlers(g, ex, ey, k) {
+    const A = ramp(ANTLER), far = mix(A[0], "#6a6266", 0.3), pat = k > 1 ? ANTLER_SCENE : ANTLER_PEN, w = (pat[0].length - 1) / 2;
+    const mine = new Set(), n = pat.length;
+    pat.forEach((row, j) => [...row].forEach((ch, i) => {
+      if (ch === ".") return;
+      const x = Math.round(ex - w + i), y = ey - n + 1 + j;
+      g.set(x, y, ch === "N" ? (j % 3 === 0 ? A[3] : A[2]) : far);
+      mine.add(x + "," + y);
+    }));
+    for (const key of mine) {
+      const [x, y] = key.split(",").map(Number);
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) if (!g.get(x + dx, y + dy) && !mine.has(x + dx + "," + (y + dy))) g.set(x + dx, y + dy, OUTLINE);
+    }
   }
   // the warhorse's caparison: a cloth over the back to the knees, gold-hemmed, and a steel chanfron on the face
   function barding(g, p, q, frame, coats, k) {
@@ -665,15 +737,22 @@
 
   // the pets' rhythm: one shared tick, but a mount only shifts every third beat, and not all in step
   const live = new Set();
-  let beat = 0;
-  setInterval(() => {
+  let beat = 0, beatTimer = 0;
+  function pulse() {
     beat++;
     for (const a of live) {
       if (!a.cv.isConnected) { if (++a.idle > 8) live.delete(a); continue; }
       a.idle = 0;
       a.draw((beat + a.phase) % 3 === 0 ? 1 : 0);
     }
-  }, 650);
+  }
+  function pulsing() {
+    const on = !(window.Settings && Settings.calm());
+    if (on && !beatTimer) beatTimer = setInterval(pulse, 650);
+    else if (!on && beatTimer) { clearInterval(beatTimer); beatTimer = 0; }
+  }
+  pulsing();
+  if (window.Settings) Settings.watch(pulsing);
   function mountSprite(kind, colour, scale, opts) {
     opts = opts || {};
     scale = scale || 3;
