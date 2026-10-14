@@ -529,21 +529,23 @@
     ctx.fillStyle = "#3a2410"; ctx.fillRect(x - 3, my - 1, 7, 1); ctx.fillRect(x - 3, my, 1, 1); ctx.fillRect(x + 3, my, 1, 1); ctx.fillRect(x - 2, my + 1, 1, 1); ctx.fillRect(x + 2, my + 1, 1, 1); ctx.fillRect(x - 1, my + 2, 1, 1); ctx.fillRect(x + 1, my + 2, 1, 1);
     ctx.fillStyle = "#f0c850"; ctx.fillRect(x - 2, my, 5, 1); ctx.fillRect(x - 1, my + 1, 3, 1); ctx.fillStyle = "#c8902a"; ctx.fillRect(x, my + 2, 1, 1);
   }
+  // a click lands on a pet anywhere over its sprite (a wolf is bigger than a cat)
+  function petHit(p, dx, dy) { const img = p.right[0]; return Math.abs(dx) < (img.width >> 1) + 1 && dy < 2 && dy > -img.height - 2; }
   const HEART = ["xx.xx", "xhxxx", ".xxx.", "..x.."];
   // a pet that was just clicked (p.pat = the time) hops, wags, and a few small hearts float up off it
   function drawPet(ctx, st, p, frame, now) {
     const lift = st.bed && st.bed.has(p.u, p.v) ? st.bed.z : 0;
     const [x0, y0] = st.iso(p.u, p.v), x = Math.round(x0), y = Math.round(y0) - lift, age = p.pat != null && now != null ? now - p.pat : 9;
     const hop = age < 0.45 ? Math.round(Math.sin((age / 0.45) * Math.PI) * 3) : 0, wag = age < 1 && Math.floor(age * 9) % 2 ? 1 : 0;
-    ctx.fillStyle = "rgba(20,10,4,0.3)"; ctx.fillRect(x - 5, y - 1, 10, 2);
-    const img = (p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame];
+    const img = (p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame], hw = img.width >> 1, sw = Math.max(5, hw - 2);
+    ctx.fillStyle = "rgba(20,10,4,0.3)"; ctx.fillRect(x - sw, y - 1, sw * 2, 2);
     // curled up by a sleeping owner: legs tucked under, belly on the ground, until a pat stands it up
-    if (p.curl && age > 1.2) ctx.drawImage(img, 0, 0, img.width, img.height - 3, x - 7, y - img.height + 3, img.width, img.height - 3);
-    else ctx.drawImage(img, x - 7, y - 10 - hop);
+    if (p.curl && age > 1.2) ctx.drawImage(img, 0, 0, img.width, img.height - 3, x - hw, y - img.height + 3, img.width, img.height - 3);
+    else ctx.drawImage(img, x - hw, y - img.height - hop);
     for (let i = 0; i < 3; i++) {
       const t = age - i * 0.18;
       if (t < 0 || t > 0.95) continue;
-      const hx = x - 3 + (i - 1) * 5 + Math.round(Math.sin(t * 12 + i * 2.1) * 1.2), hy = y - 14 - Math.round(t * 16) - (i === 1 ? 2 : 0);
+      const hx = x - 3 + (i - 1) * 5 + Math.round(Math.sin(t * 12 + i * 2.1) * 1.2), hy = y - img.height - 4 - Math.round(t * 16) - (i === 1 ? 2 : 0);
       ctx.globalAlpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.4;
       HEART.forEach((row, j) => { for (let k = 0; k < 5; k++) if (row[k] !== ".") { ctx.fillStyle = row[k] === "h" ? "#ffc8c8" : j > 1 ? "#c8384a" : "#e8566a"; ctx.fillRect(hx + k, hy + j, 1, 1); } });
       ctx.globalAlpha = 1;
@@ -583,7 +585,7 @@
       place() {
         const k = cv.clientWidth / st.W, cw = cv.clientWidth;
         for (const b of bubbles) {
-          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? 12 : b.a.h && b.a.h.look && b.a.h.look.child ? 26 : 36;
+          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? b.a.right[0].height + 2 : b.a.h && b.a.h.look && b.a.h.look.child ? 26 : 36;
           const bw = b.el.offsetWidth / 2;
           b.el.style.left = `${Math.max(bw + 4, Math.min(cw - bw - 4, x * k))}px`;
           b.el.style.top = `${Math.max(b.el.offsetHeight + 4, (y - lift) * k)}px`;
@@ -940,7 +942,7 @@
       const mx = (ev.clientX - rect.left) / k, my = (ev.clientY - rect.top) / k;
       const hit = actors.filter((a) => !a.local).concat([keep]).filter((a) => { const [x, y] = st.iso(a.u, a.v); return Math.abs(mx - x) < 9 && my < y && my > y - 34; })
         .sort((p, q) => q.u + q.v - (p.u + p.v))[0];
-      const pet = !hit && actors.map((a) => a.pet).find((p) => { if (!p) return false; const [x, y] = st.iso(p.u, p.v); return Math.abs(mx - x) < 8 && my < y + 2 && my > y - 12; });
+      const pet = !hit && actors.map((a) => a.pet).find((p) => { if (!p) return false; const [x, y] = st.iso(p.u, p.v); return petHit(p, mx - x, my - y); });
       if (hit) say(hit, hit.keeper ? keepLines[Math.floor(r() * keepLines.length)] : pick(hit, r), still ? 999 : 3);
       else if (pet) { pet.pat = T.now; if (pet.lines.length) say(pet, pick(pet, r, () => true), still ? 999 : 2.2); }
       L.redraw();
@@ -955,6 +957,6 @@
       cast: pending.map((h) => ({ h, lines: h.chatter || [] })) });
   }
 
-  window.Tavern = { scene, inn, stage, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
+  window.Tavern = { scene, inn, stage, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, petHit, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
     shade, line, slab, legs, table, stool, pallet, zzz, mugAt, candle, lighting, inRoom, weatherAt };
 })();

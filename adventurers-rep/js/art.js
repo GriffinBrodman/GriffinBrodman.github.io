@@ -315,20 +315,26 @@
       g.rect(9, 1 + oy, 1, 3, mane); g.set(1, 4 + oy, mane); g.set(1, 5 + oy, mane); g.set(2, 4 + oy, mane);
       g.rect(3, 6 + oy, 1, 4 - oy, c[1]); g.rect(5, 6 + oy, 1, 4 - oy, c[2]); g.rect(8, 6 + oy, 1, 4 - oy, c[1]); g.rect(9, 6 + oy, 1, 4 - oy, c[2]);
     } else if (kind === "wolf") {
+      // a wolf stands taller and longer than any dog, so it gets a bigger grid than the other pets
       const c = ramp(["#8a8a96", "#d0ccc4", "#46424c", "#9a6a4a", "#8a7a66"][Math.floor(r() * 5)]);
       const p = ramp(mix(c[4], "#f4f0e6", 0.6));
       const pal = { 0: c[0], 1: c[1], 2: c[2], 3: c[3], 4: c[4], p: p[3], q: p[1], e: "#f0c840", n: OUTLINE };
-      paint(["....0.1.12", "....0.1.12"], pal, 7);
-      paint([
-        "..........3",
-        ".........042",
-        "........3443",
-        "..33443333e33n",
-        ".23122222222pq",
-        ".22.1222221pp",
-        ".21.11qpq1p",
-        ".0",
-      ], pal, oy);
+      const w = new Grid(22, 14), put = (rows, dy) => rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") w.set(x + 1, y + 1 + dy, pal[ch]); }));
+      put(["", "", "", "", "", "", "", "", ".....1.2....1.2", ".....1.2....1.2", ".....1.2....1.2", ".....0.p....0.p"], 0);
+      put([
+        "..............4..4",
+        ".............343.43",
+        "............3444444",
+        "....33333333444e444",
+        "..33444444444444444n",
+        ".3322222222222pqqqq",
+        ".22.2222222222pp",
+        ".21..qq222222122",
+        "2p...1qqqq.1",
+        "p",
+      ], oy);
+      w.outline(OUTLINE);
+      return w;
     } else if (kind === "falcon") {
       const c = ramp(["#5a6a80", "#7a5a3a", "#9a7a52", "#b06a3a"][Math.floor(r() * 4)]);
       const b = ramp("#efe4cc");

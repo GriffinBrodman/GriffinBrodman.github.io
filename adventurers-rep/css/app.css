@@ -194,14 +194,15 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .hero-head .portrait { position: relative; display: flex; align-items: flex-end; gap: 10px; padding: 10px;
   background: linear-gradient(180deg, #4a301d, #2e1d12); border: 3px solid var(--wood0); box-shadow: 0 0 0 1px var(--brass), inset 0 0 0 1px rgba(236, 197, 106, 0.3); }
 .hero-head .portrait canvas.main { width: 200px; height: 200px; display: block; }
-.hero-head .portrait canvas.full { width: 84px; height: 102px; }
-.hero-head .portrait canvas.pet { position: absolute; bottom: 8px; right: -10px; width: 56px; height: 40px; }
-.hero-head .portrait canvas.portrait-mount { width: auto; height: 57px; margin-left: -6px; }
-.hero-head .portrait.has-mount canvas.pet { position: static; width: 42px; height: 30px; margin-left: -8px; }
+.hero-head .portrait { --k: 3; }
+.hero-head .portrait canvas.full, .hero-head .portrait canvas.pet, .hero-head .portrait canvas.portrait-mount { width: calc(var(--sw) * var(--k)); height: calc(var(--sh) * var(--k)); }
+.hero-head .portrait canvas.pet { position: absolute; bottom: 8px; right: -10px; }
+.hero-head .portrait canvas.portrait-mount { margin-left: -6px; }
+.hero-head .portrait.has-mount canvas.pet { position: static; margin-left: -8px; }
 .hero-head .portrait canvas.full { position: relative; z-index: 1; }
 .hero-head h1 { font-size: 40px; margin-bottom: 0; }
 .hero-head .epi { color: var(--gold); font-family: var(--px); font-size: 18px; }
-@media (max-width: 600px) { .hero-head .portrait canvas.main { width: 160px; height: 160px; } .hero-head .portrait canvas.full { width: 56px; height: 68px; } }
+@media (max-width: 600px) { .hero-head .portrait canvas.main { width: 160px; height: 160px; } }
 .statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
 .statgrid div { background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 6px 2px; }
 .statgrid b { display: block; font-family: var(--body); font-weight: 700; font-size: 26px; line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; color: var(--ink); }
@@ -295,9 +296,9 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
   .hero-head .hero-details { grid-column: 1 / -1; }
   .hero-head .portrait canvas.main { width: 104px; height: 104px; }
   .hero-head .portrait { flex-wrap: wrap; justify-content: center; align-items: flex-end; max-width: 128px; row-gap: 4px; }
-  .hero-head .portrait canvas.full { width: 42px; height: 51px; }
-  .hero-head .portrait canvas.pet { position: static; width: 42px; height: 30px; }
-  .hero-head .portrait canvas.portrait-mount { position: static; height: 36px; }
+  .hero-head .portrait { --k: 2; }
+  .hero-head .portrait canvas.pet { position: static; }
+  .hero-head .portrait canvas.portrait-mount { position: static; }
   .hero-head h1 { font-size: 28px; }
 }
 .quest-seal { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px; font-family: var(--px); font-size: 11px; line-height: 1.1; color: #ffe9b8; background: radial-gradient(circle at 35% 30%, #c8503e, #8e2a22 60%, #6a1c16); border: 2px solid #4a100c; box-shadow: inset 0 0 0 3px rgba(255, 190, 150, 0.2); }
