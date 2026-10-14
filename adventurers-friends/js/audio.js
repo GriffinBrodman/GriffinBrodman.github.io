@@ -1,10 +1,11 @@
-/* Sound, all synthesised with WebAudio (no files): page ambience, UI and fight effects, and the bard,
-   who sings the league's songs in a K.K.-style syllable voice over a plucked lute. */
+/* Sound, all synthesised with WebAudio (no files): page ambience, UI and fight effects, the talking text's voices and animal
+   calls, and the bard, who sings the league's songs in a K.K.-style syllable voice over a plucked lute. */
 (function () {
   "use strict";
-  const KEY = "al.sound";
-  const prefs = (() => { try { return Object.assign({ on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return { on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }; } })();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* storage unavailable */ } };
+  // every level and switch lives in Settings (settings.js); these defaults only cover a page that loads audio.js alone
+  const FALLBACK = { sound: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6, voices: true, voice: 0.7 };
+  const pref = (k) => (window.Settings ? Settings.get(k) : FALLBACK[k]);
+  const prefs = { get on() { return pref("sound"); } };
 
   let ctx = null, master, bus = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -18,7 +19,7 @@
     comp.threshold.value = -16; comp.ratio.value = 4;
     master = ctx.createGain();
     master.connect(comp); comp.connect(ctx.destination);
-    for (const k of ["amb", "music", "sfx"]) { bus[k] = ctx.createGain(); bus[k].connect(master); }
+    for (const k of ["amb", "music", "sfx", "voice"]) { bus[k] = ctx.createGain(); bus[k].connect(master); }
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -27,10 +28,11 @@
   }
   function levels() {
     if (!ctx) return;
-    master.gain.value = prefs.on ? prefs.master : 0;
-    bus.amb.gain.value = prefs.amb * 0.5;
-    bus.music.gain.value = prefs.music;
-    bus.sfx.gain.value = prefs.sfx * 0.8;
+    master.gain.value = prefs.on ? pref("master") : 0;
+    bus.amb.gain.value = pref("amb") * 0.5;
+    bus.music.gain.value = pref("music");
+    bus.sfx.gain.value = pref("sfx") * 0.8;
+    bus.voice.gain.value = pref("voices") ? pref("voice") : 0;
   }
   function now() { return ctx.currentTime; }
 
@@ -333,34 +335,137 @@
     perf = null;
   }
 
-  // ---------- controls ----------
+  // ---------- talking: one short blip per syllable in a speaker's own voice, Animal Crossing style ----------
+  // v: { pitch (midi), timbre: "soft" | "buzzy" | "chirpy", formant, vib }; o: { at, semi, len, vol, bend, vowel, cons, whisper }
+  const FORMANT = { a: [760, 1180], e: [480, 1850], i: [330, 2250], o: [520, 880], u: [380, 820], y: [330, 2150] };
+  const voiceOn = () => !!(ctx && started && prefs.on && pref("voices") && ctx.state === "running");
+  function blip(v, o) {
+    if (!voiceOn()) return;
+    const t = now() + 0.02 + (o.at || 0), len = Math.max(0.03, o.len || 0.07), vol = 0.2 * (o.vol == null ? 1 : o.vol), out = bus.voice;
+    const f0 = mtof(v.pitch + (o.semi || 0)), f1 = f0 * Math.pow(2, (o.bend || 0) / 12), [fa, fb] = FORMANT[o.vowel] || FORMANT.a, k = v.formant || 1;
+    if (o.whisper) {
+      noise(t, len * 1.2, vol * 0.9, "bandpass", fb * k, out, 3);
+      noise(t, len, vol * 0.5, "bandpass", fa * k * 1.4, out, 2);
+      return;
+    }
+    const g = ctx.createGain(), lvl = v.timbre === "chirpy" ? vol * 0.55 : vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(lvl, t + Math.min(0.012, len * 0.3));
+    g.gain.setValueAtTime(lvl * 0.85, t + len * 0.6);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    g.connect(out);
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(v.timbre === "chirpy" ? f0 * 0.82 : f0, t);
+    if (v.timbre === "chirpy") osc.frequency.exponentialRampToValueAtTime(f0, t + 0.022);
+    osc.frequency.linearRampToValueAtTime(f1, t + len);
+    if (v.vib) {
+      const l = ctx.createOscillator(), lg = ctx.createGain();
+      l.frequency.value = 6 + v.vib * 3; lg.gain.value = f0 * 0.02 * v.vib;
+      l.connect(lg); lg.connect(osc.frequency); l.start(t); l.stop(t + len + 0.02);
+    }
+    if (v.timbre === "buzzy") {
+      osc.type = "sawtooth";
+      for (const [f, q, a] of [[fa * k, 6, 1], [fb * k, 8, 0.7]]) {
+        const bp = ctx.createBiquadFilter(), ga = ctx.createGain();
+        bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q; ga.gain.value = a * 2.2;
+        osc.connect(bp); bp.connect(ga); ga.connect(g);
+      }
+    } else {
+      osc.type = v.timbre === "chirpy" ? "square" : "triangle";
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.value = v.timbre === "chirpy" ? 2400 * k : 1500 * k + fb * 0.25;
+      osc.connect(lp); lp.connect(g);
+    }
+    osc.start(t); osc.stop(t + len + 0.03);
+    if (o.cons) noise(t, 0.018, vol * 0.3, "highpass", 3200, out);
+  }
+  // animals: one call per sound word; vol scales it, pitch shifts the voiced ones
+  function tone(type, f0, f1, t, len, vol, filt) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + len);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.02, len * 0.2)); g.gain.exponentialRampToValueAtTime(0.0008, t + len);
+    let n = o;
+    if (filt) { const f = ctx.createBiquadFilter(); f.type = filt[0]; f.frequency.value = filt[1]; if (filt[2]) f.Q.value = filt[2]; o.connect(f); n = f; }
+    n.connect(g); g.connect(bus.voice); o.start(t); o.stop(t + len + 0.03);
+    return o;
+  }
+  function trill(o, t, len, rate, depth) {
+    const l = ctx.createOscillator(), lg = ctx.createGain();
+    l.frequency.value = rate; lg.gain.value = depth;
+    l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + len + 0.03);
+  }
+  function glide(o, t, pts) { for (const [dt, f] of pts) o.frequency.linearRampToValueAtTime(f, t + dt); }
+  const CALLS = {
+    bark: (t, v, p) => { tone("sawtooth", 520 * p, 300 * p, t, 0.11, v, ["bandpass", 900, 1.4]); noise(t, 0.06, v * 0.6, "bandpass", 1300, bus.voice, 1.2); },
+    yip: (t, v, p) => tone("square", 900 * p, 700 * p, t, 0.07, v * 0.5, ["lowpass", 2400]),
+    sniff: (t, v) => { noise(t, 0.05, v * 0.5, "highpass", 2600, bus.voice); noise(t + 0.09, 0.05, v * 0.45, "highpass", 2800, bus.voice); },
+    snore: (t, v) => noise(t, 0.6, v * 0.35, "lowpass", 380, bus.voice),
+    growl: (t, v) => trill(tone("sawtooth", 95, 80, t, 0.55, v * 0.9, ["lowpass", 520]), t, 0.55, 26, 14),
+    howl: (t, v, p) => { const o = tone("sine", 420 * p, 520 * p, t, 1.0, v * 0.8); glide(o, t, [[0.45, 700 * p], [1.0, 520 * p]]); trill(o, t, 1.0, 5, 9); },
+    mrrp: (t, v, p) => trill(tone("triangle", 380 * p, 620 * p, t, 0.24, v * 0.9, ["lowpass", 2200]), t, 0.1, 32, 40),
+    mew: (t, v, p) => glide(tone("triangle", 600 * p, 560 * p, t, 0.3, v * 0.8, ["lowpass", 2600]), t, [[0.1, 900 * p], [0.3, 560 * p]]),
+    purr: (t, v) => trill(tone("sawtooth", 46, 42, t, 0.8, v * 0.7, ["lowpass", 260]), t, 0.8, 24, 10),
+    click: (t, v) => noise(t, 0.012, v * 0.9, "bandpass", 3400, bus.voice, 3),
+    lick: (t, v) => noise(t, 0.04, v * 0.5, "bandpass", 5200, bus.voice, 2),
+    kek: (t, v, p) => { tone("square", 2100 * p, 1800 * p, t, 0.05, v * 0.35, ["lowpass", 4200]); tone("square", 2100 * p, 1800 * p, t + 0.09, 0.05, v * 0.32, ["lowpass", 4200]); },
+    skree: (t, v, p) => tone("sawtooth", 2600 * p, 1500 * p, t, 0.32, v * 0.45, ["bandpass", 2400, 2]),
+    rustle: (t, v) => { for (let i = 0; i < 4; i++) noise(t + i * 0.035, 0.03, v * 0.35, "highpass", 4000, bus.voice); },
+    snort: (t, v) => { noise(t, 0.28, v * 0.9, "bandpass", 520, bus.voice, 2); noise(t + 0.05, 0.18, v * 0.5, "lowpass", 300, bus.voice); },
+    whinny: (t, v, p) => trill(tone("sawtooth", 950 * p, 520 * p, t, 0.65, v * 0.55, ["bandpass", 1400, 1.5]), t, 0.65, 11, 60),
+    sigh: (t, v) => noise(t, 0.7, v * 0.5, "bandpass", 700, bus.voice, 0.8),
+    heehaw: (t, v) => { tone("sawtooth", 640, 600, t, 0.26, v * 0.6, ["bandpass", 1100, 2]); tone("sawtooth", 280, 250, t + 0.3, 0.32, v * 0.7, ["bandpass", 700, 2]); },
+    moo: (t, v) => tone("sawtooth", 118, 92, t, 0.9, v * 0.8, ["lowpass", 520]),
+    groan: (t, v) => trill(tone("sawtooth", 140, 105, t, 0.8, v * 0.7, ["bandpass", 600, 1.4]), t, 0.8, 7, 8),
+    chime: (t, v) => { bell(88, t, v * 0.25, bus.voice); bell(93, t + 0.09, v * 0.2, bus.voice); bell(97, t + 0.18, v * 0.16, bus.voice); },
+    rattle: (t, v) => { for (let i = 0; i < 5; i++) noise(t + i * 0.05 + Math.random() * 0.02, 0.015, v * 0.7, "bandpass", 2000 + Math.random() * 1500, bus.voice, 4); },
+    chew: (t, v) => { for (let i = 0; i < 3; i++) noise(t + i * 0.2, 0.08, v * 0.4, "lowpass", 600, bus.voice); },
+    thump: (t, v) => { tone("sine", 140, 60, t, 0.14, v * 0.9); tone("sine", 140, 60, t + 0.22, 0.14, v * 0.7); },
+  };
+  function critter(call, o) {
+    if (!voiceOn() || !CALLS[call]) return;
+    const opt = o || {};
+    CALLS[call](now() + 0.02 + (opt.at || 0), 0.3 * (opt.vol == null ? 1 : opt.vol), opt.pitch || 1);
+  }
+
+  // ---------- controls: the header's quick panel; it edits the same Settings as the Settings page ----------
   function controls() {
     const top = document.querySelector(".top");
     if (!top || document.getElementById("snd")) return;
     const btn = document.createElement("button");
     btn.id = "snd"; btn.className = "snd-btn"; btn.title = "Sound";
-    const icon = () => (btn.textContent = prefs.on ? "🔊" : "🔇");
-    icon();
     const panel = document.createElement("div");
     panel.className = "snd-panel"; panel.hidden = true;
+    const sliders = [];
     const row = (label, key) => {
       const r = document.createElement("label"), inp = document.createElement("input");
-      inp.type = "range"; inp.min = 0; inp.max = 1; inp.step = 0.05; inp.value = prefs[key];
-      inp.oninput = () => { prefs[key] = +inp.value; save(); levels(); };
+      inp.type = "range"; inp.min = 0; inp.max = 1; inp.step = 0.05; inp.value = pref(key);
+      inp.oninput = () => { if (window.Settings) Settings.set(key, +inp.value); };
+      sliders.push(() => { if (+inp.value !== pref(key)) inp.value = pref(key); });
       r.append(label, inp); return r;
     };
     const tog = document.createElement("button");
     tog.className = "btn small";
-    const togTxt = () => (tog.textContent = prefs.on ? "Mute" : "Unmute");
-    togTxt();
-    tog.onclick = () => { prefs.on = !prefs.on; save(); levels(); icon(); togTxt(); if (prefs.on) { start(); ambience(scenery || page); } else stopAmb(); };
-    panel.append(tog, row("Volume", "master"), row("Ambience", "amb"), row("Music", "music"), row("Effects", "sfx"));
+    tog.onclick = () => { if (window.Settings) Settings.set("sound", !prefs.on); };
+    const more = document.createElement("a");
+    more.href = "#/settings"; more.className = "snd-more"; more.textContent = "All settings";
+    more.onclick = () => { panel.hidden = true; };
+    const show = () => { btn.textContent = prefs.on ? "🔊" : "🔇"; tog.textContent = prefs.on ? "Mute" : "Unmute"; for (const f of sliders) f(); };
+    panel.append(tog, row("Volume", "master"), row("Ambience", "amb"), row("Music", "music"), row("Effects", "sfx"), row("Voices", "voice"), more);
+    show();
+    if (window.Settings) Settings.watch(show);
     btn.onclick = (e) => { e.stopPropagation(); panel.hidden = !panel.hidden; start(); };
     document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== btn) panel.hidden = true; });
+    const gear = document.createElement("a");
+    gear.href = "#/settings"; gear.className = "snd-btn set-btn"; gear.title = "Settings"; gear.textContent = "⚙";
     const wrap = document.createElement("div");
-    wrap.className = "snd-wrap"; wrap.append(btn, panel);
+    wrap.className = "snd-wrap"; wrap.append(gear, btn, panel);
     top.appendChild(wrap);
   }
+  if (window.Settings) Settings.watch((keys) => {
+    levels();
+    if (!keys.includes("sound")) return;
+    if (prefs.on) { if (started) ambience(scenery || page); else start(); } else stopAmb();
+  });
   function start() {
     if (started || !prefs.on) return;
     if (!init()) return;
@@ -372,8 +477,9 @@
     start();
     if (e.target.closest && e.target.closest(".btn, nav a, .tabs button, .choices button")) sfx("click");
   }, { capture: true });
+  document.addEventListener("keydown", start, { capture: true });
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
 
-  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, townAmbience, get on() { return prefs.on; } };
+  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, townAmbience, blip, critter, get on() { return prefs.on; }, get talking() { return voiceOn(); } };
 })();

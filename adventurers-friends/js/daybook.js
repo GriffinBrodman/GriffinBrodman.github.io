@@ -307,6 +307,10 @@
     try { starsUrl = g.toCanvas(1).toDataURL(); } catch (e) { starsUrl = ""; }
     return starsUrl;
   }
+  // a sitting at a town table: what it came to, and a link to its replay while the script is kept
+  function tableLink(b) {
+    return h("span", null, b.table, b.game ? [" ", h("a", { href: `#/${b.route || "table"}/${b.game}` }, "▸ watch")] : null);
+  }
   let uid = 0;
   function render(db, opts) {
     opts = opts || {};
@@ -328,7 +332,8 @@
       const parts = spanParts(from, to), when = parts.join("–"), mid = (from + to) / 2, tipId = `${id}-t${i}`;
       const say = b.line || label;
       const cap = h("li", { class: "db-cap" }, icon(act, 1), h("b", { class: "db-when" }, when),
-        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, label), b.line ? [h("span", { class: "db-dash" }, " · "), b.line] : null));
+        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, label), b.line ? [h("span", { class: "db-dash" }, " · "), b.line] : null,
+          b.table ? [h("span", { class: "db-dash" }, " · "), tableLink(b)] : null));
       caps.append(cap);
       const right = mid > start + (end - start) * 0.55;
       const li = h("li", {
@@ -344,6 +349,7 @@
         onclick: (e) => { const open = !li.classList.contains("open"); for (const o of li.parentNode.querySelectorAll(".db-b.open")) o.classList.remove("open"); li.classList.toggle("open", open); e.stopPropagation(); },
       }, icon(act, 2), h("span", { class: "db-txt" }, h("span", { class: "db-lbl" }, label), h("span", { class: "db-hrs" }, parts[0] + "–", h("wbr"), parts[1]))),
       b.line ? h("p", { class: "db-line" }, b.line) : null,
+      b.table ? h("p", { class: "db-line db-table" }, tableLink(b)) : null,
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
       rows.push(li);
     });
@@ -373,9 +379,13 @@
         h("div", { class: "db-ntxt" }, h("span", { class: "db-nt" }, "Night"), h("span", { class: "db-nk" }, kind)),
         NIGHT[ev.kind] ? h("div", { class: "db-nico" }, nightIcon(ev.kind, 2)) : null,
         ev.line ? h("p", { class: "db-line" }, ev.line) : null,
+        ev.table ? h("p", { class: "db-line db-table" }, tableLink(ev)) : null,
+        ...(ev.more || []).map((x) => h("p", { class: "db-line db-table" }, tableLink(x))),
         ev.line ? h("span", { class: "db-tip", role: "tooltip" }, h("b", null, "Night"), h("i", null, ` ${kind.toLowerCase()}`), h("br"), ev.line) : null);
       caps.append(h("li", { class: "db-cap db-cap-night" }, icon("moon", 1), h("b", { class: "db-when" }, "night"),
-        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, kind), ev.line ? [h("span", { class: "db-dash" }, " · "), ev.line] : null)));
+        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, kind), ev.line ? [h("span", { class: "db-dash" }, " · "), ev.line] : null,
+          ev.table ? [h("span", { class: "db-dash" }, " · "), tableLink(ev)] : null,
+          (ev.more || []).map((x) => [h("span", { class: "db-dash" }, " · "), tableLink(x)]))));
     }
     const title = opts.title === false ? null : opts.title || db.title || db.label || (db.day != null ? `Day ${db.day}` : null);
     let more = null;

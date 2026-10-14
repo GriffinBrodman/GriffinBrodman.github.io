@@ -58,6 +58,7 @@
     if ((idn.known_for || []).length) p.appendChild(el("div", { class: "town-chips" }, el("span", { class: "tiny dim" }, "Known for "), idn.known_for.map((k) => el("span", { class: "town-chip" }, k))));
     p.appendChild(el("p", null, t.desc));
     if (idn.landmark) p.appendChild(el("p", { class: "small" }, el("b", null, idn.landmark + ". "), idn.landmark_line || ""));
+    if (id === "frosthold" && L.yeti) p.appendChild(yetiBoard(L.yeti));
     const md = (L.town_mood || {})[id];
     if (md) {
       const deals = (md.deals || []).map((x) => x.good ? `${S.goods[x.good].name.toLowerCase()} ${Math.round(x.off * 100)}% off` : x.text);
@@ -77,6 +78,7 @@
       el("li", null, el("b", null, "Tavern: "), `${t.tavern}`),
       t.trainer ? el("li", null, el("b", null, "Trainer: "), `${t.trainer[0]}, at ${t.trainer[1]}`) : null,
       t.dish ? el("li", null, el("b", null, "To eat: "), t.dish) : null,
+      t.game ? el("li", null, el("b", null, "Game of choice: "), `${t.game.name}, dealt by ${t.game.dealer}`) : null,
       buys.length ? el("li", { class: "gold" }, el("b", null, "Pays well for: "), buys.join(", ")) : null,
       el("li", { class: "dim" }, el("b", null, "Odd jobs: "), t.jobs.join(", ").replace(/_/g, " ")),
     ].filter(Boolean);
@@ -88,6 +90,19 @@
     const maps = (L.map_stock || {})[id] || [];
     if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
       el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
+  }
+  // one move a day, pinned under a white footprint; whoever answers the Society's letters is never named
+  function yetiBoard(y) {
+    const box = el("div", { class: "yeti-board" }, el("h4", null, "The Yeti Society's correspondence game"));
+    if (window.ChessReplay) { try { box.appendChild(ChessReplay.player(y)); } catch (e) { /* the words below still tell it */ } }
+    const us = y.players.find((x) => !x.yeti);
+    const who = y.hero ? [A.heroLink(y.hero), " plays the Society's side by letter"] : ["The Society plays its own side"];
+    const state = y.result ? (y.result === "draw" ? "The game was drawn." : y.players[y.winner].yeti ? "The footprint won." : `${us.name} beat the footprint${y.badge ? " and wears the Society's badge" : ""}.`)
+      : `Move ${y.move}, day ${y.yeti.day}. The reply arrives overnight, under a white footprint.`;
+    box.appendChild(el("p", { class: "small" }, ...who, ". ", state));
+    const past = (y.past || []).filter((x) => x.society_won);
+    if (past.length) box.appendChild(el("p", { class: "tiny dim" }, "Beaten the footprint before: ", past.map((x, i) => [i ? ", " : "", x.hero ? A.heroLink(x.hero) : "the Society"])));
+    return box;
   }
   function showNode(side, id) {
     side.innerHTML = "";

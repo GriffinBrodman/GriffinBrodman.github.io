@@ -1,5 +1,5 @@
 /* Isometric pixel rooms with heroes who walk, chat and order drinks. Tavern.scene is the preseason tavern on the Crier;
-   Tavern.inn is the same common room for any cast; the stage, actor, speech and loop helpers are shared with camp.js.
+   Tavern.inn is the same common room for any cast; the stage, actor, talk (speech.js) and loop helpers are shared with camp.js.
    Everything said comes from the sim (league.voice); this only stages it. */
 (function () {
   "use strict";
@@ -455,7 +455,7 @@
     const pet = h.pet ? { g0: Art.petGrid(h.pet, 0), g1: Art.petGrid(h.pet, 1) } : null;
     return { h, name: o.name || h.name, lines: (o.lines || []).slice(), u, v, tu: u, tv: v, face: o.face || 1, mode: "idle", wait: o.wait || 1, mug: 0, said: [],
       right: g.toCanvas(1), left: g.flipX().toCanvas(1), cls: o.look || App.heroLook(hs), focus: !!o.focus, keeper: !!o.keeper,
-      pet: pet && { name: h.pet.name, lines: o.petLines || [], right: [pet.g0.toCanvas(1), pet.g1.toCanvas(1)], left: [pet.g0.flipX().toCanvas(1), pet.g1.flipX().toCanvas(1)],
+      pet: pet && { name: h.pet.name, kind: h.pet.kind, lines: o.petLines || [], right: [pet.g0.toCanvas(1), pet.g1.toCanvas(1)], left: [pet.g0.flipX().toCanvas(1), pet.g1.flipX().toCanvas(1)],
         u: u - 0.6, v: v + 0.4, tu: u - 0.6, tv: v + 0.4, face: 1, pet: true, said: [] } };
   }
   // nameless townsfolk who fill a quiet common room; they never speak
@@ -560,71 +560,51 @@
     return p;
   }
 
-  // ---------- speech bubbles, positioned over the canvas in CSS pixels ----------
+  // ---------- talking text (speech.js), anchored in CSS pixels over each speaker's head ----------
   function talk(wrap, cv, st) {
-    const layer = document.createElement("div");
-    layer.className = "tavern-talk";
-    wrap.appendChild(layer);
-    const bubbles = [];
-    const T = {
-      now: 0,
-      say(a, text, secs) {
-        if (!text) return;
-        for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].a === a) { bubbles[i].el.remove(); bubbles.splice(i, 1); }
-        if (bubbles.length >= 3) { const old = bubbles.shift(); old.el.remove(); }
-        const el = document.createElement("div");
-        el.className = "tavern-bubble" + (a.keeper ? " keeper" : "") + (a.pet === true ? " pet" : "") + (a.focus ? " focus" : "");
-        const b = document.createElement("b"); b.textContent = a.name;
-        el.append(b, document.createTextNode(" " + text));
-        layer.appendChild(el);
-        bubbles.push({ a, el, until: T.now + (secs || Math.min(5.5, 2.4 + text.length / 22)) });
-      },
-      speaking(a) { return bubbles.some((b) => b.a === a); },
-      get count() { return bubbles.length; },
-      prune() { for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].until < T.now) { bubbles[i].el.remove(); bubbles.splice(i, 1); } },
-      place() {
-        const k = cv.clientWidth / st.W, cw = cv.clientWidth;
-        for (const b of bubbles) {
-          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? b.a.right[0].height + 2 : b.a.h && b.a.h.look && b.a.h.look.child ? 26 : 36;
-          const bw = b.el.offsetWidth / 2;
-          b.el.style.left = `${Math.max(bw + 4, Math.min(cw - bw - 4, x * k))}px`;
-          b.el.style.top = `${Math.max(b.el.offsetHeight + 4, (y - lift) * k)}px`;
-        }
-      },
-    };
-    return T;
+    if (!window.Speech) return { now: 0, say(a, t, s, done) { if (done) done(); }, speaking: () => false, count: 0, prune() {}, place() {}, clear() {} };
+    return Speech.layer(wrap, (a) => {
+      const k = cv.clientWidth / st.W, [x, y] = a.at || st.iso(a.u, a.v);
+      const lift = a.at ? 0 : a.pet === true ? a.right[0].height + 2 : a.h && a.h.look && a.h.look.child ? 26 : 36;
+      return [x * k, (y - lift) * k];
+    });
   }
 
-  // ---------- the loop: one rAF, stopped offscreen, in a hidden tab and once the scene leaves the page ----------
-  const reduced = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // ---------- the loop: one rAF, stopped offscreen, in a hidden tab, once the scene leaves the page, and outright in static mode ----------
+  // reduced(): hold still, for reduced motion or the Static scenes setting
+  const reduced = () => (window.Settings ? Settings.calm() : !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches));
   function loop(wrap, tick, onVisible) {
-    const still = reduced();
     let raf = 0, last = 0, onscreen = true;
     const live = () => wrap.isConnected && onscreen && !document.hidden;
     function frame(t) {
       raf = 0;
-      if (!live()) return;
+      if (!live() || reduced()) return;
       const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
       last = t;
       tick(dt);
       raf = requestAnimationFrame(frame);
     }
-    function wake() { if (!still && !raf && live()) { last = 0; raf = requestAnimationFrame(frame); } }
+    function wake() { if (!reduced() && !raf && live()) { last = 0; raf = requestAnimationFrame(frame); } }
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => {
         onscreen = es[es.length - 1].isIntersecting;
         if (onVisible) onVisible(onscreen && wrap.isConnected);
         if (!wrap.isConnected) { io.disconnect(); return; }
-        if (still && onscreen) tick(0);
+        if (reduced() && onscreen) tick(0);
         wake();
       });
       io.observe(wrap);
     }
     const vis = () => { if (!wrap.isConnected) { document.removeEventListener("visibilitychange", vis); return; } wake(); };
     document.addEventListener("visibilitychange", vis);
+    const unwatch = window.Settings ? Settings.watch((keys) => {
+      if (!wrap.isConnected) { unwatch(); return; }
+      if (!keys.includes("still") && !keys.includes("motion")) return;
+      if (reduced()) { if (raf) { cancelAnimationFrame(raf); raf = 0; } tick(0); } else wake();
+    }) : null;
     tick(0);
     wake();
-    return { still, redraw: () => { if (still || !raf) tick(0); } };
+    return { get still() { return reduced(); }, redraw: () => { if (reduced() || !raf) tick(0); } };
   }
 
   // ---------- the common room ----------
@@ -816,7 +796,6 @@
     const keep = keeper((cfg.keeper && cfg.keeper.name) || "The barkeep", 3.5, 0.6);
     keep.wait = 2;
     const focus = actors.find((a) => a.focus);
-    const still = reduced();
 
     const T = talk(wrap, cv, st);
     const say = (a, text, secs) => T.say(a, text, secs);
@@ -837,8 +816,8 @@
       else if (roll < 0.52) {
         go(a, bar[0], bar[1]);
         a.then = () => {
-          a.face = 1; say(a, pick(a, r, (t) => t.startsWith("One ")), 2.6);
-          later(1400, () => { if (!a.local || r() < 0.3) say(keep, r() < 0.5 ? "Coming up." : keepLines[Math.floor(r() * keepLines.length)], 2.6); a.mug = 30; });
+          a.face = 1;
+          T.say(a, pick(a, r, (t) => t.startsWith("One ")), 2.6, () => later(250, () => { if (!a.local || r() < 0.3) say(keep, r() < 0.5 ? "Coming up." : keepLines[Math.floor(r() * keepLines.length)], 2.6); a.mug = 30; }));
           a.wait = 4;
         };
       } else if (roll < 0.64) { go(a, fire[0], fire[1]); a.then = () => { a.face = -1; a.wait = 4 + r() * 4; if (a.focus) later(800, () => say(a, pick(a, r))); }; }
@@ -861,10 +840,14 @@
           const ex = talkFor(a, other);
           const turns = ex ? ex.map((l) => [l.id === a.h.id ? a : other, l.text]) : [a, other, a, other].slice(0, 2 + Math.floor(r() * 3)).map((s) => [s, null]);
           if (ex) talks.splice(talks.indexOf(ex), 1);
-          turns.forEach(([s, t], i) => later(300 + i * 2800, () => say(s, t || pick(s, r), 3.2)));
-          const end = 300 + turns.length * 2800;
-          later(end, () => { a.mode = "idle"; a.wait = 1 + r() * 2; other.mode = "idle"; other.wait = 1 + r() * 2; });
-          a.wait = end / 1000 + 1;
+          // each turn waits for the last to be said, so a fast talker and a slow one still take turns
+          const next = (i) => {
+            if (i >= turns.length) { a.mode = "idle"; a.wait = 1 + r() * 2; other.mode = "idle"; other.wait = 1 + r() * 2; return; }
+            const [s, t] = turns[i];
+            T.say(s, t || pick(s, r), 3.2, () => later(450, () => next(i + 1)));
+          };
+          later(300, () => next(0));
+          a.wait = 1;
         };
       }
     }
@@ -910,7 +893,7 @@
     }
 
     function draw() {
-      const now = T.now;
+      const now = T.now, still = reduced();
       ctx.drawImage(bg, 0, 0);
       for (const v of lookOut.views) v.draw(ctx, now, still);
       const flick = 0.75 + Math.sin(now * 13) * 0.08 + Math.sin(now * 7.3) * 0.08;
@@ -936,17 +919,20 @@
       T.place();
     }
     const L = loop(wrap, (dt) => { if (dt) update(dt); draw(); }, cfg.onVisible);
-    if (still && focus) { say(focus, focus.lines[0], 999); L.redraw(); }
+    if (reduced() && focus) { say(focus, focus.lines[0], 999); L.redraw(); }
     cv.addEventListener("click", (ev) => {
+      const still = reduced();
       const k = cv.clientWidth / W, rect = cv.getBoundingClientRect();
       const mx = (ev.clientX - rect.left) / k, my = (ev.clientY - rect.top) / k;
       const hit = actors.filter((a) => !a.local).concat([keep]).filter((a) => { const [x, y] = st.iso(a.u, a.v); return Math.abs(mx - x) < 9 && my < y && my > y - 34; })
         .sort((p, q) => q.u + q.v - (p.u + p.v))[0];
       const pet = !hit && actors.map((a) => a.pet).find((p) => { if (!p) return false; const [x, y] = st.iso(p.u, p.v); return petHit(p, mx - x, my - y); });
       if (hit) say(hit, hit.keeper ? keepLines[Math.floor(r() * keepLines.length)] : pick(hit, r), still ? 999 : 3);
-      else if (pet) { pet.pat = T.now; if (pet.lines.length) say(pet, pick(pet, r, () => true), still ? 999 : 2.2); }
+      else if (pet) { pet.pat = T.now; say(pet, window.Speech ? Speech.pat(pet) : pick(pet, r, () => true), still ? 999 : 2.2); }
       L.redraw();
     });
+    // for review pages (tools/dialogue_demo.html) that stage a scripted scene in the real room
+    wrap.stage = { actors, keeper: keep, talk: T, redraw: L.redraw };
     return wrap;
   }
 
