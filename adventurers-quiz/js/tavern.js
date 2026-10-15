@@ -1,5 +1,5 @@
 /* Isometric pixel rooms with heroes who walk, chat and order drinks. Tavern.scene is the preseason tavern on the Crier;
-   Tavern.inn is the same common room for any cast; the stage, actor, speech and loop helpers are shared with camp.js.
+   Tavern.inn is the same common room for any cast; the stage, actor, talk (speech.js) and loop helpers are shared with camp.js.
    Everything said comes from the sim (league.voice); this only stages it. */
 (function () {
   "use strict";
@@ -436,13 +436,13 @@
     ctx.fillStyle = "#d8a07a"; ctx.fillRect(x + 1, y - 2, 2, 3); ctx.fillStyle = "#b07a58"; ctx.fillRect(x + 1, y, 2, 1);
     return [x + 2, y - 6, (u * 1.7) % 3];
   }
-  const ZED = ["xxx", ".x.", "xxx"];
+  const ZED = ["xxxx", "..x.", ".x..", "xxxx"];
   function zzz(ctx, x, y, now) {
     for (let i = 0; i < 2; i++) {
       const t = ((now / 3.2) + i * 0.5) % 1;
       ctx.globalAlpha = t < 0.15 ? t / 0.15 : t > 0.7 ? (1 - t) / 0.3 : 1;
       const zx = Math.round(x + t * 6 + Math.sin(t * 7) * 1.5), zy = Math.round(y - t * 14);
-      ZED.forEach((row, j) => { for (let k = 0; k < 3; k++) if (row[k] === "x") { ctx.fillStyle = "#e8e2d4"; ctx.fillRect(zx + k, zy + j, 1, 1); } });
+      ZED.forEach((row, j) => { for (let k = 0; k < row.length; k++) if (row[k] === "x") { ctx.fillStyle = "#e8e2d4"; ctx.fillRect(zx + k, zy + j, 1, 1); } });
     }
     ctx.globalAlpha = 1;
   }
@@ -454,8 +454,8 @@
     const g = Art.heroGrid(hs, 0, o.look || App.heroLook(hs));
     const pet = h.pet ? { g0: Art.petGrid(h.pet, 0), g1: Art.petGrid(h.pet, 1) } : null;
     return { h, name: o.name || h.name, lines: (o.lines || []).slice(), u, v, tu: u, tv: v, face: o.face || 1, mode: "idle", wait: o.wait || 1, mug: 0, said: [],
-      right: g.toCanvas(1), left: g.flipX().toCanvas(1), focus: !!o.focus, keeper: !!o.keeper,
-      pet: pet && { name: h.pet.name, lines: o.petLines || [], right: [pet.g0.toCanvas(1), pet.g1.toCanvas(1)], left: [pet.g0.flipX().toCanvas(1), pet.g1.flipX().toCanvas(1)],
+      right: g.toCanvas(1), left: g.flipX().toCanvas(1), cls: o.look || App.heroLook(hs), focus: !!o.focus, keeper: !!o.keeper,
+      pet: pet && { name: h.pet.name, kind: h.pet.kind, lines: o.petLines || [], right: [pet.g0.toCanvas(1), pet.g1.toCanvas(1)], left: [pet.g0.flipX().toCanvas(1), pet.g1.flipX().toCanvas(1)],
         u: u - 0.6, v: v + 0.4, tu: u - 0.6, tv: v + 0.4, face: 1, pet: true, said: [] } };
   }
   // nameless townsfolk who fill a quiet common room; they never speak
@@ -482,14 +482,36 @@
     if (Math.abs(sx) > 0.02) a.face = sx > 0 ? 1 : -1;
     return false;
   }
-  // st.bed = { has(u, v), z, cut, fold }: the page's hero, idle in that bed, sits up under the covers instead of standing
+  // the same figure with the hat, hood or helm off, for someone sitting up in bed
+  function bare(a) {
+    if (!a.bare) {
+      const look = Object.assign({}, (a.cls || {}).look);
+      if (!(window.Paint && Paint.MARKS.has(look.head))) look.head = "none";
+      const g = Art.heroGrid(Object.assign({}, a.h, { alive: true }, a.h.kit ? { kit: Object.assign({}, a.h.kit, { head: null }) } : {}), 0, Object.assign({}, a.cls, { look }));
+      a.bare = [g.toCanvas(1), g.flipX().toCanvas(1)];
+    }
+    return a.face > 0 ? a.bare[0] : a.bare[1];
+  }
+  // st.bed = { has(u, v), z, cut, fold, lie, pet }: the page's hero, idle in that bed, lies asleep under the covers (lie: Paint.sleeper's
+  // quilt spec), breathing, and sits up bareheaded for a few seconds after a click (a.wake) to answer.
+  // a.rest is the same shape for anyone on a bedroll at camp, plus pad (the roll, a canvas layer) and lie.awake for lying awake.
   function drawActor(ctx, st, a, bob, now) {
     const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0), y = Math.round(y0);
-    const bed = st.bed && a.focus && a.mode === "idle" && st.bed.has(a.u, a.v) ? st.bed : null;
+    const bed = st.bed && a.focus && a.mode === "idle" && st.bed.has(a.u, a.v) ? st.bed : a.rest && a.mode === "idle" ? a.rest : null;
     if (bed) {
       // tucked in for the night, so gather() never walks them off (it skips actors that stay)
-      a.stay = true;
-      const img = a.face > 0 ? a.right : a.left, top = y - bed.z - bed.cut;
+      a.stay = true; a.abed = !a.rest;
+      const t = now || 0, up = a.wake != null && t - a.wake < 4.5, ph = a.rest ? (a.u * 2.3 + a.v * 1.7) % 6 : 0;
+      bed.awake = up;
+      if (bed.pad) ctx.drawImage(bed.pad, 0, 0);
+      if (bed.helm && !up) ctx.drawImage(bed.helm.cv, x - 12 - bed.helm.w / 2, y + 6 - bed.helm.foot);
+      if (bed.lie && !up) {
+        a.lie = a.lie || [0, 1].map((f) => Art.heroLying(a.h, f, a.cls, bed.lie).toCanvas(1));
+        ctx.drawImage(a.lie[Math.sin(t * 1.7 + ph) > 0.35 ? 1 : 0], x - 18, y - bed.z - 24);
+        if (!reduced() && !bed.lie.awake) zzz(ctx, x - 1, y - bed.z - 22, t + ph);
+        return;
+      }
+      const img = bed.lie ? bare(a) : a.face > 0 ? a.right : a.left, top = y - bed.z - bed.cut;
       ctx.drawImage(img, 0, 0, img.width, bed.cut, x - 14, top, img.width, bed.cut);
       ctx.fillStyle = bed.fold; ctx.fillRect(x - 8, y - bed.z - 1, 16, 2);
       ctx.fillStyle = "rgba(255,248,230,0.5)"; ctx.fillRect(x - 8, y - bed.z - 1, 16, 1);
@@ -502,22 +524,28 @@
   }
   // the page's hero gets a small bobbing gold marker, like a game cursor; drawn last so no light or bars cover it
   function drawMarker(ctx, st, a, now) {
-    const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0), my = Math.round(y0) - 40 - (Math.floor((now || 0) * 2.5) % 2);
+    const lie = a.rest && a.mode === "idle" && !(a.wake != null && now - a.wake < 4.5);
+    const [x0, y0] = st.iso(a.u, a.v), x = Math.round(x0) - (lie ? 3 : 0), my = Math.round(y0) - (lie ? 31 : 40) - (Math.floor((now || 0) * 2.5) % 2);
     ctx.fillStyle = "#3a2410"; ctx.fillRect(x - 3, my - 1, 7, 1); ctx.fillRect(x - 3, my, 1, 1); ctx.fillRect(x + 3, my, 1, 1); ctx.fillRect(x - 2, my + 1, 1, 1); ctx.fillRect(x + 2, my + 1, 1, 1); ctx.fillRect(x - 1, my + 2, 1, 1); ctx.fillRect(x + 1, my + 2, 1, 1);
     ctx.fillStyle = "#f0c850"; ctx.fillRect(x - 2, my, 5, 1); ctx.fillRect(x - 1, my + 1, 3, 1); ctx.fillStyle = "#c8902a"; ctx.fillRect(x, my + 2, 1, 1);
   }
+  // a click lands on a pet anywhere over its sprite (a wolf is bigger than a cat)
+  function petHit(p, dx, dy) { const img = p.right[0]; return Math.abs(dx) < (img.width >> 1) + 1 && dy < 2 && dy > -img.height - 2; }
   const HEART = ["xx.xx", "xhxxx", ".xxx.", "..x.."];
   // a pet that was just clicked (p.pat = the time) hops, wags, and a few small hearts float up off it
   function drawPet(ctx, st, p, frame, now) {
     const lift = st.bed && st.bed.has(p.u, p.v) ? st.bed.z : 0;
     const [x0, y0] = st.iso(p.u, p.v), x = Math.round(x0), y = Math.round(y0) - lift, age = p.pat != null && now != null ? now - p.pat : 9;
     const hop = age < 0.45 ? Math.round(Math.sin((age / 0.45) * Math.PI) * 3) : 0, wag = age < 1 && Math.floor(age * 9) % 2 ? 1 : 0;
-    ctx.fillStyle = "rgba(20,10,4,0.3)"; ctx.fillRect(x - 5, y - 1, 10, 2);
-    ctx.drawImage((p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame], x - 7, y - 10 - hop);
+    const img = (p.face > 0 ? p.right : p.left)[wag ? 1 - frame : frame], hw = img.width >> 1, sw = Math.max(5, hw - 2);
+    ctx.fillStyle = "rgba(20,10,4,0.3)"; ctx.fillRect(x - sw, y - 1, sw * 2, 2);
+    // curled up by a sleeping owner: legs tucked under, belly on the ground, until a pat stands it up
+    if (p.curl && age > 1.2) ctx.drawImage(img, 0, 0, img.width, img.height - 3, x - hw, y - img.height + 3, img.width, img.height - 3);
+    else ctx.drawImage(img, x - hw, y - img.height - hop);
     for (let i = 0; i < 3; i++) {
       const t = age - i * 0.18;
       if (t < 0 || t > 0.95) continue;
-      const hx = x - 3 + (i - 1) * 5 + Math.round(Math.sin(t * 12 + i * 2.1) * 1.2), hy = y - 14 - Math.round(t * 16) - (i === 1 ? 2 : 0);
+      const hx = x - 3 + (i - 1) * 5 + Math.round(Math.sin(t * 12 + i * 2.1) * 1.2), hy = y - img.height - 4 - Math.round(t * 16) - (i === 1 ? 2 : 0);
       ctx.globalAlpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.4;
       HEART.forEach((row, j) => { for (let k = 0; k < 5; k++) if (row[k] !== ".") { ctx.fillStyle = row[k] === "h" ? "#ffc8c8" : j > 1 ? "#c8384a" : "#e8566a"; ctx.fillRect(hx + k, hy + j, 1, 1); } });
       ctx.globalAlpha = 1;
@@ -532,71 +560,51 @@
     return p;
   }
 
-  // ---------- speech bubbles, positioned over the canvas in CSS pixels ----------
+  // ---------- talking text (speech.js), anchored in CSS pixels over each speaker's head ----------
   function talk(wrap, cv, st) {
-    const layer = document.createElement("div");
-    layer.className = "tavern-talk";
-    wrap.appendChild(layer);
-    const bubbles = [];
-    const T = {
-      now: 0,
-      say(a, text, secs) {
-        if (!text) return;
-        for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].a === a) { bubbles[i].el.remove(); bubbles.splice(i, 1); }
-        if (bubbles.length >= 3) { const old = bubbles.shift(); old.el.remove(); }
-        const el = document.createElement("div");
-        el.className = "tavern-bubble" + (a.keeper ? " keeper" : "") + (a.pet === true ? " pet" : "") + (a.focus ? " focus" : "");
-        const b = document.createElement("b"); b.textContent = a.name;
-        el.append(b, document.createTextNode(" " + text));
-        layer.appendChild(el);
-        bubbles.push({ a, el, until: T.now + (secs || Math.min(5.5, 2.4 + text.length / 22)) });
-      },
-      speaking(a) { return bubbles.some((b) => b.a === a); },
-      get count() { return bubbles.length; },
-      prune() { for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].until < T.now) { bubbles[i].el.remove(); bubbles.splice(i, 1); } },
-      place() {
-        const k = cv.clientWidth / st.W, cw = cv.clientWidth;
-        for (const b of bubbles) {
-          const [x, y] = b.a.at || st.iso(b.a.u, b.a.v), lift = b.a.at ? 0 : b.a.pet === true ? 12 : 36;
-          const bw = b.el.offsetWidth / 2;
-          b.el.style.left = `${Math.max(bw + 4, Math.min(cw - bw - 4, x * k))}px`;
-          b.el.style.top = `${Math.max(b.el.offsetHeight + 4, (y - lift) * k)}px`;
-        }
-      },
-    };
-    return T;
+    if (!window.Speech) return { now: 0, say(a, t, s, done) { if (done) done(); }, speaking: () => false, count: 0, prune() {}, place() {}, clear() {} };
+    return Speech.layer(wrap, (a) => {
+      const k = cv.clientWidth / st.W, [x, y] = a.at || st.iso(a.u, a.v);
+      const lift = a.at ? 0 : a.pet === true ? a.right[0].height + 2 : a.h && a.h.look && a.h.look.child ? 26 : 36;
+      return [x * k, (y - lift) * k];
+    });
   }
 
-  // ---------- the loop: one rAF, stopped offscreen, in a hidden tab and once the scene leaves the page ----------
-  const reduced = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // ---------- the loop: one rAF, stopped offscreen, in a hidden tab, once the scene leaves the page, and outright in static mode ----------
+  // reduced(): hold still, for reduced motion or the Static scenes setting
+  const reduced = () => (window.Settings ? Settings.calm() : !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches));
   function loop(wrap, tick, onVisible) {
-    const still = reduced();
     let raf = 0, last = 0, onscreen = true;
     const live = () => wrap.isConnected && onscreen && !document.hidden;
     function frame(t) {
       raf = 0;
-      if (!live()) return;
+      if (!live() || reduced()) return;
       const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
       last = t;
       tick(dt);
       raf = requestAnimationFrame(frame);
     }
-    function wake() { if (!still && !raf && live()) { last = 0; raf = requestAnimationFrame(frame); } }
+    function wake() { if (!reduced() && !raf && live()) { last = 0; raf = requestAnimationFrame(frame); } }
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => {
         onscreen = es[es.length - 1].isIntersecting;
         if (onVisible) onVisible(onscreen && wrap.isConnected);
         if (!wrap.isConnected) { io.disconnect(); return; }
-        if (still && onscreen) tick(0);
+        if (reduced() && onscreen) tick(0);
         wake();
       });
       io.observe(wrap);
     }
     const vis = () => { if (!wrap.isConnected) { document.removeEventListener("visibilitychange", vis); return; } wake(); };
     document.addEventListener("visibilitychange", vis);
+    const unwatch = window.Settings ? Settings.watch((keys) => {
+      if (!wrap.isConnected) { unwatch(); return; }
+      if (!keys.includes("still") && !keys.includes("motion")) return;
+      if (reduced()) { if (raf) { cancelAnimationFrame(raf); raf = 0; } tick(0); } else wake();
+    }) : null;
     tick(0);
     wake();
-    return { still, redraw: () => { if (still || !raf) tick(0); } };
+    return { get still() { return reduced(); }, redraw: () => { if (reduced() || !raf) tick(0); } };
   }
 
   // ---------- the common room ----------
@@ -788,7 +796,6 @@
     const keep = keeper((cfg.keeper && cfg.keeper.name) || "The barkeep", 3.5, 0.6);
     keep.wait = 2;
     const focus = actors.find((a) => a.focus);
-    const still = reduced();
 
     const T = talk(wrap, cv, st);
     const say = (a, text, secs) => T.say(a, text, secs);
@@ -809,8 +816,8 @@
       else if (roll < 0.52) {
         go(a, bar[0], bar[1]);
         a.then = () => {
-          a.face = 1; say(a, pick(a, r, (t) => t.startsWith("One ")), 2.6);
-          later(1400, () => { if (!a.local || r() < 0.3) say(keep, r() < 0.5 ? "Coming up." : keepLines[Math.floor(r() * keepLines.length)], 2.6); a.mug = 30; });
+          a.face = 1;
+          T.say(a, pick(a, r, (t) => t.startsWith("One ")), 2.6, () => later(250, () => { if (!a.local || r() < 0.3) say(keep, r() < 0.5 ? "Coming up." : keepLines[Math.floor(r() * keepLines.length)], 2.6); a.mug = 30; }));
           a.wait = 4;
         };
       } else if (roll < 0.64) { go(a, fire[0], fire[1]); a.then = () => { a.face = -1; a.wait = 4 + r() * 4; if (a.focus) later(800, () => say(a, pick(a, r))); }; }
@@ -833,10 +840,14 @@
           const ex = talkFor(a, other);
           const turns = ex ? ex.map((l) => [l.id === a.h.id ? a : other, l.text]) : [a, other, a, other].slice(0, 2 + Math.floor(r() * 3)).map((s) => [s, null]);
           if (ex) talks.splice(talks.indexOf(ex), 1);
-          turns.forEach(([s, t], i) => later(300 + i * 2800, () => say(s, t || pick(s, r), 3.2)));
-          const end = 300 + turns.length * 2800;
-          later(end, () => { a.mode = "idle"; a.wait = 1 + r() * 2; other.mode = "idle"; other.wait = 1 + r() * 2; });
-          a.wait = end / 1000 + 1;
+          // each turn waits for the last to be said, so a fast talker and a slow one still take turns
+          const next = (i) => {
+            if (i >= turns.length) { a.mode = "idle"; a.wait = 1 + r() * 2; other.mode = "idle"; other.wait = 1 + r() * 2; return; }
+            const [s, t] = turns[i];
+            T.say(s, t || pick(s, r), 3.2, () => later(450, () => next(i + 1)));
+          };
+          later(300, () => next(0));
+          a.wait = 1;
         };
       }
     }
@@ -882,7 +893,7 @@
     }
 
     function draw() {
-      const now = T.now;
+      const now = T.now, still = reduced();
       ctx.drawImage(bg, 0, 0);
       for (const v of lookOut.views) v.draw(ctx, now, still);
       const flick = 0.75 + Math.sin(now * 13) * 0.08 + Math.sin(now * 7.3) * 0.08;
@@ -908,17 +919,20 @@
       T.place();
     }
     const L = loop(wrap, (dt) => { if (dt) update(dt); draw(); }, cfg.onVisible);
-    if (still && focus) { say(focus, focus.lines[0], 999); L.redraw(); }
+    if (reduced() && focus) { say(focus, focus.lines[0], 999); L.redraw(); }
     cv.addEventListener("click", (ev) => {
+      const still = reduced();
       const k = cv.clientWidth / W, rect = cv.getBoundingClientRect();
       const mx = (ev.clientX - rect.left) / k, my = (ev.clientY - rect.top) / k;
       const hit = actors.filter((a) => !a.local).concat([keep]).filter((a) => { const [x, y] = st.iso(a.u, a.v); return Math.abs(mx - x) < 9 && my < y && my > y - 34; })
         .sort((p, q) => q.u + q.v - (p.u + p.v))[0];
-      const pet = !hit && actors.map((a) => a.pet).find((p) => { if (!p) return false; const [x, y] = st.iso(p.u, p.v); return Math.abs(mx - x) < 8 && my < y + 2 && my > y - 12; });
+      const pet = !hit && actors.map((a) => a.pet).find((p) => { if (!p) return false; const [x, y] = st.iso(p.u, p.v); return petHit(p, mx - x, my - y); });
       if (hit) say(hit, hit.keeper ? keepLines[Math.floor(r() * keepLines.length)] : pick(hit, r), still ? 999 : 3);
-      else if (pet) { pet.pat = T.now; if (pet.lines.length) say(pet, pick(pet, r, () => true), still ? 999 : 2.2); }
+      else if (pet) { pet.pat = T.now; say(pet, window.Speech ? Speech.pat(pet) : pick(pet, r, () => true), still ? 999 : 2.2); }
       L.redraw();
     });
+    // for review pages (tools/dialogue_demo.html) that stage a scripted scene in the real room
+    wrap.stage = { actors, keeper: keep, talk: T, redraw: L.redraw };
     return wrap;
   }
 
@@ -929,6 +943,6 @@
       cast: pending.map((h) => ({ h, lines: h.chatter || [] })) });
   }
 
-  window.Tavern = { scene, inn, stage, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
+  window.Tavern = { scene, inn, stage, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, petHit, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
     shade, line, slab, legs, table, stool, pallet, zzz, mugAt, candle, lighting, inRoom, weatherAt };
 })();

@@ -8,7 +8,11 @@
   const parties = {};
   const events = {};
   if (L) {
-    for (const h of L.heroes) heroes[h.id] = h;
+    // owners sign up in whatever case they type; a name typed all in lower case is shown capitalised ("cade" -> "Cade")
+    for (const h of L.heroes) {
+      if (h.owner && h.owner === h.owner.toLowerCase()) h.owner = h.owner.replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+      heroes[h.id] = h;
+    }
     for (const p of L.parties) parties[p.id] = p;
     for (const e of L.events) events[e.id] = e;
   }
@@ -34,18 +38,41 @@
   const IRREGULAR = { hero: "heroes", party: "parties" };
   function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
   function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+  // a crew's own exported possessive when there is one (party.poss), else as league/heroes.py poss: "The Mossy Cats'", "Brix's"
+  function poss(s, pid) {
+    const p = pid && parties[pid];
+    if (p && p.poss) return p.poss;
+    s = String(s || "");
+    return s + (/s$/.test(s) && !/ss$/.test(s) ? "'" : "'s");
+  }
 
   // ---------- sprites ----------
   const animated = new Set();
-  let frame = 0;
-  setInterval(() => {
+  let frame = 0, idleTimer = 0;
+  function idle() {
     frame ^= 1;
     for (const a of animated) {
       if (!a.canvas.isConnected) { animated.delete(a); continue; }
       a.draw(frame);
     }
-  }, 650);
+  }
+  // static scenes (and reduced motion) stop the idle beat outright, not just its drawing
+  function idling() {
+    const on = !(window.Settings && Settings.calm());
+    if (on && !idleTimer) idleTimer = setInterval(idle, 650);
+    else if (!on && idleTimer) { clearInterval(idleTimer); idleTimer = 0; }
+  }
+  idling();
+  if (window.Settings) Settings.watch(idling);
   function heroLook(h) { return S.classes[h.cls] || S.classes.warrior; }
+  // a legendary figure (L.legends[].art, from league/export.py legend_art) as a hero-like figure for any scene: { h, cls, lines }
+  function legendFigure(name) {
+    const art = ((L.legends || []).find((x) => x.name === name) || {}).art;
+    if (!art) return null;
+    const k = art.kit;
+    return { h: { id: "legend:" + name, name, look: art.look, kit: k, weapon: k.weapon.family, weapon_tier: k.weapon.tier, armor_tier: k.armor.tier, legend: true, alive: true },
+      cls: { name: "legend", look: { outfit: k.armor.outfit, head: "none", aura: null, offhand: "none" } }, lines: art.lines || [] };
+  }
   function spriteCanvas(gridFn, scale, cls, animate) {
     const g0 = gridFn(0);
     const cv = el("canvas", { width: g0.w * scale, height: g0.h * scale, class: cls || "" });
@@ -90,6 +117,28 @@
   function itemSprite(id, scale) { return Art.itemGrid(id).toCanvas(scale || 2); }
 
   // ---------- names & links ----------
+  // the site's one money formatter (league/town.py money is the sim's): wealth in silver, small sums in copper, gold only as flavour
+  function money(copper, gold) {
+    copper = Math.round(Math.abs(copper || 0));
+    const s = Math.floor(copper / 10), c = copper % 10;
+    if (!s) return `${c} copper`;
+    if (gold && copper >= 1000 && copper % 100 === 0) return `${copper / 100} gold piece${copper > 100 ? "s" : ""}`;
+    if (c && s < 10) return `${s} silver ${c} copper`;
+    return `${s.toLocaleString("en-US")} silver`;
+  }
+  // money that changes hands (a table's winnings or losses, a reward): gold pieces from 100 silver up, the rest as money(); town.py gold_words
+  function coins(copper) {
+    copper = Math.round(Math.abs(copper || 0));
+    const g = Math.floor(copper / 100), rest = copper % 100;
+    if (copper < 1000 || !g) return money(copper);
+    return `${g.toLocaleString("en-US")} gold piece${g > 1 ? "s" : ""}` + (rest ? ` and ${money(rest)}` : "");
+  }
+  // a sitting at a town table, as the day box and the calendar show it: "Lost 3 silver at Liar's Dice ▸ watch"
+  function tableLink(x) {
+    if (!x || !x.table) return null;
+    return el("span", { class: "table-line" }, x.table, x.game ? [" ", el("a", { href: `#/${x.route || "table"}/${x.game}` }, "▸ watch")] : null);
+  }
+
   function heroLink(id, opts) {
     const h = heroes[id];
     if (!h) return el("span", null, "someone");
@@ -146,16 +195,17 @@
     const s = ((L && L.seasons) || []).find((x) => x.start_day <= day && day <= x.end_day);
     if (s) return [s.season, day - s.start_day + 1];
     const m = (L && L.meta) || {};
-    return m.season ? [m.season, day - (m.day - m.season_day)] : [1, day];
+    if (!m.season) return [1, day];
+    // a deadline can fall past this season's last day, into the next one
+    const d = day - (m.day - m.season_day), len = m.season_length || 30;
+    return d > len ? [m.season + Math.floor((d - 1) / len), ((d - 1) % len) + 1] : [m.season, d];
   }
-  // "S2 · Day 9" on cards; in a sentence "day 9", or "season 2, day 9" when it isn't this season ("in season 2, on day 9" after "on")
+  // "S2 · Day 9" on cards; in a sentence always "day 9 of season 2" ("on day 9 of season 2" after "on"): a bare "day 9" reads as the world's day
   function when(day, prose) {
     if (day == null) return "";
     const [s, d] = seasonOf(day);
     if (!prose) return `S${s} · Day ${d}`;
-    const now = s === ((L && L.meta) || {}).season;
-    if (prose === "on") return now ? `on day ${d}` : `in season ${s}, on day ${d}`;
-    return now ? `day ${d}` : `season ${s}, day ${d}`;
+    return `${prose === "on" ? "on " : ""}day ${d} of season ${s}`;
   }
 
   // ---------- events ----------
@@ -183,7 +233,10 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
     const fightLink = e.fight && LD_has("fight", e.fight) ? el("a", { class: "watch", href: `#/fight/${e.fight}` }, " ▶ watch")
-      : e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, " ♪ hear it") : null;
+      : e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, " ♪ hear it")
+      : e.night && nightIds.has(e.night) ? el("a", { class: "watch", href: `#/night/${e.night}` }, e.music || e.anthem ? " ♪ listen" : " ▶ watch")
+      : e.meal && mealIds.has(e.meal) ? el("a", { class: "watch", href: `#/meal/${e.meal}` }, " ▶ watch")
+      : e.reading && readingIds.has(e.reading) ? el("a", { class: "watch", href: `#/reading/${e.reading}` }, " ▶ watch") : null;
     const ks = e.kind === "keystone", tag = ks ? "✦ Keystone" : e.sk ? `✧ ${e.sk}` : null;
     const share = !opts.noShare && (SHARE_KINDS.has(e.kind) || e.imp >= 5) ? shareBtn(e.text, eventHash(e)) : null;
     const jump = (movesOf[e.id] || []).filter((m) => heroes[m.hero] || parties[m.party]);
@@ -198,7 +251,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   const movesOf = {};
   for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
-  const fightIds = new Set((L && L.fights_index) || []);
+  const fightIds = new Set((L && L.fights_index) || []), nightIds = new Set((L && L.nights_index) || []), mealIds = new Set((L && L.meals_index) || []), readingIds = new Set((L && L.readings_index) || []);
   function LD_has(kind, id) { return kind !== "fight" || fightIds.has(id); }
   function feed(list, opts) {
     const ul = el("ul", { class: "feed" });
@@ -227,6 +280,17 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
       document.head.appendChild(s);
     });
     return pending[key];
+  }
+  // the heavy players (fights, meals, readings, music and night games) load with their first page, in order; a <script> tag works from file://
+  const scripts = {};
+  function need(names) {
+    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js"]`) ? Promise.resolve() : new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = `js/${n}.js`;
+      s.onload = resolve;
+      s.onerror = () => { delete scripts[n]; reject(new Error("could not load " + n)); };
+      document.head.appendChild(s);
+    }))), Promise.resolve());
   }
 
   // ---------- follow ("my heroes") ----------
@@ -291,14 +355,12 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
-    if (window.Sound) { Sound.stopSong(); Sound.setPage(hash); }
+    if (window.Music) Music.stop();
+    if (window.Sound) Sound.setPage(hash);
     for (const a of document.querySelectorAll("#nav a")) {
       const target = a.getAttribute("href").slice(1);
       a.classList.toggle("on", target === "/" ? hash === "/" : hash.startsWith(target));
     }
-    // on a phone the nav is one scrolling row; keep the current page's tab in sight
-    const nav = document.getElementById("nav"), on = nav && nav.querySelector("a.on");
-    if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, on.offsetLeft - nav.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2);
     for (const [re, fn] of routes) {
       const m = hash.match(re);
       if (m) {
@@ -348,7 +410,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, spriteCanvas, when,
-    animated,
+    nodeName, clsName, richText, eventRow, feed, load, need, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink, poss,
   };
 })();

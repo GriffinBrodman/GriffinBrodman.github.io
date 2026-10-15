@@ -1,12 +1,13 @@
-/* Sound, all synthesised with WebAudio (no files): page ambience, UI and fight effects, and the bard,
-   who sings the league's songs in a K.K.-style syllable voice over a plucked lute. */
+/* Sound, all synthesised with WebAudio (no files): page ambience, UI and fight effects, the talking text's voices and animal
+   calls, and the shared context and Music bus that music.js plays every song on (the event ballads included). */
 (function () {
   "use strict";
-  const KEY = "al.sound";
-  const prefs = (() => { try { return Object.assign({ on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return { on: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6 }; } })();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* storage unavailable */ } };
+  // every level and switch lives in Settings (settings.js); these defaults only cover a page that loads audio.js alone
+  const FALLBACK = { sound: true, master: 0.7, amb: 0.5, music: 0.7, sfx: 0.6, voices: true, voice: 0.7 };
+  const pref = (k) => (window.Settings ? Settings.get(k) : FALLBACK[k]);
+  const prefs = { get on() { return pref("sound"); } };
 
-  let ctx = null, master, bus = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
+  let ctx = null, master, bus = {}, duckG = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
@@ -18,7 +19,10 @@
     comp.threshold.value = -16; comp.ratio.value = 4;
     master = ctx.createGain();
     master.connect(comp); comp.connect(ctx.destination);
-    for (const k of ["amb", "music", "sfx"]) { bus[k] = ctx.createGain(); bus[k].connect(master); }
+    for (const k of ["amb", "music", "sfx", "voice"]) { bus[k] = ctx.createGain(); bus[k].connect(master); }
+    // a song fades the outdoor ambience right out and lets a tavern's room murmur sit under it (bus.room is on the Ambience slider)
+    bus.room = ctx.createGain();
+    for (const k of ["amb", "room"]) { duckG[k] = ctx.createGain(); bus[k].disconnect(); bus[k].connect(duckG[k]); duckG[k].connect(master); }
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -27,10 +31,12 @@
   }
   function levels() {
     if (!ctx) return;
-    master.gain.value = prefs.on ? prefs.master : 0;
-    bus.amb.gain.value = prefs.amb * 0.5;
-    bus.music.gain.value = prefs.music;
-    bus.sfx.gain.value = prefs.sfx * 0.8;
+    master.gain.value = prefs.on ? pref("master") : 0;
+    bus.amb.gain.value = pref("amb") * 0.5;
+    bus.room.gain.value = pref("amb") * 0.5;
+    bus.music.gain.value = pref("music");
+    bus.sfx.gain.value = pref("sfx") * 0.8;
+    bus.voice.gain.value = pref("voices") ? pref("voice") : 0;
   }
   function now() { return ctx.currentTime; }
 
@@ -96,27 +102,6 @@
     o.connect(g); g.connect(dest || bus.music); o.start(t); o.stop(t + 0.32);
     noise(t, 0.08, vol * 0.4, "lowpass", 1800, dest || bus.music);
   }
-  // the bard's voice: a buzzy source through two vowel formants, with a little chirp up into each note
-  const VOWELS = { a: [800, 1200], e: [450, 1950], i: [320, 2300], o: [520, 900], u: [360, 800], y: [320, 2300] };
-  function sing(syl, midi, t, dur, vol, dest) {
-    const v = (syl.toLowerCase().match(/[aeiouy]/) || ["a"])[0], [f1, f2] = VOWELS[v];
-    const o = ctx.createOscillator(), g = ctx.createGain(), b1 = ctx.createBiquadFilter(), b2 = ctx.createBiquadFilter(), mix = ctx.createGain();
-    o.type = "sawtooth";
-    o.frequency.setValueAtTime(mtof(midi - 1.2), t);
-    o.frequency.exponentialRampToValueAtTime(mtof(midi), t + 0.04);
-    b1.type = "bandpass"; b1.frequency.value = f1; b1.Q.value = 7;
-    b2.type = "bandpass"; b2.frequency.value = f2; b2.Q.value = 9;
-    mix.gain.value = 1;
-    const len = Math.max(0.09, dur * 0.85);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.018);
-    g.gain.setValueAtTime(vol * 0.8, t + len * 0.7);
-    g.gain.linearRampToValueAtTime(0.0001, t + len);
-    o.connect(b1); o.connect(b2); b1.connect(mix); b2.connect(mix); mix.connect(g); g.connect(dest || bus.music);
-    o.start(t); o.stop(t + len + 0.02);
-    if (/^[^aeiouy]/i.test(syl)) noise(t, 0.03, vol * 0.25, "highpass", 3000, dest || bus.music);
-  }
-
   // ---------- effects ----------
   const SFX = {
     click: () => { const t = now(); noise(t, 0.04, 0.35, "bandpass", 1900, bus.sfx, 4); },
@@ -137,7 +122,7 @@
   // ---------- ambience per page ----------
   const PENTA = [0, 2, 4, 7, 9];
   function stopAmb() { clearInterval(ambTimer); ambTimer = null; for (const n of ambNodes) { try { n.stop(); } catch (e) { /* already stopped */ } } ambNodes = []; }
-  function bed(type, freq, vol, lfo) {
+  function bed(type, freq, vol, lfo, dest) {
     const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = noiseBuf; src.loop = true;
     f.type = type; f.frequency.value = freq; g.gain.value = vol;
@@ -146,12 +131,12 @@
       l.frequency.value = lfo; lg.gain.value = freq * 0.4;
       l.connect(lg); lg.connect(f.frequency); l.start(); ambNodes.push(l);
     }
-    src.connect(f); f.connect(g); g.connect(bus.amb); src.start(); ambNodes.push(src);
+    src.connect(f); f.connect(g); g.connect(dest || bus.amb); src.start(); ambNodes.push(src);
   }
   // ---------- scene ambience: the hero page's "tonight" scene, while it is on screen ----------
-  function crackle(t, vol) {
+  function crackle(t, vol, dest) {
     const n = 1 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.012 + Math.random() * 0.03, vol * (0.4 + Math.random()), "bandpass", 1800 + Math.random() * 3200, bus.amb, 1.5);
+    for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.012 + Math.random() * 0.03, vol * (0.4 + Math.random()), "bandpass", 1800 + Math.random() * 3200, dest || bus.amb, 1.5);
   }
   function cricket(t, vol) {
     const f = 4200 + Math.random() * 900;
@@ -180,7 +165,7 @@
     o.start(t); o.stop(t + 0.3);
   }
   function snort(t) { noise(t, 0.35, 0.12, "bandpass", 500 + Math.random() * 300, bus.amb, 2); noise(t + 0.08, 0.2, 0.06, "lowpass", 300, bus.amb); }
-  function footstep(t, vol) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 70; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.14); noise(t, 0.05, vol * 0.5, "lowpass", 900, bus.amb); }
+  function footstep(t, vol, dest) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 70; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12); o.connect(g); g.connect(dest || bus.amb); o.start(t); o.stop(t + 0.14); noise(t, 0.05, vol * 0.5, "lowpass", 900, dest || bus.amb); }
   const SCENES = {
     camp: { beds: [["lowpass", 260, 0.1, 0.3], ["bandpass", 1400, 0.012, 0.05]], tick: 260, step(t, n) {
       crackle(t, 0.12); if (Math.random() < 0.18) noise(t, 0.4, 0.04, "lowpass", 500, bus.amb);
@@ -207,12 +192,56 @@
       if (Math.random() < 0.12) plink(t, 0.06);
       if (Math.random() < 0.025) { for (let k = 0; k < 4; k++) footstep(t + k * 0.55, 0.08 - k * 0.012); }
       if (Math.random() < 0.015) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(3000, t); o.frequency.linearRampToValueAtTime(3600, t + 0.06); g.gain.setValueAtTime(0.015, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.08); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.1); } } },
+    tavern: { room: true, beds: [["bandpass", 420, 0.07, 0.31], ["bandpass", 1050, 0.025, 0.17], ["lowpass", 200, 0.04, 0.4]], tick: 240, step(t, n, root, dest) {
+      const busy = 0.5 + 0.5 * Math.sin(n * 0.045) * Math.sin(n * 0.017 + 1);
+      for (let k = 0; k < 2; k++) if (Math.random() < 0.35 + busy * 0.4) murmur(dest, t + Math.random() * 0.2, 0.012 + Math.random() * 0.014);
+      if (Math.random() < 0.05) { clink(dest, t + Math.random() * 0.2, 0.012); if (Math.random() < 0.35) clink(dest, t + 0.12 + Math.random() * 0.05, 0.01); }
+      if (Math.random() < 0.012 + busy * 0.01) laugh(dest, t + Math.random() * 0.3);
+      if (Math.random() < 0.3) crackle(t, 0.03, dest);
+      if (Math.random() < 0.01) { for (let k = 0; k < 3; k++) footstep(t + k * 0.5, 0.05 - k * 0.01, dest); } } },
   };
+  // the song scene's tavern: a crowd's murmur heard through the room, cups clinking and the odd laugh, all on bus.room
+  function murmur(dest, t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), [f1, f2] = Object.values(FORMANT)[Math.floor(Math.random() * 6)];
+    const f0 = 95 + Math.random() * 130, len = 0.1 + Math.random() * 0.28;
+    o.type = "sawtooth"; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * (0.85 + Math.random() * 0.3), t + len);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.linearRampToValueAtTime(0.0001, t + len);
+    for (const [f, a] of [[f1, 1], [f2, 0.5]]) { const bp = ctx.createBiquadFilter(), ga = ctx.createGain(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 6; ga.gain.value = a; o.connect(bp); bp.connect(ga); ga.connect(g); }
+    g.connect(dest); o.start(t); o.stop(t + len + 0.05);
+  }
+  function clink(dest, t, vol) {
+    const f = 2400 + Math.random() * 1400;
+    for (const [m, a] of [[1, 1], [2.76, 0.4], [5.4, 0.15]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f * m; g.gain.setValueAtTime(vol * a, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.3 / m);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(t + 0.35);
+    }
+  }
+  function laugh(dest, t) {
+    const n = 3 + Math.floor(Math.random() * 4), f0 = 180 + Math.random() * 160;
+    for (let k = 0; k < n; k++) {
+      const at = t + k * (0.12 + Math.random() * 0.03), o = ctx.createOscillator(), g = ctx.createGain(), len = 0.08;
+      o.type = "sawtooth"; o.frequency.setValueAtTime(f0 * (1 - k * 0.04), at);
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.015); g.gain.linearRampToValueAtTime(0.0001, at + len);
+      for (const [f, a] of [[FORMANT.a[0], 1], [FORMANT.a[1], 0.5]]) { const bp = ctx.createBiquadFilter(), ga = ctx.createGain(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 5; ga.gain.value = a; o.connect(bp); bp.connect(ga); ga.connect(g); }
+      g.connect(dest); o.start(at); o.stop(at + len + 0.05);
+    }
+  }
   function sceneAmbience(kind) {
     const sc = SCENES[kind], root = 50 + Math.floor(Math.random() * 5);
-    for (const [type, f, vol, lfo] of sc.beds) bed(type, f, vol, lfo);
+    let dest = bus.amb;
+    if (sc.room) { dest = ctx.createBiquadFilter(); dest.type = "lowpass"; dest.frequency.value = 2400; dest.connect(bus.room); }
+    for (const [type, f, vol, lfo] of sc.beds) bed(type, f, vol, lfo, dest);
     let n = 0;
-    ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root), sc.tick);
+    ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root, dest), sc.tick);
+  }
+  function duck(on) {
+    if (!ctx) return;
+    const t = now();
+    for (const [k, v] of [["amb", on ? 0 : 1], ["room", on ? 0.3 : 1]]) {
+      const g = duckG[k].gain;
+      g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(v, t + (on ? 1.2 : 2.5));
+    }
   }
 
   // while a town's own tune plays on the Map (town_music.js), the map's generic wind and lute step aside
@@ -277,90 +306,137 @@
     if (started) ambience(scenery || page);
   }
 
-  // ---------- the bard ----------
-  const MODES = { glory: { scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 7, 9, 5], bpm: 112, root: 60 }, sad: { scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 8, 3, 10], bpm: 76, root: 57 },
-    shame: { scale: [0, 2, 4, 5, 7, 9, 10], prog: [0, 10, 5, 0], bpm: 132, root: 62 } };
-  function syllables(line) {
-    const out = [];
-    for (const w of line.split(/\s+/).filter(Boolean)) {
-      const parts = w.match(/[^aeiouy]*[aeiouy]+(?:[^aeiouy]*$|[^aeiouy](?=[^aeiouy]))?/gi);
-      (parts && parts.join("").length === w.length ? parts : [w]).forEach((p, i, arr) => out.push(i === arr.length - 1 ? p + " " : p));
+  // ---------- talking: one short blip per syllable in a speaker's own voice, Animal Crossing style ----------
+  // v: { pitch (midi), timbre: "soft" | "buzzy" | "chirpy", formant, vib }; o: { at, semi, len, vol, bend, vowel, cons, whisper }
+  const FORMANT = { a: [760, 1180], e: [480, 1850], i: [330, 2250], o: [520, 880], u: [380, 820], y: [330, 2150] };
+  const voiceOn = () => !!(ctx && started && prefs.on && pref("voices") && ctx.state === "running");
+  function blip(v, o) {
+    if (!voiceOn()) return;
+    const t = now() + 0.02 + (o.at || 0), len = Math.max(0.03, o.len || 0.07), vol = 0.2 * (o.vol == null ? 1 : o.vol), out = bus.voice;
+    const f0 = mtof(v.pitch + (o.semi || 0)), f1 = f0 * Math.pow(2, (o.bend || 0) / 12), [fa, fb] = FORMANT[o.vowel] || FORMANT.a, k = v.formant || 1;
+    if (o.whisper) {
+      noise(t, len * 1.2, vol * 0.9, "bandpass", fb * k, out, 3);
+      noise(t, len, vol * 0.5, "bandpass", fa * k * 1.4, out, 2);
+      return;
     }
-    return out;
-  }
-  function rngFrom(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
-  // returns a schedule: [{t, syl, line, idx}] and plays it; onSyl(lineIdx, sylIdx) drives the karaoke highlight
-  let perf = null;
-  function playSong(song, onSyl, onEnd) {
-    if (!init()) return null;
-    stopSong();
-    if (ctx.state === "suspended") ctx.resume();
-    const mode = MODES[song.mood] || MODES.glory, r = rngFrom(song.seed || 7), beat = 60 / mode.bpm, t0 = now() + 0.3;
-    const motif = {}, timers = [], out = ctx.createGain();
-    out.connect(bus.music);
-    let t = t0, deg = 2;
-    const chordAt = (i) => mode.prog[i % mode.prog.length];
-    song.lyrics.forEach((line, li) => {
-      const syls = syllables(line), chorus = line === song.title;
-      if (chorus && !motif.notes) motif.notes = syls.map(() => (deg = Math.max(0, Math.min(9, deg + [-1, 1, 1, 2, -2, 0][Math.floor(r() * 6)]))));
-      const notes = chorus && motif.notes ? motif.notes : syls.map((_, i) => (i === syls.length - 1 ? [0, 2, 4][Math.floor(r() * 3)] : (deg = Math.max(0, Math.min(9, deg + [-1, 1, -1, 2, -2, 1, 0][Math.floor(r() * 7)])))));
-      const stepLen = beat * (song.mood === "sad" ? 1 : 0.5);
-      syls.forEach((syl, si) => {
-        const d = notes[si] % 7, oct = Math.floor(notes[si] / 7) * 12, midi = mode.root + mode.scale[d] + oct;
-        const len = si === syls.length - 1 ? stepLen * 2 : stepLen;
-        sing(syl, midi, t, len, 0.32, out);
-        const at = t;
-        timers.push(setTimeout(() => onSyl && onSyl(li, si), Math.max(0, (at - now()) * 1000)));
-        t += len;
-      });
-      t += beat;
-    });
-    const end = t + beat * 2;
-    for (let bt = t0, i = 0; bt < end; bt += beat, i++) {
-      const ch = chordAt(Math.floor(i / 4)), base = mode.root - 12 + ch;
-      if (i % 4 === 0) pluck(base - 12, bt, 0.5, out);
-      pluck(base + [0, 4, 7, 12][i % 4] + (mode.scale[2] === 3 && i % 4 === 1 ? -1 : 0), bt + (song.mood === "shame" ? beat * 0.5 : 0), 0.22, out);
-      if (song.mood !== "sad" && i % 2 === 1) noise(bt, 0.05, 0.08, "highpass", 6000, out);
+    const g = ctx.createGain(), lvl = v.timbre === "chirpy" ? vol * 0.55 : vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(lvl, t + Math.min(0.012, len * 0.3));
+    g.gain.setValueAtTime(lvl * 0.85, t + len * 0.6);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    g.connect(out);
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(v.timbre === "chirpy" ? f0 * 0.82 : f0, t);
+    if (v.timbre === "chirpy") osc.frequency.exponentialRampToValueAtTime(f0, t + 0.022);
+    osc.frequency.linearRampToValueAtTime(f1, t + len);
+    if (v.vib) {
+      const l = ctx.createOscillator(), lg = ctx.createGain();
+      l.frequency.value = 6 + v.vib * 3; lg.gain.value = f0 * 0.02 * v.vib;
+      l.connect(lg); lg.connect(osc.frequency); l.start(t); l.stop(t + len + 0.02);
     }
-    timers.push(setTimeout(() => { perf = null; onEnd && onEnd(); }, (end - now()) * 1000 + 300));
-    perf = { timers, end, out };
-    return perf;
+    if (v.timbre === "buzzy") {
+      osc.type = "sawtooth";
+      for (const [f, q, a] of [[fa * k, 6, 1], [fb * k, 8, 0.7]]) {
+        const bp = ctx.createBiquadFilter(), ga = ctx.createGain();
+        bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q; ga.gain.value = a * 2.2;
+        osc.connect(bp); bp.connect(ga); ga.connect(g);
+      }
+    } else {
+      osc.type = v.timbre === "chirpy" ? "square" : "triangle";
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.value = v.timbre === "chirpy" ? 2400 * k : 1500 * k + fb * 0.25;
+      osc.connect(lp); lp.connect(g);
+    }
+    osc.start(t); osc.stop(t + len + 0.03);
+    if (o.cons) noise(t, 0.018, vol * 0.3, "highpass", 3200, out);
   }
-  function stopSong() {
-    if (!perf) return;
-    perf.timers.forEach(clearTimeout);
-    perf.out.disconnect();
-    perf = null;
+  // animals: one call per sound word; vol scales it, pitch shifts the voiced ones
+  function tone(type, f0, f1, t, len, vol, filt) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + len);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.02, len * 0.2)); g.gain.exponentialRampToValueAtTime(0.0008, t + len);
+    let n = o;
+    if (filt) { const f = ctx.createBiquadFilter(); f.type = filt[0]; f.frequency.value = filt[1]; if (filt[2]) f.Q.value = filt[2]; o.connect(f); n = f; }
+    n.connect(g); g.connect(bus.voice); o.start(t); o.stop(t + len + 0.03);
+    return o;
+  }
+  function trill(o, t, len, rate, depth) {
+    const l = ctx.createOscillator(), lg = ctx.createGain();
+    l.frequency.value = rate; lg.gain.value = depth;
+    l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + len + 0.03);
+  }
+  function glide(o, t, pts) { for (const [dt, f] of pts) o.frequency.linearRampToValueAtTime(f, t + dt); }
+  const CALLS = {
+    bark: (t, v, p) => { tone("sawtooth", 520 * p, 300 * p, t, 0.11, v, ["bandpass", 900, 1.4]); noise(t, 0.06, v * 0.6, "bandpass", 1300, bus.voice, 1.2); },
+    yip: (t, v, p) => tone("square", 900 * p, 700 * p, t, 0.07, v * 0.5, ["lowpass", 2400]),
+    sniff: (t, v) => { noise(t, 0.05, v * 0.5, "highpass", 2600, bus.voice); noise(t + 0.09, 0.05, v * 0.45, "highpass", 2800, bus.voice); },
+    snore: (t, v) => noise(t, 0.6, v * 0.35, "lowpass", 380, bus.voice),
+    growl: (t, v) => trill(tone("sawtooth", 95, 80, t, 0.55, v * 0.9, ["lowpass", 520]), t, 0.55, 26, 14),
+    howl: (t, v, p) => { const o = tone("sine", 420 * p, 520 * p, t, 1.0, v * 0.8); glide(o, t, [[0.45, 700 * p], [1.0, 520 * p]]); trill(o, t, 1.0, 5, 9); },
+    mrrp: (t, v, p) => trill(tone("triangle", 380 * p, 620 * p, t, 0.24, v * 0.9, ["lowpass", 2200]), t, 0.1, 32, 40),
+    mew: (t, v, p) => glide(tone("triangle", 600 * p, 560 * p, t, 0.3, v * 0.8, ["lowpass", 2600]), t, [[0.1, 900 * p], [0.3, 560 * p]]),
+    purr: (t, v) => trill(tone("sawtooth", 46, 42, t, 0.8, v * 0.7, ["lowpass", 260]), t, 0.8, 24, 10),
+    click: (t, v) => noise(t, 0.012, v * 0.9, "bandpass", 3400, bus.voice, 3),
+    lick: (t, v) => noise(t, 0.04, v * 0.5, "bandpass", 5200, bus.voice, 2),
+    kek: (t, v, p) => { tone("square", 2100 * p, 1800 * p, t, 0.05, v * 0.35, ["lowpass", 4200]); tone("square", 2100 * p, 1800 * p, t + 0.09, 0.05, v * 0.32, ["lowpass", 4200]); },
+    skree: (t, v, p) => tone("sawtooth", 2600 * p, 1500 * p, t, 0.32, v * 0.45, ["bandpass", 2400, 2]),
+    rustle: (t, v) => { for (let i = 0; i < 4; i++) noise(t + i * 0.035, 0.03, v * 0.35, "highpass", 4000, bus.voice); },
+    snort: (t, v) => { noise(t, 0.28, v * 0.9, "bandpass", 520, bus.voice, 2); noise(t + 0.05, 0.18, v * 0.5, "lowpass", 300, bus.voice); },
+    whinny: (t, v, p) => trill(tone("sawtooth", 950 * p, 520 * p, t, 0.65, v * 0.55, ["bandpass", 1400, 1.5]), t, 0.65, 11, 60),
+    sigh: (t, v) => noise(t, 0.7, v * 0.5, "bandpass", 700, bus.voice, 0.8),
+    heehaw: (t, v) => { tone("sawtooth", 640, 600, t, 0.26, v * 0.6, ["bandpass", 1100, 2]); tone("sawtooth", 280, 250, t + 0.3, 0.32, v * 0.7, ["bandpass", 700, 2]); },
+    moo: (t, v) => tone("sawtooth", 118, 92, t, 0.9, v * 0.8, ["lowpass", 520]),
+    groan: (t, v) => trill(tone("sawtooth", 140, 105, t, 0.8, v * 0.7, ["bandpass", 600, 1.4]), t, 0.8, 7, 8),
+    chime: (t, v) => { bell(88, t, v * 0.25, bus.voice); bell(93, t + 0.09, v * 0.2, bus.voice); bell(97, t + 0.18, v * 0.16, bus.voice); },
+    rattle: (t, v) => { for (let i = 0; i < 5; i++) noise(t + i * 0.05 + Math.random() * 0.02, 0.015, v * 0.7, "bandpass", 2000 + Math.random() * 1500, bus.voice, 4); },
+    chew: (t, v) => { for (let i = 0; i < 3; i++) noise(t + i * 0.2, 0.08, v * 0.4, "lowpass", 600, bus.voice); },
+    thump: (t, v) => { tone("sine", 140, 60, t, 0.14, v * 0.9); tone("sine", 140, 60, t + 0.22, 0.14, v * 0.7); },
+  };
+  function critter(call, o) {
+    if (!voiceOn() || !CALLS[call]) return;
+    const opt = o || {};
+    CALLS[call](now() + 0.02 + (opt.at || 0), 0.3 * (opt.vol == null ? 1 : opt.vol), opt.pitch || 1);
   }
 
-  // ---------- controls ----------
+  // ---------- controls: the header's quick panel; it edits the same Settings as the Settings page ----------
   function controls() {
     const top = document.querySelector(".top");
     if (!top || document.getElementById("snd")) return;
     const btn = document.createElement("button");
     btn.id = "snd"; btn.className = "snd-btn"; btn.title = "Sound";
-    const icon = () => (btn.textContent = prefs.on ? "🔊" : "🔇");
-    icon();
     const panel = document.createElement("div");
     panel.className = "snd-panel"; panel.hidden = true;
+    const sliders = [];
     const row = (label, key) => {
       const r = document.createElement("label"), inp = document.createElement("input");
-      inp.type = "range"; inp.min = 0; inp.max = 1; inp.step = 0.05; inp.value = prefs[key];
-      inp.oninput = () => { prefs[key] = +inp.value; save(); levels(); };
+      inp.type = "range"; inp.min = 0; inp.max = 1; inp.step = 0.05; inp.value = pref(key);
+      inp.oninput = () => { if (window.Settings) Settings.set(key, +inp.value); };
+      sliders.push(() => { if (+inp.value !== pref(key)) inp.value = pref(key); });
       r.append(label, inp); return r;
     };
     const tog = document.createElement("button");
     tog.className = "btn small";
-    const togTxt = () => (tog.textContent = prefs.on ? "Mute" : "Unmute");
-    togTxt();
-    tog.onclick = () => { prefs.on = !prefs.on; save(); levels(); icon(); togTxt(); if (prefs.on) { start(); ambience(scenery || page); } else stopAmb(); };
-    panel.append(tog, row("Volume", "master"), row("Ambience", "amb"), row("Music", "music"), row("Effects", "sfx"));
+    tog.onclick = () => { if (window.Settings) Settings.set("sound", !prefs.on); };
+    const more = document.createElement("a");
+    more.href = "#/settings"; more.className = "snd-more"; more.textContent = "All settings";
+    more.onclick = () => { panel.hidden = true; };
+    const show = () => { btn.textContent = prefs.on ? "🔊" : "🔇"; tog.textContent = prefs.on ? "Mute" : "Unmute"; for (const f of sliders) f(); };
+    panel.append(tog, row("Volume", "master"), row("Ambience", "amb"), row("Music", "music"), row("Effects", "sfx"), row("Voices", "voice"), more);
+    show();
+    if (window.Settings) Settings.watch(show);
     btn.onclick = (e) => { e.stopPropagation(); panel.hidden = !panel.hidden; start(); };
     document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== btn) panel.hidden = true; });
+    const gear = document.createElement("a");
+    gear.href = "#/settings"; gear.className = "snd-btn set-btn"; gear.title = "Settings"; gear.textContent = "⚙";
     const wrap = document.createElement("div");
-    wrap.className = "snd-wrap"; wrap.append(btn, panel);
+    wrap.className = "snd-wrap"; wrap.append(gear, btn, panel);
     top.appendChild(wrap);
   }
+  if (window.Settings) Settings.watch((keys) => {
+    levels();
+    if (!keys.includes("sound")) return;
+    if (prefs.on) { if (started) ambience(scenery || page); else start(); } else stopAmb();
+  });
   function start() {
     if (started || !prefs.on) return;
     if (!init()) return;
@@ -372,8 +448,14 @@
     start();
     if (e.target.closest && e.target.closest(".btn, nav a, .tabs button, .choices button")) sfx("click");
   }, { capture: true });
+  document.addEventListener("keydown", start, { capture: true });
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
 
-  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, townAmbience, get on() { return prefs.on; } };
+  // music.js plays on this context: the Music bus, the shared ducking, and whether a first click has unlocked sound
+  function engine() {
+    if (!init()) return null;
+    return { ctx, out: bus.music, noiseBuf, duck, get live() { return !!(started && prefs.on && ctx.state === "running"); } };
+  }
+  window.Sound = { sfx, setPage, scene, townAmbience, blip, critter, engine, get on() { return prefs.on; }, get talking() { return voiceOn(); } };
 })();

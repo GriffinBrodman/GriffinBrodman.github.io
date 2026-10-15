@@ -89,6 +89,9 @@
 .db-nt { font-family: var(--px, monospace); font-size: 15px; font-weight: 600; color: var(--db-gilt2); }
 .db-nk { font-family: var(--px, monospace); font-size: 13px; line-height: 1.15; color: #d8ccb0; }
 .db-nico canvas { width: 32px; height: 32px; }
+/* links on the night sky read in the gilt of the night's title, not the page's crimson */
+.db-night .db-line a { color: var(--db-gilt2); text-decoration: underline; text-decoration-color: rgba(240, 200, 120, 0.55); text-underline-offset: 2px; }
+.db-night .db-line a:hover, .db-night .db-line a:focus-visible { color: #fff2c8; text-decoration-color: currentColor; }
 
 .db-more { margin: 6px 0 0; }
 .db-more-s { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; cursor: pointer; list-style: none; font-family: var(--px, monospace); font-size: 13px;

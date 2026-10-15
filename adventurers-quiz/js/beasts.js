@@ -32,6 +32,15 @@
   };
   const ln = (P, x0, y0, x1, y1, m, s, r) => P.line(x0, y0, x1, y1, m, s, r >= 1 ? r : 0);
   const mid = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  // ---------- poses (deaths): every pose is painted natively; q is the pose, null for the standing sprite ----------
+  const lerp = (a, b, t) => a + (b - a) * t, c01 = (v) => Math.max(0, Math.min(1, v)), rmp = (x, a, b) => c01((x - a) / (b - a));
+  const lerpPts = (A, B, t) => A.map((p, i) => [lerp(p[0], B[i][0], t), lerp(p[1], B[i][1], t)]);
+  // a shut eye is the lid's dark line where the eye was
+  const shut = (P, x, y) => { P.px(x, y, INK); P.px(x + 1, y, INK); };
+  const look = (P, x, y, E, glint, q) => (q && q.eyes > 0.5 ? shut(P, x, y) : eye(P, x, y, E, glint));
+  // a body sinking onto the floor: back and front settle separately (fb, ff from 0 to 1, by up to D), the head drops after them
+  const sink = (P, q, D, xb, xf, hx0, hx1, HD) => { P.bend = (x) => lerp(q.fb || 0, q.ff || 0, rmp(x, xb, xf)) * D + (q.head || 0) * HD * rmp(x, hx0, hx1); };
+  const flat = (P, fn) => { const b = P.bend; P.bend = null; fn(); P.bend = b; };
 
   function mats(p) {
     const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255; };
@@ -47,17 +56,21 @@
   }
 
   function rat(P, c, f) {
-    const E = c.E;
+    const E = c.E, q = c.q, ff = q ? q.ff || 0 : 0, fb = q ? q.fb || 0 : 0;
+    if (q) sink(P, q, 1.4, 5, 13, 11, 14, 1.8);
     P.layer = 1;
-    limb(P, [[3.5, 8], [1.8, 8.6], [0.8, 7.2 - f], [0.6, 5.5 - f]], 1, 0.5, "b");
-    P.rect(5, 9, 2, 2, "ad", -0.2); P.rect(12, 9, 2, 2, "ad", -0.2);
+    const tl = [[3.5, 8], [1.8, 8.6], [0.8, 7.2 - f], [0.6, 5.5 - f]];
+    if (q) flat(P, () => limb(P, lerpPts(tl, [[3.5, 9.2], [1.6, 10.2], [-0.4, 10.6], [-2, 10.4]], fb), 1, 0.5, "b"));
+    else limb(P, tl, 1, 0.5, "b");
+    if (q) flat(P, () => { P.rect(5, 9, 2, 2, "ad", -0.2); P.rect(12, 9, 2, 2, "ad", -0.2); });
+    else { P.rect(5, 9, 2, 2, "ad", -0.2); P.rect(12, 9, 2, 2, "ad", -0.2); }
     P.layer = 2;
     P.ell(9, 7 + f * 0.4, 5.6, 3, "a", { fn: fur });
     P.ell(6.5, 7.4, 3.6, 3, "a", { fn: fur });
     P.ell(10, 9, 4, 1.2, "b", { fn: from(8.6) });
     P.layer = 3;
-    P.rect(7, 9, 2, 2, "n", 0); P.rect(11, 9, 2, 2, "n", 0);
-    P.px(7, 11, "b", 0.2); P.px(8, 11, "b", 0.2); P.px(11, 11, "b", 0.2); P.px(12, 11, "b", 0.2);
+    if (q) flat(P, () => { P.rect(7 + ff * 6, 10, 2, 1, "n", 0); P.rect(11 + ff * 4, 10, 2, 1, "n", 0); P.px(8 + ff * 6, 11, "b", 0.2); P.px(12 + ff * 4, 11, "b", 0.2); });
+    else { P.rect(7, 9, 2, 2, "n", 0); P.rect(11, 9, 2, 2, "n", 0); P.px(7, 11, "b", 0.2); P.px(8, 11, "b", 0.2); P.px(11, 11, "b", 0.2); P.px(12, 11, "b", 0.2); }
     P.layer = 4;
     P.ell(14.2, 6.4 + f * 0.4, 2.8, 2.3, "n", { fn: fur });
     P.ell(16.8, 7.1 + f * 0.4, 1.9, 1.3, "n", { fn: fur });
@@ -65,15 +78,23 @@
     P.ell(12.8, 4.1 + f * 0.4, 1, 1.1, "pink", { k: 0.5 });
     P.px(18, 7 + f * 0.4, "pink", 0.4);
     P.px(17, 8.6 + f * 0.4, TOOTH);
-    eye(P, 15, 5.4 + f * 0.4, E);
+    look(P, 15, 5.4 + f * 0.4, E, false, q);
     P.px(18.4, 5.6, "#d8d0c4"); P.px(19, 6.4, "#d8d0c4");
   }
 
   function wolf(P, c, f) {
-    const E = c.E, dy = f - 1.4;
+    const E = c.E, dy = f - 1.4, q = c.q, ff = q ? q.ff || 0 : 0, fb = q ? q.fb || 0 : 0, D = 3.6;
+    if (q) sink(P, q, D, 7, 18, 17, 22, 3.4);
     P.layer = 1;
-    limb(P, [[5, 8], [3, 9.4], [1.6, 11.5 + f * 1.2], [1.4, 13.5 + f * 1.2]], 1.9, 1, "ad");
-    for (const x of [8.5, 16.5]) { limb(P, [[x, 10], [x, 13], [x, 16]], 1.5, 1.2, "ad"); P.ell(x + 0.6, 16.6, 1.8, 0.9, "ad"); }
+    const tl = [[5, 8], [3, 9.4], [1.6, 11.5 + f * 1.2], [1.4, 13.5 + f * 1.2]];
+    if (q) flat(P, () => limb(P, lerpPts(tl, [[5, 8 + D], [2.6, 14.4], [0, 16], [-2.6, 16.6]], fb), 1.9, 1, "ad"));
+    else limb(P, tl, 1.9, 1, "ad");
+    const legs = (x, k, front) => {
+      const dn = front ? [[x, 10 + D], [x + 2, 15.2], [x + 5.4, 16]] : [[x, 10 + D], [x + 2.6, 15.4], [x - 1.6, 16]];
+      limb(P, lerpPts([[x, 10], [x, 13], [x, 16]], dn, k), 1.5, 1.2, "ad"); P.ell(lerp(x + 0.6, front ? x + 6 : x - 1.4, k), 16.6, 1.8, 0.9, "ad");
+    };
+    if (q) flat(P, () => { legs(8.5, fb, false); legs(16.5, ff, true); });
+    else for (const x of [8.5, 16.5]) { limb(P, [[x, 10], [x, 13], [x, 16]], 1.5, 1.2, "ad"); P.ell(x + 0.6, 16.6, 1.8, 0.9, "ad"); }
     P.layer = 2;
     P.ell(11, 9 + dy, 8, 4.3, "a", { fn: fur });
     P.ell(6.5, 9.4 + dy, 4.3, 4.3, "a", { fn: fur });
@@ -81,8 +102,14 @@
     P.ell(11, 12 + dy, 6.5, 1.8, "b", { fn: from(11.4 + dy) });
     for (let i = 0; i < 6; i++) P.poly([[7 + i * 2, 5.2 + dy], [8 + i * 2, 3.4 + dy + (i % 2) * 0.6], [9.4 + i * 2, 5.6 + dy]], "a", -0.1);
     P.layer = 3;
-    limb(P, [[6.2, 10 + dy], [4.6, 12.6], [6, 15.2]], 2.2, 1.2, "n"); P.ell(7, 16.6, 2, 1, "n", { s: 0.1 });
-    limb(P, [[18.8, 10 + dy], [19, 13], [19.2, 15.8]], 1.7, 1.2, "n"); P.ell(19.8, 16.6, 2, 1, "n", { s: 0.1 });
+    if (q) flat(P, () => {
+      limb(P, lerpPts([[6.2, 10 + dy], [4.6, 12.6], [6, 15.2]], [[6.2, 10 + dy + D], [9.6, 14.8], [5.6, 16]], fb), 2.2, 1.2, "n"); P.ell(lerp(7, 5.4, fb), 16.6, 2, 1, "n", { s: 0.1 });
+      limb(P, lerpPts([[18.8, 10 + dy], [19, 13], [19.2, 15.8]], [[18.8, 10 + dy + D], [19.6, 15.4], [24.4, 16]], ff), 1.7, 1.2, "n"); P.ell(lerp(19.8, 25, ff), 16.6, 2, 1, "n", { s: 0.1 });
+    });
+    else {
+      limb(P, [[6.2, 10 + dy], [4.6, 12.6], [6, 15.2]], 2.2, 1.2, "n"); P.ell(7, 16.6, 2, 1, "n", { s: 0.1 });
+      limb(P, [[18.8, 10 + dy], [19, 13], [19.2, 15.8]], 1.7, 1.2, "n"); P.ell(19.8, 16.6, 2, 1, "n", { s: 0.1 });
+    }
     P.layer = 4;
     limb(P, [[16.5, 8.5 + dy], [19, 6.8 + dy]], 3.2, 2.8, "n");
     P.ell(18.5, 8.4 + dy, 2.2, 2, "b", { fn: from(8 + dy) });
@@ -93,21 +120,30 @@
     P.poly([[18.2, 4 + dy], [18.4, 2.2 + dy], [19.6, 3.8 + dy]], "dhorn", 0.1);
     P.px(24, 7 + dy, INK); P.px(25, 7.4 + dy, INK);
     P.px(23, 9.2 + dy, TOOTH); P.px(24, 9.2 + dy, TOOTH);
-    eye(P, 21, 5.6 + dy, E);
+    look(P, 21, 5.6 + dy, E, false, q);
   }
 
   function boar(P, c, f) {
-    const E = c.E, dy = f - 1;
+    const E = c.E, dy = f - 1, q = c.q, ff = q ? q.ff || 0 : 0, fb = q ? q.fb || 0 : 0, D = 3;
+    if (q) sink(P, q, D, 7, 19, 19, 24, 2.2);
     P.layer = 1;
-    for (const x of [8, 16.5]) { limb(P, [[x, 11], [x, 14], [x, 16]], 1.8, 1.4, "ad"); P.rect(x - 1, 16, 3, 1, "dhorn", -0.3); }
+    const far = (x, k, front) => { limb(P, lerpPts([[x, 11], [x, 14], [x, 16]], [[x, 11 + D], [x + (front ? 2 : 2.4), 15.4], [x + (front ? 4.6 : -1.4), 16]], k), 1.8, 1.4, "ad"); P.rect(lerp(x - 1, front ? x + 3.6 : x - 2.4, k), 16, 3, 1, "dhorn", -0.3); };
+    if (q) flat(P, () => { far(8, fb, false); far(16.5, ff, true); });
+    else for (const x of [8, 16.5]) { limb(P, [[x, 11], [x, 14], [x, 16]], 1.8, 1.4, "ad"); P.rect(x - 1, 16, 3, 1, "dhorn", -0.3); }
     P.layer = 2;
     P.ell(12.5, 9 + dy, 8.4, 5.4, "a", { fn: fur });
     P.ell(18, 9.2 + dy, 5, 4.8, "a", { fn: fur });
     P.ell(12.5, 12.8 + dy, 6.5, 1.6, "b", { fn: from(12 + dy) });
     for (let i = 0; i < 8; i++) P.poly([[7 + i * 1.5, 5 + dy], [8 + i * 1.5, 2.4 + dy + (i % 2)], [9.2 + i * 1.5, 5.2 + dy]], "ad", -0.1);
     P.layer = 3;
-    limb(P, [[6.5, 11 + dy], [6, 14], [6.5, 16]], 2.4, 1.6, "n"); P.rect(5, 16, 3, 1, "dhorn", 0);
-    limb(P, [[19.4, 11 + dy], [19.4, 14], [19.4, 16]], 2, 1.5, "n"); P.rect(18, 16, 3, 1, "dhorn", 0);
+    if (q) flat(P, () => {
+      limb(P, lerpPts([[6.5, 11 + dy], [6, 14], [6.5, 16]], [[6.5, 11 + dy + D], [9.4, 15.2], [5, 16]], fb), 2.4, 1.6, "n"); P.rect(lerp(5, 3.6, fb), 16, 3, 1, "dhorn", 0);
+      limb(P, lerpPts([[19.4, 11 + dy], [19.4, 14], [19.4, 16]], [[19.4, 11 + dy + D], [20.6, 15.2], [23.4, 16]], ff), 2, 1.5, "n"); P.rect(lerp(18, 22.4, ff), 16, 3, 1, "dhorn", 0);
+    });
+    else {
+      limb(P, [[6.5, 11 + dy], [6, 14], [6.5, 16]], 2.4, 1.6, "n"); P.rect(5, 16, 3, 1, "dhorn", 0);
+      limb(P, [[19.4, 11 + dy], [19.4, 14], [19.4, 16]], 2, 1.5, "n"); P.rect(18, 16, 3, 1, "dhorn", 0);
+    }
     P.layer = 4;
     P.ell(21, 9.2 + dy, 3.6, 3.3, "n", { fn: fur });
     P.ell(23.4, 10.4 + dy, 2, 2, "b");
@@ -115,22 +151,34 @@
     P.poly([[19, 6.4 + dy], [19.8, 3.2 + dy], [22.2, 6 + dy]], "n", 0.1);
     P.poly([[22, 12 + dy], [22.8, 12.6 + dy], [24.4, 8.4 + dy], [23.4, 9 + dy]], "horn", 0.4);
     P.poly([[20.4, 12 + dy], [21, 12.8 + dy], [21.6, 14.4 + dy], [20.4, 13.8 + dy]], "horn", 0.1);
-    eye(P, 21.4, 7.6 + dy, E);
-    limb(P, [[3.6, 7.4 + dy], [2, 6.6 + dy], [2.4, 5 + dy]], 0.8, 0.5, "ad");
+    look(P, 21.4, 7.6 + dy, E, false, q);
+    const tl = [[3.6, 7.4 + dy], [2, 6.6 + dy], [2.4, 5 + dy]];
+    limb(P, q ? lerpPts(tl, [[3.6, 7.4 + dy], [2.2, 9.4 + dy], [1.6, 11 + dy]], fb) : tl, 0.8, 0.5, "ad");
   }
 
   function bear(P, c, f) {
-    const E = c.E, dy = f;
+    const E = c.E, dy = f, q = c.q, ff = q ? q.ff || 0 : 0, fb = q ? q.fb || 0 : 0, D = 3;
+    if (q) sink(P, q, D, 8, 20, 19, 25, 4.6);
     P.layer = 1;
-    for (const x of [10, 22]) { limb(P, [[x, 17], [x, 20], [x, 23]], 3, 2.6, "ad"); P.ell(x + 1, 24, 3.2, 1.3, "ad"); }
+    const far = (x, k, front) => { limb(P, lerpPts([[x, 17], [x, 20], [x, 23]], [[x, 17 + D], [x + (front ? 2.4 : 3), 22.4], [x + (front ? 5.4 : -1.6), 23.2]], k), 3, 2.6, "ad"); P.ell(lerp(x + 1, front ? x + 6.6 : x - 1.6, k), 24, 3.2, 1.3, "ad"); };
+    if (q) flat(P, () => { far(10, fb, false); far(22, ff, true); });
+    else for (const x of [10, 22]) { limb(P, [[x, 17], [x, 20], [x, 23]], 3, 2.6, "ad"); P.ell(x + 1, 24, 3.2, 1.3, "ad"); }
     P.layer = 2;
     P.ell(14, 15 + dy, 10.4, 7.6, "a", { fn: fur });
     P.ell(19.6, 11.6 + dy, 6.2, 5.6, "a", { fn: fur });
     P.ell(13, 20.2 + dy, 7.6, 2.4, "b", { fn: from(19.4 + dy) });
     P.layer = 3;
-    limb(P, [[6.5, 17 + dy], [6, 20.4], [6.4, 23]], 3.8, 3, "n"); P.ell(7.2, 24.2, 3.6, 1.4, "n", { s: 0.1 });
-    limb(P, [[19, 18 + dy], [19.4, 21], [19.4, 23]], 3.4, 2.8, "n"); P.ell(20.2, 24.2, 3.4, 1.4, "n", { s: 0.1 });
-    for (const x of [5.5, 7, 8.5, 18.6, 20.2, 21.8]) P.px(x, 25, TOOTH);
+    if (q) flat(P, () => {
+      limb(P, lerpPts([[6.5, 17 + dy], [6, 20.4], [6.4, 23]], [[6.5, 17 + dy + D], [10.4, 22.6], [5, 23.4]], fb), 3.8, 3, "n"); P.ell(lerp(7.2, 4.4, fb), 24.2, 3.6, 1.4, "n", { s: 0.1 });
+      limb(P, lerpPts([[19, 18 + dy], [19.4, 21], [19.4, 23]], [[19, 18 + dy + D], [21, 22.8], [25.4, 23.4]], ff), 3.4, 2.8, "n"); P.ell(lerp(20.2, 26.6, ff), 24.2, 3.4, 1.4, "n", { s: 0.1 });
+      for (const x of [5.5, 7, 8.5]) P.px(x + (4.4 - 7.2) * fb, 25, TOOTH);
+      for (const x of [18.6, 20.2, 21.8]) P.px(x + (26.6 - 20.2) * ff, 25, TOOTH);
+    });
+    else {
+      limb(P, [[6.5, 17 + dy], [6, 20.4], [6.4, 23]], 3.8, 3, "n"); P.ell(7.2, 24.2, 3.6, 1.4, "n", { s: 0.1 });
+      limb(P, [[19, 18 + dy], [19.4, 21], [19.4, 23]], 3.4, 2.8, "n"); P.ell(20.2, 24.2, 3.4, 1.4, "n", { s: 0.1 });
+      for (const x of [5.5, 7, 8.5, 18.6, 20.2, 21.8]) P.px(x, 25, TOOTH);
+    }
     P.layer = 4;
     P.ell(23.2, 9 + dy, 4.8, 4.2, "n", { fn: fur });
     P.ell(21.2, 4.6 + dy, 1.9, 1.9, "n"); P.ell(21.4, 4.9 + dy, 1, 1, "bd", { k: 0.4 });
@@ -138,16 +186,29 @@
     P.ell(26.4, 10.8 + dy, 2.9, 2.3, "b");
     P.px(28, 9.6 + dy, INK); P.px(27, 9.6 + dy, INK); P.px(27, 12.6 + dy, INK); P.px(26, 12.6 + dy, INK);
     P.px(28, 12 + dy, TOOTH);
-    eye(P, 23.2, 7.6 + dy, E, true);
+    look(P, 23.2, 7.6 + dy, E, true, q);
     P.px(22, 6.4 + dy, "ad", -0.2); P.px(23, 6.4 + dy, "ad", -0.2);
   }
 
+  // posed: lift (body up), drop (body down onto the floor), splay (feet out), squash, head (the head sags), curl[i] per leg pair
+  // (0 standing, 1 folded up over the back), eyes (0 lit, 1 dark)
   function spider(P, c, f, big) {
-    const E = c.E, abd = c.p1;
+    const q = c.q, E = q && q.eyes ? mix(c.E, "#2a1a2a", q.eyes) : c.E, abd = c.p1;
     const legs = [[[12, 9], [5.5, 3], [0.8, 12.6]], [[13.4, 9], [9.6, 1.8], [7, 14.6]], [[15.4, 9], [20, 1.8], [19.4, 14.8]], [[16.4, 8.6], [22.4, 3.4], [23, 12.4]]];
+    const by = q ? (q.drop || 0) - (q.lift || 0) : 0, sq = q ? q.squash || 0 : 0, hy = by + (q ? q.head || 0 : 0), fb = f * 0.5;
+    const KC = [[4.4, 0.8], [9.0, 0.0], [16.2, 0.6], [20.0, 2.2]], FC = [[1.4, 4.6], [6.6, 3.6], [18.6, 3.8], [22.8, 5.8]];
+    const pose = (l, i) => {
+      if (!q) return null;
+      const sp = q.splay || 0, cl = c01(((q.curl || [])[i] || 0)), out = l[2][0] < 11 ? -1 : 1;
+      let kn = [l[1][0] + out * sp * 1.6, l[1][1] + sp * 2.2 + by * 0.35], ft = [l[2][0] + out * sp * 2.4, Math.min(14.8, l[2][1] + by * 0.1)];
+      kn = [lerp(kn[0], KC[i][0], cl), lerp(kn[1], KC[i][1] + by, cl)]; ft = [lerp(ft[0], FC[i][0], cl), lerp(ft[1], FC[i][1] + by, cl)];
+      return [[l[0][0], l[0][1] + by], kn, ft];
+    };
     const draw = (set, m, dx, layer, r) => {
       P.layer = layer;
       set.forEach((l, i) => {
+        const pz = pose(l, i);
+        if (pz) { ln(P, pz[0][0] + dx, pz[0][1], pz[1][0] + dx, pz[1][1], m, 0, r); ln(P, pz[1][0] + dx, pz[1][1], pz[2][0] + dx, pz[2][1], m, -0.15, r * 0.85); return; }
         const dk = (i % 2 ? f : -f);
         const k = [l[1][0] + dx, l[1][1] + dk * 0.9];
         ln(P, l[0][0] + dx, l[0][1], k[0], k[1], m, 0, r);
@@ -156,25 +217,27 @@
     };
     draw(legs, "ad", 1.2, 1, 0.45);
     P.layer = 2;
-    P.ell(7.6, 7.2 + f * 0.5, 5.4, 4.4, "a");
-    P.ell(14.8, 8.2, 3.4, 2.8, "a");
-    P.ell(8, 8.6 + f * 0.5, 3.2, 1.6, "b", { s: -0.1, k: 0.6, fn: from(8.4) });
+    P.ell(7.6, 7.2 + fb + by + sq * 0.6, 5.4 + sq * 0.5, 4.4 - sq * 0.6, "a");
+    P.ell(14.8, 8.2 + hy, 3.4, 2.8, "a");
+    P.ell(8, 8.6 + fb + by + sq * 0.6, 3.2, 1.6, "b", { s: -0.1, k: 0.6, fn: from(8.4 + by) });
     P.layer = 3;
-    for (const [x, y] of [[6, 4.8], [9, 4.6], [7.4, 8.4], [10.4, 7.4]]) P.px(x, y + f * 0.5, abd, 0);
-    ln(P, 7, 5.6, 7.6, 9.4, "b", 0.2);
+    for (const [x, y] of [[6, 4.8], [9, 4.6], [7.4, 8.4], [10.4, 7.4]]) P.px(x, y + fb + by + sq * 0.6, abd, 0);
+    ln(P, 7, 5.6 + by, 7.6, 9.4 + by, "b", 0.2);
     draw(legs, "n", 0, 3, 0.5);
     P.layer = 4;
-    P.ell(17, 8, 2, 2, "n", { s: 0.1 });
-    P.px(17, 6.5, E); P.px(18, 7, E); P.px(16, 6.4, E); P.px(18.6, 8.4, E);
-    P.px(16.4, 7.2, "#ffffff");
-    P.poly([[17.4, 9.4], [18.4, 9.4], [18, 11.6]], "horn", 0.2);
+    P.ell(17, 8 + hy, 2, 2, "n", { s: 0.1 });
+    P.px(17, 6.5 + hy, E); P.px(18, 7 + hy, E); P.px(16, 6.4 + hy, E); P.px(18.6, 8.4 + hy, E);
+    if (!q || !q.eyes || q.eyes < 0.5) P.px(16.4, 7.2 + hy, "#ffffff");
+    P.poly([[17.4, 9.4 + hy], [18.4, 9.4 + hy], [18, 11.6 + hy]], "horn", 0.2);
   }
 
   function bat(P, c, f) {
-    const E = c.E;
+    const E = c.E, q = c.q, dn = q ? q.down || 0 : 0, hd = dn * 3.6;
     const wing = (side) => {
       const X = (x) => (side < 0 ? x : 26 - x);
-      const S = [11.5, 7], Wr = [5, 3.6 - 2.4 * f], F = [[0.4, 7.4 - 3.6 * f], [3, 11.6 - 3.4 * f], [7, 12.4 - 2.4 * f]], R = [11.5, 10.4];
+      let S = [11.5, 7], Wr = [5, 3.6 - 2.4 * f], F = [[0.4, 7.4 - 3.6 * f], [3, 11.6 - 3.4 * f], [7, 12.4 - 2.4 * f]], R = [11.5, 10.4];
+      // dead: the wings fall open flat on the floor either side of the body
+      if (q) { S = mid(S, [11.4, 10.6], dn); Wr = mid(Wr, [4.6, 10.4], dn); F = lerpPts(F, [[-0.8, 14.2], [2.8, 14.8], [7.4, 14.8]], dn); R = mid(R, [11.4, 13.4], dn); }
       const pts = [S, Wr, F[0], mid(F[0], F[1], 0.5), F[1], mid(F[1], F[2], 0.5), F[2], R];
       pts[3] = mid(pts[3], Wr, 0.3); pts[5] = mid(pts[5], Wr, 0.3); pts[3] = mid(pts[3], S, 0.12); pts[5] = mid(pts[5], S, 0.12);
       P.layer = 1;
@@ -186,16 +249,17 @@
     };
     wing(-1); wing(1);
     P.layer = 3;
-    P.ell(13, 9.4, 3, 3.9, "n", { fn: fur });
-    P.ell(13, 10, 1.8, 2.4, "b", { k: 0.5 });
-    P.px(12, 13.4, "horn", 0); P.px(14, 13.4, "horn", 0);
+    P.ell(13, 9.4 + dn * 2.6, 3, 3.9 - dn * 0.8, "n", { fn: fur });
+    P.ell(13, 10 + dn * 2.6, 1.8, 2.4 - dn * 0.6, "b", { k: 0.5 });
+    if (!q || dn < 0.5) { P.px(12, 13.4, "horn", 0); P.px(14, 13.4, "horn", 0); }
     P.layer = 4;
-    P.ell(13, 5.6, 3.2, 2.7, "n", { fn: fur });
-    P.poly([[10.4, 4.6], [9.8, 0.8], [12.2, 3.4]], "n", 0.15);
-    P.poly([[15.6, 4.6], [16.2, 0.8], [13.8, 3.4]], "n", -0.2);
-    P.px(10.6, 3, "b", 0.2); P.px(15.4, 3, "b", -0.2);
-    P.px(11.4, 5.2, E); P.px(14.6, 5.2, E); P.px(11.4, 4.6, "#ffffff");
-    P.px(13, 6.4, "pink", 0); P.px(12, 7.6, TOOTH); P.px(14, 7.6, TOOTH);
+    P.ell(13, 5.6 + hd, 3.2, 2.7, "n", { fn: fur });
+    P.poly([[10.4, 4.6 + hd], [9.8, 0.8 + hd + dn * 1.6], [12.2, 3.4 + hd]], "n", 0.15);
+    P.poly([[15.6, 4.6 + hd], [16.2, 0.8 + hd + dn * 1.6], [13.8, 3.4 + hd]], "n", -0.2);
+    P.px(10.6, 3 + hd, "b", 0.2); P.px(15.4, 3 + hd, "b", -0.2);
+    if (q && q.eyes > 0.5) { P.px(11, 5.2 + hd, INK); P.px(14.4, 5.2 + hd, INK); }
+    else { P.px(11.4, 5.2 + hd, E); P.px(14.6, 5.2 + hd, E); P.px(11.4, 4.6 + hd, "#ffffff"); }
+    P.px(13, 6.4 + hd, "pink", 0); P.px(12, 7.6 + hd, TOOTH); P.px(14, 7.6 + hd, TOOTH);
   }
 
   function slime(P, c, f) {
@@ -215,48 +279,58 @@
     P.px(11, 12.4, E, 0); P.px(12, 12.4, E, 0);
   }
 
+  // posed: arm (the near arm swings across the body as he goes over), eyes, crown: false leaves the ice crown off, part "crown" is only the crown
   function troll(P, c, f, ice) {
-    const E = c.E, dy = f;
-    P.layer = 1;
-    limb(P, [[21.4, 12.6 + dy], [24, 19], [23.4, 26]], 3.2, 2.8, "ad"); P.ell(23.2, 27.6, 3.2, 2.8, "ad");
-    limb(P, [[17.4, 25], [18, 29], [18, 32.4]], 3.6, 3.2, "ad"); P.ell(19, 33, 4, 1.7, "ad");
-    P.layer = 2;
-    P.ell(14.6, 16 + dy, 8.6, 9.4, "a");
-    P.ell(12.4, 11.6 + dy, 8.2, 5, "a");
-    P.ell(14, 20.4 + dy, 5.8, 5.4, "b", { k: 0.8, fn: (x, y, s) => s + ((x + y * 3) % 7 === 0 ? -0.3 : 0) });
-    P.layer = 3;
-    P.rect(8, 24 + dy, 13, 3, "cloth", (x, y) => 0.2 - (x - 8) * 0.04 - (y - 24) * 0.2);
-    P.poly([[10, 27 + dy], [12.4, 27 + dy], [11.4, 30 + dy]], "cloth", -0.2);
-    P.poly([[15, 27 + dy], [17.4, 27 + dy], [16.4, 30.4 + dy]], "cloth", -0.3);
-    limb(P, [[9.6, 28], [9, 31], [9, 33.2]], 4, 3.4, "n"); P.ell(9.6, 34, 4.4, 1.8, "n", { s: 0.1 });
-    P.layer = 4;
-    limb(P, [[8.4, 12.6 + dy], [5.6, 19], [6.6, 26 + dy * 0.5]], 3.6, 3.2, "n");
-    P.ell(6.6, 28.4 + dy * 0.5, 3.4, 3, "n", { s: 0.1 });
-    P.rect(5, 30 + dy * 0.5, 1, 1, "horn", 0.2); P.rect(8, 30 + dy * 0.5, 1, 1, "horn", 0.2);
-    for (const [x, y] of [[10, 14], [17, 18], [13, 12], [7, 22]]) P.px(x, y + dy, "bd", 0);
-    P.layer = 5;
-    P.ell(20, 8 + dy, 4.8, 4.2, "n", { s: 0.15 });
-    P.ell(21.2, 10.8 + dy, 3.6, 2.2, "n", { fn: from(10 + dy) });
-    P.ell(24.4, 8.6 + dy, 1.7, 1.5, "bd", { k: 0.6 });
-    P.poly([[16.2, 8 + dy], [13, 5.6 + dy], [16.4, 10.6 + dy]], "n", -0.1);
-    P.poly([[17.8, 7.6 + dy], [14.6, 6.4 + dy], [17.4, 9.4 + dy]], "bd", -0.2);
-    P.rect(19, 6.4 + dy, 5, 1, "ad", -0.5);
-    P.px(20.4, 7.8 + dy, E); P.px(23, 7.8 + dy, E); P.px(20.4, 7.2 + dy, "#ffffff");
-    P.poly([[19.6, 10.4 + dy], [20.6, 10.4 + dy], [20.2, 7.8 + dy + 3.6]], "horn", 0.4);
-    P.poly([[23.2, 10.4 + dy], [24.2, 10.4 + dy], [23.6, 13.6 + dy]], "horn", 0.2);
-    P.rect(21, 10 + dy, 2, 1, "void", 0);
-    if (ice) {
+    const E = c.E, dy = f, q = c.q, am = q ? q.arm || 0 : 0;
+    if (!(q && q.part === "crown")) {
+      P.layer = 1;
+      const fa = [[21.4, 12.6 + dy], [24, 19], [23.4, 26]];
+      limb(P, q ? lerpPts(fa, [[21.4, 12.6], [21.6, 19.4], [19.6, 25.4]], am) : fa, 3.2, 2.8, "ad"); if (q) P.ell(lerp(23.2, 19.4, am), lerp(27.6, 27.2, am), 3.2, 2.8, "ad"); else P.ell(23.2, 27.6, 3.2, 2.8, "ad");
+      limb(P, [[17.4, 25], [18, 29], [18, 32.4]], 3.6, 3.2, "ad"); P.ell(19, 33, 4, 1.7, "ad");
+      P.layer = 2;
+      P.ell(14.6, 16 + dy, 8.6, 9.4, "a");
+      P.ell(12.4, 11.6 + dy, 8.2, 5, "a");
+      P.ell(14, 20.4 + dy, 5.8, 5.4, "b", { k: 0.8, fn: (x, y, s) => s + ((x + y * 3) % 7 === 0 ? -0.3 : 0) });
+      P.layer = 3;
+      P.rect(8, 24 + dy, 13, 3, "cloth", (x, y) => 0.2 - (x - 8) * 0.04 - (y - 24) * 0.2);
+      P.poly([[10, 27 + dy], [12.4, 27 + dy], [11.4, 30 + dy]], "cloth", -0.2);
+      P.poly([[15, 27 + dy], [17.4, 27 + dy], [16.4, 30.4 + dy]], "cloth", -0.3);
+      limb(P, [[9.6, 28], [9, 31], [9, 33.2]], 4, 3.4, "n"); P.ell(9.6, 34, 4.4, 1.8, "n", { s: 0.1 });
+      P.layer = 4;
+      const na = [[8.4, 12.6 + dy], [5.6, 19], [6.6, 26 + dy * 0.5]], hx = lerp(6.6, 15.4, am), hy = lerp(28.4 + dy * 0.5, 22.6, am);
+      limb(P, q ? lerpPts(na, [[8.4, 12.6], [10.4, 19.4], [14.6, 21.6]], am) : na, 3.6, 3.2, "n");
+      if (q) { P.ell(hx, hy, 3.4, 3, "n", { s: 0.1 }); P.rect(hx - 1.6, hy + 1.6, 1, 1, "horn", 0.2); P.rect(hx + 1.4, hy + 1.6, 1, 1, "horn", 0.2); }
+      else { P.ell(6.6, 28.4 + dy * 0.5, 3.4, 3, "n", { s: 0.1 }); P.rect(5, 30 + dy * 0.5, 1, 1, "horn", 0.2); P.rect(8, 30 + dy * 0.5, 1, 1, "horn", 0.2); }
+      for (const [x, y] of [[10, 14], [17, 18], [13, 12], [7, 22]]) P.px(x, y + dy, "bd", 0);
+      P.layer = 5;
+      P.ell(20, 8 + dy, 4.8, 4.2, "n", { s: 0.15 });
+      P.ell(21.2, 10.8 + dy, 3.6, 2.2, "n", { fn: from(10 + dy) });
+      P.ell(24.4, 8.6 + dy, 1.7, 1.5, "bd", { k: 0.6 });
+      P.poly([[16.2, 8 + dy], [13, 5.6 + dy], [16.4, 10.6 + dy]], "n", -0.1);
+      P.poly([[17.8, 7.6 + dy], [14.6, 6.4 + dy], [17.4, 9.4 + dy]], "bd", -0.2);
+      P.rect(19, 6.4 + dy, 5, 1, "ad", -0.5);
+      if (q && q.eyes > 0.5) { shut(P, 20, 7.8 + dy); shut(P, 22.4, 7.8 + dy); }
+      else { P.px(20.4, 7.8 + dy, E); P.px(23, 7.8 + dy, E); P.px(20.4, 7.2 + dy, "#ffffff"); }
+      P.poly([[19.6, 10.4 + dy], [20.6, 10.4 + dy], [20.2, 7.8 + dy + 3.6]], "horn", 0.4);
+      P.poly([[23.2, 10.4 + dy], [24.2, 10.4 + dy], [23.6, 13.6 + dy]], "horn", 0.2);
+      P.rect(21, 10 + dy, 2, 1, "void", 0);
+    }
+    if (ice && !(q && q.crown === false)) {
       P.layer = 6;
       P.rect(15.4, 2.4 + dy, 10, 1, "b", 0.4);
       for (const [x, h] of [[16, 3], [19, 5], [22, 4], [24.4, 2.6]]) P.poly([[x - 0.8, 3.4 + dy], [x + 0.2, 3.4 - h + dy], [x + 1.4, 3.4 + dy]], "b", 0.5);
     }
   }
 
+  // posed: ff, fb (forelegs and haunches folded, 0 to 1), neck (the head lowered to the floor), wings (drooped), tail (laid flat), eyes
   function dragon(P, c, f, big) {
-    const E = c.E, W = P.w / P.s, H = P.h / P.s, sc = big ? 1.5 : 1, flap = f ? -2.6 * sc : 0;
+    const E = c.E, q = c.q, W = (P.dw || P.w) / P.s, H = (P.dh || P.h) / P.s, sc = big ? 1.5 : 1, flap = f ? -2.6 * sc : 0;
     const x = (v) => W * v, y = (v) => H * v;
-    const sh = [x(0.46), y(0.5)], wr = [x(0.37), y(0.15) + flap];
-    const tips = [[x(0.03), y(0.2) + flap * 0.7], [x(0.1), y(0.38) + flap * 0.35], [x(0.22), y(0.52)]];
+    const ff = q ? q.ff || 0 : 0, fb = q ? q.fb || 0 : 0, nk = q ? q.neck || 0 : 0, wg = q ? q.wings || 0 : 0, tl = q ? q.tail || 0 : 0, D = H * 0.12;
+    if (q) P.bend = (px) => lerp(fb, ff, rmp(px, x(0.36), x(0.62))) * D;
+    const sh = [x(0.46), y(0.5)], wr = [x(0.37) - wg * x(0.03), y(0.15) + flap + wg * y(0.24)];
+    const tips = q ? [[x(0.03) - wg * x(0.04), y(0.2) + wg * y(0.52)], [x(0.1) - wg * x(0.03), y(0.38) + wg * y(0.4)], [x(0.22), y(0.52) + wg * y(0.2)]]
+      : [[x(0.03), y(0.2) + flap * 0.7], [x(0.1), y(0.38) + flap * 0.35], [x(0.22), y(0.52)]];
     const root = [x(0.3), y(0.62)];
     const sc2 = (a, b) => mid(mid(a, b, 0.5), wr, 0.24);
     const wingPts = (dx, dy) => [sh, wr, tips[0], sc2(tips[0], tips[1]), tips[1], sc2(tips[1], tips[2]), tips[2], root].map((p) => [p[0] + dx, p[1] + dy]);
@@ -271,20 +345,30 @@
     ln(P, wr[0], wr[1], wr[0] - 1.2 * sc, wr[1] - 1.8 * sc, "horn", 0.4);
     const tail = [];
     for (let i = 0; i < 12; i++) { const t = i / 11; tail.push([x(0.34 - t * 0.31), y(0.64 + Math.sin(t * 3 + f * 0.7) * 0.1 + t * 0.08)]); }
-    limb(P, tail, 3 * sc, 0.5 * sc, "a");
-    const tt = tail[11];
-    P.poly([[tt[0] + 0.6, tt[1]], [tt[0] - 2.4 * sc, tt[1] - 1.8 * sc], [tt[0] - 1.8 * sc, tt[1] + 1 * sc]], "b", 0.2);
-    for (const lx of [0.33, 0.56]) {
-      limb(P, [[x(lx + 0.08), y(0.68)], [x(lx + 0.09), y(0.82)], [x(lx + 0.06), y(0.9)]], 2 * sc, 1 * sc, "ad");
-      P.ell(x(lx + 0.08), y(0.93), 2.2 * sc, 0.9 * sc, "ad");
-    }
+    const tailDraw = () => {
+      // laid flat, the tail runs along the floor from the haunch
+      const tp = q ? tail.map((p, i) => { const t = i / 11; return [p[0] - tl * t * x(0.05), lerp(p[1] + fb * D * (1 - t), y(0.9) - (1 - t) * y(0.1) * (1 - fb), tl * Math.min(1, t * 1.6))]; }) : tail;
+      limb(P, tp, 3 * sc, 0.5 * sc, "a");
+      const tt = tp[11];
+      P.poly([[tt[0] + 0.6, tt[1]], [tt[0] - 2.4 * sc, tt[1] - 1.8 * sc * (1 - tl * 0.6)], [tt[0] - 1.8 * sc, tt[1] + 1 * sc * (1 - tl * 0.6)]], "b", 0.2);
+    };
+    if (q) flat(P, tailDraw); else tailDraw();
+    const legsFar = () => {
+      for (const [lx, k, front] of [[0.33, fb, false], [0.56, ff, true]]) {
+        const st = [[x(lx + 0.08), y(0.68)], [x(lx + 0.09), y(0.82)], [x(lx + 0.06), y(0.9)]];
+        const dn = front ? [[x(lx + 0.08), y(0.68) + D], [x(lx + 0.1), y(0.88)], [x(lx + 0.18), y(0.92)]] : [[x(lx + 0.08), y(0.68) + D], [x(lx + 0.15), y(0.88)], [x(lx + 0.02), y(0.92)]];
+        limb(P, q ? lerpPts(st, dn, k) : st, 2 * sc, 1 * sc, "ad");
+        P.ell(q ? lerp(x(lx + 0.08), x(lx + (front ? 0.2 : 0.02)), k) : x(lx + 0.08), y(0.93), 2.2 * sc, 0.9 * sc, "ad");
+      }
+    };
+    if (q) flat(P, legsFar); else legsFar();
     P.layer = 2;
     const bx = x(0.46), by = y(0.64), brx = 8.6 * sc, bry = 4.6 * sc;
     P.ell(bx, by, brx, bry, "a", { fn: (px, py, s) => s + ((px + (py & 1) * 2) % 4 === 0 ? -0.18 : 0) });
     P.ell(x(0.57), y(0.6), 5.6 * sc, 5 * sc, "a");
-    const hx = x(0.76), hy = y(0.22);
+    const hx = x(0.76) + nk * x(0.07), hy = q ? lerp(y(0.22), H - 1.6 - 3.4 * sc - ff * D, nk) : y(0.22);
     const neck = [];
-    for (let i = 0; i < 6; i++) { const t = i / 5; neck.push([x(0.55) + (hx - 1.5 * sc - x(0.55)) * t, y(0.56) + (hy + 1.5 * sc - y(0.56)) * t + Math.sin(t * Math.PI) * 1.2 * sc]); }
+    for (let i = 0; i < 6; i++) { const t = i / 5; neck.push([x(0.55) + (hx - 1.5 * sc - x(0.55)) * t, y(0.56) + (hy + 1.5 * sc - y(0.56)) * t + Math.sin(t * Math.PI) * 1.2 * sc * (1 - nk * 2.2)]); }
     limb(P, neck, 3.2 * sc, 2 * sc, "a");
     neck.forEach((n, i) => { const r = 3.2 * sc - i * 0.24 * sc; P.ell(n[0] + r * 0.4, n[1] + r * 0.55, r * 0.5, r * 0.65, "b", { k: 0.7, fn: (px, py, s) => s + ((py | 0) % 2 ? -0.2 : 0.05) }); });
     P.ell(bx + 0.5 * sc, by + 3 * sc, 7.6 * sc, 2.3 * sc, "b", { s: -0.05, fn: (px, py, s) => (py < by + 2.2 * sc ? false : s + ((py | 0) % 2 ? -0.28 : 0.08)) });
@@ -294,12 +378,15 @@
       P.poly([[px - 1, py + 1], [px - 0.3 * sc, py - 1.6 * sc], [px + 1, py + 1]], "bd", -0.1);
     }
     neck.forEach((n, i) => { if (i % 2 === 0 && i < 5) P.poly([[n[0] - 1.2, n[1] - 1.8 * sc], [n[0] - 0.8, n[1] - 3.4 * sc], [n[0] + 0.4, n[1] - 2.2 * sc]], "bd", -0.1); });
-    limb(P, [[x(0.37), y(0.68)], [x(0.4), y(0.82)], [x(0.36), y(0.91)]], 2.8 * sc, 1.2 * sc, "n");
-    P.ell(x(0.38), y(0.7), 4 * sc, 3.7 * sc, "n");
-    P.ell(x(0.36), y(0.93), 2.6 * sc, 1 * sc, "n", { s: 0.1 });
-    limb(P, [[x(0.6), y(0.68)], [x(0.65), y(0.8)], [x(0.64), y(0.91)]], 2.1 * sc, 1.1 * sc, "n");
-    P.ell(x(0.65), y(0.93), 2.4 * sc, 0.9 * sc, "n", { s: 0.1 });
-    for (const lx of [0.31, 0.34, 0.37, 0.61, 0.64, 0.67]) P.px(x(lx), H - 1, "horn", 0.2);
+    const legsNear = () => {
+      limb(P, q ? lerpPts([[x(0.37), y(0.68)], [x(0.4), y(0.82)], [x(0.36), y(0.91)]], [[x(0.37), y(0.68) + D], [x(0.46), y(0.88)], [x(0.3), y(0.92)]], fb) : [[x(0.37), y(0.68)], [x(0.4), y(0.82)], [x(0.36), y(0.91)]], 2.8 * sc, 1.2 * sc, "n");
+      if (!q) P.ell(x(0.38), y(0.7), 4 * sc, 3.7 * sc, "n");
+      P.ell(q ? lerp(x(0.36), x(0.29), fb) : x(0.36), y(0.93), 2.6 * sc, 1 * sc, "n", { s: 0.1 });
+      limb(P, q ? lerpPts([[x(0.6), y(0.68)], [x(0.65), y(0.8)], [x(0.64), y(0.91)]], [[x(0.6), y(0.68) + D], [x(0.63), y(0.88)], [x(0.74), y(0.92)]], ff) : [[x(0.6), y(0.68)], [x(0.65), y(0.8)], [x(0.64), y(0.91)]], 2.1 * sc, 1.1 * sc, "n");
+      P.ell(q ? lerp(x(0.65), x(0.76), ff) : x(0.65), y(0.93), 2.4 * sc, 0.9 * sc, "n", { s: 0.1 });
+      for (const [lx, k, d] of [[0.31, fb, -0.07], [0.34, fb, -0.07], [0.37, fb, -0.07], [0.61, ff, 0.11], [0.64, ff, 0.11], [0.67, ff, 0.11]]) P.px(x(lx + (q ? d * k : 0)), H - 1, "horn", 0.2);
+    };
+    if (q) { flat(P, legsNear); P.ell(x(0.38), y(0.7), 4 * sc, 3.7 * sc, "n"); } else legsNear();
     P.layer = 4;
     P.ell(hx, hy, 3.7 * sc, 2.9 * sc, "n");
     P.ell(hx + 3.3 * sc, hy + 0.9 * sc, 3 * sc, 1.7 * sc, "n");
@@ -309,9 +396,10 @@
     limb(P, [[hx + 0.2 * sc, hy - 2.3 * sc], [hx - 2 * sc, hy - 3.8 * sc], [hx - 4.6 * sc, hy - 3.8 * sc]], 0.9 * sc, 0.4 * sc, "dhorn");
     P.px(hx + 5.8 * sc, hy + 0.2 * sc, INK); P.px(hx + 5.8 * sc, hy + 1.2 * sc, INK);
     for (let i = 0; i < 3; i++) P.px(hx + (2 + i * 1.4) * sc, hy + 2.2 * sc, TOOTH);
-    P.px(hx + 1.2 * sc, hy - 0.8 * sc, E); P.px(hx + 2.2 * sc, hy - 0.8 * sc, INK); P.px(hx + 1.2 * sc, hy - 1.8 * sc, "#ffffff");
+    if (q && q.eyes > 0.5) shut(P, hx + 1 * sc, hy - 0.6 * sc);
+    else { P.px(hx + 1.2 * sc, hy - 0.8 * sc, E); P.px(hx + 2.2 * sc, hy - 0.8 * sc, INK); P.px(hx + 1.2 * sc, hy - 1.8 * sc, "#ffffff"); }
     P.rect(hx - 0.2 * sc, hy - 1.6 * sc, 3.4 * sc, 1, "ad", -0.4);
-    if (big && f) { P.px(hx + 7.2 * sc, hy + 1.4 * sc, "#ffd84a"); P.px(hx + 7.8 * sc, hy + 2 * sc, "#ff8a2a"); }
+    if (big && f && !q) { P.px(hx + 7.2 * sc, hy + 1.4 * sc, "#ffd84a"); P.px(hx + 7.8 * sc, hy + 2 * sc, "#ff8a2a"); }
   }
 
   function chest(P, c, f) {
@@ -361,8 +449,22 @@
     P.rect(11, 11, 3, 1, "void", 0);
   }
 
+  // part "skull" is only the crowned skull; part "body" is everything else
   function lich(P, c, f) {
-    const E = c.E;
+    const E = c.E, q = c.q, part = q && q.part;
+    const skull = () => {
+      P.layer = 3;
+      P.ell(17, 9.5, 4.6, 5, "a", { s: 0.1 });
+      P.rect(15, 13, 5, 2, "a", -0.15);
+      for (let x = 15; x < 20; x += 2) P.px(x, 14, "void");
+      for (const ex of [15.2, 19]) P.ell(ex, 10, 1.3, 1.3, "void", { k: 0 });
+      if (!(q && q.eyes > 0.5)) { P.px(15, 10, E); P.px(19, 10, E); }
+      P.px(17, 12, "void");
+      P.rect(12.5, 4, 9, 2, "gold", 0.2);
+      for (const x of [13, 15, 17, 19, 21]) { P.px(x, 3, "gold", 0.4); if (x % 4 === 1) P.px(x, 2, "gold", 0.6); }
+      P.px(17, 4, E);
+    };
+    if (part === "skull") return skull();
     P.layer = 1;
     P.poly([[9, 9], [11.5, 1], [14, 9]], "bd", 0.1); P.poly([[20, 9], [22.5, 1], [25, 9]], "bd", -0.3);
     const hem = [[11, 13], [23, 13], [28, 30], [29, 39 + f], [26, 36], [24, 41 - f], [21, 37], [18, 42 + f], [15, 37], [12, 41 - f], [9, 36], [6, 39], [7, 30]];
@@ -375,22 +477,33 @@
     P.ell(6, 23.5, 1.4, 1.4, "a", { s: 0.2 });
     for (const dx of [-1, 0, 1]) ln(P, 28 + dx, 26, 28 + dx * 1.5, 28.5, "a", -0.1);
     P.ell(5.5, 4.2, 2.6, 2.4, "a", { s: 0.2 }); P.px(4, 4, "void"); P.px(6, 4, "void"); P.rect(4, 6, 3, 1, "void", 0);
+    if (part !== "body") skull();
     P.layer = 3;
-    P.ell(17, 9.5, 4.6, 5, "a", { s: 0.1 });
-    P.rect(15, 13, 5, 2, "a", -0.15);
-    for (let x = 15; x < 20; x += 2) P.px(x, 14, "void");
-    for (const ex of [15.2, 19]) P.ell(ex, 10, 1.3, 1.3, "void", { k: 0 });
-    P.px(15, 10, E); P.px(19, 10, E); P.px(17, 12, "void");
-    P.rect(12.5, 4, 9, 2, "gold", 0.2);
-    for (const x of [13, 15, 17, 19, 21]) { P.px(x, 3, "gold", 0.4); if (x % 4 === 1) P.px(x, 2, "gold", 0.6); }
-    P.px(17, 4, E);
     for (const [x, y] of [[5, 1 - f], [4, 0], [6, -1 + f], [5, -1]]) P.px(x, y + 1, E);
     P.px(5, 0, "#ffffff");
     for (const [x, y] of [[2, 16 + f], [31, 12 - f], [30, 33 + f], [1, 30 - f]]) P.px(x, y, E);
   }
 
+  // part "hat" / "pot" paints only the hat or the cauldron; part "body" is the crone without either
   function crone(P, c, f) {
-    const E = c.E;
+    const E = c.E, q = c.q, part = q && q.part;
+    const hat = () => {
+      P.layer = 4;
+      P.poly([[14, 10.5], [28, 9], [23, 4], [27, -1], [19, 3]], "bd", (x) => 0.2 - (x - 14) * 0.05);
+      P.ell(21, 9.8, 8.2, 1.6, "bd", { s: -0.1 });
+      P.rect(18, 7, 6, 1, "gold", 0.1);
+    };
+    const pot = () => {
+      P.layer = 5;
+      P.ell(9, 30.5, 6.6, 4.4, "iron", { s: 0.1 });
+      P.ell(9, 26.6, 6.4, 1.3, "iron", { s: 0.4 });
+      for (let x = 4; x <= 14; x++) P.px(x, 26.6, (x + f) % 3 ? "#5ab83a" : "#a8f07a");
+      for (const [x, y] of [[6, 24 - f], [11, 23 + f], [8, 21 - f]]) P.px(x, y, "#a8f07a");
+      for (const x of [4, 13]) P.rect(x, 34, 1, 2, "iron", -0.3);
+      for (const [x, y] of [[7, 35], [9, 34], [11, 35]]) P.px(x, y + (f ? 0 : 0), x === 9 ? "#ffd04a" : "#ff7a2a");
+    };
+    if (part === "hat") return hat();
+    if (part === "pot") return pot();
     P.layer = 1;
     P.rect(31, 9, 1, 26, "wm", 0.05); P.px(31, 8, "wm", 0.4);
     P.poly([[7, 24], [25, 24], [27, 35], [5, 35]], "bd", (x, y) => 0.15 - (x - 5) * 0.04 + ((x + y * 3) % 7 === 0 ? -0.35 : 0));
@@ -405,17 +518,9 @@
     P.ell(23, 14, 3.8, 4, "a", { s: 0.05 });
     P.poly([[25.5, 13], [29.6, 15.8], [26, 16.4]], "a", 0.2);
     P.px(28, 14, "ad"); P.px(23, 13, E); P.px(24, 13, INK); P.px(25, 17, INK); P.px(26, 17, TOOTH);
-    P.layer = 4;
-    P.poly([[14, 10.5], [28, 9], [23, 4], [27, -1], [19, 3]], "bd", (x) => 0.2 - (x - 14) * 0.05);
-    P.ell(21, 9.8, 8.2, 1.6, "bd", { s: -0.1 });
-    P.rect(18, 7, 6, 1, "gold", 0.1);
-    P.layer = 5;
-    P.ell(9, 30.5, 6.6, 4.4, "iron", { s: 0.1 });
-    P.ell(9, 26.6, 6.4, 1.3, "iron", { s: 0.4 });
-    for (let x = 4; x <= 14; x++) P.px(x, 26.6, (x + f) % 3 ? "#5ab83a" : "#a8f07a");
-    for (const [x, y] of [[6, 24 - f], [11, 23 + f], [8, 21 - f]]) P.px(x, y, "#a8f07a");
-    for (const x of [4, 13]) P.rect(x, 34, 1, 2, "iron", -0.3);
-    for (const [x, y] of [[7, 35], [9, 34], [11, 35]]) P.px(x, y + (f ? 0 : 0), x === 9 ? "#ffd04a" : "#ff7a2a");
+    if (part === "body") return;
+    hat();
+    pot();
   }
 
   function golem(P, c, f, big) {
@@ -453,28 +558,50 @@
     P.px(19, 16 + dy, "b", 0.4); P.px(12, 27, "b", 0.4);
   }
 
+  // posed: drop, curl (legs folded in under the belly), claws (dropped open to the sides), eyes (stalks droop, eyes go dark); deaths.js turns it
+  // over onto its back with tilt
   function crab(P, c, f) {
-    const E = c.E, o = f ? 1 : 0;
+    const q = c.q, E = q && q.eyes ? mix(c.E, "#2a1a2a", q.eyes) : c.E, o = f ? 1 : 0, by = q ? q.drop || 0 : 0, cu = q ? c01(q.curl || 0) : 0, cl = q ? q.claws || 0 : 0, ey = q ? q.eyes || 0 : 0;
     P.layer = 1;
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
       const bx = 13 + s * (3 + i * 1.7), fx = 13 + s * (6.6 + i * 2.4);
+      if (q) {
+        // folded in under the belly; a crab dies on its back, so these end up curled in the air
+        const kn = mid([13 + s * (6 + i * 2), 12.6 + by * 0.5], [13 + s * (5.2 + i * 1.7), 17.6 + by - i * 0.4], cu), ft = mid([fx, 15.2], [13 + s * (2.8 + i * 1.3), 12.4 + by], cu);
+        ln(P, bx, 11 + by, kn[0], kn[1], "ad", 0, 0.6); ln(P, kn[0], kn[1], ft[0], ft[1], "ad", -0.2, 0.55);
+        continue;
+      }
       ln(P, bx, 11, 13 + s * (6 + i * 2), 12.6 - o * (i % 2), "ad", 0, 0.6);
       ln(P, 13 + s * (6 + i * 2), 12.6 - o * (i % 2), fx, 15.2, "ad", -0.2, 0.55);
     }
     P.layer = 2;
-    P.ell(13, 9, 8, 4.4, "a", { k: 1.1 });
-    P.ell(13, 11, 6, 2, "b", { k: 0.5, fn: from(10.6) });
-    for (const [x, y] of [[9, 7], [13, 6], [16.4, 8], [11, 9.4]]) P.ell(x, y, 1, 0.8, "b", { k: 0.4 });
+    P.ell(13, 9 + by, 8, 4.4, "a", { k: 1.1 });
+    P.ell(13, 11 + by, 6, 2, "b", { k: 0.5, fn: from(10.6 + by) });
+    for (const [x, y] of [[9, 7], [13, 6], [16.4, 8], [11, 9.4]]) P.ell(x, y + by, 1, 0.8, "b", { k: 0.4 });
     P.layer = 3;
     for (const s of [-1, 1]) {
-      const sx = s < 0 ? 4.6 : 21.4, ex = s < 0 ? 4 : 22;
-      limb(P, [[13 + s * 6, 8.4], [13 + s * 8, 6.4 - o], [ex, 5.4 - o]], 1.6, 1.3, s < 0 ? "a" : "ad");
-      P.ell(sx, 4 - o, 3.2, 2.7, s < 0 ? "a" : "ad", { s: s < 0 ? 0.05 : -0.05 });
-      P.poly([[sx + s * 0.4, 2.4 - o], [sx + s * 2.6, 0.2 - o * 1.5], [sx + s * 3.4, 3 - o]], s < 0 ? "a" : "ad", 0.15);
-      P.px(sx + s * 2, 1.2 - o * 1.5, "horn", 0.3);
+      const sx = s < 0 ? 4.6 : 21.4, ex = s < 0 ? 4 : 22, cy = cl * 4.4;
+      if (!q) {
+        limb(P, [[13 + s * 6, 8.4], [13 + s * 8, 6.4 - o], [ex, 5.4 - o]], 1.6, 1.3, s < 0 ? "a" : "ad");
+        P.ell(sx, 4 - o, 3.2, 2.7, s < 0 ? "a" : "ad", { s: s < 0 ? 0.05 : -0.05 });
+        P.poly([[sx + s * 0.4, 2.4 - o], [sx + s * 2.6, 0.2 - o * 1.5], [sx + s * 3.4, 3 - o]], s < 0 ? "a" : "ad", 0.15);
+        P.px(sx + s * 2, 1.2 - o * 1.5, "horn", 0.3);
+        continue;
+      }
+      const dx = s * cl * 2.6;
+      limb(P, [[13 + s * 6, 8.4 + by], [13 + s * 8 + dx * 0.5, 6.4 + cy * 0.7], [ex + dx, 5.4 + cy]], 1.6, 1.3, s < 0 ? "a" : "ad");
+      P.ell(sx + dx, 4 + cy, 3.2, 2.7, s < 0 ? "a" : "ad", { s: s < 0 ? 0.05 : -0.05 });
+      P.poly([[sx + s * 0.4 + dx, 2.4 + cy], [sx + s * 2.6 + dx, 0.2 + cy], [sx + s * 3.4 + dx, 3 + cy]], s < 0 ? "a" : "ad", 0.15);
+      P.px(sx + s * 2 + dx, 1.2 + cy, "horn", 0.3);
     }
     P.layer = 4;
-    for (const s of [-1, 1]) { const ex = 13 + s * 2.6; ln(P, ex, 6, ex + s * 0.6, 4, "a", 0, 0); P.ell(ex + s * 0.6, 3.6, 1.3, 1.3, "b", { s: 0.2 }); P.px(ex + s * 0.6, 3.4, E); P.px(ex + s * 0.6 - 0.4, 3, "#ffffff"); }
+    if (!q) for (const s of [-1, 1]) { const ex = 13 + s * 2.6; ln(P, ex, 6, ex + s * 0.6, 4, "a", 0, 0); P.ell(ex + s * 0.6, 3.6, 1.3, 1.3, "b", { s: 0.2 }); P.px(ex + s * 0.6, 3.4, E); P.px(ex + s * 0.6 - 0.4, 3, "#ffffff"); }
+    else for (const s of [-1, 1]) {
+      const ex = 13 + s * 2.6, tx = ex + s * (0.6 + ey * 1.6), ty = 4 + by + ey * 2.4;
+      ln(P, ex, 6 + by, tx, ty, "a", 0, 0); P.ell(tx, ty - 0.4, 1.3, 1.3, "b", { s: 0.2 });
+      if (ey > 0.5) P.px(tx, ty - 0.2, INK);
+      else { P.px(tx, ty - 0.6, E); P.px(tx - 0.4, ty - 1, "#ffffff"); }
+    }
   }
 
   function wisp(P, c, f) {
@@ -509,11 +636,13 @@
     P.px(3, 5 - f, c.p1); P.px(20, 6 + f, c.p1); P.px(5, 25 + f, c.p1); P.px(19, 21 - f, c.p1);
   }
 
+  // posed: slack (the coils drop and the raised head comes down to the floor), eyes
   function serpent(P, c, f) {
-    const E = c.E, pts = [];
+    const E = c.E, pts = [], q = c.q, sl = q ? q.slack || 0 : 0;
     for (let i = 0; i < 22; i++) {
       const t = i / 21;
-      pts.push([2 + t * 22, 20.2 + Math.sin(t * 8 - f * 1.1) * 3 * (1 - t * 0.5) - Math.max(0, t - 0.62) * 24]);
+      pts.push(q ? [2 + t * 22, 20.2 + sl * 3.2 + Math.sin(t * 8 - f * 1.1) * 3 * (1 - t * 0.5) * (1 - sl * 0.75) - Math.max(0, t - 0.62) * 24 * (1 - sl)]
+        : [2 + t * 22, 20.2 + Math.sin(t * 8 - f * 1.1) * 3 * (1 - t * 0.5) - Math.max(0, t - 0.62) * 24]);
     }
     const rad = (i) => (i < 4 ? 0.8 + i * 0.5 : i > 17 ? 2.6 - (i - 17) * 0.1 : 2.8);
     P.layer = 1;
@@ -528,20 +657,25 @@
     P.ell(hx + 3, hy + 1.2, 2.6, 0.9, "b", { fn: from(hy + 0.8) });
     P.poly([[hx + 0.4, hy - 3], [hx - 1.6, hy - 5.6], [hx + 1.4, hy - 2.4]], "bd", 0.2);
     P.poly([[hx + 1.4, hy - 3], [hx + 0.2, hy - 5.4], [hx + 2.4, hy - 2.4]], "bd", -0.1);
-    ln(P, hx + 5, hy + 1.6, hx + 6.4 - 0, hy + 3.4 + f * 0.4, "pink", 0.2);
-    P.px(hx + 6.4, hy + 3.6 + f * 0.4, "pink", 0.3); P.px(hx + 4.8, hy + 3.4 + f * 0.4, "pink", 0.3);
-    eye(P, hx + 1.8, hy - 1.4, E, true);
+    if (!q) {
+      ln(P, hx + 5, hy + 1.6, hx + 6.4 - 0, hy + 3.4 + f * 0.4, "pink", 0.2);
+      P.px(hx + 6.4, hy + 3.6 + f * 0.4, "pink", 0.3); P.px(hx + 4.8, hy + 3.4 + f * 0.4, "pink", 0.3);
+    }
+    look(P, hx + 1.8, hy - 1.4, E, true, q);
     P.px(hx + 5, hy - 0.4, INK);
     P.px(hx + 4.4, hy + 1.2, TOOTH);
   }
 
+  // posed: slack (the tentacles go limp and spread over the floor, the mantle sags), eyes
   function kraken(P, c, f) {
-    const E = c.E;
+    const E = c.E, q = c.q, sl = q ? q.slack || 0 : 0;
+    if (q) P.bend = () => sl * 3;
     const tent = (bx, side, near) => {
       const pts = [];
       for (let i = 0; i < 12; i++) {
         const t = i / 11;
-        pts.push([bx + side * t * 5 * (near ? 1 : 0.6) + Math.sin(t * 5 + bx * 0.3 + f * 1.4) * 2.2 * t, 20 + t * 17]);
+        if (q) pts.push([bx + side * t * (5 * (near ? 1 : 0.6) + 9 * sl) + Math.sin(t * 5 + bx * 0.3 + f * 1.4) * 2.2 * t * (1 - sl), lerp(20 + t * 17, 21 + t * 12.6, sl)]);
+        else pts.push([bx + side * t * 5 * (near ? 1 : 0.6) + Math.sin(t * 5 + bx * 0.3 + f * 1.4) * 2.2 * t, 20 + t * 17]);
       }
       pts.forEach((p, i) => { const r = 2.7 - i * 0.2; P.ell(p[0], p[1], r, r, near ? "a" : "ad", { k: 0.8 }); });
       pts.forEach((p, i) => { if (i > 1 && i < 10 && i % 2) P.px(p[0] + 0.6, p[1] + 0.8, near ? "b" : "bd", 0.3); });
@@ -558,6 +692,13 @@
     P.ell(22, 17.4, 7, 3, "b", { s: -0.2, fn: from(16.4) });
     P.poly([[20.4, 19], [23.6, 19], [22, 22.4]], "horn", 0.1);
     for (const [ex, s] of [[16.6, 1], [27, 0.5]]) {
+      if (q && q.eyes > 0.5) {
+        // shut: the heavy lid down over the eye, a dark crease along its edge
+        P.ell(ex, 13.4, 3.6, 3.2, "a", { s: 0.15, k: 0.6 });
+        P.rect(ex - 2.6, 14.6, 6, 1, "ad", -0.6);
+        P.rect(ex - 3, 10, 6, 1, "ad", -0.5);
+        continue;
+      }
       P.ell(ex, 13.4, 3.6, 3.2, "horn", { s: 0.4, k: 0.5 });
       P.ell(ex + 0.8, 13.6, 2, 2, E);
       P.rect(ex + 0.4, 12.2, 1, 3, INK);
@@ -566,9 +707,14 @@
     }
   }
 
+  // posed: kneel (0 to 1, onto the rear knee), head (the head's own roll on the neck), eyes; part "banner" / "cleaver" / "crown" paints only that piece, without lists pieces
+  // left off (they fall on their own)
   function warchief(P, c, f) {
-    const E = c.E, d = f;
+    const E = c.E, d = f, q = c.q, kn = q ? q.kneel || 0 : 0, D = 6 * kn;
+    const has = (k) => !(q && q.part ? q.part !== k : q && q.without && q.without.includes(k));
     const flut = (k) => (f ? 1 : -1) * Math.sin(k * 1.7) * 0.9;
+    if (q && D) P.bend = () => D;
+    const banner = () => {
     P.layer = 1;
     P.rect(9, 5, 2, 43, "wood", (x) => (x === 9 ? 0.35 : -0.25));
     P.rect(2, 6, 9, 1, "wood", -0.1);
@@ -580,13 +726,30 @@
     for (let i = 0; i < 4; i++) { P.px(3 + i * 1.34, 15 + i, "horn", -0.1); P.px(7 - i * 1.34, 15 + i, "horn", -0.1); }
     P.ell(10, 2.6, 2.1, 1.9, "horn", { s: 0.2 });
     P.px(9, 2, "void"); P.px(11, 2, "void"); P.rect(9, 4, 3, 1, "horn", -0.3);
+    };
+    if (has("banner")) { if (q) flat(P, banner); else banner(); }
+    if (q && q.part && q.part !== "body") { if (q.part === "cleaver") flat(P, () => cleaver(P, d)); if (q.part === "crown") crown(P, d); P.bend = null; return; }
     P.layer = 3;
-    for (const [sx, s] of [[20, -1], [30, 1]]) {
-      limb(P, [[sx, 38 + d], [sx + s * 1.6, 42.4], [sx + s * 1.2, 45.6]], 2.9, 2.4, "a");
-      P.rect(sx + s * 1.2 - 2.4, 44, 5, 2, "cloth", -0.15);
-      P.ell(sx + s * 1.8, 47, 3.4, 1.4, "a", { s: -0.2 });
-      P.px(sx + s * 1.8 + 2.6 * s, 47, "horn", 0.3); P.px(sx + s * 1.8 + 1 * s, 48, "horn", 0);
-    }
+    const legs = () => {
+      for (const [sx, s] of [[20, -1], [30, 1]]) {
+        if (!q) {
+          limb(P, [[sx, 38 + d], [sx + s * 1.6, 42.4], [sx + s * 1.2, 45.6]], 2.9, 2.4, "a");
+          P.rect(sx + s * 1.2 - 2.4, 44, 5, 2, "cloth", -0.15);
+          P.ell(sx + s * 1.8, 47, 3.4, 1.4, "a", { s: -0.2 });
+          P.px(sx + s * 1.8 + 2.6 * s, 47, "horn", 0.3); P.px(sx + s * 1.8 + 1 * s, 48, "horn", 0);
+          continue;
+        }
+        // kneeling: the rear knee goes to the floor with the shin flat behind it; the front thigh comes level and the shin stands
+        const st = [[sx, 38 + d], [sx + s * 1.6, 42.4], [sx + s * 1.2, 45.6]];
+        const dn = s < 0 ? [[sx, 38 + D], [sx - 1.2, 46.2], [sx - 6.6, 46.6]] : [[sx, 38 + D], [sx + 5, 43.6], [sx + 5.2, 45.8]];
+        const L = lerpPts(st, dn, kn), ft = s < 0 ? [lerp(sx + s * 1.8, sx - 8.6, kn), 47] : [lerp(sx + s * 1.8, sx + 6.6, kn), 47];
+        limb(P, L, 2.9, 2.4, "a");
+        P.rect(lerp(sx + s * 1.2 - 2.4, s < 0 ? sx - 5.4 : sx + 2.8, kn), lerp(44, s < 0 ? 45.4 : 43.6, kn), 5, 2, "cloth", -0.15);
+        P.ell(ft[0], ft[1], 3.4, 1.4, "a", { s: -0.2 });
+        P.px(ft[0] + 2.6 * (s < 0 ? lerp(-1, 1, kn) : 1), 47, "horn", 0.3); P.px(ft[0] + (s < 0 ? lerp(-1, 1, kn) : 1), 48, "horn", 0);
+      }
+    };
+    if (q) flat(P, legs); else legs();
     P.layer = 4;
     P.ell(25, 29.4 + d, 10, 8.2, "a", { s: -0.12, k: 0.9 });
     P.ell(25.4, 32 + d, 6.8, 4.8, "n", { s: 0.05, k: 0.7 });
@@ -618,6 +781,38 @@
     P.ell(35, 22 + d, 3.3, 2.9, "horn", { s: 0.2 });
     P.px(34, 21.6 + d, "void"); P.px(36, 21.6 + d, "void"); P.px(35, 23 + d, "void");
     P.rect(34, 24.4 + d, 3, 1, "horn", -0.3); P.px(35, 24.4 + d, "void");
+    if (has("cleaver")) cleaver(P, d);
+    P.layer = 10;
+    P.ell(39, 32.4 + d, 2.5, 2.3, "arm", { s: 0.1 });
+    P.rect(37.6, 31.4 + d, 3, 1, "ad", -0.4);
+    P.ell(11, 32 + d, 2.4, 2.2, "arm", { s: 0.2 });
+    P.rect(9.6, 31 + d, 3, 1, "ad", -0.4);
+    // head (radians): the head rolls on the neck against the body's fall, so a fallen Gruk still shows his face and ears
+    const tf0 = P.tf;
+    if (q && q.head) P.tf = { ox: (tf0 ? tf0.ox : 0) + 25 * P.s, oy: (tf0 ? tf0.oy : 0) + 21 * P.s, cx: 25, cy: 21, s: P.s, a: q.head };
+    P.layer = 11;
+    P.poly([[19.6, 12.6 + d], [11.4, 8.2 + d], [13, 11.6 + d], [19.6, 16.4 + d]], "a", 0.3);
+    P.poly([[19, 13.4 + d], [14.4, 10.8 + d], [19, 15.4 + d]], "pink", -0.25);
+    P.poly([[30.4, 12.6 + d], [38.6, 8.2 + d], [37, 11.6 + d], [30.4, 16.4 + d]], "a", -0.1);
+    P.poly([[31, 13.4 + d], [35.6, 10.8 + d], [31, 15.4 + d]], "pink", -0.4);
+    P.px(35, 12.6 + d, "gold", 0.5); P.px(35, 13.6 + d, "gold", 0);
+    P.ell(25, 14.4 + d, 7, 5.8, "a", { s: 0.1 });
+    P.ell(25, 18.4 + d, 6.8, 3, "a", { s: -0.08, k: 0.7 });
+    if (has("crown")) crown(P, d);
+    P.layer = 12;
+    ln(P, 20, 12 + d, 23.6, 13.4 + d, "ad", -0.7); ln(P, 30, 12 + d, 26.4, 13.4 + d, "ad", -0.7);
+    if (q && q.eyes > 0.5) { P.rect(21.6, 14 + d, 2, 1, INK); P.rect(26.4, 14 + d, 2, 1, INK); }
+    else { P.rect(21.6, 14 + d, 2, 1, E); P.px(23, 14 + d, INK); P.rect(26.4, 14 + d, 2, 1, E); P.px(26.4, 14 + d, INK); }
+    P.px(21.6, 15 + d, "ad", -0.4); P.px(22.6, 15 + d, "ad", -0.4); P.px(27.4, 15 + d, "ad", -0.4); P.px(28.4, 15 + d, "ad", -0.4);
+    P.ell(25, 16.6 + d, 1.7, 1.5, "n", { s: 0.35 });
+    P.px(24, 17.4 + d, "ad", -0.6); P.px(26, 17.4 + d, "ad", -0.6);
+    P.rect(21.6, 19 + d, 7, 1, "void", 0);
+    P.px(21, 18 + d, TOOTH); P.px(21, 17 + d, TOOTH); P.px(29, 18 + d, TOOTH); P.px(29, 17 + d, TOOTH);
+    P.px(23.4, 19 + d, TOOTH); P.px(26.6, 19 + d, TOOTH);
+    P.tf = tf0;
+    P.bend = null;
+  }
+  function cleaver(P, d) {
     P.layer = 10;
     P.rect(38.4, 26.4 + d, 2, 4, "wood", (x) => (x < 39 ? 0.4 : -0.1)); P.rect(38.4, 25.6 + d, 2, 1, "iron", 0.4);
     const bx = 36, by = 34.4 + d;
@@ -628,36 +823,43 @@
     P.ell(bx + 2.6, by + 2.4, 0.8, 0.8, "void", { k: 0 });
     for (const [x, y] of [[bx + 3, by + 7], [bx + 4, by + 8], [bx + 2, by + 9], [bx + 6, by + 4]]) P.px(x, y, "rust", 0.1);
     P.erase(Math.floor(bx + 10.2), Math.floor(by + 5.4));
-    P.ell(39, 32.4 + d, 2.5, 2.3, "arm", { s: 0.1 });
-    P.rect(37.6, 31.4 + d, 3, 1, "ad", -0.4);
-    P.ell(11, 32 + d, 2.4, 2.2, "arm", { s: 0.2 });
-    P.rect(9.6, 31 + d, 3, 1, "ad", -0.4);
-    P.layer = 11;
-    P.poly([[19.6, 12.6 + d], [11.4, 8.2 + d], [13, 11.6 + d], [19.6, 16.4 + d]], "a", 0.3);
-    P.poly([[19, 13.4 + d], [14.4, 10.8 + d], [19, 15.4 + d]], "pink", -0.25);
-    P.poly([[30.4, 12.6 + d], [38.6, 8.2 + d], [37, 11.6 + d], [30.4, 16.4 + d]], "a", -0.1);
-    P.poly([[31, 13.4 + d], [35.6, 10.8 + d], [31, 15.4 + d]], "pink", -0.4);
-    P.px(35, 12.6 + d, "gold", 0.5); P.px(35, 13.6 + d, "gold", 0);
-    P.ell(25, 14.4 + d, 7, 5.8, "a", { s: 0.1 });
-    P.ell(25, 18.4 + d, 6.8, 3, "a", { s: -0.08, k: 0.7 });
+  }
+  function crown(P, d) {
     P.layer = 12;
     P.rect(18.6, 8.6 + d, 13, 2, "gold", (x) => 0.35 - (x - 18) * 0.05);
     for (const [x, h] of [[19, 2.4], [22, 4.2], [25, 5.6], [28, 3.6], [31, 2.6]]) P.poly([[x - 1.1, 8.8 + d], [x + 0.2 - (x === 28 ? 1 : 0), 8.8 - h + d], [x + 1.2, 8.8 + d]], "gold", 0.3 - (x - 19) * 0.04);
     P.px(25, 9.4 + d, "b", 0.6); P.px(21, 9.4 + d, "void"); P.px(29, 9.4 + d, "void");
-    ln(P, 20, 12 + d, 23.6, 13.4 + d, "ad", -0.7); ln(P, 30, 12 + d, 26.4, 13.4 + d, "ad", -0.7);
-    P.rect(21.6, 14 + d, 2, 1, E); P.px(23, 14 + d, INK); P.rect(26.4, 14 + d, 2, 1, E); P.px(26.4, 14 + d, INK);
-    P.px(21.6, 15 + d, "ad", -0.4); P.px(22.6, 15 + d, "ad", -0.4); P.px(27.4, 15 + d, "ad", -0.4); P.px(28.4, 15 + d, "ad", -0.4);
-    P.ell(25, 16.6 + d, 1.7, 1.5, "n", { s: 0.35 });
-    P.px(24, 17.4 + d, "ad", -0.6); P.px(26, 17.4 + d, "ad", -0.6);
-    P.rect(21.6, 19 + d, 7, 1, "void", 0);
-    P.px(21, 18 + d, TOOTH); P.px(21, 17 + d, TOOTH); P.px(29, 18 + d, TOOTH); P.px(29, 17 + d, TOOTH);
-    P.px(23.4, 19 + d, TOOTH); P.px(26.6, 19 + d, TOOTH);
   }
 
   // goblins stand about a head under a hero and kobolds lower again; both share Gruk's materials so a camp reads as one tribe
   function goblin(P, c, f, pal) {
-    const E = c.E, d = f;
+    const E = c.E, d = f, q = c.q, kn = q ? q.kneel || 0 : 0, D = 3 * kn;
     const kit = pal === "green_archer" ? "archer" : pal === "green_shaman" ? "shaman" : "grunt";
+    const spear = () => {
+      P.rect(23, 3 + d, 1, 25 - d, "wood", (x, y) => (y % 5 === 0 ? -0.15 : 0.15));
+      P.poly([[23.5, -0.6 + d], [25.4, 3.4 + d], [23.5, 6 + d], [21.6, 3.4 + d]], "steel", (x) => (x < 23.5 ? 0.6 : -0.1));
+      P.rect(22.6, 6 + d, 2, 1, "paint", 0.1);
+    };
+    const bow = () => {
+      const pts = [];
+      for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push([21.6 + Math.sin(t * Math.PI) * 2.8, 11.4 + t * 16.4 + d * 0.5]); }
+      ln(P, 21.6, 11.6 + d * 0.5, 21.6, 27.6 + d * 0.5, "#d8ccb0");
+      for (let i = 0; i < pts.length - 1; i++) ln(P, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], "wood", 0.35 - Math.abs(i - 6) * 0.07);
+    };
+    const staff = () => {
+      P.rect(23, 6 + d, 1, 22 - d, "wood", (x, y) => (y % 4 === 0 ? -0.2 : 0.15));
+      P.ell(23.4, 3.6 + d, 2, 1.8, "horn", { s: 0.3, k: 0.5 });
+      P.rect(22.6, 5.4 + d, 2, 1, "horn", -0.1);
+      P.px(22, 3 + d, "void"); P.px(24, 3 + d, "void"); P.px(23, 5 + d, "void");
+      P.px(f ? 24 : 22, 3 + d, E);
+      ln(P, 21.6, 6.6 + d, 20.6, 9.4 + d, "b", 0.2); P.px(20.4, 10 + d, E);
+      P.px(25, 7 + d, "fur", 0.2); P.px(25, 8 + d, "fur", -0.1);
+    };
+    // part "weapon" is the spear, bow or staff alone; without ["weapon"] leaves it out (it falls on its own)
+    const weapon = { grunt: spear, archer: bow, shaman: staff }[kit], noW = q && q.without && q.without.includes("weapon");
+    if (q && q.part === "weapon") { P.layer = 10; weapon(); return; }
+    const held = () => { if (noW) return; if (q) flat(P, weapon); else weapon(); };
+    if (q && D) P.bend = () => D;
     P.layer = 1;
     if (kit === "archer") {
       P.poly([[6.6, 15 + d], [9.2, 14 + d], [11.6, 23 + d], [9, 24 + d]], "cloth", (x) => 0.3 - (x - 6) * 0.1);
@@ -670,7 +872,14 @@
       P.px(8, 21 + d, "iron", 0.5);
     }
     P.layer = 2;
-    for (const [x, s] of [[11.6, -0.3], [15, 0]]) {
+    if (q) flat(P, () => {
+      for (const [x, s] of [[11.6, -0.3], [15, 0]]) {
+        const dn = s ? [[x, 23 + D], [x - 1, 27.6], [x - 4.2, 27.8]] : [[x, 23 + D], [x + 3.4, 25.8], [x + 3.4, 27.4]];
+        limb(P, lerpPts([[x, 23 + d * 0.5], [x - 0.8, 25.4], [x + 0.2, 27.2]], dn, kn), 1.3, 1.1, s ? "ad" : "a", s);
+        P.ell(lerp(x + 1.4, s ? x - 5.2 : x + 4.4, kn), 28, 2.1, 1, s ? "ad" : "a", { s: s - 0.1 });
+      }
+    });
+    else for (const [x, s] of [[11.6, -0.3], [15, 0]]) {
       limb(P, [[x, 23 + d * 0.5], [x - 0.8, 25.4], [x + 0.2, 27.2]], 1.3, 1.1, s ? "ad" : "a", s);
       P.ell(x + 1.4, 28, 2.1, 1, s ? "ad" : "a", { s: s - 0.1 });
     }
@@ -718,54 +927,72 @@
         (x, y) => 0.5 - (y - 5) * 0.12 + (Math.round(x) === 12 ? -0.35 : 0));
       P.poly([[12.6, 9 + d], [19.4, 9 + d], [20.4, 10.4 + d], [23.6, 13 + d], [19.4, 13 + d], [18.4, 13.8 + d], [14.4, 13.6 + d], [12.4, 12 + d]], "horn",
         (x, y) => 0.45 - (x - 12) * 0.05 - (y - 9 - d) * 0.1);
-      P.rect(15, 11 + d, 2, 1, "void", 0); P.px(15, 11 + d, E); P.px(19, 11 + d, E);
+      P.rect(15, 11 + d, 2, 1, "void", 0);
+      if (q && q.eyes > 0.5) { P.px(15, 11 + d, INK); P.px(19, 11 + d, INK); } else { P.px(15, 11 + d, E); P.px(19, 11 + d, E); }
       P.px(20, 12 + d, "dhorn", -0.2); P.px(21, 12 + d, "dhorn", -0.2);
     } else {
       P.rect(14.6, 11 + d, 5, 1, "a", -0.7);
-      P.px(15, 12 + d, E); P.px(16, 12 + d, INK); P.px(19, 12 + d, E); P.px(20, 12 + d, INK);
+      if (q && q.eyes > 0.5) { shut(P, 15, 12 + d); shut(P, 19, 12 + d); }
+      else { P.px(15, 12 + d, E); P.px(16, 12 + d, INK); P.px(19, 12 + d, E); P.px(20, 12 + d, INK); }
       P.poly([[18, 12.8 + d], [22.4, 14.2 + d], [18.4, 14.8 + d]], "a", (x, y) => (y < 13.6 + d ? 0.7 : 0.2) - (x - 18) * 0.08);
     }
     P.rect(15, 15 + d, 4, 1, "void", 0);
     P.px(16, 14 + d, TOOTH);
     P.layer = 10;
     if (kit === "grunt") {
-      P.rect(23, 3 + d, 1, 25 - d, "wood", (x, y) => (y % 5 === 0 ? -0.15 : 0.15));
-      P.poly([[23.5, -0.6 + d], [25.4, 3.4 + d], [23.5, 6 + d], [21.6, 3.4 + d]], "steel", (x) => (x < 23.5 ? 0.6 : -0.1));
-      P.rect(22.6, 6 + d, 2, 1, "paint", 0.1);
+      held();
       limb(P, [[16.4, 17.8 + d], [19, 20.6 + d], [22.2, 19.8 + d]], 1.2, 1, "a");
       P.ell(23.4, 19.6 + d, 1.4, 1.3, "a", { s: 0.2 });
     }
     if (kit === "archer") {
       limb(P, [[16.4, 17.8 + d], [19, 20 + d], [22, 19.6 + d]], 1.2, 1, "a");
-      const bow = [];
-      for (let i = 0; i <= 12; i++) { const t = i / 12; bow.push([21.6 + Math.sin(t * Math.PI) * 2.8, 11.4 + t * 16.4 + d * 0.5]); }
-      ln(P, 21.6, 11.6 + d * 0.5, 21.6, 27.6 + d * 0.5, "#d8ccb0");
-      for (let i = 0; i < bow.length - 1; i++) ln(P, bow[i][0], bow[i][1], bow[i + 1][0], bow[i + 1][1], "wood", 0.35 - Math.abs(i - 6) * 0.07);
+      held();
       P.ell(22.8, 19.6 + d, 1.3, 1.3, "a", { s: 0.2 });
     }
     if (kit === "shaman") {
       limb(P, [[16.2, 17.8 + d], [19, 20.6 + d], [22, 19.8 + d]], 1.3, 1.1, "b");
-      P.rect(23, 6 + d, 1, 22 - d, "wood", (x, y) => (y % 4 === 0 ? -0.2 : 0.15));
-      P.ell(23.4, 3.6 + d, 2, 1.8, "horn", { s: 0.3, k: 0.5 });
-      P.rect(22.6, 5.4 + d, 2, 1, "horn", -0.1);
-      P.px(22, 3 + d, "void"); P.px(24, 3 + d, "void"); P.px(23, 5 + d, "void");
-      P.px(f ? 24 : 22, 3 + d, E);
-      ln(P, 21.6, 6.6 + d, 20.6, 9.4 + d, "b", 0.2); P.px(20.4, 10 + d, E);
-      P.px(25, 7 + d, "fur", 0.2); P.px(25, 8 + d, "fur", -0.1);
+      held();
       P.ell(23.2, 19.6 + d, 1.3, 1.2, "a", { s: 0.2 });
     }
+    P.bend = null;
   }
 
   function kobold(P, c, f, pal) {
-    const E = c.E, d = f, sling = pal === "rust_sling";
+    const E = c.E, d = f, sling = pal === "rust_sling", q = c.q, kn = q ? q.kneel || 0 : 0, D = 2.6 * kn;
+    const pick = () => {
+      ln(P, 22.8, 5.4 + d, 20.6, 22.4 + d, "wood", (t) => 0.3 - t * 0.4);
+      const ph = [[17.4, 6.4], [19.8, 4.8], [22.8, 4.6], [25.4, 5.8], [27.2, 8]];
+      for (let i = 0; i < ph.length - 1; i++) ln(P, ph[i][0], ph[i][1] + d, ph[i + 1][0], ph[i + 1][1] + d, "iron", 0.5 - i * 0.2, i === 1 || i === 2 ? 1 : 0);
+    };
+    const noW = q && q.without && q.without.includes("weapon");
+    if (q && q.part === "weapon") {
+      P.layer = 8;
+      if (!sling) pick();
+      else { const sx = 24.8, sy = 4.2; ln(P, 21.4, 6.6, sx - 0.6, sy + 0.6, "cloth", 0.3); ln(P, 22.2, 6.6, sx + 0.6, sy + 0.6, "cloth", -0.2); P.ell(sx, sy, 1.5, 1.3, "steel", { s: 0.2 }); }
+      return;
+    }
     P.layer = 1;
     const tail = [];
     for (let i = 0; i <= 8; i++) { const t = i / 8; tail.push([8.4 - t * 6.8, 19.4 + t * 4 - Math.sin(t * Math.PI) * 0.6 - (t > 0.7 ? (t - 0.7) * (f ? 7 : 3) : 0)]); }
-    limb(P, tail, 2, 0.5, "a");
-    for (const i of [2, 4]) P.px(tail[i][0], tail[i][1] - 2, "ad", -0.1);
+    // kneeling, the tail lies along the floor behind
+    // going over backwards, the tail swings up along the back, so it ends up lying along the floor behind the body
+    const fl = q ? q.fall || 0 : 0;
+    const tl = q ? tail.map(([x, y], i) => { const t = i / 8, kx = x - kn * t * 1.6, ky = Math.min(24.2, y + D * (1 - t) + kn * t * 2.6); return [lerp(kx, 8.4 - t * 2.2, fl), lerp(ky, 19.4 - t * 12, fl)]; }) : tail;
+    limb(P, tl, 2, 0.5, "a");
+    for (const i of [2, 4]) P.px(tl[i][0], tl[i][1] - 2, "ad", -0.1);
+    if (q && D) P.bend = () => D;
     limb(P, [[10.6, 16 + d], [10, 18.6 + d], [11.2, 20.2 + d]], 0.9, 0.8, "ad");
     P.layer = 2;
-    for (const [x, s] of [[10.4, -0.3], [13.4, 0]]) {
+    if (q) flat(P, () => {
+      for (const [x, s] of [[10.4, -0.3], [13.4, 0]]) {
+        const dn = s ? [[x, 19.6 + D], [x - 0.8, 23.6], [x - 3.4, 23.8], [x - 4.4, 24]] : [[x, 19.6 + D], [x + 2.6, 21.6 + D * 0.4], [x + 2.8, 23.2], [x + 2.8, 24]];
+        limb(P, lerpPts([[x, 19.6 + d * 0.5], [x - 1.2, 21.4], [x + 0.2, 23], [x - 0.2, 24]], dn, kn), 1.4, 0.8, s ? "ad" : "a", s);
+        const fx = lerp(x + 1, s ? x - 5 : x + 3.8, kn);
+        P.ell(fx, 24.4, 1.8, 0.8, s ? "ad" : "a", { s: s - 0.1 });
+        P.px(fx + 1.6 * (s ? lerp(1, -1, kn) : 1), 24, "horn", 0.2);
+      }
+    });
+    else for (const [x, s] of [[10.4, -0.3], [13.4, 0]]) {
       limb(P, [[x, 19.6 + d * 0.5], [x - 1.2, 21.4], [x + 0.2, 23], [x - 0.2, 24]], 1.4, 0.8, s ? "ad" : "a", s);
       P.ell(x + 1, 24.4, 1.8, 0.8, s ? "ad" : "a", { s: s - 0.1 });
       P.px(x + 2.6, 24, "horn", 0.2);
@@ -792,25 +1019,27 @@
     P.ell(12.4, 14 + d, 1.8, 1.4, "belly", { s: -0.1, fn: (x, y, s) => (y < 13 + d ? false : s) });
     P.layer = 7;
     P.poly([[12.8, 9 + d], [10.6, 6.6 + d], [7.6, 5.6 + d], [5.6, 6 + d], [8.4, 7.2 + d], [9.6, 9 + d], [10.6, 10.4 + d]], "dhorn", (x, y) => 0.6 - (12 - x) * 0.08 - (y - 6) * 0.12);
-    P.px(14, 10 + d, E); P.px(15, 10 + d, INK); P.rect(13.4, 9 + d, 3, 1, "a", -0.4);
+    if (q && q.eyes > 0.5) shut(P, 14, 10 + d); else { P.px(14, 10 + d, E); P.px(15, 10 + d, INK); }
+    P.rect(13.4, 9 + d, 3, 1, "a", -0.4);
     P.px(18, 10 + d, INK);
     P.rect(14, 12 + d, 5, 1, "a", -0.8);
     P.px(16, 12 + d, TOOTH);
     P.layer = 8;
     if (!sling) {
       limb(P, [[14.4, 15.6 + d], [17.6, 18.4 + d], [20.6, 17.4 + d]], 1, 0.8, "a");
-      ln(P, 22.8, 5.4 + d, 20.6, 22.4 + d, "wood", (t) => 0.3 - t * 0.4);
-      const ph = [[17.4, 6.4], [19.8, 4.8], [22.8, 4.6], [25.4, 5.8], [27.2, 8]];
-      for (let i = 0; i < ph.length - 1; i++) ln(P, ph[i][0], ph[i][1] + d, ph[i + 1][0], ph[i + 1][1] + d, "iron", 0.5 - i * 0.2, i === 1 || i === 2 ? 1 : 0);
+      if (!noW) { if (q) flat(P, pick); else pick(); }
       P.ell(21.2, 17.4 + d, 1.2, 1.1, "a", { s: 0.2 });
     } else {
       const hx = 21.8, hy = 7.4 + d, sx = f ? 18.6 : 24.8, sy = f ? 3.6 : 4.2;
       limb(P, [[14.4, 15.6 + d], [18.8, 14.8 + d], [hx, hy + 1]], 1.1, 0.9, "a");
       P.ell(hx, hy, 1.2, 1.2, "a", { s: 0.2 });
-      ln(P, hx - 0.4, hy - 0.8, sx - 0.6, sy + 0.6, "cloth", 0.3);
-      ln(P, hx + 0.4, hy - 0.8, sx + 0.6, sy + 0.6, "cloth", -0.2);
-      P.ell(sx, sy, 1.5, 1.3, "steel", { s: 0.2 });
+      if (!noW) {
+        ln(P, hx - 0.4, hy - 0.8, sx - 0.6, sy + 0.6, "cloth", 0.3);
+        ln(P, hx + 0.4, hy - 0.8, sx + 0.6, sy + 0.6, "cloth", -0.2);
+        P.ell(sx, sy, 1.5, 1.3, "steel", { s: 0.2 });
+      }
     }
+    P.bend = null;
   }
 
   function blob(P, c, f) {
@@ -822,17 +1051,25 @@
 
   const DRAW = { rat, wolf, boar, bear, bat, slime, chest, wraith, crab, wisp, elemental, serpent, kraken, lich, crone, warchief };
 
-  function draw(body, pal, frame, boss, palette) {
+  // pose (deaths): the same body painted in another pose on a canvas padded by pad on every side, the standing sprite's place
+  // at (pad, pad); tilt turns the whole figure about pivot (fractions of the standing sprite) and is painted natively at that angle
+  function draw(body, pal, frame, boss, palette, pose) {
     const f = frame || 0, size = SIZES[body] || SIZES.blob;
     const k = (boss && !NATIVE_BOSS.has(body) ? 1.35 : 1) * (BODYK[body] || 1);
     const w = body === "spider_big" ? 34 : size[0], h = body === "spider_big" ? 24 : size[1];
     const s = (body === "spider_big" ? 34 / 24 : 1) * k;
     const W = Math.round(w * k), H = Math.round(h * k);
-    const P = new Paint(W, H);
-    if (s !== 1) P.tf = { ox: 0, oy: 0, cx: 0, cy: 0, s };
+    const pad = pose ? Math.max(W, H) : 0;
+    const P = new Paint(W + pad * 2, H + pad * 2);
+    if (s !== 1 || pad) P.tf = { ox: pad, oy: pad, cx: 0, cy: 0, s };
+    if (pose) {
+      P.dw = W; P.dh = H; P.eraseT = true; P.screenLight = true;
+      const pv = pose.pivot || [0.5, 1];
+      if (pose.tilt) P.post = { a: pose.tilt, cx: pad + pv[0] * W, cy: pad + pv[1] * H, ox: pad + pv[0] * W, oy: pad + pv[1] * H };
+    }
     P.s = s;
     const p = palette;
-    const c = { E: p[2], p0: p[0], p1: p[1], p2: p[2] };
+    const c = { E: p[2], p0: p[0], p1: p[1], p2: p[2], q: pose || null };
     const m = mats(p);
     let outline = "#16121a";
     switch (body) {
@@ -845,8 +1082,10 @@
       default: (DRAW[body] || blob)(P, c, f);
     }
     if (body === "wisp") outline = mix(p[0], "#10182a", 0.75);
-    return P.render(m, { outline });
+    const g = P.render(m, { outline });
+    if (pose) { g.pad = pad; g.stand = [W, H]; }
+    return g;
   }
 
-  window.Beasts = { draw: (body, pal, frame, boss, palette) => draw(body, pal, frame, boss, palette) };
+  window.Beasts = { draw: (body, pal, frame, boss, palette, pose) => draw(body, pal, frame, boss, palette, pose) };
 })();

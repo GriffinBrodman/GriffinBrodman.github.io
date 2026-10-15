@@ -3,7 +3,8 @@
   Anim.stage(canvas, base, actors, opts) -> { draw(t), stop() }
     Makes `canvas` a live panel: every tick it copies `base` (a same-size canvas) and draws the actors on top.
     All panels share one requestAnimationFrame ticker; a panel only redraws while it is on screen and the tab is
-    visible, at opts.fps (default 10). Under prefers-reduced-motion it draws one still frame (time opts.still, default 2).
+    visible, at opts.fps (default 10). Under reduced motion or the Static scenes setting (Settings.calm) it holds one still
+    frame (time opts.still, default 2), and picks up again live when the setting changes.
     opts.over: a canvas drawn after the back actors and before actors marked `front` (heroes in a vignette, say).
     A canvas that never reaches the page (used only as an image elsewhere) is dropped after a few seconds.
 
@@ -22,12 +23,12 @@
                     cobweb({x,y,size,side:"l"|"r"})
     any sprite:     flip({a,b,x,y,rate}) alternates two canvases (replay-style idle)  rise({x,y,cv,h,period})
   Helpers: Anim.sprite(rows, pal, outline) builds a cached outlined pixel sprite from strings ("." is empty, other
-  characters index pal); Anim.put(ctx, cv, x, y, faceLeft) draws one by its feet; Anim.reduced is true when still.
+  characters index pal); Anim.put(ctx, cv, x, y, faceLeft) draws one by its feet; Anim.reduced is true while still.
 */
 (function () {
   "use strict";
   const OUT = "#1a1220";
-  const reduced = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const calm = () => (window.Settings ? Settings.calm() : !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches));
   const rng = (seed) => Art.rng((seed >>> 0) * 2654435761 + 97);
   const frac = (v) => ((v % 1) + 1) % 1;
   const R = Math.round;
@@ -546,10 +547,10 @@
     for (const e of es) { const s = e.target.stageOf; if (!s) continue; s.vis = e.isIntersecting; if (e.target.isConnected) s.seen = true; else if (s.seen) s.stop(); }
     wake();
   }) : null;
-  function wake() { if (!raf && !document.hidden && live.size) raf = requestAnimationFrame(tick); }
+  function wake() { if (!raf && !document.hidden && live.size && !calm()) raf = requestAnimationFrame(tick); }
   function tick(now) {
     raf = 0;
-    if (document.hidden) return;
+    if (document.hidden || calm()) return;
     let any = false;
     for (const s of live) {
       if (!s.cv.isConnected) { if (s.seen) s.stop(); continue; }
@@ -562,6 +563,16 @@
     if (any) raf = requestAnimationFrame(tick);
   }
   document.addEventListener("visibilitychange", wake);
+  if (window.Settings) Settings.watch((keys) => {
+    if (!keys.includes("still") && !keys.includes("motion")) return;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    for (const s of live) {
+      if (!s.cv.isConnected) { if (s.seen) s.stop(); continue; }
+      s.t0 = null; s.last = -1e9;
+      if (calm()) s.draw(s.still);
+    }
+    wake();
+  });
 
   function stage(cv, base, actors, opts) {
     opts = opts || {};
@@ -580,7 +591,7 @@
     s.draw(s.still);
     cv.stageOf = s;
     cv.anim = s;
-    if (reduced || !actors.length) return s;
+    if (!actors.length) return s;
     live.add(s);
     if (io) io.observe(cv);
     setTimeout(() => { if (!s.seen && !cv.isConnected) s.stop(); }, 4000);
@@ -588,7 +599,7 @@
     return s;
   }
 
-  window.Anim = { stage, sprite, put, light, reduced, rng, look,
+  window.Anim = { stage, sprite, put, light, get reduced() { return calm(); }, rng, look,
     villager, skeleton, cat, quad, rabbit, crab, wagon, flag,
     bird, gull, eagle, bat, butterfly,
     torch, glow, smoke, embers, fireflies, wisp, snow, rain, mist, shade,

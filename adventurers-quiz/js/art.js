@@ -146,7 +146,9 @@
     fire: ["#ff9a3a", "#ffd25a", "#ff5a2a"], ice: ["#9ae8ff", "#e8fbff", "#5ab8f0"], holy: ["#ffe88a", "#fff6c8", "#ffd04a"],
     death: ["#7ad08a", "#2a4a3a", "#a0f0b0"], storm: ["#fff35a", "#a0d8ff", "#ffffff"], nature: ["#7ad04a", "#c8f07a", "#3a9a3a"],
     arcane: ["#c88aff", "#f0c8ff", "#8a5aff"], shadow: ["#3a2a4a", "#5a4a6a", "#1a1020"], rage: ["#ff4a4a", "#ff9a7a", "#c81a2a"],
-    gold: ["#ffd84a", "#fff2a0", "#e8a02a"],
+    gold: ["#ffd84a", "#fff2a0", "#e8a02a"], fate: ["#f0d080", "#fff4cc", "#3a5aa8"],
+    mana: ["#4ad0c8", "#b8fff0", "#1a8a9a"], illusion: ["#f0a0c8", "#a8f0e0", "#fff0fa"], elements: ["#ff9a3a", "#9ae8ff", "#fff35a"],
+    lore: ["#f4e4b0", "#c8a860", "#5a8ad0"],
   };
 
   const drawHero = (o) => Paint.fullBody(o);
@@ -315,20 +317,26 @@
       g.rect(9, 1 + oy, 1, 3, mane); g.set(1, 4 + oy, mane); g.set(1, 5 + oy, mane); g.set(2, 4 + oy, mane);
       g.rect(3, 6 + oy, 1, 4 - oy, c[1]); g.rect(5, 6 + oy, 1, 4 - oy, c[2]); g.rect(8, 6 + oy, 1, 4 - oy, c[1]); g.rect(9, 6 + oy, 1, 4 - oy, c[2]);
     } else if (kind === "wolf") {
+      // a wolf stands taller and longer than any dog, so it gets a bigger grid than the other pets
       const c = ramp(["#8a8a96", "#d0ccc4", "#46424c", "#9a6a4a", "#8a7a66"][Math.floor(r() * 5)]);
       const p = ramp(mix(c[4], "#f4f0e6", 0.6));
       const pal = { 0: c[0], 1: c[1], 2: c[2], 3: c[3], 4: c[4], p: p[3], q: p[1], e: "#f0c840", n: OUTLINE };
-      paint(["....0.1.12", "....0.1.12"], pal, 7);
-      paint([
-        "..........3",
-        ".........042",
-        "........3443",
-        "..33443333e33n",
-        ".23122222222pq",
-        ".22.1222221pp",
-        ".21.11qpq1p",
-        ".0",
-      ], pal, oy);
+      const w = new Grid(22, 14), put = (rows, dy) => rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") w.set(x + 1, y + 1 + dy, pal[ch]); }));
+      put(["", "", "", "", "", "", "", "", ".....1.2....1.2", ".....1.2....1.2", ".....1.2....1.2", ".....0.p....0.p"], 0);
+      put([
+        "..............4..4",
+        ".............343.43",
+        "............3444444",
+        "....33333333444e444",
+        "..33444444444444444n",
+        ".3322222222222pqqqq",
+        ".22.2222222222pp",
+        ".21..qq222222122",
+        "2p...1qqqq.1",
+        "p",
+      ], oy);
+      w.outline(OUTLINE);
+      return w;
     } else if (kind === "falcon") {
       const c = ramp(["#5a6a80", "#7a5a3a", "#9a7a52", "#b06a3a"][Math.floor(r() * 4)]);
       const b = ramp("#efe4cc");
@@ -370,7 +378,7 @@
     dragon: ["#a83a3a", "#e8b84a", "#ffd84a"],
   };
 
-  function drawMonster(body, pal, frame, boss) {
+  function drawMonster(body, pal, frame, boss, pose) {
     const p = MPAL[pal] || MPAL.grey;
     const E = p[2];
     let g;
@@ -378,28 +386,29 @@
     const humanoid = (skin, cloth, opts) => drawHero({
       look: { skin, hair: opts.hair || "#2a2020", style: opts.style == null ? 4 : opts.style, face: opts.face || 0, fav: cloth, scars: opts.scars || [] },
       clsLook: { outfit: opts.outfit || "leather", head: opts.head || "none", aura: opts.aura || null, offhand: opts.off || "none" },
-      weapon: opts.weapon || "sword", weaponTier: opts.tier || 1, armorTier: 1, frame: f,
+      weapon: opts.weapon || "sword", weaponTier: opts.tier || 1, armorTier: 1, frame: f, pose,
     });
     switch (body) {
-      case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p);
+      case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p, pose);
       case "human": {
-        if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p);
+        if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p, pose);
         const map = { bandit: ["hood", "leather", "sword"], bandit_archer: ["hood", "leather", "bow"], bandit_captain: ["tricorn", "fancy", "sword"],
           necromancer: ["skull_hood", "robe_dark", "staff"] };
         const [head, outfit, weapon] = map[pal] || ["none", "leather", "sword"];
         g = humanoid(p[0], p[1], { style: 0, head, outfit, weapon, face: pal === "bandit_captain" ? 2 : 1, aura: pal === "necromancer" ? "death" : null, off: pal === "necromancer" ? "skull" : "none", tier: pal === "bandit_captain" ? 3 : 1 });
         break;
       }
-      case "hag": if (boss) return Beasts.draw("crone", pal, f, false, p); g = humanoid(p[0], p[1], { style: 1, hair: "#d8d8d0", head: "none", outfit: "robe_dark", weapon: "staff", aura: "nature", scars: ["pale"] }); break;
+      case "hag": if (boss) return Beasts.draw("crone", pal, f, false, p, pose); g = humanoid(p[0], p[1], { style: 1, hair: "#d8d8d0", head: "none", outfit: "robe_dark", weapon: "staff", aura: "nature", scars: ["pale"] }); break;
       case "siren": g = humanoid("#a8d8d0", "#3a8a9a", { style: 1, hair: "#2a6a8a", outfit: "fancy", weapon: "lute" }); break;
       case "skeleton": case "zombie": {
         const isS = body === "skeleton";
         g = humanoid(isS ? "#e8e0d0" : p[0], isS ? "#a89880" : p[1], { style: 4, outfit: isS ? "leather" : "cloak", weapon: pal === "bone_archer" ? "bow" : isS ? "sword" : "none", scars: isS ? [] : ["scar", "pale"] });
+        if (pose) break;
         for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (g.get(x, y) === "#1a1220" && y > 8 && y < 12 && x > 9 && x < 17) g.set(x, y, E);
         if (isS) for (let y = 15; y < 24; y += 2) g.hline(9, 16, y, "#5a5040");
         break;
       }
-      default: return Beasts.draw(body, pal, f, boss, p);
+      default: return Beasts.draw(body, pal, f, boss, p, pose);
     }
     return g;
   }
@@ -1009,8 +1018,30 @@
     return cached(key + (h.id || h.name || ""), () => drawHero({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
       armorTier: h.armor_tier || h.weapon_tier || 1, legend: h.legend, kit: h.kit || null, frame: frame || 0 }));
   }
+  // the same hero in the saddle: legs bent for riding (Paint.fullBody's seated pose, the boot's sole on row `sole`), everything
+  // above the belt unchanged
+  function heroSeated(h, frame, cls, sole) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    const key = "seat:" + JSON.stringify([h.look, clsLook, h.weapon, h.weapon_tier, h.armor_tier || h.weapon_tier, h.legend, h.kit || null, frame || 0, sole || 32]);
+    return cached(key + (h.id || h.name || ""), () => drawHero({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
+      armorTier: h.armor_tier || h.weapon_tier || 1, legend: h.legend, kit: h.kit || null, frame: frame || 0, seated: sole || 32 }));
+  }
+  // the same hero asleep in bed (q: Paint.sleeper's quilt spec), and the helm or hat they took off for the night
+  function heroLying(h, frame, cls, q) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    const key = "lie:" + JSON.stringify([h.id || h.name, h.look, clsLook, h.kit || null, frame || 0, q]);
+    return cached(key, () => Paint.sleeper({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
+      armorTier: h.armor_tier || h.weapon_tier || 1, kit: h.kit || null, frame: frame || 0 }, q));
+  }
+  function heroAside(h, cls) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    return cached("aside:" + JSON.stringify([h.id || h.name, h.look, clsLook, h.kit || null]), () => Paint.setAside({ id: h.id, name: h.name, look: h.look, clsLook,
+      weapon: h.weapon, weaponTier: h.weapon_tier || 1, armorTier: h.armor_tier || h.weapon_tier || 1, kit: h.kit || null }));
+  }
   function heroCanvas(h, scale, frame, cls) { return heroGrid(h, frame, cls).toCanvas(scale); }
   function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : ""), () => drawMonster(m.body, m.pal, frame, m.boss)); }
+  // a monster in a death pose (see Beasts.draw): the grid carries pad (its standing sprite sits at (pad, pad)) and stand [w, h]
+  function monsterPose(m, pose) { return cached("mp:" + m.body + m.pal + (m.boss ? "b" : "") + JSON.stringify(pose), () => drawMonster(m.body, m.pal, 0, m.boss, pose)); }
   function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (pet.coat || "") + (frame || 0), () => drawPet(pet.kind, pet.name, frame, pet.coat)); }
   function bannerGrid(b, big) { return cached("b:" + (big ? "L" : "S") + JSON.stringify(b), () => drawBanner(b, big)); }
   // the champion's medallion: a lit gold pixel ring with laurel sprays and a ribbon
@@ -1051,5 +1082,5 @@
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();
