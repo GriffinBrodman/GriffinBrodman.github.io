@@ -758,7 +758,8 @@
     }
     left.appendChild(panel("Stats", sg));
     const tp = panel("Personality");
-    for (const t of ["boldness", "risk"]) tp.appendChild(traitRow(t, h.traits[t], true));
+    const grew = h.grew || ((L.heroes || []).find((x) => x.id === h.id) || {}).grew || [];
+    for (const t of ["boldness", "risk"]) tp.appendChild(traitRow(t, h.traits[t], true, grew.filter((g) => g.trait === t), h.name));
     tp.appendChild(el("div", { style: { height: "6px" } }));
     for (const t of ["greed", "honor", "sociability", "curiosity", "temper", "loyalty"]) tp.appendChild(traitRow(t, h.traits[t]));
     tp.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } },
@@ -834,9 +835,20 @@
     if (o.reads && o.reads.read) p.appendChild(el("p", { class: "tiny dim" }, `Has read the cards ${o.reads.read} time${o.reads.read === 1 ? "" : "s"}; ${o.reads.hits} of ${o.reads.checked} omens came true.`));
     return p;
   }
-  function traitRow(t, v, big) {
-    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", null, TRAIT_LABEL[t]),
-      el("div", { class: "tbar" }, el("i", { style: { left: ((v + 1) / 2) * 100 + "%" } })), el("span", { class: "word" }, traitWord(t, v)));
+  // a trait that has moved shows where it started (a hollow marker), the way it went, and on hover what moved it
+  const bandMid = (t, word) => { const i = TRAIT_WORDS[t].indexOf(word); return i < 0 ? null : -1 + 0.4 * i + 0.2; };
+  function traitRow(t, v, big, changes, who) {
+    const pos = (x) => ((x + 1) / 2) * 100;
+    const moved = (changes || []).length ? changes : null;
+    const v0 = moved ? (moved[0].v0 != null ? moved[0].v0 : bandMid(t, moved[0].from)) : null;
+    const bar = el("div", { class: "tbar" },
+      v0 != null ? el("i", { class: "was", style: { left: pos(v0) + "%" } }) : null,
+      v0 != null ? el("span", { class: "moved", style: { left: Math.min(pos(v0), pos(v)) + "%", width: Math.abs(pos(v) - pos(v0)) + "%" } }) : null,
+      el("i", { style: { left: pos(v) + "%" } }));
+    const row = el("div", { class: "trait" + (big ? " big" : "") + (moved ? " grew" : "") }, el("span", null, TRAIT_LABEL[t]), bar,
+      el("span", { class: "word" }, traitWord(t, v), moved ? el("span", { class: "gold" }, v > v0 ? " ↑" : " ↓") : null));
+    if (!moved) return row;
+    return tip(row, moved.map((g) => `Was ${g.from}, now ${g.to}.${g.day ? " Day " + g.day + ":" : ""} ${g.why || ""}.`).join(" "), `${who} grew ${moved[moved.length - 1].mood}`);
   }
   // the leaning first (where this hero's arc is heading), then what has grown it: affinity starts empty and fills from what they learn and do
   function affinityPanel(h) {
@@ -1154,7 +1166,31 @@
   // the hero's day as a little almanac strip (web/js/daybook.js); the plain day box below still lists what it added up to
   function dayCalendar(h) {
     if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
-    try { return Daybook.render(h.daybook); } catch (e) { return null; }
+    const today = L.meta.day;
+    const kept = h.daybook_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).daybook_days || [];
+    const days = kept.filter((d) => d !== today).concat([today]).sort((a, b) => a - b);
+    const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginBottom: "6px" } });
+    let readOpen = false;
+    const draw = (d, db) => {
+      let out = null;
+      try { out = db ? Daybook.render(db) : null; } catch (e) { out = null; }
+      // an open "Read the day" stays open while paging, so a reader comparing days isn't made to reopen it every time
+      const fold = out && out.querySelector("details.db-more");
+      if (fold) {
+        fold.open = readOpen;
+        fold.addEventListener("toggle", () => { readOpen = fold.open; });
+      }
+      body.replaceChildren(out || el("p", { class: "small muted" }, `Nothing was written down for day ${d}.`));
+      const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
+      nav.replaceChildren(
+        prev != null ? el("button", { class: "btn small", onclick: () => go(prev) }, `‹ Day ${prev}`) : el("span"),
+        next != null ? el("button", { class: "btn small", onclick: () => go(next) }, next === today ? "Today ›" : `Day ${next} ›`) : el("span"));
+    };
+    // past days load on demand from their own small files (export.save_daybook)
+    const go = (d) => (d === today ? draw(d, h.daybook) : A.load(`daybook/${h.id}/${d}`).then((db) => draw(d, db), () => draw(d, null)));
+    draw(today, h.daybook);
+    // the buttons sit above the day, so they don't move when a day is taller or shorter than the last
+    return el("div", null, days.length > 1 ? nav : null, body);
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }

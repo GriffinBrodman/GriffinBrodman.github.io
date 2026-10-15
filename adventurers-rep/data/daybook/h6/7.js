@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h6/7"]={"day":7,"label":"Day 7","title":"Season 1, day 7, hour by hour","blocks":[{"act":"delve","label":"Underground","from":6.0,"to":18.0,"line":"Spent the day in Goblin Camp."}],"evening":{"kind":"dungeon","line":"Camped in Goblin Camp","more":[{"table":"Joined in on \"The Heron King\" by the fire","game":"n1","route":"night"}]}};

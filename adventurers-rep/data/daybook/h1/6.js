@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h1/6"]={"day":6,"label":"Day 6","title":"Season 1, day 6, hour by hour","blocks":[{"act":"hunt","label":"Hunting","from":6.0,"to":18.0,"line":"Spent the day on the King's Road."}],"evening":{"kind":"camp","line":"Camped out on the King's Road"}};

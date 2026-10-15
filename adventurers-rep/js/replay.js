@@ -1419,7 +1419,8 @@
       ctx.fillStyle = "#120c18"; ctx.fillRect(x - B, y - B, w + 2 * B, 5 * B);
       ctx.fillStyle = "#3a2822"; ctx.fillRect(x, y, w, 3 * B);
       ctx.fillStyle = q.side === 0 ? "#6ccf7a" : "#e2645c"; ctx.fillRect(x, y, w * clamp(s.hp / q.maxhp, 0, 1), 3 * B);
-      txt(marks[q.i] + " " + q.name, x, y - 2 * B, 5, "#f6ebd0", "left", B);
+      // the mark in brackets: a bare "A Gruk the Warchief" reads as an article, not as the key to the list below
+      txt(`[${marks[q.i]}] ${q.name}`, x, y - 2 * B, 5, "#f6ebd0", "left", B);
     }
     function cutin(slot, u, B, K, X, Y) {
       const cvw = cv.width, cvh = cv.height, b = slot.members[0].b, a = units[b.a], an = anchors[b.a] || { x: a.x, y: a.y, top: a.y - a.sh };
@@ -1576,6 +1577,8 @@
     if (f.outcome === "stalemate" || f.winner == null) return "Stalemate";
     // fled_label (league/fights.py) names only the ones who ran, so a boss cut down before the rest fled isn't said to flee
     const w = f.winner === 0 ? L0 : L1, l = (f.winner === 0 && f.fled_label) || (f.winner === 0 ? L1 : L0);
+    // when some fell and only the rest ran, the win comes first: "The Verdant Sigil wins; a Goblin Shaman flees"
+    if (f.outcome === "fled" && f.winner === 0 && f.fled_label) return `${vb(w, "wins", "win")}; ${vb(l, "flees", "flee")}`;
     return { wiped: vb(w, "wins", "win"), fled: vb(l, "flees", "flee"), surrender: vb(l, "surrenders", "surrender") }[f.outcome] || vb(w, "wins", "win");
   }
 })();
