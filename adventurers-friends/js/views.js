@@ -1302,6 +1302,11 @@
         goalLine(p.goal), ...(p.vows || []).map((v) => vowLine(v))),
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
     v.appendChild(head);
+    // every boss the crew brought down, one trophy each, with a link to watch the kill while the fight is still kept
+    if ((p.trophies || []).length) v.appendChild(panel(`Trophies (${p.trophies.length})`, el("div", { class: "trophies" }, ...p.trophies.map((t) =>
+      el("div", { class: "trophy-card" }, el("span", { class: "trophy-icon", "aria-hidden": "true" }, "🏆"),
+        el("div", null, el("b", { class: "gold" }, t.boss), el("div", { class: "tiny dim" }, `${t.place} · ${A.when(t.day)}`),
+          t.fight ? el("a", { class: "watch tiny", href: `#/fight/${t.fight}` }, "▸ watch the kill") : null))))));
     const mem = el("div", { class: "members" });
     for (const m of p.members) if (heroes[m]) mem.appendChild(el("a", { href: `#/hero/${m}` }, A.heroPortrait(heroes[m], 3), heroes[m].name,
       el("div", { class: "tiny gold" }, (p.roles || {})[m] || (m === p.leader ? "leader" : "")), el("div", { class: "tiny dim" }, `Lv ${heroes[m].level} ${heroes[m].title}`)));

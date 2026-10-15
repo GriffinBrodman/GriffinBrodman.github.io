@@ -791,3 +791,7 @@ table.boxscore { margin-bottom: 8px; }
 .chess-replay .chess-real { margin-top: 4px; font-style: italic; }
 /* a sung line is a lyric, not the singer talking about themselves */
 .say.sung .say-who:not(:empty)::before { content: "\266A "; }
+
+.trophies { display: flex; flex-wrap: wrap; gap: 10px; }
+.trophy-card { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border: 1px solid var(--edge2); border-radius: 3px; background: rgba(200, 150, 62, 0.08); }
+.trophy-icon { font-size: 26px; line-height: 1; }
