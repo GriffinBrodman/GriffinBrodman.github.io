@@ -11,21 +11,28 @@
            {shapes: [...], about}; the first shape is the default.
            slash  arc cross wide flurry claw bite          melee cuts: a crescent smear at the target
            thrust stab rapier pierce lance                  a streak through the target (pierce runs through every target)
-           smash  hammer stomp slam quake                    overhead blows: crack decal, shockwave, dust
+           smash  hammer stomp slam quake jaws deadfall      overhead blows: crack decal, shockwave, dust; jaws = a tossed trap
+                                                             snaps shut on the shins, deadfall = a log drops on the foes
            arrow  arrow volley bolt sling throw              physical missiles; volley lobs `count` of them
            bolt   missile lance lob strike drain swarm       shaped spell projectiles (never balls); the school is the material
            beam   ray pillar breath chain                    sustained: a ray, a column from the sky, a cone, a hopping chain
            nova   burst rain eruption storm cloud            area spells; a floor ring marks the area
            heal   motes glyph wave regen                     rising motes, a floor glyph, a wave over allies, leafy regrowth
            buff   aura chevrons shout vanish rage path       self/ally boosts; shout = rally, vanish = stealth, rage = fury,
-                                                             path = a trail of glowing hoofprints runs out to each ally
+                  decoy anthem                               path = a trail of glowing hoofprints runs out to each ally,
+                                                             decoy = `count` copies of the hero split off (mirror images),
+                                                             anthem = a stave of light carries notes out to each ally
            summon circle rise call puff                      the newcomer arrives at `to` (its target pose ramps it in)
            curse  hex dread cloud mark bind lure             debuffs and fear: sigils, a dread pulse, a cloud, a reticle, binds;
-                                                             lure = a glamour on the water draws foes in, weed coils them
+                  strings swirl phantasm mirrors snare       lure = a glamour on the water draws foes in, weed coils them;
+                                                             strings = a puppet bar on threads (charm), swirl = a dizzy spiral,
+                                                             phantasm = a horror rises behind the foe (count 1 = horned),
+                                                             mirrors = panes round the foe flash and shatter, snare = a loop
+                                                             on the ground jerks tight round the ankles
            guard  shield wall dome parry                     a plate, a wall, a bubble or a parry flash in front of `from`
   SCHOOLS  palette + material (particle shapes, decal, sound timbre). FightFX.SCHOOLS[id] = {pal, particle, decal, sound}:
            blade shield fury command flame frost storm arcane lore holy healing shadow death wild beast marksman road
-           riding trade song hearth craft, plus physical poison water bone. Aliases: fire ice lightning nature light
+           riding trade song hearth craft illusion, plus physical poison water bone. Aliases: fire ice lightning nature light
            rage dark necro venom acid -> their school. Unknown -> physical.
 
   PARAMS   every field optional; FightFX.params(p) returns the filled copy.
@@ -145,6 +152,7 @@
     riding:   { pal: ["#3c2c1c", "#7a5a38", "#c09a6a", "#ecdcb4", "#fff8e8"], p: "dust", q: "spark", head: "streak", burst: "spark", decal: "hoof", snd: "hooves" },
     trade:    { pal: ["#4a3008", "#a07818", "#e8c440", "#fff0a0", "#ffffff"], p: "coin", q: "glint", head: "coin", burst: "coin", decal: null, snd: "coin" },
     song:     { pal: ["#4a1830", "#b04a70", "#f090a8", "#ffe0d0", "#ffffff"], p: "note", q: "mote", head: "note", burst: "note", decal: null, snd: "song" },
+    illusion: { pal: ["#3a1a2a", "#a8507a", "#f0a0c0", "#c4f4e6", "#ffffff"], p: "facet", q: "glint", head: "facet", burst: "facet", decal: null, snd: "illusion", acc: "#7ae4cc" },
     hearth:   { pal: ["#4a2408", "#b05a18", "#f0a040", "#ffe0a0", "#fff8e0"], p: "ember", q: "steam", head: "flame", burst: "ember", decal: "soot", snd: "hearth" },
     craft:    { pal: ["#1e1e24", "#5a5a66", "#a8a0a0", "#e8c070", "#fff4d0"], p: "cog", q: "spark", head: "cog", burst: "cog", decal: "soot", snd: "craft" },
     poison:   { pal: ["#1a2808", "#4a7a10", "#94d030", "#e0ff90", "#ffffe0"], p: "drip", q: "bubble", head: "spit", burst: "drip", decal: "puddle", snd: "poison" },
@@ -446,6 +454,12 @@
       case "heart": bmpS(BMP.heart, x - 2, y - 2, pal[2], pal[0], a); Pa(x - 1, y - 1, pal[4], a); return;
       case "chevron": chevron(x, y, 2 + rnd(s), pal[3], pal[1], a); return;
       case "petal": Pa(x, y, pal[3], a); Pa(x + (fl((ph || 0) * 8) % 2), y + 1, pal[2], a); return;
+      case "facet": {
+        const z = s > 1.1 ? 2 : 1, col = (fl((ph || 0) * 10) + (i || 0)) % 2 ? pal[2] : S.acc || pal[3];
+        for (let d = -z; d <= z; d++) { Pa(x + d, y, col, a); Pa(x, y + d * 1.5, col, a); }
+        Pa(x, y - z * 1.5 - 1, pal[0], a * 0.6); Pa(x, y, pal[4], a);
+        return;
+      }
       default: Pa(x, y, pal[3], a);
     }
   }
@@ -692,6 +706,14 @@
       case "coin": {
         for (let i = 0; i < 4; i++) { const v = u - i * 0.05; if (v < 0) break; const [x, y] = path(v); coin(x + (i % 2) * 2, y + (i % 2 ? 2 : -1), v * 30 + i, pal, 1, k); }
         for (let i = 1; i < 5; i++) { const v = u - i * 0.05; if (v < 0) break; const [x, y] = path(v); Pa(x, y - 2, pal[4], 1 - i / 5); }
+        break;
+      }
+      case "facet": {
+        // a prism: a bright diamond with a trail of chips flipping rose and mint
+        for (let i = 1; i < 9; i++) { const v = u - i * 0.035; if (v < 0) break; const [x, y] = path(v); part("facet", x + hr(sd, i, 1, -2, 2), y + hr(sd, i, 2, -2, 2), 0.8, 0, i / 9, S, i, u); }
+        const z = 3 * k;
+        poly([[hx + Math.cos(ang) * z * 1.4, hy + Math.sin(ang) * z * 1.4], [hx - Math.sin(ang) * z, hy + Math.cos(ang) * z], [hx - Math.cos(ang) * z, hy - Math.sin(ang) * z], [hx + Math.sin(ang) * z, hy - Math.cos(ang) * z]], fl(u * 12) % 2 ? pal[2] : S.acc || pal[3], 1);
+        Pa(hx, hy, pal[4], 1); Pa(hx - 1, hy - 1, pal[4], 1);
         break;
       }
       case "cog": {
@@ -1404,7 +1426,7 @@
         if (tt < 0.1) star(X.cx, X.cy - 6 * k, 8 * k * (1 - tt / 0.1), pal, 1);
         if (tt < 0.3) halo(X.cx, X.cy - 4 * k, 11 * k * (1 - tt / 0.3) + 3, pal, 0.85);
         // the wave front: a ring of short risers, the school's material standing up off the floor
-        const front = R * eOut3(Math.min(1, tt / 0.4)), wf = 1 - seg(tt, 0.25, 0.65), light = ["holy", "healing", "arcane", "lore", "song", "trade", "command", "storm"].includes(S.id);
+        const front = R * eOut3(Math.min(1, tt / 0.4)), wf = 1 - seg(tt, 0.25, 0.65), light = ["holy", "healing", "arcane", "lore", "song", "trade", "command", "storm", "illusion"].includes(S.id);
         if (wf > 0) for (let j = 0; j < 22; j++) {
           const a = j / 22 * TAU + 0.13, x = X.cx + Math.cos(a) * front, y = X.cy + Math.sin(a) * front * FLAT, hh = (10 + 7 * hs(X.seed, j, 7)) * k * wf;
           if (light) { line(x - 1, y, x - 1, y - hh * 0.8, pal[1], wf); line(x, y, x, y - hh, pal[3], wf); line(x + 1, y, x + 1, y - hh * 0.6, pal[2], wf); Pa(x, y - hh, pal[4], wf); Pa(x, y - hh - 1, pal[4], wf * 0.6); }
@@ -2047,6 +2069,369 @@
     },
     marks(X) { return X.shape === "wall" ? [{ kind: X.S.id === "frost" ? "frost" : X.S.id === "flame" ? "scorch" : X.S.id === "wild" ? "vines" : "scuff", x: X.from.x + X.dir * 13 * X.k, y: X.from.y + 1, at: X.T.impacts[0], opts: { size: 0.5, seed: X.seed, school: X.S.id } }] : X.shape === "shield" ? [{ kind: "skid", x: X.from.x, y: X.from.y, at: X.T.impacts[0], opts: { size: 0.3, flip: X.dir > 0 } }] : []; },
   };
+
+  // ===== the class rework's shapes: decoys, songs, puppet strings, dizzy spells, phantasms, mirrors, snares, traps, deadfalls =====
+  // each joins an existing family (its timing conventions, sound and pose roles) and is dispatched by shape
+  const EXT = {};
+  function extend(fam, shape, def) { FAM[fam].shapes.push(shape); (EXT[fam] = EXT[fam] || {})[shape] = def; }
+  const ROPE = ["#3a2814", "#7a5a30", "#b8945a", "#e4cc94", "#fff4d0"], IRON = ["#1e1c22", "#4a4852", "#8a8a96", "#c8ccd6", "#ffffff"];
+  const LOG = ["#2a1a0e", "#5a3a1e", "#8a5e32", "#b88a52", "#e0c08a"];
+  // a figure's outline, for the decoys: head, shoulders, a coat to the knees, two legs; fill(x, y, edge) paints each pixel
+  function figure(x, y, h, fill) {
+    const hr0 = h * 0.13, hy = y - h * 0.84, sh = h * 0.2;
+    for (let yy = fl(hy - hr0); yy <= y; yy++) {
+      const t = (yy - (y - h * 0.7)) / (h * 0.7);
+      let hw = yy < hy + hr0 ? Math.sqrt(Math.max(0, hr0 * hr0 - (yy + 0.5 - hy) ** 2)) : yy < y - h * 0.7 ? hr0 * 0.6 : t < 0.62 ? sh - t * 0.05 * h : h * 0.15;
+      const legs = t >= 0.62;
+      for (let xx = fl(x - hw); xx <= x + hw; xx++) {
+        if (legs && Math.abs(xx + 0.5 - x) < 1) continue;
+        const edge = xx <= x - hw + 1 || xx >= x + hw - 1 || yy === fl(hy - hr0);
+        fill(xx, yy, edge);
+      }
+    }
+  }
+  const glowC2 = (X) => X.S.acc || X.pal[3];
+  const prism = (X, j, u) => ((fl(u * 10) + j) % 2 ? X.pal[2] : X.S.acc || X.pal[3]);
+
+  extend("buff", "decoy", {
+    time: (X) => ({ windup: 0.2, impacts: X.tos.map(() => 0.42), dur: 1.55 }),
+    copies: (X) => Math.max(1, Math.min(4, X.P.count || 2)),
+    draw(X, u, layer) {
+      const k = X.k, pal = X.pal, f = X.from, h = hgt(f), n = this.copies(X), end = X.T.dur, out = eOut(seg(u, 0.25, 0.55)), pop = seg(u, end - 0.4, end - 0.1);
+      for (let j = 0; j < n; j++) {
+        const side = j % 2 ? -1 : 1, x = f.x + side * (19 + 13 * fl(j / 2)) * k * out, a = seg(u, 0.25, 0.32) * (1 - pop), body = j % 2 ? pal[2] : X.S.acc || pal[3];
+        if (layer === "floor") { if (a > 0) gdisc(x, f.y, 6 * k, pal[1], a * 0.45); continue; }
+        if (a > 0 && !(pop > 0 && fl(u * 30 + j) % 2)) {
+          // a copy is the hero in light: a dithered body, a lit rim on the left, scan lines that crawl down it
+          figure(x, f.y, h, (xx, yy, edge) => {
+            const scan = (yy + fl(u * 40)) % 4 === 0;
+            if (edge) Pa(xx, yy, xx < x ? pal[4] : pal[1], a);
+            else Pa(xx, yy, scan ? pal[4] : body, a * (scan ? 0.95 : 0.7));
+          });
+          Pa(x - 1, f.y - h * 0.85, pal[0], a); Pa(x + 2, f.y - h * 0.85, pal[0], a);
+        }
+        if (pop > 0 && pop < 1) for (let m = 0; m < 6; m++) { const ang = m / 6 * TAU + j; part("facet", x + Math.cos(ang) * pop * 10 * k, f.y - h * 0.5 + Math.sin(ang) * pop * 12 * k, 1.2, 0, pop, X.S, m + j, u); }
+        // the split: streaks of light running from the hero out to each copy
+        if (u > 0.22 && u < 0.6) for (let m = 0; m < 3; m++) { const yy = f.y - h * (0.3 + m * 0.25), q = seg(u, 0.22 + m * 0.03, 0.5); line(lerp(f.x, x, q * 0.4), yy, lerp(f.x, x, q), yy, pal[3], 1 - seg(u, 0.45, 0.6)); }
+      }
+      if (layer === "fx" && u > 0.38 && u < 0.5) star(f.x, f.y - h * 0.55, 6 * k, pal, 1 - seg(u, 0.38, 0.5));
+    },
+    pose(X, role, u, i, o) {
+      if (role !== "actor" && X.tos[0] !== X.from) return;
+      if (u > 0.3 && u < 0.6) { o.white = fl(u * 30) % 2 ? 0.5 : 0; o.alpha = 0.8; }
+      o.tint = X.pal[3]; o.tintAmt = 0.2 * Math.sin(seg(u, 0.1, X.T.dur) * Math.PI);
+    },
+    marks: () => [],
+  });
+
+  // a stave of light runs out to each ally with the notes riding it; a big note lands over every head
+  extend("buff", "anthem", {
+    time(X) { const ts = byDist(X, X.from.x, X.from.y, 170, 0.4); return { windup: 0.3, impacts: ts, dur: Math.max(...ts) + 0.85 }; },
+    draw(X, u, layer) {
+      const k = X.k, pal = X.pal, f = X.from, s = head(f), end = X.T.dur, fade = 1 - seg(u, end - 0.3, end);
+      if (layer === "floor") {
+        for (let r = 0; r < 2; r++) { const t2 = u - X.T.windup - r * 0.18; if (t2 > 0 && t2 < 0.7) gring(f.x, f.y, (6 + t2 * 90) * k, pal[3], 1 - t2 / 0.7, 1, 10); }
+        return;
+      }
+      for (let j = 0; j < 5; j++) { const ph = (u * 1.4 + j / 5) % 1, a = Math.sin(seg(u, 0, X.T.windup + 0.2) * Math.PI); if (a > 0) part("note", s.x + Math.sin(j * 2.1 + u * 4) * 8 * k, s.y + 2 - ph * 16, 1.2, 0, ph, X.S, j, u); }
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], h = head(q), v = eOut(seg(u, X.T.windup, ti)), tt = u - ti;
+        if (q !== f && v > 0 && tt < 0.3) {
+          const a = fade * (1 - seg(tt, 0, 0.3)), path = (z) => [lerp(s.x, h.x, z), lerp(s.y + 2, h.y - 2, z) - Math.sin(z * Math.PI) * 10 * k + Math.sin(z * 14 - u * 10) * 1.5];
+          for (let z = 0; z <= v; z += 0.012) { const [x, y] = path(z); for (const dy of [-3, 0, 3]) { Pa(x, y + dy * k * 0.7 + 1, pal[0], a * 0.5); Pa(x, y + dy * k * 0.7, dy ? pal[2] : pal[3], a * (0.55 + 0.45 * z / Math.max(0.01, v))); } }
+          for (let m = 0; m < 3; m++) { const z = v - m * 0.12; if (z > 0) { const [x, y] = path(z); part("note", x, y - 1, m ? 1 : 1.6, 0, m * 0.15, X.S, m + i); } }
+        }
+        if (tt > 0 && tt < 0.7) {
+          const a = 1 - seg(tt, 0.45, 0.7);
+          bmpS(i % 2 ? BMP.note : BMP.note2, h.x - 3, h.y - 12 - tt * 10, pal[3], pal[0], a, 2);
+          chevron(h.x, h.y - 2 - tt * 8, 3, pal[3], pal[1], a);
+          if (tt < 0.15) { halo(h.x, h.y + 3, 7 * k, pal, 0.6 * (1 - tt / 0.15)); star(h.x + 5, h.y - 4, 4 * k, pal, 1 - tt / 0.15); }
+        }
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { const q = seg(u, 0.05, X.T.windup + 0.3); o.rot = Math.sin(u * 18) * 0.05 * Math.sin(q * Math.PI); o.dy = -1.5 * Math.sin(q * Math.PI); return; }
+      const tt = u - X.T.impacts[i];
+      if (tt > -0.05 && tt < 0.5) { o.tint = X.pal[3]; o.tintAmt = 0.3 * (1 - seg(tt, 0, 0.5)); o.dy = tt > 0 && tt < 0.2 ? -2.5 * Math.sin(tt / 0.2 * Math.PI) * SCALE : 0; }
+    },
+    marks: () => [],
+  });
+
+  // a control bar drops over each foe on threads of light; the foe dances to it
+  extend("curse", "strings", {
+    time: (X) => ({ windup: 0.3, impacts: X.tos.map((q, i) => 0.6 + i * 0.06), dur: 1.55 + X.tos.length * 0.06 }),
+    draw(X, u, layer) {
+      if (layer === "floor") return;
+      const k = X.k, pal = X.pal, end = X.T.dur, fade = 1 - seg(u, end - 0.3, end), s = X.src;
+      if (u < 0.6) for (let j = 0; j < 4; j++) Pa(s.x + (j - 1.5) * 2, s.y - 2 - Math.abs(Math.sin(u * 20 + j)) * 2, pal[4], 1);
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, h = head(q), c = chest(q), drop = eOut(seg(u, ti - 0.3, ti)), sway = tt > 0 ? Math.sin(tt * 7 + i) * 0.35 : 0;
+        if (drop <= 0) return;
+        const by = h.y - 14 * k - (1 - drop) * 30, bx = q.x, w = 9 * k, ca = Math.cos(sway), sa = Math.sin(sway);
+        const end0 = [bx - ca * w, by - sa * w], end1 = [bx + ca * w, by + sa * w];
+        // threads from the caster's fingers to the bar, while it falls
+        if (tt < 0.1) lineFn(s.x, s.y, bx, by, (v) => (on(lerp(s.x, bx, v), lerp(s.y, by, v), 0.35 * drop * (1 - seg(tt, 0, 0.1))) ? pal[3] : null));
+        for (const [ex, ey, tx, ty] of [[end0[0], end0[1], c.x - 6 * k, c.y + 2], [end1[0], end1[1], c.x + 6 * k, c.y + 2], [bx, by, h.x, h.y]]) { line(ex + 1, ey, tx + 1 + (tt > 0 ? sway * 6 : 0), ty, pal[1], fade * 0.6); line(ex, ey, tx + (tt > 0 ? sway * 6 : 0), ty, pal[4], fade * 0.9); }
+        line(end0[0], end0[1] + 1, end1[0], end1[1] + 1, LOG[1], fade); line(end0[0], end0[1], end1[0], end1[1], LOG[3], fade);
+        line(bx - sa * 4, by - 4, bx + sa * 4, by + 4, LOG[2], fade);
+        Pa(end0[0], end0[1], pal[4], fade); Pa(end1[0], end1[1], pal[4], fade);
+        if (tt > 0 && tt < 0.12) star(h.x, h.y - 2, 5 * k, pal, 1 - tt / 0.12);
+        if (tt > 0.1) { const ph = (tt * 0.8) % 1; part("heart", h.x + 6, h.y - 4 - ph * 10, 1, 0, ph, X.S, i); }
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { const q = seg(u, 0, X.T.windup + 0.3); o.dy = -1.2 * Math.sin(q * Math.PI); o.tint = X.pal[3]; o.tintAmt = 0.15 * Math.sin(q * Math.PI); return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0 || X.P.miss) return;
+      const held = 1 - seg(u, X.T.dur - 0.3, X.T.dur);
+      o.dx = Math.sin(tt * 7 + i) * 2.4 * held * SCALE; o.dy = -Math.abs(Math.sin(tt * 7 + i)) * 1.5 * held; o.rot = Math.sin(tt * 7 + i) * 0.08 * held;
+      o.tint = X.pal[2]; o.tintAmt = 0.18 * held; if (tt < 0.05) o.white = 0.6;
+    },
+    marks: () => [],
+  });
+
+  // the dizzy spell: a spiral turns over the face, stars and question marks circle the head
+  extend("curse", "swirl", {
+    time: (X) => ({ windup: 0.28, impacts: X.tos.map((q, i) => 0.55 + i * 0.06), dur: 1.45 + X.tos.length * 0.06 }),
+    draw(X, u, layer) {
+      if (layer === "floor") return;
+      const k = X.k, pal = X.pal, end = X.T.dur, fade = 1 - seg(u, end - 0.3, end);
+      charge(X, u, layer, 0.02, X.T.windup);
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, h = head(q);
+        if (tt < -0.25) return;
+        if (tt < 0) { const v = seg(tt, -0.25, 0); for (let m = 0; m < 4; m++) { const a = m / 4 * TAU + u * 9, r = (16 - 12 * v) * k; part("facet", h.x + Math.cos(a) * r, h.y + 4 + Math.sin(a) * r * 0.5, 1, 0, 0, X.S, m, u); } return; }
+        const a0 = 1 - seg(tt, 0.9, 1.1), spin = -u * 9;
+        for (let m = 0; m < 34; m++) { const t = m / 34 * 3.4 * Math.PI, r = (0.5 + t * 0.62) * k; Pa(h.x + Math.cos(t + spin) * r + 1, h.y + 5 + Math.sin(t + spin) * r * 0.8 + 1, pal[0], fade * a0 * 0.6); Pa(h.x + Math.cos(t + spin) * r, h.y + 5 + Math.sin(t + spin) * r * 0.8, m > 24 ? pal[2] : pal[4], fade * a0); }
+        for (let m = 0; m < 4; m++) {
+          const a = m / 4 * TAU + u * 5, x = h.x + Math.cos(a) * 12 * k, y = h.y - 4 + Math.sin(a) * 4 * k;
+          if (m % 2) bmpS(m === 1 ? BMP.q : BMP.heart, x - 2, y - 4, m === 1 ? pal[4] : pal[2], pal[0], fade, m === 1 ? 2 : 1);
+          else star(x, y, 3, m ? GLAM : pal, fade);
+        }
+        if (tt < 0.1) star(h.x, h.y + 4, 6 * k, pal, 1 - tt / 0.1);
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { if (u < X.T.windup + 0.05) { o.dy = -1.2; o.tint = X.pal[2]; o.tintAmt = 0.15; } return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0 || X.P.miss) return;
+      const held = 1 - seg(u, X.T.dur - 0.3, X.T.dur);
+      o.rot = Math.sin(tt * 9) * 0.1 * held; o.dx = Math.sin(tt * 4.5) * 1.5 * held; if (tt < 0.05) o.white = 0.6;
+    },
+    marks: () => [],
+  });
+
+  // a horror only the foe can see rises behind it: a looming head of smoke with lit eyes and a maw, hands reaching round
+  extend("curse", "phantasm", {
+    time: (X) => ({ windup: 0.3, impacts: X.tos.map((q, i) => 0.72 + i * 0.06), dur: 1.7 + X.tos.length * 0.06 }),
+    draw(X, u, layer) {
+      const k = X.k, pal = X.pal, end = X.T.dur, horned = (X.P.count | 0) > 0;
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, d = tdir(X, i), rise = eOut(seg(u, ti - 0.42, ti + 0.05)), fade = 1 - seg(u, end - 0.4, end);
+        if (rise <= 0) return;
+        const H = hgt(q) * 1.5 * k * rise, cx = q.x + d * 7 * k, top = q.y - H - 8 * k, W = 15 * k, a = fade * Math.min(1, rise * 1.4);
+        if (layer === "floor") {
+          // a hooded wraith of smoke behind the foe: ragged robes from the ground up, a deep hood, a dark hollow for a face
+          const ink = "#120a12", hy = top + W * 0.55;
+          for (let yy = fl(top - W * 0.4); yy <= q.y; yy++) {
+            const v = (yy - (top - W * 0.4)) / (q.y - top + W * 0.4), half = v < 0.25 ? W * (0.2 + v * 3) : W * (0.95 + (v - 0.25) * 0.5), rag = v > 0.8 ? Math.sin(yy * 1.7 + u * 9) * 3 : 0;
+            for (let xx = fl(cx - half); xx <= cx + half + rag; xx++) {
+              const e = Math.abs(xx - cx) / half;
+              if (v > 0.85 && (xx + fl(u * 12)) % 3 === 0) continue;
+              Pa(xx, yy, e > 0.82 ? (xx < cx ? pal[1] : ink) : e > 0.5 ? pal[0] : ink, a * (v > 0.75 ? 1 - (v - 0.75) * 2.2 : 1));
+            }
+          }
+          if (horned) for (const s of [-1, 1]) { poly([[cx + s * W * 0.45, top + 2], [cx + s * W * 1.15, top - W * 0.75], [cx + s * W * 0.85, top + 4]], pal[0], a); line(cx + s * W * 0.5, top + 1, cx + s * W * 1.1, top - W * 0.7, pal[1], a); }
+          for (let yy = -W * 0.42; yy <= W * 0.42; yy++) { const hw = W * 0.55 * Math.sqrt(1 - (yy / (W * 0.45)) ** 2); for (let xx = -hw; xx <= hw; xx++) Pa(cx + xx, hy + yy, "#06040a", a); }
+          gdisc(q.x, q.y, 14 * k, ink, 0.6 * a);
+          return;
+        }
+        // eyes burning in the hollow, the glow the illusion's second colour; on the impact a maw of pale fangs opens under them
+        const ey = top + W * 0.42, open = tt > 0 ? Math.min(1, tt / 0.12) * (1 - seg(tt, 0.6, 0.9)) : 0, eyeA = a * (tt > -0.2 ? 1 : 0.5), glowC = X.S.acc || pal[3];
+        for (const s of [-1, 1]) {
+          const ex = cx + s * W * 0.24;
+          halo(ex, ey, 3.5 * k, [pal[0], pal[1], glowC, glowC], eyeA * 0.7);
+          poly([[ex - 2.2 * k, ey - s * 0.8], [ex + 2.2 * k, ey + s * 0.8 - 1], [ex, ey + 1.4 * k]], glowC, eyeA);
+          Pa(ex, ey, "#ffffff", eyeA);
+        }
+        if (open > 0) {
+          const my = top + W * 0.72, mw = W * 0.34, mh = 5 * k * open;
+          for (let m = 0; m < 5; m++) { const x = cx - mw + m * mw * 0.5; poly([[x - 1.2, my], [x + 1.2, my], [x, my + 2.4 * k]], "#efe6d4", a); poly([[x + mw * 0.25 - 1, my + mh], [x + mw * 0.25 + 1, my + mh], [x + mw * 0.25, my + mh - 2 * k]], "#d8ccb8", a * open); }
+        }
+        // two long hands reach round the foe
+        for (const s of [-1, 1]) {
+          const reach = seg(u, ti - 0.15, ti + 0.15), sx = cx + s * W * 0.9, sy = top + W * 1.3, tx = q.x + s * 9 * k, ty = q.y - hgt(q) * 0.45;
+          if (reach > 0) for (let m = 0; m < 3; m++) line(sx, sy + m, lerp(sx, tx, reach), lerp(sy, ty, reach) + m - 1, m === 1 ? pal[1] : "#120a12", a * 0.9);
+          if (reach >= 1) for (let m = 0; m < 3; m++) { line(tx, ty, tx - s * (2 + m), ty + 3 + m, "#120a12", a); Pa(tx - s * (2 + m), ty + 3 + m, glowC2(X), a); }
+        }
+        for (let j = 0; j < 6; j++) { const ph = (u * 0.9 + j / 6) % 1; part("wisp", cx + hr(X.seed, j, 1, -1, 1) * W, top + W * 0.4 - ph * 16, k, -Math.PI / 2, ph, X.S, j, u); }
+        if (tt > 0 && tt < 0.7) for (let j = 0; j < 2; j++) drip(head(q).x + (j ? 5 : -5), head(q).y + 2 + tt * 10, 2, ["#5a8ab0", "#7aa8d0", "#a8d0f0", "#d8f0ff", "#ffffff"], 1 - tt / 0.7);
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { const q = seg(u, 0.05, X.T.windup + 0.3); o.tint = X.pal[1]; o.tintAmt = 0.3 * Math.sin(q * Math.PI); o.sy = 1 + 0.05 * Math.sin(q * Math.PI); return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0 || X.P.miss) return;
+      const held = 1 - seg(u, X.T.dur - 0.4, X.T.dur);
+      o.sy = 1 - 0.07 * held; o.sx = 1 + 0.03 * held; o.dx = (Math.sin(u * 70) * 0.8 + tdir(X, i) * -2.5) * held; if (tt < 0.05) o.white = 0.7;
+    },
+    marks: () => [],
+  });
+
+  // panes of glass stand round each foe and flash; every one shows the wrong reflection, then they shatter
+  extend("curse", "mirrors", {
+    time: (X) => ({ windup: 0.3, impacts: X.tos.map((q, i) => 0.58 + i * 0.05), dur: 1.5 + X.tos.length * 0.05 }),
+    draw(X, u, layer) {
+      const k = X.k, pal = X.pal, end = X.T.dur;
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, grow = eOut(seg(u, ti - 0.3, ti)), crack = seg(u, end - 0.5, end - 0.2), h = hgt(q) * 1.1;
+        if (grow <= 0) return;
+        for (let m = 0; m < 4; m++) {
+          const ang = (m / 4) * TAU + 0.4 + i, x = q.x + Math.cos(ang) * 13 * k, back = Math.sin(ang) < 0;
+          if ((layer === "floor") !== back) continue;
+          const y = q.y + Math.sin(ang) * 4 * k, H = h * 0.9 * grow, w = 3.5 * k;
+          if (crack <= 0) {
+            const GLASS = ["#5a7a90", "#9ab8cc", "#c8dce8", "#e8f4fa"];
+            for (let yy = 0; yy < H; yy++) for (let xx = -w; xx <= w; xx++) {
+              const frame = Math.abs(xx) >= w - 0.5 || yy >= H - 1 || yy === 0, sweep = Math.abs(((yy - xx * 2) / H) - ((u * 1.4 + m * 0.35) % 1.6)) < 0.07;
+              const ghost = Math.abs(xx) < w * 0.5 && yy > H * 0.25 && yy < H * 0.8;
+              const col = frame ? (xx < 0 || yy >= H - 1 ? "#e0b450" : "#8a6424") : sweep ? "#ffffff" : ghost ? (m % 2 ? pal[1] : GLASS[0]) : xx < 0 ? GLASS[3] : GLASS[2];
+              Pa(x + xx, y - yy, col, frame ? 1 : 0.85);
+            }
+            Pa(x - w + 1, y - H + 2, prism(X, m, u), 1);
+          } else for (let j = 0; j < 6; j++) { const life = crack, ox = hr(X.seed, j + m * 7, 1, -1, 1) * 14 * life, oy = -H * hr(X.seed, j + m * 7, 2, 0.1, 0.9) + life * life * 30; part("facet", x + ox, y + oy, 1.1, 0, life, X.S, j + m, u); }
+        }
+        if (layer === "fx" && tt > 0 && tt < 0.3) { star(q.x, q.y - h * 0.6, 7 * k * (1 - tt / 0.3), GLAM, 1 - tt / 0.3); }
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { if (u < X.T.windup + 0.1) { o.dy = -1.2; o.tint = X.pal[3]; o.tintAmt = 0.2; } return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0 || X.P.miss) return;
+      const held = 1 - seg(u, X.T.dur - 0.5, X.T.dur);
+      o.dx = (fl(tt * 5) % 2 ? 1.5 : -1.5) * held; o.tint = X.pal[3]; o.tintAmt = 0.25 * held; if (tt < 0.08) o.white = 0.8;
+    },
+    marks: () => [],
+  });
+
+  // a loop lies hidden on the ground round the feet, then jerks tight round the ankles
+  extend("curse", "snare", {
+    time: (X) => ({ windup: 0.25, impacts: X.tos.map((q, i) => 0.55 + i * 0.06), dur: 1.3 + X.tos.length * 0.06 }),
+    draw(X, u, layer) {
+      const k = X.k, wild = X.S.id === "wild", R = wild ? X.pal : ROPE, end = X.T.dur, fade = 1 - seg(u, end - 0.3, end);
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, show = seg(u, ti - 0.35, ti - 0.2);
+        if (show <= 0) return;
+        const r = (tt < 0 ? 12 : lerp(12, 4, eOut(Math.min(1, tt / 0.1)))) * k, lift = tt > 0 ? Math.min(1, tt / 0.1) * 2 : 0;
+        if (layer === "floor") {
+          if (tt < 0.05) for (let m = 0; m < 48; m++) { const th = m / 48 * TAU, x = q.x + Math.cos(th) * r, y = q.y + Math.sin(th) * r * FLAT; Pa(x, y + 1, R[0], show * fade); Pa(x, y, m % 4 === 0 ? R[3] : R[2], show * fade); }
+          // the line runs off to a stake at the edge
+          const sx = q.x - tdir(X, i) * 22 * k;
+          line(sx, q.y + 3, q.x - tdir(X, i) * r, q.y + 2 - lift, R[0], show * fade); line(sx, q.y + 2, q.x - tdir(X, i) * r, q.y + 1 - lift, R[2], show * fade); Rt(sx - 1, q.y - 3, 2, 5, LOG[1]); P(sx - 1, q.y - 3, LOG[3]);
+          return;
+        }
+        if (tt < 0) return;
+        for (let b = 0; b < 2; b++) {
+          const y = q.y - 2 - b * 3 - lift, rr = r * (1 - b * 0.1);
+          for (let m = 0; m < 22; m++) { const th = m / 21 * Math.PI, x = q.x + Math.cos(th) * rr, yy = y + Math.sin(th) * rr * 0.32; Pa(x, yy + 1, R[0], fade); Pa(x, yy, m % 3 === 0 ? R[3] : R[2], fade); if (wild && m % 5 === 2) thorn(x, yy, -Math.PI / 2, X.pal, fade); }
+        }
+        if (tt < 0.25) for (let m = 0; m < 5; m++) { const a = m / 5 * Math.PI + Math.PI; part("dust", q.x + Math.cos(a) * 9 * k, q.y + 1, k, 0, tt / 0.25, X.S, m); }
+        if (tt < 0.1) star(q.x, q.y - 4, 5 * k, wild ? X.pal : ROPE, 1 - tt / 0.1);
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { if (u > X.T.windup && u < X.T.windup + 0.35) o.dx = -X.dir * 2 * Math.sin(seg(u, X.T.windup, X.T.windup + 0.35) * Math.PI) * SCALE; return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0 || X.P.miss) return;
+      if (tt < 0.12) { o.dy = -2 * Math.sin(tt / 0.12 * Math.PI); o.sy = 0.94; o.white = tt < 0.04 ? 0.7 : 0; }
+      else if (u < X.T.dur - 0.25) { o.sx = 0.95; o.dx = Math.sin(u * 30) * 0.6; }
+    },
+    marks(X) { return X.P.miss ? [] : X.tos.map((q, i) => ({ kind: X.S.id === "wild" ? "vines" : "scuff", x: q.x, y: q.y + 1, at: X.T.impacts[i], opts: { size: 0.6, seed: X.seed + i, school: X.S.id } })); },
+  });
+
+  // a steel trap is tossed under the foe and its jaws snap shut on the shins
+  function jaws(x, y, close, a, k) {
+    const rx = lerp(11, 7.5, close) * k, ry = lerp(3, 7, close) * k, cy = y - lerp(0, 6.5, close) * k;
+    for (let m = 0; m < 72; m++) {
+      const th = m / 72 * TAU, c = Math.cos(th), sn = Math.sin(th), px = x + c * rx, py = cy + sn * ry;
+      Pa(px + c, py + sn, IRON[0], a); Pa(px, py, sn < 0 ? IRON[3] : IRON[1], a); Pa(px - c, py - sn, IRON[2], a);
+    }
+    for (let m = 0; m < 14; m++) {
+      const th = m / 14 * TAU + (close > 0.5 ? 0.22 : 0), c = Math.cos(th), sn = Math.sin(th), bx = x + c * (rx - 1.5), by = cy + sn * (ry - 1.5), L = 2.6 * k;
+      line(bx, by, bx - c * L, by - sn * L * (ry / rx), IRON[4], a); Pa(bx - c * L, by - sn * L * (ry / rx), "#ffffff", a);
+    }
+    for (const s of [-1, 1]) { Rt(x + s * (rx + 1) - 1, cy - 1, 3, 3, IRON[1]); P(x + s * (rx + 1) - 1, cy - 1, IRON[3]); }
+  }
+  extend("smash", "jaws", {
+    time: (X) => ({ windup: 0.2, impacts: X.tos.map((q, i) => 0.5 + i * 0.05), dur: 1.2 + X.tos.length * 0.05 }),
+    draw(X, u, layer) {
+      const k = X.k, end = X.T.dur, fade = 1 - seg(u, end - 0.3, end);
+      X.tos.forEach((q, i) => {
+        const ti = X.T.impacts[i], tt = u - ti, land = ti - 0.14;
+        if (u < land) {
+          if (u > X.T.windup) { const v = seg(u, X.T.windup, land), [x, y] = lob(X.src.x, X.src.y, q.x, q.y - 2, 22 * k, v); for (let m = -2; m <= 2; m++) Pa(x + m, y, IRON[m === -2 ? 3 : 2], 1); Pa(x, y - 1, IRON[4], 1); Pa(x - 2, y + 1, IRON[1], 1); Pa(x + 2, y + 1, IRON[1], 1); }
+          return;
+        }
+        const close = tt < 0 ? 0 : eOut(Math.min(1, tt / 0.06));
+        if (layer === "floor") { if (tt < 0) jaws(q.x, q.y + 1, 0, 1, k); gdisc(q.x, q.y + 1, 9 * k, IRON[0], 0.3 * fade); return; }
+        if (tt >= 0) jaws(q.x, q.y + 1, close, fade, k);
+        if (tt >= 0 && !X.P.miss) burst(X, q.x, q.y - 6 * k, tt, tdir(X, i), 0.9, "spark");
+      });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { recoil(X, u, o, 2); return; }
+      const tt = u - X.T.impacts[i];
+      if (tt < 0) return;
+      struck(X, u, i, o, 2);
+      if (tt < 0.12) { o.dy = -2.5 * Math.sin(tt / 0.12 * Math.PI); o.sy = 1.04; }
+      else if (u < X.T.dur - 0.3) o.dx = (o.dx || 0) + Math.sin(u * 40) * 0.5;
+    },
+    marks(X) { return X.P.miss ? [] : X.tos.map((q, i) => ({ kind: "gouge", x: q.x, y: q.y + 1, at: X.T.impacts[i], opts: { size: 0.5, seed: X.seed + i } })); },
+  });
+
+  // a log comes down on the foes from a cut rope above
+  extend("smash", "deadfall", {
+    time: (X) => ({ windup: 0.3, impacts: X.tos.map(() => 0.66), dur: 1.4 }),
+    draw(X, u, layer) {
+      const k = X.k, imp = X.T.impacts[0], xs = X.tos.map((q) => q.x), L = Math.max(...xs) - Math.min(...xs) + 26 * k, cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+      const gy = X.tos.reduce((m, q) => m + q.y, 0) / X.tos.length, top = Math.min(...X.tos.map((q) => q.y - hgt(q))) - 6;
+      const fall = eIn(seg(u, imp - 0.25, imp)), tt = u - imp, bounce = tt > 0 ? Math.abs(Math.sin(Math.min(1, tt / 0.3) * Math.PI)) * 5 * (1 - seg(tt, 0, 0.3)) : 0;
+      const ly = lerp(-12, tt > 0 ? gy - 5 * k - bounce : top + 4, tt > 0 ? 1 : fall), fade = 1 - seg(u, X.T.dur - 0.3, X.T.dur);
+      if (layer === "floor") {
+        if (u < imp) gdisc(cx, gy, (L / 2) * (0.4 + 0.6 * fall), "rgba(20,14,10,0.5)", 0.6 * fall);
+        if (tt > 0 && tt < 0.5) for (let j = 0; j < 10; j++) part("dust", cx + hr(X.seed, j, 1, -0.5, 0.5) * L, gy - 1, 1.6 * k, 0, tt / 0.5, X.S, j);
+        return;
+      }
+      if (u < imp - 0.25) {
+        // the rope creaks, then snaps
+        const sx = cx + L * 0.3, a = seg(u, X.T.windup - 0.1, X.T.windup + 0.1);
+        line(sx, -2, sx, 14, ROPE[2], a); if (u > imp - 0.32) { Pa(sx, 14, ROPE[4], 1); star(sx, 15, 3, ROPE, 1); }
+        return;
+      }
+      const R = 3.5 * k;
+      for (let x = cx - L / 2; x <= cx + L / 2; x++) for (let dy = -R; dy <= R; dy++) {
+        const v = dy / R, col = v < -0.55 ? LOG[3] : v < 0.1 ? LOG[2] : v < 0.7 ? LOG[1] : LOG[0];
+        Pa(x, ly + dy, (fl(x) * 3 + fl(dy)) % 11 === 0 ? LOG[1] : col, fade);
+      }
+      for (const ex of [cx - L / 2, cx + L / 2]) { for (let dy = -R; dy <= R; dy++) Pa(ex, ly + dy, LOG[4], fade); Pa(ex, ly, LOG[1], fade); }
+      if (tt > 0) X.tos.forEach((q, i) => { if (!X.P.miss) burst(X, q.x, gy - 8 * k, tt, tdir(X, i), 1.1, "spark"); });
+    },
+    pose(X, role, u, i, o) {
+      if (role === "actor") { if (u > X.T.windup - 0.1 && u < X.T.windup + 0.2) o.dx = -X.dir * 1.5; return; }
+      struck(X, u, i, o, 3);
+      const tt = u - X.T.impacts[i];
+      if (tt > 0 && tt < 0.2) { o.sy = 0.88 + 0.12 * (tt / 0.2); o.sx = 1.08 - 0.08 * (tt / 0.2); }
+    },
+    marks(X) { return X.P.miss ? [] : X.tos.map((q, i) => ({ kind: "crack", x: q.x, y: q.y + 1, at: X.T.impacts[i], opts: { size: 0.8, seed: X.seed + i } })); },
+  });
+
+  for (const f in EXT) {
+    const F = FAM[f], base = { time: F.time, draw: F.draw, pose: F.pose, marks: F.marks };
+    F.time = function (X) { const e = EXT[f][X.shape]; return e ? e.time.call(e, X) : base.time.call(this, X); };
+    F.draw = function (X, u, layer) { const e = EXT[f][X.shape]; return e ? e.draw.call(e, X, u, layer) : base.draw.call(this, X, u, layer); };
+    F.pose = function (X, role, u, i, o) { const e = EXT[f][X.shape]; return e ? e.pose.call(e, X, role, u, i, o) : base.pose.call(this, X, role, u, i, o); };
+    F.marks = function (X) { const e = EXT[f][X.shape]; return e ? e.marks.call(e, X) : base.marks ? base.marks.call(this, X) : []; };
+  }
   for (const f in FAM) FAM[f].id = f;
 
   // ---------- the 3x5 pixel font ----------
@@ -2436,6 +2821,8 @@
       craft: { cast: (t, p, v) => { for (let i = 0; i < 6; i++) { noise(t + i * 0.038, 0.02, 0.18 * v, "bandpass", 3200 * p, 4); tone(t + i * 0.038, 900 * p, 700 * p, 0.03, 0.06 * v, "square"); } }, hit: (t, p, v) => { ring(t, 310 * p, 0.6, 0.12 * v); ring(t, 467 * p, 0.4, 0.07 * v); B.thud(t, p, v * 0.8); } },
       poison: { cast: (t, p, v) => { for (let i = 0; i < 6; i++) { const at = t + i * 0.055 + R() * 0.02, f = (300 + R() * 300) * p; tone(at, f, f * 2.4, 0.07, 0.09 * v); } }, hit: (t, p, v) => { noise(t, 0.28, 0.4 * v, "lowpass", 1000, 1, 180); tone(t, 180, 70, 0.18, 0.25 * v); for (let i = 0; i < 4; i++) { const f = (400 + R() * 400) * p; tone(t + 0.08 + i * 0.06, f, f * 2, 0.06, 0.06 * v); } } },
       water: { cast: (t, p, v) => noise(t, 0.35, 0.22 * v, "lowpass", 400 * p, 1, 1200 * p, 0.15), hit: (t, p, v) => { noise(t, 0.3, 0.4 * v, "bandpass", 1500 * p, 0.8, 500); for (let i = 0; i < 5; i++) { const f = (900 + R() * 900) * p; tone(t + 0.05 + R() * 0.2, f, f * 1.6, 0.05, 0.05 * v); } } },
+      illusion: { cast: (t, p, v) => { [1568, 1319, 1175, 988].forEach((f, i) => { tone(t + i * 0.05, f * p, f * p * 1.01, 0.38, 0.07 * v, "sine", 0.01); tone(t + i * 0.05, f * p * 1.007, f * p, 0.38, 0.05 * v, "triangle", 0.01); }); noise(t, 0.4, 0.08 * v, "highpass", 5200, 0, 0, 0.32); },
+        hit: (t, p, v) => { for (let i = 0; i < 6; i++) tone(t + R() * 0.06, (2400 + R() * 1800) * p, 0, 0.26, 0.04 * v); bell(t, 1320 * p, 0.7, 0.05 * v); tone(t, 120, 60, 0.15, 0.3 * v); } },
       bone: { cast: (t, p, v) => { for (let i = 0; i < 6; i++) { const f = (700 + R() * 600) * p; tone(t + i * 0.045, f, f * 0.7, 0.04, 0.15 * v, "triangle"); noise(t + i * 0.045, 0.02, 0.15 * v, "bandpass", 2600, 3); } }, hit: (t, p, v) => { noise(t, 0.05, 0.5 * v, "bandpass", 2200, 2); tone(t, 180 * p, 80, 0.12, 0.35 * v); for (let i = 0; i < 4; i++) tone(t + 0.04 + i * 0.04, (800 + R() * 500) * p, 500, 0.04, 0.1 * v, "triangle"); } },
     };
     // families shape the cast; the school colours it
@@ -2454,16 +2841,37 @@
       guard: { cast: (t, P, T, p, v) => { if (P.shape === "parry") return; if (P.shape === "wall") noise(t + 0.1, 0.3, 0.35 * v, "lowpass", 200, 1, 900, 0.2); else noise(t + 0.08, 0.2, 0.08 * v, "highpass", 5000, 0, 0, 0.1); T.cast(t + 0.05, p, v * 0.5); }, hit: (t, P, T, p, v) => { if (P.shape === "parry") { ring(t, 1250 * p, 0.6, 0.12 * v); noise(t, 0.05, 0.5 * v, "highpass", 3000); } else if (P.shape === "wall") TIM[T.id === "ice" ? "ice" : "clang"].hit(t, p * 0.8, v * 0.5); else { ring(t, 880 * p, 0.6, 0.07 * v); tone(t, 140, 80, 0.12, 0.3 * v); } } },
     };
     for (const id in TIM) TIM[id].id = id;
+    // the rework's shapes carry their own sound; the school still colours it
+    const SHAPESND = {
+      decoy: { cast: (t, P, T, p, v) => { TIM.illusion.cast(t + 0.15, p, v); noise(t + 0.3, 0.25, 0.12 * v, "bandpass", 3000 * p, 2, 6000 * p, 0.04); } },
+      anthem: { cast: (t, P, T, p, v) => { [0, 2, 4, 7, 4, 9].forEach((n, i) => B.pluck(t + 0.1 + i * 0.06, 330 * p * (n > 7 ? 2 * NOTES[n - 8] : NOTES[n % 8]), v)); if (T.id !== "song") T.cast(t, p, v * 0.4); },
+        hit: (t, P, T, p, v) => { [0, 4, 7].forEach((n, i) => tone(t + i * 0.02, 392 * p * NOTES[n % 8] * (n > 6 ? 1 : 1), 0, 0.5, 0.09 * v, "triangle", 0.01)); } },
+      strings: { cast: (t, P, T, p, v) => { for (let i = 0; i < 3; i++) B.pluck(t + 0.25 + i * 0.1, (196 + i * 37) * p, v * 0.8, 0.5); T.cast(t, p, v * 0.4); },
+        hit: (t, P, T, p, v) => { B.pluck(t, 147 * p, v, 0.7); B.pluck(t + 0.12, 165 * p, v * 0.6, 0.6); } },
+      swirl: { cast: (t, P, T, p, v) => { T.cast(t, p, v * 0.6); wob(t + 0.2, 300 * p, 600 * p, 0.35, 0.06 * v, "sine", 9, 0.8, 3000); },
+        hit: (t, P, T, p, v) => { wob(t, 700 * p, 250 * p, 0.5, 0.08 * v, "triangle", 12, 0.7, 3000); tone(t, 110, 60, 0.12, 0.25 * v); } },
+      phantasm: { cast: (t, P, T, p, v) => { noise(t, 0.6, 0.25 * v, "lowpass", 120, 1, 700, 0.5); wob(t + 0.25, 70 * p, 46 * p, 0.6, 0.2 * v, "sawtooth", 7, 0.6, 500); },
+        hit: (t, P, T, p, v) => { tone(t, 58 * p, 30, 0.7, 0.55 * v); noise(t, 0.4, 0.2 * v, "bandpass", 700, 1.5, 300); T.hit(t, p * 0.8, v * 0.4); } },
+      mirrors: { cast: (t, P, T, p, v) => { for (let i = 0; i < 5; i++) tone(t + 0.2 + i * 0.05, (1800 + i * 260) * p, 0, 0.3, 0.05 * v); T.cast(t, p, v * 0.4); },
+        hit: (t, P, T, p, v) => { ring(t, 2200 * p, 0.5, 0.06 * v); noise(t, 0.08, 0.3 * v, "highpass", 4000); } },
+      snare: { cast: (t, P, T, p, v) => { noise(t + 0.3, 0.2, 0.25 * v, "bandpass", 900 * p, 2, 3200 * p, 0.15); },
+        hit: (t, P, T, p, v) => { noise(t, 0.05, 0.4 * v, "bandpass", 1600, 2); tone(t, 160 * p, 80, 0.12, 0.35 * v); if (T.id === "wild") TIM.wild.hit(t, p, v * 0.4); } },
+      jaws: { cast: (t, P, T, p, v) => { B.whoosh(t + 0.2, p * 0.9, v * 0.6, 0.2); },
+        hit: (t, P, T, p, v) => { ring(t, 760 * p, 0.5, 0.11 * v); noise(t, 0.05, 0.5 * v, "highpass", 2500); tone(t, 140, 70, 0.15, 0.4 * v); for (let i = 0; i < 3; i++) B.clink(t + 0.06 + i * 0.05, (1500 + R() * 400) * p, v * 0.4); } },
+      deadfall: { cast: (t, P, T, p, v) => { for (let i = 0; i < 3; i++) tone(t + 0.15 + i * 0.07, 220 * p, 180 * p, 0.08, 0.08 * v, "sawtooth", 0.01, 900); noise(t + 0.38, 0.05, 0.3 * v, "highpass", 3000); },
+        hit: (t, P, T, p, v) => { B.heavy(t, p * 0.9, v); noise(t, 0.1, 0.3 * v, "bandpass", 500, 2); tone(t + 0.15, 90, 50, 0.2, 0.25 * v); } },
+    };
     const PITCH = [1, 0.84, 1.19, 0.71];
     const IMPACT_AT = { slash: 0.3, thrust: 0.3, smash: 0.45, arrow: 0.4, bolt: 0.55, beam: 0.4, nova: 0.48, heal: 0.45, buff: 0.35, summon: 0.8, curse: 0.47, guard: 0.26 };
     function fam(f, p, phase, at) {
       const P = params(p), S = school(P), T = TIM[S.snd] || TIM.thud, pitch = PITCH[P.sound] * (0.97 + R() * 0.06), F = FAMSND[f] || {}, v = 1;
       const Q = { shape: (FAM[f] && FAM[f].shapes.includes(P.shape)) ? P.shape : FAM[f] ? FAM[f].shapes[0] : null, count: P.count };
-      if (phase !== "impact") { if (F.cast) F.cast(at, Q, T, pitch, v); else T.cast(at, pitch, v); }
+      const SS = SHAPESND[Q.shape];
+      if (phase !== "impact") { if (SS && SS.cast) SS.cast(at, Q, T, pitch, v); else if (F.cast) F.cast(at, Q, T, pitch, v); else T.cast(at, pitch, v); }
       if (phase !== "cast") {
         const ht = phase === "impact" ? at : at + (IMPACT_AT[f] || 0.4) / P.speed;
         if (P.miss && f !== "heal" && f !== "buff" && f !== "summon" && f !== "guard") STING.miss(ht, 1, 1);
-        else if (F.hit) F.hit(ht, Q, T, pitch, v); else T.hit(ht, pitch, v);
+        else if (SS && SS.hit) SS.hit(ht, Q, T, pitch, v); else if (F.hit) F.hit(ht, Q, T, pitch, v); else T.hit(ht, pitch, v);
         if (P.crit) STING.crit(ht + 0.01, 1, 0.8);
       }
     }

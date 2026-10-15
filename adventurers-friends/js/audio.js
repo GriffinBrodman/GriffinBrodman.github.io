@@ -1,5 +1,5 @@
 /* Sound, all synthesised with WebAudio (no files): page ambience, UI and fight effects, the talking text's voices and animal
-   calls, and the bard, who sings the league's songs in a K.K.-style syllable voice over a plucked lute. */
+   calls, and the shared context and Music bus that music.js plays every song on (the event ballads included). */
 (function () {
   "use strict";
   // every level and switch lives in Settings (settings.js); these defaults only cover a page that loads audio.js alone
@@ -102,27 +102,6 @@
     o.connect(g); g.connect(dest || bus.music); o.start(t); o.stop(t + 0.32);
     noise(t, 0.08, vol * 0.4, "lowpass", 1800, dest || bus.music);
   }
-  // the bard's voice: a buzzy source through two vowel formants, with a little chirp up into each note
-  const VOWELS = { a: [800, 1200], e: [450, 1950], i: [320, 2300], o: [520, 900], u: [360, 800], y: [320, 2300] };
-  function sing(syl, midi, t, dur, vol, dest) {
-    const v = (syl.toLowerCase().match(/[aeiouy]/) || ["a"])[0], [f1, f2] = VOWELS[v];
-    const o = ctx.createOscillator(), g = ctx.createGain(), b1 = ctx.createBiquadFilter(), b2 = ctx.createBiquadFilter(), mix = ctx.createGain();
-    o.type = "sawtooth";
-    o.frequency.setValueAtTime(mtof(midi - 1.2), t);
-    o.frequency.exponentialRampToValueAtTime(mtof(midi), t + 0.04);
-    b1.type = "bandpass"; b1.frequency.value = f1; b1.Q.value = 7;
-    b2.type = "bandpass"; b2.frequency.value = f2; b2.Q.value = 9;
-    mix.gain.value = 1;
-    const len = Math.max(0.09, dur * 0.85);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.018);
-    g.gain.setValueAtTime(vol * 0.8, t + len * 0.7);
-    g.gain.linearRampToValueAtTime(0.0001, t + len);
-    o.connect(b1); o.connect(b2); b1.connect(mix); b2.connect(mix); mix.connect(g); g.connect(dest || bus.music);
-    o.start(t); o.stop(t + len + 0.02);
-    if (/^[^aeiouy]/i.test(syl)) noise(t, 0.03, vol * 0.25, "highpass", 3000, dest || bus.music);
-  }
-
   // ---------- effects ----------
   const SFX = {
     click: () => { const t = now(); noise(t, 0.04, 0.35, "bandpass", 1900, bus.sfx, 4); },
@@ -327,64 +306,6 @@
     if (started) ambience(scenery || page);
   }
 
-  // ---------- the bard ----------
-  const MODES = { glory: { scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 7, 9, 5], bpm: 112, root: 60 }, sad: { scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 8, 3, 10], bpm: 76, root: 57 },
-    shame: { scale: [0, 2, 4, 5, 7, 9, 10], prog: [0, 10, 5, 0], bpm: 132, root: 62 } };
-  function syllables(line) {
-    const out = [];
-    for (const w of line.split(/\s+/).filter(Boolean)) {
-      const parts = w.match(/[^aeiouy]*[aeiouy]+(?:[^aeiouy]*$|[^aeiouy](?=[^aeiouy]))?/gi);
-      (parts && parts.join("").length === w.length ? parts : [w]).forEach((p, i, arr) => out.push(i === arr.length - 1 ? p + " " : p));
-    }
-    return out;
-  }
-  function rngFrom(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
-  // returns a schedule: [{t, syl, line, idx}] and plays it; onSyl(lineIdx, sylIdx) drives the karaoke highlight
-  let perf = null;
-  function playSong(song, onSyl, onEnd) {
-    if (!init()) return null;
-    stopSong();
-    if (ctx.state === "suspended") ctx.resume();
-    const mode = MODES[song.mood] || MODES.glory, r = rngFrom(song.seed || 7), beat = 60 / mode.bpm, t0 = now() + 0.3;
-    const motif = {}, timers = [], out = ctx.createGain();
-    out.connect(bus.music);
-    duck(true);
-    let t = t0, deg = 2;
-    const chordAt = (i) => mode.prog[i % mode.prog.length];
-    song.lyrics.forEach((line, li) => {
-      const syls = syllables(line), chorus = line === song.title;
-      if (chorus && !motif.notes) motif.notes = syls.map(() => (deg = Math.max(0, Math.min(9, deg + [-1, 1, 1, 2, -2, 0][Math.floor(r() * 6)]))));
-      const notes = chorus && motif.notes ? motif.notes : syls.map((_, i) => (i === syls.length - 1 ? [0, 2, 4][Math.floor(r() * 3)] : (deg = Math.max(0, Math.min(9, deg + [-1, 1, -1, 2, -2, 1, 0][Math.floor(r() * 7)])))));
-      const stepLen = beat * (song.mood === "sad" ? 1 : 0.5);
-      syls.forEach((syl, si) => {
-        const d = notes[si] % 7, oct = Math.floor(notes[si] / 7) * 12, midi = mode.root + mode.scale[d] + oct;
-        const len = si === syls.length - 1 ? stepLen * 2 : stepLen;
-        sing(syl, midi, t, len, 0.32, out);
-        const at = t;
-        timers.push(setTimeout(() => onSyl && onSyl(li, si), Math.max(0, (at - now()) * 1000)));
-        t += len;
-      });
-      t += beat;
-    });
-    const end = t + beat * 2;
-    for (let bt = t0, i = 0; bt < end; bt += beat, i++) {
-      const ch = chordAt(Math.floor(i / 4)), base = mode.root - 12 + ch;
-      if (i % 4 === 0) pluck(base - 12, bt, 0.5, out);
-      pluck(base + [0, 4, 7, 12][i % 4] + (mode.scale[2] === 3 && i % 4 === 1 ? -1 : 0), bt + (song.mood === "shame" ? beat * 0.5 : 0), 0.22, out);
-      if (song.mood !== "sad" && i % 2 === 1) noise(bt, 0.05, 0.08, "highpass", 6000, out);
-    }
-    timers.push(setTimeout(() => { perf = null; duck(false); onEnd && onEnd(); }, (end - now()) * 1000 + 300));
-    perf = { timers, end, out };
-    return perf;
-  }
-  function stopSong() {
-    if (!perf) return;
-    perf.timers.forEach(clearTimeout);
-    perf.out.disconnect();
-    perf = null;
-    duck(false);
-  }
-
   // ---------- talking: one short blip per syllable in a speaker's own voice, Animal Crossing style ----------
   // v: { pitch (midi), timbre: "soft" | "buzzy" | "chirpy", formant, vib }; o: { at, semi, len, vol, bend, vowel, cons, whisper }
   const FORMANT = { a: [760, 1180], e: [480, 1850], i: [330, 2250], o: [520, 880], u: [380, 820], y: [330, 2150] };
@@ -531,5 +452,10 @@
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
 
-  window.Sound = { sfx, setPage, scene, playSong, stopSong, syllables, townAmbience, blip, critter, get on() { return prefs.on; }, get talking() { return voiceOn(); } };
+  // music.js plays on this context: the Music bus, the shared ducking, and whether a first click has unlocked sound
+  function engine() {
+    if (!init()) return null;
+    return { ctx, out: bus.music, noiseBuf, duck, get live() { return !!(started && prefs.on && ctx.state === "running"); } };
+  }
+  window.Sound = { sfx, setPage, scene, townAmbience, blip, critter, engine, get on() { return prefs.on; }, get talking() { return voiceOn(); } };
 })();

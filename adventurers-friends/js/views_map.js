@@ -79,6 +79,14 @@
       t.trainer ? el("li", null, el("b", null, "Trainer: "), `${t.trainer[0]}, at ${t.trainer[1]}`) : null,
       t.dish ? el("li", null, el("b", null, "To eat: "), t.dish) : null,
       t.game ? el("li", null, el("b", null, "Game of choice: "), `${t.game.name}, dealt by ${t.game.dealer}`) : null,
+      (L.tarot_readers || {})[id] ? (() => {
+        const r = L.tarot_readers[id], name = r.label === "seer" ? "a seer" : r.label === "fraud" ? "a fraud, say some" : null;
+        return el("li", null, el("b", null, "Fortune-teller: "), `${r.name}, ${r.title}`, name ? el("span", { class: r.label === "seer" ? "gold" : "dim" }, ` (${name}: ${r.hits} of ${r.checked} came true)`) : null,
+          r.also ? el("div", { class: "tiny" }, `${r.also.name}, ${r.also.title}, reads for ${r.also.for.map((c) => c + "s").join(", ").replace(/, ([^,]*)$/, " and $1")}.`) : null,
+          r.fair ? el("div", { class: "tiny gold" }, "The omen fair is on: readings at half price.") : null,
+          r.visitor ? el("div", { class: "tiny" }, `Visiting: ${r.visitor.name}, ${r.visitor.title}.`) : null,
+          r.rival ? el("div", { class: "tiny" }, `Across the square: ${r.rival.name}, ${r.rival.title}.`) : null);
+      })() : null,
       buys.length ? el("li", { class: "gold" }, el("b", null, "Pays well for: "), buys.join(", ")) : null,
       el("li", { class: "dim" }, el("b", null, "Odd jobs: "), t.jobs.join(", ").replace(/_/g, " ")),
     ].filter(Boolean);
@@ -94,7 +102,9 @@
   // one move a day, pinned under a white footprint; whoever answers the Society's letters is never named
   function yetiBoard(y) {
     const box = el("div", { class: "yeti-board" }, el("h4", null, "The Yeti Society's correspondence game"));
-    if (window.ChessReplay) { try { box.appendChild(ChessReplay.player(y)); } catch (e) { /* the words below still tell it */ } }
+    const spot = el("div");
+    box.appendChild(spot);
+    A.need(["chess_replay"]).then(() => spot.replaceWith(ChessReplay.player(y))).catch(() => { /* the words below still tell it */ });
     const us = y.players.find((x) => !x.yeti);
     const who = y.hero ? [A.heroLink(y.hero), " plays the Society's side by letter"] : ["The Society plays its own side"];
     const state = y.result ? (y.result === "draw" ? "The game was drawn." : y.players[y.winner].yeti ? "The footprint won." : `${us.name} beat the footprint${y.badge ? " and wears the Society's badge" : ""}.`)

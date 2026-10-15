@@ -1897,22 +1897,22 @@
       cap.textContent = `${rs.length > 1 && i >= 0 ? `Round ${i + 1} of ${rs.length}: ` : ""}${rec.name || "A hero"} ${what}. Click the scene to watch again.`;
       fig.appendChild(cap);
     }
-    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1;
+    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
     const evs = p.ev.slice().sort((a, b) => a[0] - b[0]);
     const paint = () => { const f = render(rec, t, opts); img.data.set(f.data); g.putImageData(img, 0, 0); };
-    const live = () => fig.isConnected && onscreen && !doc.hidden;
+    const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     function frame(ms) {
       raf = 0;
       if (!live()) { last = 0; return; }
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
-      t += dt;
+      t += dt * rate;
       while (fired < evs.length && evs[fired][0] <= t) { if (evs[fired][0] > t - 0.25) Snd.play(evs[fired][1], evs[fired][2]); fired++; }
       // the hold only needs the slow flicker of lamps and water, so it repaints a dozen times a second
       if (t < p.dur + 0.3 || t - lastDraw > 1 / 12) { paint(); lastDraw = t; }
       raf = root.requestAnimationFrame(frame);
     }
-    const wake = () => { if (!reduced() && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
+    const wake = () => { if ((forced || !reduced()) && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
     cv.addEventListener("click", () => { t = 0; fired = 0; lastDraw = -1; paint(); wake(); });
     if ("IntersectionObserver" in root) {
       const io = new root.IntersectionObserver((es) => {
@@ -1923,6 +1923,15 @@
       io.observe(fig);
     } else onscreen = true;
     doc.addEventListener("visibilitychange", wake);
+    // the page's shared control bar drives the player through this (replay.js); a press of Play also plays under reduced motion
+    fig.replay = {
+      get t() { return t; }, get dur() { return p.dur; }, get playing() { return !held && t < p.dur && (forced || !reduced()); },
+      play() { held = false; forced = true; wake(); },
+      pause() { held = true; },
+      restart() { held = false; forced = true; t = 0; fired = 0; lastDraw = -1; paint(); wake(); },
+      skip() { t = p.dur; fired = evs.length; lastDraw = -1; paint(); wake(); },
+      rate(s) { rate = s; },
+    };
     paint();
     wake();
     return fig;

@@ -1975,18 +1975,18 @@
     const g = cv.getContext("2d"), img = g.createImageData(W, H);
     let p = planFor(rec, { mode });
     if (!p) return fig;
-    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1;
+    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
     let evs = p.ev.slice().sort((a, b) => a[0] - b[0]);
     const label = () => { if (btn) btn.textContent = mode === "key" ? "▸ Watch the full game" : "▸ Back to the key moments"; };
     label();
     const paint = () => { const f = render(rec, t, { mode }); img.data.set(f.data); g.putImageData(img, 0, 0); };
-    const live = () => fig.isConnected && onscreen && !doc.hidden;
+    const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     function frame(ms) {
       raf = 0;
       if (!live()) { last = 0; return; }
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
-      t += dt;
+      t += dt * rate;
       while (fired < evs.length && evs[fired][0] <= t) {
         const e = evs[fired], late = t - e[0];
         if (late < 0.25) Snd.play(e[1], e[2], e[3]);
@@ -1996,8 +1996,8 @@
       if (t < p.dur + 0.3 || t - lastDraw > 1 / 12) { paint(); lastDraw = t; }
       raf = root.requestAnimationFrame(frame);
     }
-    const wake = () => { if (!reduced() && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
-    const restart = () => { t = reduced() ? p.dur + 1 : 0; fired = 0; lastDraw = -1; paint(); wake(); };
+    const wake = () => { if ((forced || !reduced()) && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
+    const restart = () => { held = false; t = reduced() && !forced ? p.dur + 1 : 0; fired = 0; lastDraw = -1; paint(); wake(); };
     cv.addEventListener("click", restart);
     if (btn) btn.addEventListener("click", () => { mode = mode === "key" ? "full" : "key"; p = planFor(rec, { mode }); evs = p.ev.slice().sort((a, b) => a[0] - b[0]); label(); restart(); });
     if ("IntersectionObserver" in root) {
@@ -2009,6 +2009,15 @@
       io.observe(fig);
     } else onscreen = true;
     doc.addEventListener("visibilitychange", wake);
+    // the page's shared control bar drives the player through this (replay.js); a press of Play also plays under reduced motion
+    fig.replay = {
+      get t() { return t; }, get dur() { return p.dur; }, get playing() { return !held && t < p.dur && (forced || !reduced()); },
+      play() { held = false; forced = true; wake(); },
+      pause() { held = true; },
+      restart() { forced = true; restart(); },
+      skip() { t = p.dur; fired = evs.length; lastDraw = -1; paint(); wake(); },
+      rate(s) { rate = s; },
+    };
     paint();
     wake();
     return fig;

@@ -295,9 +295,11 @@
     const figs = [];
     // depth is u + v, which is (y - OY) / 4 for anyone standing on the floor
     const add = (a, x, y, extra) => { const f = figure(a, x, y, extra); f.key = (y - OY) / 4; figs.push(f); return f; };
-    const bard = add(Tv.actor(BARD, 0, 0, { look: bardCls }), OX, OY + 12, { role: "bard", face: 1, ph: 0.1 });
-    bard.key = 4;
-    const about = (song.heroes || []).map((id) => H[id]).filter((h) => h && h.alive !== false).slice(0, 3);
+    // a crew's tavern set (music_replay.js) puts its own players on the stage in the bard's place
+    const bard = o.cast ? null : add(Tv.actor(BARD, 0, 0, { look: bardCls }), OX, OY + 12, { role: "bard", face: 1, ph: 0.1 });
+    if (bard) bard.key = 4;
+    for (const c of o.cast || []) { const f = add(c.a, c.x, c.y, { role: c.role || "band", face: c.face || 1, ph: c.ph || 0 }); f.key = c.key; f.id = c.id; f.extra = c.extra; c.f = f; }
+    const about = o.cast ? [] : (song.heroes || []).map((id) => H[id]).filter((h) => h && h.alive !== false).slice(0, 3);
     const SPOTS = [[OX - 26, OY + 42], [OX + 28, OY + 44], [OX - 52, OY + 50]];
     about.forEach((h, i) => {
       const a = Tv.actor(h, 0, 0, {});
@@ -306,10 +308,10 @@
       f.toBard = f.face;
       if (a.pet) { const [pu, pv] = uv(x + (f.face > 0 ? -12 : 12), y + 5); const p = Object.assign(a.pet, { u: pu, v: pv, face: f.face }); figs.push({ pet: p, key: pu + pv }); }
     });
-    const ghost = song.dirge && H[song.dirge] ? add(Tv.actor(H[song.dirge], 0, 0, {}), OX + 30, OY + 22, { role: "ghost", face: -1, ph: 0.6 }) : null;
+    const ghost = !o.cast && song.dirge && H[song.dirge] ? add(Tv.actor(H[song.dirge], 0, 0, {}), OX + 30, OY + 22, { role: "ghost", face: -1, ph: 0.6 }) : null;
     if (ghost) ghost.key = 4.5;
     const LOCALS = [[OX - 82, OY + 44, 1], [OX + 62, OY + 52, -1], [OX - 104, OY + 62, 1], [OX + 84, OY + 76, -1]].filter(([x]) => x > 8 && x < W - 8);
-    for (const [x, y, face] of LOCALS.slice(0, Math.max(3, 5 - about.length))) {
+    for (const [x, y, face] of LOCALS.slice(0, o.cast ? 4 : Math.max(3, 5 - about.length))) {
       const a = Tv.local(r, 0, 0);
       add(a, x, y, { role: "local", face, ph: r() });
     }
@@ -351,6 +353,7 @@
         p.dip = nod ? 1 : p.dip;
         p.face = frac(t / 11 + f.ph) < 0.12 ? -f.face : f.face;
       }
+      if (o.pose) o.pose(f, t, p, playing);
       return p;
     }
     function draw(ctx, t, still, playing) {
@@ -358,18 +361,20 @@
       const flick = 0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.08;
       Tv.flames(ctx, st, t, FIRE.v0, FIRE.v1, flick, 1, true);
       const list = things.map((th) => ({ key: th.key, draw: () => ctx.drawImage(th.cv, 0, 0) }));
-      for (const f of figs) list.push({ key: f.key, draw: () => (f.pet ? Tv.drawPet(ctx, st, f.pet, frac(t / 1.6 + 0.3) < 0.5 ? 0 : 1, t) : drawFig(ctx, f, pose(f, t, playing))) });
+      for (const f of figs) list.push({ key: f.key, draw: () => { if (f.pet) { Tv.drawPet(ctx, st, f.pet, frac(t / 1.6 + 0.3) < 0.5 ? 0 : 1, t); return; } const p = pose(f, t, playing); drawFig(ctx, f, p); if (f.extra) f.extra(ctx, t, p, f); } });
+      for (const th of o.things || []) list.push({ key: th.key, draw: () => th.draw(ctx, t) });
       list.sort((p, q) => p.key - q.key).forEach((d) => d.draw());
-      const bardFace = pose(bard, t, playing).face;
+      const bardFace = bard ? pose(bard, t, playing).face : 1;
       for (const [x, y] of candles) Tv.candle(ctx, R(x), R(y), t, flick, 3);
       const lights = [{ x: fireAt[0] + 14, y: fireAt[1] + 4, r: 84, k: 0.62 + flick * 0.35 }, { x: OX, y: OY + 4, r: 56, k: 0.55 + flick * 0.08 }];
       for (const [x, y] of candles) lights.push({ x, y: y - 5, r: 24, k: 0.45 + flick * 0.12 });
       for (const [lu, lv, drop] of [[6.2, 6.2, 70], [11.5, 6.5, 66]]) { Tv.lantern(ctx, st, lu, lv, flick, drop, true); const [x, y] = st.iso(lu, lv); lights.push({ x, y: y - drop + 10, r: 60, k: 0.5 + flick * 0.1 }); }
       { const [x, y] = st.rwall(5.5, 28); lights.push({ x, y: y + 10, r: 30, k: 0.5, cool: true }); }
       shine(ctx, t, lights, 0.42);
+      if (o.over) o.over(ctx, t);
       // the tune rising off the lute, a little faster while the song is on
       const per = playing ? 0.42 : 0.95, life = 2.6;
-      for (let k = Math.floor((t - life) / per); k <= Math.floor(t / per); k++) {
+      for (let k = Math.floor((t - life) / per); bard && k <= Math.floor(t / per); k++) {
         const age = t - k * per - h01(k, 3) * per * 0.5;
         if (age < 0 || age > life) continue;
         const g = notes[Math.floor(h01(k, 1) * 2)], s = age / life, side = h01(k, 2) < 0.5 ? -1 : 1;
@@ -386,7 +391,7 @@
         if (f.how === "shy") { const s = frac(t / 4.2 + f.ph); if (s < 0.25) ctx.drawImage(drop, R(f.x - 8 * f.toBard) - 2, R(top + 6 + s * 16)); }
       }
     }
-    return { bg, draw, strum: () => { strum = performance.now(); } };
+    return { bg, draw, strum: () => { strum = performance.now(); }, figs, st, OX, OY, look, W };
   }
 
   // the Songbook's stage: a live canvas W x H; .ballad.playing(on) speeds the bard up, .ballad.strum() on each sung syllable
@@ -421,5 +426,5 @@
     return scene(song, { W, H, event: e, fps: 12, sound: false });
   }
 
-  window.Ballad = { scene, vignette, reaction, LOOKS };
+  window.Ballad = { scene, vignette, reaction, LOOKS, build, FULL };
 })();
