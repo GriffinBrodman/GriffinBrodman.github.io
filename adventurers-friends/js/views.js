@@ -639,6 +639,8 @@
     v.appendChild(head);
     const cal = dayCalendar(h);
     if (cal) v.appendChild(el("section", { class: "panel daybook-panel" }, cal));
+    const tro = trophyShelf(h.trophies);
+    if (tro) v.appendChild(tro);
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
     if (night) v.appendChild(panel(null, night));
 
@@ -1164,6 +1166,14 @@
     return pn;
   }
   // the hero's day as a little almanac strip (web/js/daybook.js); the plain day box below still lists what it added up to
+  // one trophy per boss brought down; a hero's shelf also says which crew they did it with
+  function trophyShelf(list) {
+    if (!(list || []).length) return null;
+    return panel(`Trophies (${list.length})`, el("div", { class: "trophies" }, ...list.map((t) =>
+      el("div", { class: "trophy-card" }, el("span", { class: "trophy-icon", "aria-hidden": "true" }, "🏆"),
+        el("div", null, el("b", { class: "gold" }, t.boss), el("div", { class: "tiny dim" }, `${t.place} · ${A.when(t.day)}${t.with ? " · with " + t.with : t.with === null ? " · alone" : ""}`),
+          t.fight ? el("a", { class: "watch tiny", href: `#/fight/${t.fight}` }, "▸ watch the kill") : null)))));
+  }
   function dayCalendar(h) {
     if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
     const today = L.meta.day;
@@ -1303,10 +1313,8 @@
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
     v.appendChild(head);
     // every boss the crew brought down, one trophy each, with a link to watch the kill while the fight is still kept
-    if ((p.trophies || []).length) v.appendChild(panel(`Trophies (${p.trophies.length})`, el("div", { class: "trophies" }, ...p.trophies.map((t) =>
-      el("div", { class: "trophy-card" }, el("span", { class: "trophy-icon", "aria-hidden": "true" }, "🏆"),
-        el("div", null, el("b", { class: "gold" }, t.boss), el("div", { class: "tiny dim" }, `${t.place} · ${A.when(t.day)}`),
-          t.fight ? el("a", { class: "watch tiny", href: `#/fight/${t.fight}` }, "▸ watch the kill") : null))))));
+    const tro = trophyShelf(p.trophies);
+    if (tro) v.appendChild(tro);
     const mem = el("div", { class: "members" });
     for (const m of p.members) if (heroes[m]) mem.appendChild(el("a", { href: `#/hero/${m}` }, A.heroPortrait(heroes[m], 3), heroes[m].name,
       el("div", { class: "tiny gold" }, (p.roles || {})[m] || (m === p.leader ? "leader" : "")), el("div", { class: "tiny dim" }, `Lv ${heroes[m].level} ${heroes[m].title}`)));
