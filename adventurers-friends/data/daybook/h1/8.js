@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h1/8"]={"day":8,"label":"Day 8","title":"Season 1, day 8, hour by hour","blocks":[{"act":"road","label":"On the road","from":6.0,"to":18.0,"line":"Started in Saltmarrow, ended in the Salt Cliffs."}],"evening":{"kind":"camp","line":"Camped out in the Salt Cliffs"}};

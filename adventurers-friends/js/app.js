@@ -269,12 +269,14 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   // ---------- lazy data ----------
   const pending = {};
+  // the build's version (export.stamp_site), so a lazily loaded file matches the page that asked for it
+  const V = window.AL_V ? "?v=" + window.AL_V : "";
   function load(key) {
     if (LD[key]) return Promise.resolve(LD[key]);
     if (pending[key]) return pending[key];
     pending[key] = new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = `data/${key}.js`;
+      s.src = `data/${key}.js${V}`;
       s.onload = () => (LD[key] ? resolve(LD[key]) : reject(new Error("missing " + key)));
       s.onerror = () => reject(new Error("could not load " + key));
       document.head.appendChild(s);
@@ -284,9 +286,9 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // the heavy players (fights, meals, readings, music and night games) load with their first page, in order; a <script> tag works from file://
   const scripts = {};
   function need(names) {
-    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js"]`) ? Promise.resolve() : new Promise((resolve, reject) => {
+    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js${V}"]`) ? Promise.resolve() : new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = `js/${n}.js`;
+      s.src = `js/${n}.js${V}`;
       s.onload = resolve;
       s.onerror = () => { delete scripts[n]; reject(new Error("could not load " + n)); };
       document.head.appendChild(s);

@@ -38,7 +38,7 @@
   function load(deck) {
     if (!cache[deck]) {
       const have = window.TarotCardData && window.TarotCardData[deck];
-      cache[deck] = (have ? Promise.resolve() : script(`js/tarot/${deck}.js`))
+      cache[deck] = (have ? Promise.resolve() : script(`js/tarot/${deck}.js${window.AL_V ? "?v=" + window.AL_V : ""}`))
         .then(() => Promise.all(window.TarotCardData[deck].map(decode)))
         .then((imgs) => {
           const all = meta.order.concat(meta.extra || []), at = (i) => imgs[i].data;

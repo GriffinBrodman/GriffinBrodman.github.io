@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h18/14"]={"day":14,"label":"Day 14","title":"Season 1, day 14, hour by hour","blocks":[{"act":"hunt","label":"Hunting","from":6.0,"to":18.0,"line":"Spent the day in the Greenwood. Morgan handles a Wolf in the Greenwood. Loot: 1 pelt."}],"evening":{"kind":"camp","line":"Camped out in the Greenwood"}};

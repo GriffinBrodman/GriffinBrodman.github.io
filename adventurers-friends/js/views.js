@@ -1154,7 +1154,23 @@
   // the hero's day as a little almanac strip (web/js/daybook.js); the plain day box below still lists what it added up to
   function dayCalendar(h) {
     if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
-    try { return Daybook.render(h.daybook); } catch (e) { return null; }
+    const today = L.meta.day;
+    const kept = h.daybook_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).daybook_days || [];
+    const days = kept.filter((d) => d !== today).concat([today]).sort((a, b) => a - b);
+    const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginTop: "6px" } });
+    const draw = (d, db) => {
+      let out = null;
+      try { out = db ? Daybook.render(db) : null; } catch (e) { out = null; }
+      body.replaceChildren(out || el("p", { class: "small muted" }, `Nothing was written down for day ${d}.`));
+      const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
+      nav.replaceChildren(
+        prev != null ? el("button", { class: "btn small", onclick: () => go(prev) }, `‹ Day ${prev}`) : el("span"),
+        next != null ? el("button", { class: "btn small", onclick: () => go(next) }, next === today ? "Today ›" : `Day ${next} ›`) : el("span"));
+    };
+    // past days load on demand from their own small files (export.save_daybook)
+    const go = (d) => (d === today ? draw(d, h.daybook) : A.load(`daybook/${h.id}/${d}`).then((db) => draw(d, db), () => draw(d, null)));
+    draw(today, h.daybook);
+    return el("div", null, body, days.length > 1 ? nav : null);
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
