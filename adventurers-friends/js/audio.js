@@ -7,7 +7,7 @@
   const pref = (k) => (window.Settings ? Settings.get(k) : FALLBACK[k]);
   const prefs = { get on() { return pref("sound"); } };
 
-  let ctx = null, master, bus = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
+  let ctx = null, master, bus = {}, duckG = {}, noiseBuf = null, ambTimer = null, ambNodes = [], page = "", started = false, scenery = null;
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
   function init() {
@@ -20,6 +20,9 @@
     master = ctx.createGain();
     master.connect(comp); comp.connect(ctx.destination);
     for (const k of ["amb", "music", "sfx", "voice"]) { bus[k] = ctx.createGain(); bus[k].connect(master); }
+    // a song fades the outdoor ambience right out and lets a tavern's room murmur sit under it (bus.room is on the Ambience slider)
+    bus.room = ctx.createGain();
+    for (const k of ["amb", "room"]) { duckG[k] = ctx.createGain(); bus[k].disconnect(); bus[k].connect(duckG[k]); duckG[k].connect(master); }
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -30,6 +33,7 @@
     if (!ctx) return;
     master.gain.value = prefs.on ? pref("master") : 0;
     bus.amb.gain.value = pref("amb") * 0.5;
+    bus.room.gain.value = pref("amb") * 0.5;
     bus.music.gain.value = pref("music");
     bus.sfx.gain.value = pref("sfx") * 0.8;
     bus.voice.gain.value = pref("voices") ? pref("voice") : 0;
@@ -139,7 +143,7 @@
   // ---------- ambience per page ----------
   const PENTA = [0, 2, 4, 7, 9];
   function stopAmb() { clearInterval(ambTimer); ambTimer = null; for (const n of ambNodes) { try { n.stop(); } catch (e) { /* already stopped */ } } ambNodes = []; }
-  function bed(type, freq, vol, lfo) {
+  function bed(type, freq, vol, lfo, dest) {
     const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = noiseBuf; src.loop = true;
     f.type = type; f.frequency.value = freq; g.gain.value = vol;
@@ -148,12 +152,12 @@
       l.frequency.value = lfo; lg.gain.value = freq * 0.4;
       l.connect(lg); lg.connect(f.frequency); l.start(); ambNodes.push(l);
     }
-    src.connect(f); f.connect(g); g.connect(bus.amb); src.start(); ambNodes.push(src);
+    src.connect(f); f.connect(g); g.connect(dest || bus.amb); src.start(); ambNodes.push(src);
   }
   // ---------- scene ambience: the hero page's "tonight" scene, while it is on screen ----------
-  function crackle(t, vol) {
+  function crackle(t, vol, dest) {
     const n = 1 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.012 + Math.random() * 0.03, vol * (0.4 + Math.random()), "bandpass", 1800 + Math.random() * 3200, bus.amb, 1.5);
+    for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.012 + Math.random() * 0.03, vol * (0.4 + Math.random()), "bandpass", 1800 + Math.random() * 3200, dest || bus.amb, 1.5);
   }
   function cricket(t, vol) {
     const f = 4200 + Math.random() * 900;
@@ -182,7 +186,7 @@
     o.start(t); o.stop(t + 0.3);
   }
   function snort(t) { noise(t, 0.35, 0.12, "bandpass", 500 + Math.random() * 300, bus.amb, 2); noise(t + 0.08, 0.2, 0.06, "lowpass", 300, bus.amb); }
-  function footstep(t, vol) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 70; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.14); noise(t, 0.05, vol * 0.5, "lowpass", 900, bus.amb); }
+  function footstep(t, vol, dest) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 70; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12); o.connect(g); g.connect(dest || bus.amb); o.start(t); o.stop(t + 0.14); noise(t, 0.05, vol * 0.5, "lowpass", 900, dest || bus.amb); }
   const SCENES = {
     camp: { beds: [["lowpass", 260, 0.1, 0.3], ["bandpass", 1400, 0.012, 0.05]], tick: 260, step(t, n) {
       crackle(t, 0.12); if (Math.random() < 0.18) noise(t, 0.4, 0.04, "lowpass", 500, bus.amb);
@@ -209,12 +213,56 @@
       if (Math.random() < 0.12) plink(t, 0.06);
       if (Math.random() < 0.025) { for (let k = 0; k < 4; k++) footstep(t + k * 0.55, 0.08 - k * 0.012); }
       if (Math.random() < 0.015) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(3000, t); o.frequency.linearRampToValueAtTime(3600, t + 0.06); g.gain.setValueAtTime(0.015, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.08); o.connect(g); g.connect(bus.amb); o.start(t); o.stop(t + 0.1); } } },
+    tavern: { room: true, beds: [["bandpass", 420, 0.07, 0.31], ["bandpass", 1050, 0.025, 0.17], ["lowpass", 200, 0.04, 0.4]], tick: 240, step(t, n, root, dest) {
+      const busy = 0.5 + 0.5 * Math.sin(n * 0.045) * Math.sin(n * 0.017 + 1);
+      for (let k = 0; k < 2; k++) if (Math.random() < 0.35 + busy * 0.4) murmur(dest, t + Math.random() * 0.2, 0.012 + Math.random() * 0.014);
+      if (Math.random() < 0.05) { clink(dest, t + Math.random() * 0.2, 0.012); if (Math.random() < 0.35) clink(dest, t + 0.12 + Math.random() * 0.05, 0.01); }
+      if (Math.random() < 0.012 + busy * 0.01) laugh(dest, t + Math.random() * 0.3);
+      if (Math.random() < 0.3) crackle(t, 0.03, dest);
+      if (Math.random() < 0.01) { for (let k = 0; k < 3; k++) footstep(t + k * 0.5, 0.05 - k * 0.01, dest); } } },
   };
+  // the song scene's tavern: a crowd's murmur heard through the room, cups clinking and the odd laugh, all on bus.room
+  function murmur(dest, t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), [f1, f2] = Object.values(FORMANT)[Math.floor(Math.random() * 6)];
+    const f0 = 95 + Math.random() * 130, len = 0.1 + Math.random() * 0.28;
+    o.type = "sawtooth"; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * (0.85 + Math.random() * 0.3), t + len);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.linearRampToValueAtTime(0.0001, t + len);
+    for (const [f, a] of [[f1, 1], [f2, 0.5]]) { const bp = ctx.createBiquadFilter(), ga = ctx.createGain(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 6; ga.gain.value = a; o.connect(bp); bp.connect(ga); ga.connect(g); }
+    g.connect(dest); o.start(t); o.stop(t + len + 0.05);
+  }
+  function clink(dest, t, vol) {
+    const f = 2400 + Math.random() * 1400;
+    for (const [m, a] of [[1, 1], [2.76, 0.4], [5.4, 0.15]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f * m; g.gain.setValueAtTime(vol * a, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.3 / m);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(t + 0.35);
+    }
+  }
+  function laugh(dest, t) {
+    const n = 3 + Math.floor(Math.random() * 4), f0 = 180 + Math.random() * 160;
+    for (let k = 0; k < n; k++) {
+      const at = t + k * (0.12 + Math.random() * 0.03), o = ctx.createOscillator(), g = ctx.createGain(), len = 0.08;
+      o.type = "sawtooth"; o.frequency.setValueAtTime(f0 * (1 - k * 0.04), at);
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.015); g.gain.linearRampToValueAtTime(0.0001, at + len);
+      for (const [f, a] of [[FORMANT.a[0], 1], [FORMANT.a[1], 0.5]]) { const bp = ctx.createBiquadFilter(), ga = ctx.createGain(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 5; ga.gain.value = a; o.connect(bp); bp.connect(ga); ga.connect(g); }
+      g.connect(dest); o.start(at); o.stop(at + len + 0.05);
+    }
+  }
   function sceneAmbience(kind) {
     const sc = SCENES[kind], root = 50 + Math.floor(Math.random() * 5);
-    for (const [type, f, vol, lfo] of sc.beds) bed(type, f, vol, lfo);
+    let dest = bus.amb;
+    if (sc.room) { dest = ctx.createBiquadFilter(); dest.type = "lowpass"; dest.frequency.value = 2400; dest.connect(bus.room); }
+    for (const [type, f, vol, lfo] of sc.beds) bed(type, f, vol, lfo, dest);
     let n = 0;
-    ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root), sc.tick);
+    ambTimer = setInterval(() => sc.step(now() + 0.05, n++, root, dest), sc.tick);
+  }
+  function duck(on) {
+    if (!ctx) return;
+    const t = now();
+    for (const [k, v] of [["amb", on ? 0 : 1], ["room", on ? 0.3 : 1]]) {
+      const g = duckG[k].gain;
+      g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(v, t + (on ? 1.2 : 2.5));
+    }
   }
 
   // while a town's own tune plays on the Map (town_music.js), the map's generic wind and lute step aside
@@ -300,6 +348,7 @@
     const mode = MODES[song.mood] || MODES.glory, r = rngFrom(song.seed || 7), beat = 60 / mode.bpm, t0 = now() + 0.3;
     const motif = {}, timers = [], out = ctx.createGain();
     out.connect(bus.music);
+    duck(true);
     let t = t0, deg = 2;
     const chordAt = (i) => mode.prog[i % mode.prog.length];
     song.lyrics.forEach((line, li) => {
@@ -324,7 +373,7 @@
       pluck(base + [0, 4, 7, 12][i % 4] + (mode.scale[2] === 3 && i % 4 === 1 ? -1 : 0), bt + (song.mood === "shame" ? beat * 0.5 : 0), 0.22, out);
       if (song.mood !== "sad" && i % 2 === 1) noise(bt, 0.05, 0.08, "highpass", 6000, out);
     }
-    timers.push(setTimeout(() => { perf = null; onEnd && onEnd(); }, (end - now()) * 1000 + 300));
+    timers.push(setTimeout(() => { perf = null; duck(false); onEnd && onEnd(); }, (end - now()) * 1000 + 300));
     perf = { timers, end, out };
     return perf;
   }
@@ -333,6 +382,7 @@
     perf.timers.forEach(clearTimeout);
     perf.out.disconnect();
     perf = null;
+    duck(false);
   }
 
   // ---------- talking: one short blip per syllable in a speaker's own voice, Animal Crossing style ----------

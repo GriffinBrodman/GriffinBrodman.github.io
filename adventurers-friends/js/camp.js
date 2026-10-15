@@ -41,11 +41,14 @@
     }
     // the moon, a crescent high on the right
     const mx = 160 + Math.floor(r() * 20), my = 10 + Math.floor(r() * 6);
+    moonAt(ctx, mx, my);
+    return [mx, my];
+  }
+  function moonAt(ctx, mx, my, open) {
     for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) {
       const d = x * x + y * y, cut = (x + 2.5) ** 2 + (y - 1.5) ** 2;
-      if (d <= 26 && cut > 18) { ctx.fillStyle = d > 18 ? "#c8c0a0" : "#f0e8c8"; ctx.fillRect(mx + x, my + y, 1, 1); }
+      if (d <= 26 && cut > 18 && (!open || open(mx + x, my + y))) { ctx.fillStyle = d > 18 ? "#c8c0a0" : "#f0e8c8"; ctx.fillRect(mx + x, my + y, 1, 1); }
     }
-    return [mx, my];
   }
   function stars(r, n) {
     const out = [];
@@ -220,9 +223,9 @@
       return a;
     });
     // a solo hero's road companion: a fixed spot by the fire, a share of the chatter, never wanders off
-    if (cfg.npc) {
-      const n = cfg.npc, [u, v] = cfg.spots[n.spot];
-      const a = T().actor({ id: "npc:" + n.name, name: n.name, look: n.look, kit: n.kit, weapon: n.kit.weapon.family, weapon_tier: 1, armor_tier: n.kit.armor.tier }, u, v,
+    for (const n of [cfg.npc].filter((x) => x && cfg.spots[x.spot])) {
+      const [u, v] = cfg.spots[n.spot];
+      const a = T().actor({ id: "npc:" + n.name, name: n.name, look: n.look, kit: n.kit, weapon: n.kit.weapon.family, weapon_tier: n.kit.weapon.tier || 1, armor_tier: n.kit.armor.tier }, u, v,
         { lines: n.lines, look: { name: "npc", look: { outfit: n.kit.armor.outfit, head: "none", aura: null, offhand: "none" } } });
       Object.assign(a, { spot: n.spot, stay: true, keeper: true, npc: n, rest: n.rest || null });
       if (a.rest && a.rest.at) [a.u, a.v] = [a.tu, a.tv] = a.rest.at;
@@ -480,9 +483,27 @@
     const st = T().stage(W, H, 100, 60);
     const r = Art.rng(Art.hash(seed + "camp"));
     const biome = t.biome || "plains";
-    const starList = stars(r, biome === "forest" ? 34 : 56);
+    let starList = stars(r, biome === "forest" ? 34 : 56);
     let moon;
-    const bg = layer(st, (ctx) => { moon = sky(ctx, r, biome); const g = GROUND[biome] || GROUND.plains; horizon(ctx, r, biome, g); ground(ctx, st, r, biome, t.road); });
+    // the night before a delve: the dungeon's way in, from its map header by night, stands on the horizon
+    const TS = window.TownScenes, gate = t.gate && TS && TS.frame && TS.FOOT[t.gate] ? TS.frame(t.gate, W, HZ + 2, { night: true, y0: TS.FOOT[t.gate] - HZ - 2 }) : null;
+    const bg = layer(st, (ctx) => {
+      moon = sky(ctx, r, biome); const g = GROUND[biome] || GROUND.plains;
+      if (!gate) horizon(ctx, r, biome, g);
+      ground(ctx, st, r, biome, t.road);
+      if (gate) {
+        // the scene's last rows are dithered away into the camp's own ground
+        const gc = gate.base.getContext("2d"), im = gc.getImageData(0, 0, W, HZ + 2);
+        for (let y = HZ - 3; y < HZ + 2; y++) for (let x = 0; x < W; x++) if ((y - HZ + 4) / 5 > ((x * 5 + y * 3) % 8 + 0.5) / 8) im.data[(y * W + x) * 4 + 3] = 0;
+        gc.putImageData(im, 0, 0);
+        // the ground darkens toward the far side, where it meets the scene's moonlit edge
+        for (let y = HZ - 3; y < HZ + 26; y++) { ctx.fillStyle = `rgba(8,10,26,${(0.62 * (1 - (y - HZ + 3) / 29)).toFixed(3)})`; ctx.fillRect(0, y, W, 1); }
+        ctx.drawImage(gate.base, 0, 0);
+        moonAt(ctx, moon[0], moon[1], gate.sky);
+        if (!gate.sky(moon[0], moon[1])) moon = null;
+      }
+    });
+    if (gate) starList = starList.filter((s) => gate.sky(s.x, s.y));
     const props = [{ key: 10, cv: firepit(st, 5, 5) }];
     const cols = [["#8a6a4a", "#6a4e36", "#7a5c40"], ["#5a6a4a", "#46543a", "#50603f"], ["#8a4a3a", "#6a362a", "#7a4232"]];
     // a crew with a covered wagon or a carriage sleeps under its roof, so it stands where the tent would; an open cart is
@@ -567,6 +588,7 @@
         if (shoot) { shoot.t += dt; if (shoot.t > 0.7) shoot = null; }
       },
       under(ctx, now, flick, still) {
+        if (gate) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, HZ + 2); ctx.clip(); drawAll(ctx, gate.acts, still ? 2 : now); ctx.drawImage(gate.over, 0, 0); ctx.restore(); }
         for (const s of starList) {
           const tw = still || sky2[0] ? s.b : (Math.sin(now * s.sp + s.ph) + 1) / 2 * s.b;
           if (tw < 0.15) continue;
@@ -1084,6 +1106,20 @@
       }
     }) });
     let inBed = null;
+    // a crew sharing a room at the inn gets a bed each, down the left wall below the page's hero's own; each mate is asleep,
+    // lying awake or still up (and their bed made) by the same roll as a bedroll at camp
+    const crewBeds = [], bedRects = [];
+    const crewBedsAt = (u0, v0, gap, o) => {
+      const quilts = [["#3a5a7a", "#2e4a66"], ["#4a6a3a", "#3a5630"], ["#8a6a3a", "#6e5430"], ["#6a3a5a", "#542e48"]].filter((q) => q[0] !== bl[0]);
+      for (let i = 1; i < Math.min(4, cast.length); i++) {
+        const v = v0 + (i - 1) * gap, c = o && o.quilt ? o.quilt[(i - 1) % o.quilt.length] : null, q = c ? [c, shade(c, -0.15)] : quilts[(i - 1) % quilts.length];
+        const p = bedPiece(st, u0, v, 2.4, 1.2, Object.assign({ wood: "#6a4226", head: 12, foot: 8 }, o, { quilt: q }));
+        props.push({ key: 0.5, cv: p.back });
+        const g = Art.rng(Art.hash(seed + ":bed:" + cast[i].h.id)); g(); const x = g();
+        crewBeds[i] = x < 0.25 ? null : { z: 11, cut: 20, fold: "#f2e8d4", lie: { quilt: q, len: 1.3, awake: x < 0.5 }, at: [u0 + 0.85, v + 0.6] };
+        bedRects.push([u0 - 0.3, v - 0.3, u0 + 2.7, v + 1.5]);
+      }
+    };
     const bedAt = (u, v, du, dv, o) => {
       const p = bedPiece(st, u, v, du, dv, o);
       props.push({ key: 0.5, cv: p.back });
@@ -1177,10 +1213,11 @@
         bedAt(0.4, 0.3, 2.4, 1.3, { wood: "#6a4226", quilt: [bl[0], bl[1]], head: 15, foot: 9, aside: [3.3, 0.9, 7.5] });
         tableAt(0.3, 1.85, 0.6, 0.55, 9, "#6a4226", [["book", 0.6, 0.3]]);
         candleOn(0.55, 2.2, 9, null, 74);
+        crewBedsAt(0.4, 2.65, 1.6);
         props.push({ key: 3.0 + 1.5, cv: chest(st, 3.0, 0.35, 0.6, 1.1, "#5e3a1e", "#3a3a40") });
         tableAt(5.2, 0.1, 0.8, 0.6, 11, "#6a4226", [["basin", 0.5, 0.5], ["jug", 0.15, 0.3]]);
         props.push({ key: 7.4 + 1.4, cv: layer(st, (ctx) => S.stool(ctx, st, 7.0, 1.0, "#6a4226")) });
-        packAt(3.4, 2.1); bootsAt(2.3, 2.3);
+        packAt(3.4, 2.1); if (cast.length < 2) bootsAt(2.3, 2.3); else bootsAt(3.3, 3.2);
         hostAt = (() => { const d = st.lwall(7.85, 32); return [d[0] + 4, d[1] - 2]; })();
       } else if (kind === "suite") {
         amb = 0.42;
@@ -1193,11 +1230,12 @@
         bedAt(0.4, 0.3, 2.8, 2.0, { wood: "#5a3018", quilt: ["#7a2420", "#6a1e1a", "#c8a040"], head: 22, foot: 13, posts: true, canopy: ["#8a2a24", "#6a1e1a"], arch: true, aside: [3.67, 1.25, 7.5] });
         tableAt(0.3, 2.55, 0.6, 0.55, 10, "#5a3018");
         candleOn(0.6, 2.85, 10, "gold");
+        crewBedsAt(5.6, 2.9, 1.6, { wood: "#5a3018", head: 14, foot: 9, quilt: ["#7a2420", "#2e4a5a", "#8a6a2a"] });
         props.push({ key: 3.4 + 2.1, cv: chest(st, 3.4, 0.5, 0.55, 1.5, "#5a3018", "#c8a040") });
         props.push({ key: 4.4 + 0.8, cv: cabinet(st, 4.3, 0.05, 1.4, 0.75, 36, "#5a3018", doors(4.3, 5.7, 36, "#6a3a1e")) });
         tableAt(9.4, 1.6, 0.9, 0.9, 10, "#5a3018", [["wine", 0.3, 0.6], ["fruit", 0.7, 0.3]]);
         candleOn(9.75, 1.85, 10, "three");
-        props.push({ key: 1.2 + 3.6 + 0.7, cv: chair(st, 1.3, 3.4, "#5a3018", "#2e4a5a", true) });
+        if (cast.length < 2) props.push({ key: 1.2 + 3.6 + 0.7, cv: chair(st, 1.3, 3.4, "#5a3018", "#2e4a5a", true) });
         { const [x, y] = st.iso(10.5, 0.45); props.push({ key: 11, cv: layer(st, (ctx) => { ctx.fillStyle = "#8a4a2a"; ctx.fillRect(Math.round(x) - 3, Math.round(y) - 6, 7, 6); ctx.fillStyle = "#a85e36"; ctx.fillRect(Math.round(x) - 3, Math.round(y) - 6, 2, 6); for (let i = 0; i < 14; i++) { ctx.fillStyle = i % 3 ? "#4a7a3a" : "#6a9a4a"; ctx.fillRect(Math.round(x) - 5 + (i * 7) % 11, Math.round(y) - 8 - ((i * 5) % 12), 2, 2); } }) }); }
         packAt(3.6, 2.4); bootsAt(2.6, 2.6);
         hostAt = (() => { const d = st.lwall(8.1, 34); return [d[0] + 4, d[1] - 2]; })();
@@ -1311,9 +1349,10 @@
       props.push({ key: au + av + (az ? 1 : 0), draw: (ctx) => { if (!st.bed.awake) ctx.drawImage(cv, Math.round(x - aside.w / 2), Math.round(y) - foot); } });
     }
     const host = t.host && t.host.lines && Object.assign({}, t.host, { at: hostAt || [W / 2, 20], beast: kind === "stables" ? (t.host.mount || {}).kind || "horse" : null });
-    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46]]));
+    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46], [-56, 40]]).filter(([u, v]) => !bedRects.some(([a, b, c, d]) => u > a && u < c && v > b && v < d)));
     const inside = S.inRoom(st, NU, NV, WH), shine = S.lighting(W, H, (x, y) => inside(x, y) && !views.some((v) => v && v.glass(x, y)));
     return gather({ talks: t.talk, kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
+      rest: crewBeds.length ? (h, i) => crewBeds[i] || null : null,
       under(ctx, now, flick, still) {
         for (const v of views) if (v) v.draw(ctx, now, still);
         if (fire) S.flames(ctx, st, now, fire[0], fire[1], flick, 1, true);

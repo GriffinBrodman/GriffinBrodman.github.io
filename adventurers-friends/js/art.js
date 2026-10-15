@@ -1015,6 +1015,14 @@
     return cached(key + (h.id || h.name || ""), () => drawHero({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
       armorTier: h.armor_tier || h.weapon_tier || 1, legend: h.legend, kit: h.kit || null, frame: frame || 0 }));
   }
+  // the same hero in the saddle: legs bent for riding (Paint.fullBody's seated pose, the boot's sole on row `sole`), everything
+  // above the belt unchanged
+  function heroSeated(h, frame, cls, sole) {
+    const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
+    const key = "seat:" + JSON.stringify([h.look, clsLook, h.weapon, h.weapon_tier, h.armor_tier || h.weapon_tier, h.legend, h.kit || null, frame || 0, sole || 32]);
+    return cached(key + (h.id || h.name || ""), () => drawHero({ id: h.id, name: h.name, look: h.look, clsLook, weapon: h.weapon, weaponTier: h.weapon_tier || 1,
+      armorTier: h.armor_tier || h.weapon_tier || 1, legend: h.legend, kit: h.kit || null, frame: frame || 0, seated: sole || 32 }));
+  }
   // the same hero asleep in bed (q: Paint.sleeper's quilt spec), and the helm or hat they took off for the night
   function heroLying(h, frame, cls, q) {
     const clsLook = Object.assign({ cn: (cls || {}).name || "" }, (cls || {}).look || { outfit: "leather", head: "none", aura: null, offhand: "none" });
@@ -1069,5 +1077,5 @@
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroLying, heroAside, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

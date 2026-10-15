@@ -54,6 +54,14 @@
   idling();
   if (window.Settings) Settings.watch(idling);
   function heroLook(h) { return S.classes[h.cls] || S.classes.warrior; }
+  // a legendary figure (L.legends[].art, from league/export.py legend_art) as a hero-like figure for any scene: { h, cls, lines }
+  function legendFigure(name) {
+    const art = ((L.legends || []).find((x) => x.name === name) || {}).art;
+    if (!art) return null;
+    const k = art.kit;
+    return { h: { id: "legend:" + name, name, look: art.look, kit: k, weapon: k.weapon.family, weapon_tier: k.weapon.tier, armor_tier: k.armor.tier, legend: true, alive: true },
+      cls: { name: "legend", look: { outfit: k.armor.outfit, head: "none", aura: null, offhand: "none" } }, lines: art.lines || [] };
+  }
   function spriteCanvas(gridFn, scale, cls, animate) {
     const g0 = gridFn(0);
     const cv = el("canvas", { width: g0.w * scale, height: g0.h * scale, class: cls || "" });
@@ -106,6 +114,13 @@
     if (gold && copper >= 1000 && copper % 100 === 0) return `${copper / 100} gold piece${copper > 100 ? "s" : ""}`;
     if (c && s < 10) return `${s} silver ${c} copper`;
     return `${s.toLocaleString("en-US")} silver`;
+  }
+  // money that changes hands (a table's winnings or losses, a reward): gold pieces from 100 silver up, the rest as money(); town.py gold_words
+  function coins(copper) {
+    copper = Math.round(Math.abs(copper || 0));
+    const g = Math.floor(copper / 100), rest = copper % 100;
+    if (copper < 1000 || !g) return money(copper);
+    return `${g.toLocaleString("en-US")} gold piece${g > 1 ? "s" : ""}` + (rest ? ` and ${money(rest)}` : "");
   }
   // a sitting at a town table, as the day box and the calendar show it: "Lost 3 silver at Liar's Dice ▸ watch"
   function tableLink(x) {
@@ -371,7 +386,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, spriteCanvas, when,
-    animated, money, tableLink,
+    nodeName, clsName, richText, eventRow, feed, load, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink,
   };
 })();

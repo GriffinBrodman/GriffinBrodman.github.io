@@ -39,14 +39,35 @@
     const t = S.towns[g.town] || {};
     const p = el("section", { class: "panel" }, el("h2", null, `${(t.game || {}).name || "The tables"} in ${t.name || g.town}`),
       el("p", { class: "small muted" }, A.heroLink(g.hero), g.nick ? ` (${g.nick})` : "", ` at ${g.dealer}'s table, ${A.when(g.day, "on")}. `,
-        g.net > 0 ? `Won ${A.money(g.net)}.` : g.net < 0 ? `Lost ${A.money(-g.net)}.` : "Broke even."));
+        g.net > 0 ? `Won ${A.coins(g.net)}.` : g.net < 0 ? `Lost ${A.coins(-g.net)}.` : "Broke even."),
+      (t.game || {}).rules ? el("p", { class: "small" }, el("b", null, "How it's played: "), t.game.rules) : null);
     if (window.TablesReplay) { try { p.appendChild(TablesReplay.player(g, { caption: true })); } catch (e) { /* the words below still tell it */ } }
-    p.appendChild(el("ol", { class: "small" }, g.rounds.map((r) => el("li", null, `${A.money(r.stake)} staked: ${r.cheat ? (r.caught ? "caught cheating" : "a quiet cheat, ") : ""}${r.caught ? "" : r.won ? "won" : "lost"}`))));
+    p.appendChild(el("ol", { class: "small" }, g.rounds.map((r) => el("li", null, roundWords(g.game, r)))));
     v.appendChild(p);
   }).catch(() => {
     v.appendChild(el("section", { class: "panel faded" }, el("h2", null, "That night at the tables has faded"),
       el("p", null, "Only a fortnight of table nights is kept, and the ones that made the paper."), el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
   }));
+
+  // one round of a table sitting in words: what the pieces did, then what it paid
+  const NUM = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+  function roundWords(game, r) {
+    const s = r.show || {}, n = r.net !== undefined ? r.net : r.cheat ? (r.won ? 2 : -2) * r.stake : r.won ? r.stake : -r.stake;
+    const odds = (o) => (o ? (o[0] === o[1] ? "evens" : `${o[0]}-${o[1]}`) : "");
+    const plural = (k, f) => `${NUM[k] || k} ${f}${k === 1 ? "" : "s"}`;
+    const what = r.cheat ? (r.caught ? "caught cheating" : "a quiet cheat")
+      : game === "liars_dice" && s.bid ? `${s.called_by === "hero" ? "the table bid" : "bid"} ${plural(s.bid[0], s.bid[1])}, ${s.called_by === "hero" ? "called a liar" : "the table called"}; there were ${(s.mine || []).concat(s.theirs || []).filter((x) => x === s.bid[1]).length}`
+      : game === "crown_anchor" && s.dice ? `on the ${s.pick}: ${s.dice.join(", ")}`
+      : game === "pig_races" && s.order ? `#${s.backed}${s.odds ? ` at ${odds(s.odds[s.backed - 1])}` : ""}; #${s.order[0]} won`
+      : game === "knucklebones" && s.mine ? `${s.mine.reduce((a, b) => a + b, 0)} against the house's ${(s.house || []).reduce((a, b) => a + b, 0)}`
+      : game === "undertakers_lots" && s.roll ? `lot ${s.lot}, rolled ${s.roll[0] + s.roll[1]}`
+      : game === "acorn_shells" && s.swaps ? `${plural(s.swaps.length, "swap")}, picked the ${["left", "middle", "right"][s.guess]} shell`
+      : game === "toll_toss" && s.call ? `called ${s.call}, it landed ${s.landed}`
+      : game === "candle_stakes" && s.burn ? `${plural(s.burn.length, "stub")}, ${s.burn[0] === Math.max(...s.burn) ? "the last flame" : "out early"}`
+      : "";
+    const paid = n > 0 ? `won ${A.coins(n)}` : n < 0 ? `lost ${A.coins(-n)}` : "the stake came back";
+    return `${A.coins(r.stake)} staked${what ? `, ${what}` : ""}: ${paid}${s.again ? " (a second throw, by luck)" : ""}${r.caught ? "" : ""}.`;
+  }
 
   function unitGrid(u, frame) {
     const look = u.look || {};
@@ -58,39 +79,48 @@
   }
 
   // ---------- riders ----------
-  // a hero in the saddle is one fighter: the mount at the vignettes' people scale, the rider seated on its back from the
-  // waist up with one boot down the flank, all facing right (the right-hand side mirrors the whole thing)
-  // off until riders get legs: a seated rider is drawn from the waist up and looks wrong; with it off, heroes fight on foot
-  const MOUNTED = false;
-  const SEAT = 23, riders = new Map(), backs = new Map();
+  // a hero in the saddle is one fighter: the mount at the vignettes' people scale and the rider seated on its back in the
+  // riding pose (Art.heroSeated: the near thigh along the back, the shin and boot down the flank), all facing right (the
+  // right-hand side mirrors the whole thing)
+  const MOUNTED = true;
+  const HIP = 26, riders = new Map(), backs = new Map();
   const mounted = (u) => MOUNTED && !!(u && u.mount && u.mount.kind && u.kind === "hero" && heroes[u.ref] && window.MountArt && MountArt.mountGrid);
+  // the top of the back and the belly line below the seat, where the rider's boot hangs
   function backOf(m, key) {
     if (backs.has(key)) return backs.get(key);
     // the top of the back is the median top edge across the barrel, so a hump, a mane or a drifting mote can't lift the saddle
-    const d = m.getContext("2d").getImageData(0, 0, m.width, m.height).data, ys = [];
-    for (let x = Math.round(m.width * 0.3); x <= Math.round(m.width * 0.5); x++) for (let y = 0; y < m.height; y++) if (d[(y * m.width + x) * 4 + 3] > 200) { ys.push(y); break; }
+    const d = m.getContext("2d").getImageData(0, 0, m.width, m.height).data, ys = [], on = (x, y) => d[(y * m.width + x) * 4 + 3] > 200;
+    for (let x = Math.round(m.width * 0.3); x <= Math.round(m.width * 0.5); x++) for (let y = 0; y < m.height; y++) if (on(x, y)) { ys.push(y); break; }
     ys.sort((a, b) => a - b);
     const back = ys.length ? ys[ys.length >> 1] : Math.round(m.height * 0.3);
-    backs.set(key, back);
-    return back;
+    // the belly is the median bottom of the barrel between the legs (a column that runs to the ground is a leg)
+    const bs = [];
+    for (let x = Math.round(m.width * 0.25); x <= Math.round(m.width * 0.7); x++) {
+      let y = 0;
+      while (y < m.height && !on(x, y)) y++;
+      while (y + 1 < m.height && on(x, y + 1)) y++;
+      if (y > back && y < m.height - 3) bs.push(y);
+    }
+    bs.sort((a, b) => a - b);
+    const r = { back, belly: bs.length ? bs[bs.length >> 1] : back + 8 };
+    backs.set(key, r);
+    return r;
   }
   function rider(u, frame) {
     const key = `${u.ref}|${u.mount.kind}|${u.mount.colour}|${frame}`;
     if (riders.has(key)) return riders.get(key);
-    const m = MountArt.mountGrid(u.mount.kind, u.mount.colour, frame, true), hero = unitGrid(u, frame).toCanvas(1);
-    const back = backOf(m, u.mount.kind + "|" + u.mount.colour), sx = Math.round(m.width * 0.37);
-    const L = Math.max(0, 14 - sx), lift = Math.max(0, SEAT - (back + 3));
+    const m = MountArt.mountGrid(u.mount.kind, u.mount.colour, frame, "rider");
+    const { back, belly } = backOf(m, u.mount.kind + "|" + u.mount.colour), sx = Math.round(m.width * 0.37);
+    // the boot's sole hangs just above the belly line: longer legs down a horse's deep barrel, shorter on a donkey
+    const sole = clamp(HIP + belly - back - 2, 33, 36), h = heroes[u.ref];
+    const hero = (Art.heroSeated ? Art.heroSeated(h, frame, A.heroLook(h), sole) : unitGrid(u, frame)).toCanvas(1);
+    const L = Math.max(0, 14 - sx), lift = Math.max(0, HIP - (back + 1));
     const cv = document.createElement("canvas");
     cv.width = Math.max(L + m.width, L + sx + 14); cv.height = m.height + lift;
-    const c = cv.getContext("2d"), my = cv.height - m.height, seatY = my + back + 3;
+    const c = cv.getContext("2d"), my = lift, seatY = my + back + 1;
     c.imageSmoothingEnabled = false;
     c.drawImage(m, L, my);
-    c.drawImage(hero, 0, 0, hero.width, SEAT, L + sx - 14, seatY - SEAT, hero.width, SEAT);
-    // the near boot: the hero's own shin and foot, hanging just below the seat
-    const hd = hero.getContext("2d").getImageData(0, 0, hero.width, hero.height).data;
-    let lx = -1;
-    for (let x = 0; x < 14 && lx < 0; x++) if (hd[((hero.height - 2) * hero.width + x) * 4 + 3] > 200) lx = x;
-    if (lx >= 0) c.drawImage(hero, lx, hero.height - 7, 5, 7, L + sx - 14 + lx + 3, seatY, 5, 7);
+    c.drawImage(hero, L + sx - 14, seatY - HIP);
     Object.assign(cv, { seatX: L + sx, mountL: L, mountW: m.width, mountH: m.height });
     riders.set(key, cv);
     return cv;
@@ -171,29 +201,45 @@
       case "heal": return e.t === e.a ? `${n(e.a)} patches up, recovering ${e.v}${e.k ? ` (${e.k})` : ""}.` : `${n(e.a)} heals ${n(e.t)} for ${e.v}${e.k ? ` (${e.k})` : ""}.`;
       case "guard": return `${n(e.a)}: ${e.k}. Come at me.`;
       case "buff": return `${n(e.a)}: ${e.k}.`;
-      case "rally": return `${n(e.a)}: ${e.k}! Resolve +${e.v}.`;
+      case "rally": return e.v != null ? `${n(e.a)}: ${e.k}! Resolve +${e.v}.` : `${n(e.a)}: ${e.k}! ${lift(e)}.`;
       case "fear": return `${n(e.a)}: ${e.k}. Enemy resolve -${e.v}.`;
-      case "debuff": return `${n(e.a)}: ${e.k}.`;
+      case "debuff": {
+        const t = [].concat(e.t == null ? [] : e.t);
+        if (e.st === "cowering") return t.length ? `${n(e.a)}: ${e.k}. ${n(t[0])} cowers.` : `${n(e.a)}: ${e.k}. Nobody flinches.`;
+        if (e.st === "shaken") return t.length ? `${n(e.a)}: ${e.k}. ${t.length === 1 ? n(t[0]) + " is" : t.length + " foes are"} shaken.` : `${n(e.a)}: ${e.k}. Nobody flinches.`;
+        if (e.st === "parley") return `${n(e.a)}: ${e.k}. Nobody is listening.`;
+        return `${n(e.a)}: ${e.k}.`;
+      }
+      case "parley": return `${n(e.a)}: ${e.k}. ${n(e.t)} stands down.`;
       case "stealth": return `${n(e.a)} vanishes into the shadows.`;
       case "summon": return `${n(e.a)} calls in ${e.new ? e.new.name : "help"}.`;
       case "tick": return `${n(e.a)} suffers ${e.v} from ${e.st}.`;
-      case "stunned": return `${n(e.a)} is ${e.st === "charm" ? "charmed" : "stunned"} and does nothing.`;
+      case "stunned": return e.st === "cowering" ? `${n(e.a)} cowers and does nothing.` : `${n(e.a)} is ${e.st === "charm" ? "charmed" : "stunned"} and does nothing.`;
       case "thorns": return `${n(e.t)} is hurt for ${e.v} by ${n(e.a)}'s spikes.`;
       case "down": return `${n(e.t)} goes down!`;
       case "rout": return vb(side(e.side), "breaks and runs!", "break and run!");
       case "surrender": return vb(side(e.side), "surrenders!", "surrender!");
-      case "flee": return `${n(e.a)} escapes.`;
+      case "flee": return e.walk ? `${n(e.a)} walks off the field.` : e.bolt ? `${n(e.a)}, the last one standing, bolts!` : `${n(e.a)} escapes.`;
       case "carry": return `${n(e.a)} drags ${n(e.t)} out.`;
       case "end": return e.outcome === "stalemate" ? "Both sides back off." : "The fight is over.";
       default: return "";
     }
   }
 
+  // what a rally gave its crew, in words
+  const LIFT = { pow: "harder blows", acc: "steadier aim", arm: "thicker skin", crit: "sharper eyes", eva: "quicker feet", spd: "quicker feet" };
+  function lift(e) {
+    const bits = [...new Set((e.st || []).map((s) => LIFT[s]).filter(Boolean))];
+    if (e.heals && e.heals.length) bits.push("a breath back");
+    const s = bits.length > 1 ? bits.slice(0, -1).join(", ") + " and " + bits[bits.length - 1] : bits[0] || "a lift";
+    return s[0].toUpperCase() + s.slice(1) + " for the crew";
+  }
+
   // the moments worth telling a friend: first blood, the biggest hit, the save, who did the damage, how it ended
   function highlights(f, units) {
     const n = (i) => (units[i] ? units[i].name : "someone");
     const hp = units.map((u) => (u ? u.hp0 : 0)), lastHit = {}, downs = {};
-    let first = null, big = null, save = null, carry = null, misses = 0, swings = 0;
+    let first = null, big = null, save = null, carry = null, talk = null, misses = 0, swings = 0;
     for (const e of f.log) {
       if (e.fx === "miss") { misses++; swings++; }
       if (e.fx === "hit" || e.fx === "crit") {
@@ -210,6 +256,8 @@
         hp[e.t] = e.hp != null ? e.hp : hp[e.t] + e.v;
       }
       if (e.fx === "carry" && !carry) carry = e;
+      if (e.fx === "parley" && !talk) talk = e;
+      if (e.fx === "rally") for (const [i, , v] of e.heals || []) hp[i] = v;
       if (e.fx === "down" && lastHit[e.t] != null && units[lastHit[e.t]] && units[lastHit[e.t]].side !== (units[e.t] || {}).side) downs[lastHit[e.t]] = (downs[lastHit[e.t]] || 0) + 1;
     }
     const out = [];
@@ -218,6 +266,7 @@
     else if (big && big.fx === "crit") out.push(["Biggest hit", `That first one, and a critical too.`]);
     if (save) out.push(["The save", `${n(save.e.a)} ${save.e.t === save.e.a ? "patches up" : "heals " + n(save.e.t)} at ${save.before} hp, for ${save.e.v}${save.e.k ? ` (${save.e.k})` : ""}.`]);
     else if (carry) out.push(["The save", `${n(carry.a)} drags ${n(carry.t)} out of it.`]);
+    if (talk) out.push(["The talk", `${n(talk.a)} talks ${n(talk.t)} out of the fight.`]);
     const top = Object.entries(downs).sort((a, b) => b[1] - a[1])[0];
     if (top && top[1] >= 2) out.push(["Most takedowns", `${n(+top[0])}, ${top[1]}.`]);
     out.push(["How it ended", `${outcomeText(f)} after ${f.rounds} round${f.rounds === 1 ? "" : "s"}.`]);
@@ -444,9 +493,9 @@
       const key = `${u.i}:${frame}:${part}:${away ? 1 : 0}`;
       if (!sprites.has(key)) {
         let img;
-        if (part === "foot") { let g = unitGrid(u, frame); if (u.side === 1) g = g.flipX(); img = g.toCanvas(1); }
+        if (part === "foot") { let g = unitGrid(u, frame); if ((u.side === 1) !== !!away) g = g.flipX(); img = g.toCanvas(1); }
         else {
-          img = part === "all" ? rider(u, frame) : MountArt.mountGrid(u.mount.kind, u.mount.colour, frame, true);
+          img = part === "all" ? rider(u, frame) : MountArt.mountGrid(u.mount.kind, u.mount.colour, frame, "rider");
           if ((u.side === 1) !== !!away) img = mirror(img);
         }
         sprites.set(key, img);
@@ -465,7 +514,8 @@
 
     // ---------- the fight's state at time T ----------
     function stateAt(t) {
-      const st = units.map((u) => u && { hp: u.hp0, down: null, fled: null, shown: u.summoned ? null : -1, ghost: false, hitT: -9, before: u.hp0 });
+      const st = units.map((u) => u && { hp: u.hp0, down: null, fled: null, shown: u.summoned ? null : -1, ghost: false, hitT: -9, before: u.hp0,
+        shaken: 0, cower: 0, fearT: -9, glow: 0, glowSt: null, glowT: -9, walk: false });
       let res = [100, 100], li = -1, round = 1;
       f.log.forEach((e, k) => {
         if (P.events[k] > t) return;
@@ -478,7 +528,19 @@
           case "tick": { const u = U(e.a); u.before = u.hp; u.hitT = P.events[k]; u.hp = Math.max(0, u.hp - e.v); break; }
           case "heal": U(e.t).hp = e.hp != null ? e.hp : U(e.t).hp + e.v; break;
           case "down": U(e.t).down = P.events[k]; break;
-          case "flee": U(e.a).fled = P.events[k]; break;
+          case "flee": U(e.a).fled = P.events[k]; U(e.a).walk = !!e.walk; U(e.a).bolt = !!e.bolt; break;
+          // a scare lasts a few rounds, and so does a rally's lift; the log says how many
+          case "debuff":
+            if (e.st === "shaken" || e.st === "cowering") for (const i of [].concat(e.t == null ? [] : e.t)) {
+              const u = U(i), until = round + (e.d || 2);
+              if (e.st === "shaken") u.shaken = Math.max(u.shaken, until); else u.cower = Math.max(u.cower, until);
+              u.fearT = P.events[k];
+            }
+            break;
+          case "rally":
+            for (const i of [].concat(e.t == null ? [] : e.t)) { const u = U(i); u.glow = round + (e.d || 2); u.glowSt = (e.st || [])[0] || "heal"; u.glowT = P.events[k]; }
+            for (const [i, , v] of e.heals || []) U(i).hp = v;
+            break;
           case "summon": if (e.new) U(e.new.i).shown = P.events[k]; break;
           case "stealth": U(e.a).ghost = true; break;
           case "act": U(e.a).ghost = false; break;
@@ -642,14 +704,14 @@
       // shadows, then fighters back to front
       const tallest = Math.max(...units.map((q) => (q ? q.sh : 0)));
       const depth = (q) => q.y + (tallest - q.sh) * 0.15;
-      const shown = units.filter((q) => q && st[q.i].shown !== null && !(st[q.i].fled != null && !doomed(q, st[q.i]) && t - st[q.i].fled > 1.2)).sort((a, b) => depth(a) - depth(b));
+      const shown = units.filter((q) => q && st[q.i].shown !== null && !(st[q.i].fled != null && !doomed(q, st[q.i]) && t - st[q.i].fled > fadeLen(st[q.i]))).sort((a, b) => depth(a) - depth(b));
       const place = {};
       for (const q of shown) {
         const s = st[q.i];
         let p = pose[q.i] || { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, white: 0, alpha: 1, ghosts: [] };
         if (q.mount && !calm) { const mp = mountPose(q, t); p = Object.assign({}, p, { dx: p.dx + mp.dx, dy: p.dy + mp.dy, rot: (p.rot || 0) + mp.rot }); }
         let x = q.x + p.dx, alpha = p.alpha;
-        if (s.fled != null) { x += fleeDx(q, s, t); if (!doomed(q, s)) alpha *= clamp(1 - (t - s.fled) / 1.2, 0, 1); }
+        if (s.fled != null) { x += fleeDx(q, s, t); if (!doomed(q, s)) alpha *= clamp(1 - (t - s.fled) / fadeLen(s), 0, 1); }
         if (s.shown > 0) alpha *= clamp((t - s.shown) / 0.3, 0, 1);
         if (s.ghost) alpha *= 0.5;
         place[q.i] = { x, alpha, p };
@@ -658,8 +720,9 @@
       const inverted = !calm && slot.close && invertedAt(slot, t), rim = tagAlpha(slot, u);
       if (inverted) { o.fillStyle = "#f6efe0"; o.fillRect(0, 0, W, H); }
       for (const q of shown) {
-        const s = st[q.i], pl = place[q.i], p = pl.p;
-        const bolting = !!q.mount && s.fled != null && t >= s.fled;
+        const s = st[q.i], pl = place[q.i];
+        let p = pl.p;
+        const bolting = (!!q.mount || s.walk || s.bolt) && s.fled != null && t >= s.fled;
         let img = sprite(q, s.down != null ? 0 : (frame + q.i) % 2, "all", bolting);
         if (inverted) { if (slot.members.some((m) => m.b.a === q.i || m.b.to.includes(q.i))) blit(flat(img, "#120c18"), pl.x, q.y, p, 1); continue; }
         let fx = pl.x;
@@ -690,10 +753,16 @@
           continue;
         }
         for (const g of p.ghosts) blit(img, q.x + g.dx, q.y + g.dy, { sx: p.sx, sy: p.sy, rot: 0, white: 0 }, g.a * pl.alpha);
+        const mood = moodOf(q, s, t, live.round);
+        if (mood.fear) { pl.x += mood.dx; p = Object.assign({}, p, { sx: p.sx * mood.sx, sy: p.sy * mood.sy, rot: (p.rot || 0) + mood.rot }); }
+        if (s.walk && s.fled != null && t >= s.fled && !calm) p = Object.assign({}, p, { dy: p.dy - (Math.floor((t - s.fled) * 6) % 2) });
+        if (mood.glow) { const g = flat(img, GLOW[s.glowSt] || GLOW.heal); for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) blit(g, pl.x + dx, q.y + p.dy + dy, p, mood.glow * pl.alpha); }
         if (rim && q.i === shot(slot).tag.a) { const gold = flat(img, "#f0c450"); for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1]]) blit(gold, pl.x + dx, q.y + p.dy + dy, p, rim * pl.alpha); }
         blit(img, pl.x, q.y + p.dy, p, pl.alpha);
         if (p.tint && p.tintAmt > 0.01) blit(flat(img, p.tint), pl.x, q.y + p.dy, p, p.tintAmt * pl.alpha);
+        if (mood.fear) blit(flat(img, "#2c3a78"), pl.x, q.y + p.dy, p, (mood.fear > 1 ? 0.3 : 0.22) * pl.alpha);
         if (p.white > 0.01) blit(flat(img, "#ffffff"), pl.x, q.y + p.dy, p, p.white * pl.alpha);
+        moodMarks(q, s, pl, p, mood, t);
         anchors[q.i] = { x: pl.x, y: q.y, top: q.y - q.sh };
       }
       if (!inverted) for (const x of acts) { const b = x.b; L.play(o, b.look.family, params(b), b.from, toArg(b), x.tau, "fx", b.time); }
@@ -733,7 +802,53 @@
       syncRoster(st, t);
       syncLog(live.li);
     }
-    function statusWord(s) { return { stun: "STUNNED", charm: "CHARMED", burn: "BURNING", chill: "CHILLED", poison: "POISONED", bleed: "BLEEDING", weaken: "WEAKENED", blind: "BLINDED", marked: "MARKED", root: "ROOTED", frozen: "FROZEN" }[s] || String(s).toUpperCase(); }
+    // shaken: a tremble, a blue chill and a sweat drop; cowering: a crouch, a lean away from the fight and shiver marks;
+    // a rally's lift: a glow round the crew in the colour of what it gave them, pulsing while it lasts
+    const GLOW = { pow: "#ff9a4a", acc: "#8fd6ff", arm: "#e2e8f0", crit: "#ffe066", eva: "#b8f0c8", spd: "#b8f0c8", heal: "#8af0a0" };
+    function moodOf(q, s, t, round) {
+      const out = { fear: 0, dx: 0, sx: 1, sy: 1, rot: 0, glow: 0 };
+      if (s.down != null || s.fled != null) return out;
+      const cower = s.cower >= round, shaken = s.shaken >= round;
+      out.fear = cower ? 2 : shaken ? 1 : 0;
+      const away = q.side ? 1 : -1, k = clamp((t - s.fearT) / 0.25, 0, 1);
+      if (cower) { out.sy = 1 - 0.16 * k; out.sx = 1 + 0.06 * k; out.rot = away * 0.1 * k; }
+      if (out.fear && !calm) out.dx = (Math.floor(t * (cower ? 16 : 11) + q.i) % 2 ? 1 : 0) * away;
+      if (s.glow >= round) {
+        const since = t - s.glowT;
+        out.glow = since < 0.5 ? 1 - since * 0.6 : calm ? 0.55 : 0.5 + 0.18 * Math.sin(t * 5 + q.i);
+      }
+      return out;
+    }
+    function moodMarks(q, s, pl, p, mood, t) {
+      const head = q.y + p.dy - q.sh * (p.sy || 1), side = q.side ? -1 : 1, hx = pl.x + side * Math.max(5, q.sw * 0.28);
+      if (mood.fear === 1) {
+        // a sweat drop slides down beside the head, over and over
+        const ph = calm ? 0.3 : ((t * 0.9 + q.i * 0.37) % 1), y = R(head + 3 + ph * 7);
+        o.globalAlpha = clamp(1.2 - ph, 0, 1) * pl.alpha; o.fillStyle = "#1c2a48"; o.fillRect(R(hx) - 1, y - 1, 3, 4);
+        o.fillStyle = "#a8dcff"; o.fillRect(R(hx), y, 1, 2); o.fillRect(R(hx), y - 1, 1, 1);
+        o.fillStyle = "#ffffff"; o.fillRect(R(hx), y, 1, 1);
+        o.globalAlpha = 1;
+      } else if (mood.fear === 2) {
+        // shiver marks either side of a head pulled down low
+        const on = calm || Math.floor(t * 8 + q.i) % 2 === 0;
+        o.globalAlpha = 0.9 * pl.alpha; o.fillStyle = "#e8ecf8";
+        for (const d of [-1, 1]) {
+          const x = R(pl.x + d * (q.sw * 0.42 + 2)), y = R(head + 2);
+          if (on) { o.fillRect(x, y, 1, 3); o.fillRect(x + d * 2, y + 1, 1, 2); } else o.fillRect(x + d, y + 1, 1, 3);
+        }
+        o.globalAlpha = 1;
+      }
+      if (mood.glow > 0.05 && !calm) {
+        // motes rise off a lifted fighter
+        o.fillStyle = GLOW[s.glowSt] || GLOW.heal;
+        for (let j = 0; j < 3; j++) {
+          const ph = (t * 0.7 + j / 3 + q.i * 0.21) % 1, x = R(pl.x - q.sw * 0.3 + ((j * 7 + q.i * 5) % Math.max(4, R(q.sw * 0.6)))), y = R(q.y - ph * q.sh * 0.9);
+          o.globalAlpha = Math.min(1, mood.glow * 2) * (1 - ph) * pl.alpha; o.fillRect(x, y, 1, 1);
+        }
+        o.globalAlpha = 1;
+      }
+    }
+    function statusWord(s) { return { stun: "STUNNED", charm: "CHARMED", shaken: "SHAKEN", cowering: "COWERING", burn: "BURNING", chill: "CHILLED", poison: "POISONED", bleed: "BLEEDING", weaken: "WEAKENED", blind: "BLINDED", marked: "MARKED", root: "ROOTED", frozen: "FROZEN" }[s] || String(s).toUpperCase(); }
     function invertedAt(slot, t) {
       const im = P.impacts.find((x) => x.slot === slot && (x.kind === "hit" || x.kind === "crit"));
       return !!im && t >= im.T && t < im.T + 0.07;
@@ -786,8 +901,11 @@
     const shotDown = {};
     f.log.forEach((e, k) => { if (e.fx === "down") shotDown[e.t] = P.events[k]; });
     const doomed = (q, s) => s.fled != null && shotDown[q.i] != null && shotDown[q.i] >= s.fled;
+    // a foe talked out of the fight turns its back and walks off; one that bolts is gone in a second
+    const fadeLen = (s) => (s.walk ? 2.6 : 1.2);
     function fleeDx(q, s, t) {
       if (s.fled == null) return 0;
+      if (s.walk) return (q.side ? 1 : -1) * 34 * Math.max(0, t - s.fled);
       const k = Math.max(0, t - s.fled), run = doomed(q, s) ? Math.min(k, 0.45) : k;
       return (q.side ? 1 : -1) * (q.mount ? 210 : 150) * run * run;
     }

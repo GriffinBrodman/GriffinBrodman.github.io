@@ -378,7 +378,7 @@
       case "trait": return `${h0} is not the same hero`;
       case "poached": return `Transfer scandal: ${h0}`;
       case "crime": return `${h0} in trouble with the law`;
-      case "legend": return `${h0} becomes a legend`;
+      case "legend": return e.legend ? ((e.heroes || []).length ? `${e.legend} seeks out ${h0}` : `${e.legend} is spotted`) : `${h0} meets a legend`;
       case "join": return `${h0} joins the league`;
       case "relic": return `${h0}'s mystery relic identified`;
       case "keystone": if (e.ks) return `${h0}: ${e.ks}`;
@@ -1235,17 +1235,11 @@
   // ================= SONGBOOK & THE BARD =================
   const songs = () => (L.songs || []).slice().sort((a, b) => b.day - a.day);
   const MOOD = { glory: ["♪ glory", "gold"], sad: ["♪ lament", "dim"], shame: ["♪ ballad of shame", "red"] };
-  const BARD = { id: "bard", name: "The Bard", look: { skin: "#e8b088", hair: "#7a4424", style: 1, face: 2, fav: "#c8463a", scars: [] }, weapon: "lute", weapon_tier: 2, armor_tier: 1 };
 
   function bardStage(song, slides) {
     const box = el("div", { class: "bard" });
-    const cv = el("canvas", { class: "bard-stage" });
-    const W = 240, H = 84;
-    cv.width = W * 4; cv.height = H * 4;
-    const bg = Scenes.backdrop("tavern", W, H, Art.hash(song.id));
-    const bardCls = S.classes.bard || { look: { outfit: "fancy", head: "feather_cap", offhand: "lute" } };
-    const listeners = (song.heroes || []).map((id) => heroes[id]).filter((h) => h && h.alive !== false).slice(0, 3);
-    const ghost = song.dirge && heroes[song.dirge];
+    const cv = Ballad.scene(song, { W: 256 });
+    cv.className = "bard-stage";
     const slide = el("div", { class: "slide", hidden: !slides || !slides.length });
     const lyr = el("div", { class: "lyrics" });
     const lineEls = song.lyrics.map((line) => {
@@ -1254,47 +1248,24 @@
       lyr.appendChild(row);
       return row;
     });
-    let playing = false, frame = 0, raf = 0, notes = [];
-    const draw = () => {
-      const c = cv.getContext("2d"), off = document.createElement("canvas");
-      off.width = W; off.height = H;
-      const o = off.getContext("2d");
-      o.imageSmoothingEnabled = false;
-      o.drawImage(bg, 0, 0);
-      const ground = Math.round(H * 0.62) + 16;
-      const g = Art.heroGrid(BARD, playing ? frame : 0, bardCls);
-      o.fillStyle = "#3a2214"; o.fillRect(W / 2 - 10, ground - 6, 20, 6);
-      o.drawImage(g.toCanvas(1), Math.round(W / 2 - g.w / 2), ground - g.h - 4);
-      if (ghost) { o.globalAlpha = 0.45; const gg = Art.heroGrid(ghost, 0, A.heroLook(ghost)); o.drawImage(gg.toCanvas(1), W / 2 + 30, ground - gg.h - 10 - Math.round(Math.sin(Date.now() / 600) * 2)); o.globalAlpha = 1; }
-      listeners.forEach((h, i) => { const hg = Art.heroGrid(h, 0, A.heroLook(h)); o.drawImage((i % 2 ? hg : hg.flipX()).toCanvas(1), i % 2 ? W - 60 - i * 12 : 30 + i * 12, ground - hg.h); });
-      for (const n of notes) { o.fillStyle = n.c; o.fillRect(Math.round(n.x), Math.round(n.y), 2, 2); o.fillRect(Math.round(n.x) + 2, Math.round(n.y) - 4, 1, 5); }
-      c.imageSmoothingEnabled = false;
-      c.drawImage(off, 0, 0, cv.width, cv.height);
-    };
-    const tick = () => {
-      if (!cv.isConnected) { Sound.stopSong(); return; }
-      if (playing) {
-        if (Math.random() < 0.08) notes.push({ x: W / 2 + 6 + Math.random() * 10, y: H * 0.45, vx: (Math.random() - 0.3) * 0.4, c: ["#ffd86a", "#ffffff", "#e87a5a"][Math.floor(Math.random() * 3)], life: 80 });
-        for (const n of notes) { n.y -= 0.35; n.x += n.vx; n.life--; }
-        notes = notes.filter((n) => n.life > 0);
-      }
-      draw();
-      raf = requestAnimationFrame(tick);
-    };
+    let playing = false;
     const btn = el("button", { class: "btn primary" }, "▶ Ask the bard to play");
     const about = (song.heroes || []).map((id) => (heroes[id] || {}).name).filter(Boolean);
     const shareSong = A.shareBtn(`"${song.title}", a song${about.length ? " about " + about.slice(0, 3).join(", ") : ""}, sung in ${plural(song.towns.length, "town")}. ${song.lyrics.slice(0, 2).join(" / ")}`, `#/songs/${song.id}`, "Song copied with a link.");
-    const stop = () => { playing = false; Sound.stopSong(); btn.textContent = "▶ Play it again"; for (const r of lineEls) for (const s of r.children) s.classList.remove("on", "sung"); };
+    const stop = () => { playing = false; cv.ballad.playing(false); Sound.stopSong(); btn.textContent = "▶ Play it again"; for (const r of lineEls) for (const s of r.children) s.classList.remove("on", "sung"); };
     btn.onclick = () => {
       if (playing) { stop(); return; }
       playing = true;
+      cv.ballad.playing(true);
       btn.textContent = "■ Stop";
-      let beatTimer = setInterval(() => { if (!playing) clearInterval(beatTimer); frame ^= 1; }, 280);
+      // the song stops when its stage leaves the page
+      const gone = setInterval(() => { if (!playing) clearInterval(gone); else if (!cv.isConnected) { clearInterval(gone); stop(); } }, 500);
       Sound.playSong(song, (li, si) => {
+        cv.ballad.strum();
         lineEls.forEach((r, i) => [...r.children].forEach((s, j) => { s.classList.toggle("on", i === li && j === si); s.classList.toggle("sung", i < li || (i === li && j < si)); }));
         if (slides && slides.length && si === 0) { slide.textContent = slides[li % slides.length]; slide.hidden = false; }
         lineEls[li].scrollIntoView({ block: "nearest", behaviour: "smooth" });
-      }, () => { playing = false; btn.textContent = "▶ Play it again"; });
+      }, () => { playing = false; cv.ballad.playing(false); btn.textContent = "▶ Play it again"; });
     };
     const [moodTxt, moodCls] = MOOD[song.mood] || MOOD.glory;
     box.append(
@@ -1305,7 +1276,6 @@
     const lies = Object.entries(song.versions || {});
     if (lies.length) box.appendChild(el("div", { class: "small muted", style: { marginTop: "6px" } }, "The song changes on the road: ",
       lies.map(([t, v], i) => [i ? "; " : "", `in ${A.nodeName(t, true)} they sing "${v.title}"`]), "."));
-    requestAnimationFrame(tick);
     return box;
   }
 

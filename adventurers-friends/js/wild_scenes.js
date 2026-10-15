@@ -151,7 +151,7 @@
   function P2(ctx, x, y, c) { rect(ctx, x, y, 1, 1, c); }
   function eyes(o) {
     const ps = o.pts.map((p, i) => [p[0], p[1], ((o.seed || 1) * 0.31 + i * 0.43) % 1, 5 + (i % 3) * 1.7]);
-    return { z: o.z || 0, draw(ctx, t) {
+    return { z: o.z || 0, light: true, draw(ctx, t) {
       for (const [x, y, ph, per] of ps) {
         const f = frac(t / per + ph);
         if (f > 0.55) continue;

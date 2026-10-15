@@ -9,8 +9,8 @@
     title: 1.4, bossIntro: 1.3, hold: 2.8, cutin: 1.1, glint: 0.32, morale: 1.15, settle: 0.12,
     minorRate: 3, slowRate: 0.4, flagSlowRate: 0.7, mergeMax: 3, killFreeze: 0.55, turnFreeze: 0.42, critFreeze: 0.2,
   };
-  const SUPPORT = { guard: "guard", buff: "buff", rally: "buff", fear: "curse", debuff: "curse", stealth: "buff", summon: "summon" };
-  const SHAPE = { rally: "shout", stealth: "vanish", fear: "dread", debuff: "hex" };
+  const SUPPORT = { guard: "guard", buff: "buff", rally: "buff", fear: "curse", debuff: "curse", parley: "curse", stealth: "buff", summon: "summon" };
+  const SHAPE = { rally: "shout", stealth: "vanish", fear: "dread", debuff: "hex", parley: "hex" };
 
   // ---------- what a skill looks like ----------
   function guess(e, unit, ranged) {
@@ -75,11 +75,13 @@
         case "down": if (e.t != null) alive[e.t] = false; // falls through
         case "thorns": case "flee": case "rout": case "surrender":
           if (e.fx === "flee") alive[e.a] = false;
+          // the last of a group running for it is a moment of its own, seen wide
+          if (e.bolt) { add({ kind: "flee", ev: [li], e }); cur = null; break; }
           if (cur && cur.kind === "act") cur.ev.push(li);
           else add({ kind: e.fx === "down" || e.fx === "thorns" ? "aside" : e.fx, ev: [li], e });
           break;
         case "summon": if (e.new) alive[e.new.i] = true; // falls through
-        case "guard": case "buff": case "rally": case "fear": case "debuff": case "stealth":
+        case "guard": case "buff": case "rally": case "fear": case "debuff": case "parley": case "stealth":
           cur = add({ kind: "act", a: e.a, e, ev: [li], support: e.fx, allies: units.filter((u) => u && u.side === (units[e.a] || {}).side && alive[u.i]).map((u) => u.i),
             foes: units.filter((u) => u && u.side !== (units[e.a] || {}).side && alive[u.i]).map((u) => u.i) });
           cur = null; break;
@@ -104,7 +106,7 @@
         // a crew buff plays on everyone it buffed; a status nobody fell for still reaches the other side and fizzles there
         const missed = e.fx === "debuff" && e.t != null && ![].concat(e.t).length;
         if (missed) b.whiff = true;
-        tgt = missed ? b.foes : e.fx === "debuff" && e.t ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
+        tgt = missed ? b.foes : (e.fx === "debuff" || e.fx === "parley") && e.t != null ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
           : e.fx === "summon" && e.new ? [e.new.i] : [b.a];
       }
       b.to = tgt.filter((i) => units[i]);
@@ -178,9 +180,11 @@
         t += T.morale; i++; continue;
       }
       if (b.kind === "flee" || b.kind === "carry") {
-        slots.push({ kind: "move", t0: t, len: 0.8, members: [{ b, off: 0, knots: [[0, 0], [0.8, 0.8]] }] });
+        // a foe talked out of the fight walks off, and the replay gives it time to
+        const len = b.e && b.e.walk ? 1.8 : b.e && b.e.bolt ? 1.2 : 0.8;
+        slots.push({ kind: "move", t0: t, len, members: [{ b, off: 0, knots: [[0, 0], [len, len]] }] });
         for (const li of b.ev) at(li, t + 0.05);
-        t += 0.8; i++; continue;
+        t += len; i++; continue;
       }
       if (isMinor(b)) {
         // a run of small trades plays as one beat, everyone at once, fast

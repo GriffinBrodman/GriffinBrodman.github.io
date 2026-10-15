@@ -51,13 +51,44 @@
       ["The economy", "Every town pays different prices. Heroes remember prices and swap tips, so some carry loot across the map to sell it better. The undertaker in Ashfen pays well for remains, no questions asked."],
       ["Watch the fight", "Notable fights are kept as replays. Look for \"watch\" next to a story."],
     ]],
+    ["Money", [
+      ["Copper, silver and gold", "10 copper make a silver, and 10 silver make a gold piece. A hero's purse is counted in silver, with a few copper in the pocket for pies, baths and tips; shopkeepers always give exact change."],
+      ["Gold pieces", "Big sums that change hands read in gold: a fat bounty, a dragon's hoard, a night's winnings or losses at the tables. \"12 gold pieces and 4 silver\" is 124 silver, and it goes straight into the purse as silver."],
+      ["Earned, not won", "The fortune dream (2,000 silver earned) and purse goals count silver earned by work, loot and rewards. Table winnings don't count toward them, and table losses don't take anything off."],
+    ]],
+    ["The tables", [
+      ["A game in every town", "Every town has its own game of chance and its own dealer, named in the town's Around town box. Heroes who like risk, or who carry a heavy purse, drift to the table in the afternoon or after supper. Heroes whose players said no to gambling never sit down."],
+      ["The house", "Every game is played for real: the dice, pigs, shells, lots and candles decide each round, and some games pay more than even money. Over time the house always keeps a share of what's staked, from about 2 in every 100 on the toll bridge to about 20 in Ashfen. A sharp mind, a read on people or a gambler's knack narrows it, but never past even."],
+      ["Stop-loss", "Heroes bring a bankroll, not the purse: the money for beds and food stays put, and careful heroes hold back what they're saving for a horse or a house. Reckless ones may chase a bad night once."],
+      ["Cheats", "Rogues and the dishonest sometimes cheat. A cheat who gets away with it wins double; a caught one forfeits double, is banned from that table for a week or two, and now and then spends a night in the cells. Dealers remember, and nickname their regulars."],
+      ["Watch", "Every sitting is kept as a replay for a fortnight. \"Lost 30 silver at Pig Racing ▸ watch\" in a hero's day opens it, with every round listed underneath."],
+    ]],
+    ["By the fire", [
+      ["Game sets", "Cards, dice, checkers, chess and tarot decks are real kit: bought at markets (cheapest in the town that makes them), found in dungeons, won and lost. Sets wear out and lose pieces; a pebble stands in for the missing rook. A hero carries three at most."],
+      ["Night games", "About half the nights a crew spends at camp, someone gets a set out. The game is whatever most of the people present like playing. The rest of the nights go to talk, songs and stories."],
+      ["Stakes", "Crewmates never play each other for silver. The loser takes first watch, cooks tomorrow, washes up or carries the pack, and once in a while a set or a keepsake changes hands."],
+      ["Head to head", "Every pair keeps a running record for each game. Winning streaks earn camp nicknames, sore losers demand rematches, and a hot-tempered loser may flip the board. The record shows on each hero's page under At the fire."],
+    ]],
+    ["Chess and the Yeti Society", [
+      ["Chess", "Chess nights are real games of chess, played move by move. A hero's strength comes from their mind and how much they've played, and a bad temper or a stressful week costs them. Strong players play sharp games; two bad players are a comedy."],
+      ["How a game ends", "Mate, resignation or a draw (stalemate, the same position three times, fifty quiet moves, or too little left to mate with). A game still going at move eighty is called: a side a piece or more ahead is given it, otherwise it's a draw."],
+      ["Legends", "Now and then a game follows, move for move, one of the old famous games, told here as a local legend. The real game is named in small print under the replay."],
+      ["The Yeti Society", "In Frosthold the Yeti Society plays a game by post against an opponent nobody has ever seen: one move a day, the reply left overnight under a white footprint. A hero in town may offer to play the Society's side, and beating the footprint earns the Yeti badge. The board is on the Frosthold page, with a small copy in the corner of the Crier."],
+      ["Watch", "Every chess game is kept as a replay: the key moments first, the full game a button away."],
+    ]],
   ];
+  // each town's game, from the league's own data: rules, dealer and the house's share
+  function tableGames() {
+    return Object.values(S.towns || {}).filter((t) => t.game && t.game.rules).map((t) => [`${t.game.name} (${t.name})`,
+      `${t.game.rules} Dealt by ${t.game.dealer}.${t.game.edge ? ` The house keeps about ${Math.max(1, Math.round((2 * t.game.edge - 1) * 100))} in every 100 staked.` : ""}`]);
+  }
   A.route(/^\/guide$/, (v) => {
     v.appendChild(el("h1", null, "The Guide"));
     v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page."));
     const g = el("div", { class: "grid2 even" });
-    for (const [title, items] of GUIDE) {
+    for (const [title, base] of GUIDE) {
       const dl = el("dl", { class: "kv guide" });
+      const items = title === "The tables" ? base.slice(0, 2).concat(tableGames(), base.slice(2)) : base;
       for (const [k, txt] of items) dl.append(el("dt", null, k), el("dd", null, txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", "))));
       g.appendChild(panel(title, dl));
     }

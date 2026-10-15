@@ -840,11 +840,12 @@
         }
         break;
       case "quiver":
-        if (!front) {
-          P.poly([[21, 10.5], [24.5, 9.5], [25.5, 19], [22, 20]], "bk", (x) => 0.25 - (x - 21) * 0.15);
-          if (t >= 1) P.line(21.2, 12, 24.8, 11, t === 3 ? "gold" : "dleather", 0.2);
-          if (t === 3) P.line(21.8, 18, 25.2, 17.2, "gold", 0);
-        } else P.line(19.5, 17, 9.5, 25, "strap", 0.1);
+        // the arrows sit behind the head too, so a hat brim or a hood stays in front of them
+        if (!front) { quiverBody(P, QS, t); quiverArrows(P, QS, t); }
+        else {
+          P.line(19.5, 16.6, 9, 25, t ? "dleather" : "strap", 0.15);
+          if (t >= 2) { P.px(14, 21, t === 3 ? "gold" : "omet", 0.4); P.px(15, 20, t === 3 ? "gold" : "omet", 0); }
+        }
         break;
       case "backpack":
         if (!front) {
@@ -876,16 +877,42 @@
     }
   }
 
-  function backTop(P, art, t) {
-    if (art === "quiver") {
-      const n = [2, 3, 4, 5][t];
-      for (let i = 0; i < n; i++) {
-        const x = 21.5 + i * (3.4 / n), up = i % 2;
-        P.line(x + 0.6, 10, x, 7.6 - up, "dwood", 0);
-        const m = up && t >= 2 ? "fav" : "feather";
-        dot(P, x, 7 - up, m, 0.35); dot(P, x, 8 - up, m, -0.1);
+  // the quiver is slung across the back: the strap runs over the right shoulder to the left hip, so the mouth rides up behind
+  // the right shoulder with the fletchings showing past it, and the tip peeks out low on the left; QS = sprite, QP = portrait
+  const QS = { b: [7.6, 27.6], m: [21.6, 10.6], hw: 1.75, arrow: 3.6, fl: 1.6 };
+  const QP = { b: [24, 42], m: [33.6, 15], hw: 3.1, arrow: 6, fl: 3 };
+  function quiverFrame(q) {
+    const [bx, by] = q.b, [mx, my] = q.m, L = Math.hypot(mx - bx, my - by), dx = (mx - bx) / L, dy = (my - by) / L;
+    const at = (u, v) => [bx + dx * u - dy * v, by + dy * u + dx * v];
+    const side = (x, y) => (x - bx) * -dy + (y - by) * dx;
+    return { L, dx, dy, at, side };
+  }
+  function quiverBody(P, q, t) {
+    const F = quiverFrame(q), { L, at, side } = F, w = q.hw;
+    const shade = (x, y) => 0.3 - (side(x + 0.5, y + 0.5) / w + 1) * 0.28;
+    P.poly([at(0.8, -w * 0.7), at(L, -w), at(L, w), at(0.8, w * 0.7), at(0, 0)], "bk", shade);
+    const band = (u, m, s) => P.poly([at(u, -w - 0.15), at(u + (q.hw > 2 ? 1.2 : 0.9), -w - 0.15), at(u + (q.hw > 2 ? 1.2 : 0.9), w + 0.15), at(u, w + 0.15)], m, (x, y) => s - (side(x + 0.5, y + 0.5) / w) * 0.25);
+    band(L - (q.hw > 2 ? 1.2 : 0.9), t === 3 ? "gold" : t ? "dleather" : "bk", t ? 0.25 : -0.35);
+    if (t >= 1) band(L * 0.62, t === 3 ? "gold" : "dleather", 0.1);
+    if (t === 3) band(L * 0.25, "gold", 0);
+  }
+  function quiverArrows(P, q, t) {
+    const F = quiverFrame(q), { L, dx, dy, at } = F, n = [2, 3, 4, 5][t], w = q.hw * 0.75;
+    for (let i = 0; i < n; i++) {
+      const v = n === 1 ? 0 : -w + (2 * w * i) / (n - 1), up = (i % 2 ? 0.5 : 1.3) * (q.hw > 2 ? 1.4 : 1);
+      const [x0, y0] = at(L - 0.4, v), [x1, y1] = at(L + q.arrow - q.fl + up, v + (q.hw > 2 ? 0.6 : 0.3));
+      P.line(x0, y0, x1, y1, "dwood", 0);
+      const m = i % 2 && t >= 2 ? "fav" : "feather";
+      for (let k = 0; k <= q.fl * 2; k++) {
+        const u = L + q.arrow - q.fl + up + k * 0.5, vv = v + (q.hw > 2 ? 0.6 : 0.3) + (k / (q.fl * 2)) * (q.hw > 2 ? 0.4 : 0.2);
+        const [x, y] = at(u, vv);
+        P.px(x, y, m, 0.35 - (k / (q.fl * 2)) * 0.3 - (i % 2 ? 0.15 : 0));
+        if (q.hw > 2) { const [x2, y2] = at(u, vv + 0.9); P.px(x2, y2, m, -0.15); }
       }
-    } else if (t >= 1) {
+    }
+  }
+  function backTop(P, art, t) {
+    if (art !== "quiver" && t >= 1) {
       for (const [x, sh] of [[4.5, 0.3], [21.5, -0.2]]) P.rect(x, 13, 2, 3, "bk", sh);
       if (t >= 2) for (const [x, sh] of [[5.5, 0.35], [22.5, 0]]) P.ell(x, 12.6, 1.5, 1.5, t === 3 ? "fav" : "cream", { s: sh });
     }
@@ -1350,13 +1377,8 @@
         }
         break;
       case "quiver":
-        if (!front) {
-          const n = [2, 3, 4, 5][t];
-          P.rect(29, 14, 4, 16, "bk", (x) => 0.1 - (x - 29) * 0.15);
-          for (let i = 0; i < n; i++) { const x = 28.5 + i * (5 / n); P.line(x + 0.5, 9 + (i % 2), x, 14, "feather", 0.2); P.px(x + 0.5, 9 + (i % 2), i % 2 && t >= 2 ? "fav" : "feather", 0.4); }
-          if (t >= 1) P.rect(29, 17, 4, 1, t === 3 ? "gold" : "dleather", 0.2);
-          if (t === 3) P.rect(29, 25, 4, 1, "gold", 0);
-        } else if (t) { P.line(cx + 12, 29, cx - 8, 40, "dleather", 0); P.line(cx + 13, 29.5, cx - 7, 40.5, "dleather", -0.3); }
+        if (!front) { quiverBody(P, QP, t); quiverArrows(P, QP, t); }
+        else { const m = t ? "dleather" : "strap"; P.line(cx + 12, 28.5, cx - 8, 40, m, 0.1); P.line(cx + 13, 29, cx - 7, 40.5, m, -0.3); if (t >= 2) P.rect(cx + 1, 34, 2, 2, t === 3 ? "gold" : "omet", (x) => 0.4 - (x - cx - 1) * 0.3); }
         break;
       case "backpack":
         if (!front) {
@@ -1391,7 +1413,8 @@
   function fullBody(o) {
     if (o.look && o.look.child) return childBody(o);
     const h = { id: o.id, name: o.name, look: o.look, weapon: o.weapon, weapon_tier: o.weaponTier, armor_tier: o.armorTier, legend: o.legend, kit: o.kit };
-    const cl = o.clsLook || {}, c = setup(h, cl), P = new Paint(28, 34), M = c.mats, outfit = c.outfit, K = c.k;
+    const BH = o.seated ? Math.max(34, o.seated + 2) : 34;
+    const cl = o.clsLook || {}, c = setup(h, cl), P = new Paint(28, BH), M = c.mats, outfit = c.outfit, K = c.k;
     const base = BASE[outfit] || "hide";
     c.hglow = K.head && K.head.glow;
     const HT = { ox: 14, oy: 9.6, cx: 20, cy: 15.5, s: 0.66 };
@@ -1399,13 +1422,18 @@
     P.tf = HT; headBack(P, c); P.tf = null;
     P.layer = 1;
     const back = K.back && K.back.art, bt = tierOf(K.back, 1);
-    if (outfit === "cloak" || outfit === "robe_dark" || (K.legacy && back === "banner")) P.poly([[8, 17], [20, 17], [22.5, 32], [5.5, 32]], "favd", (x) => -0.2 - (x - 14) * 0.05);
+    if (outfit === "cloak" || outfit === "robe_dark" || (K.legacy && back === "banner")) {
+      // in the saddle the cloak falls back over the mount's rump instead of hanging to the heels
+      if (o.seated) P.poly([[8, 17], [20, 17], [19, 26], [3.5, 28.5], [5, 23]], "favd", (x, y) => -0.2 - (x - 14) * 0.05 - (y - 17) * 0.02);
+      else P.poly([[8, 17], [20, 17], [22.5, 32], [5.5, 32]], "favd", (x) => -0.2 - (x - 14) * 0.05);
+    }
     if (back) glows.push([track(P, () => backSprite(P, c, back, bt, false)), K.back.glow]);
     P.layer = 2;
     const peg = c.scars.includes("peg"), boots = K.pocket && K.pocket.art === "boots";
     const bootM = boots ? "pk" : "boot", bootTop = boots ? 28 : 30;
     const bootPx = track(P, () => {
-      if (!ROBES.has(outfit)) {
+      if (o.seated) seatedLegs(P, outfit, base, bootM, peg, boots, o.seated);
+      else if (!ROBES.has(outfit)) {
         const pm = outfit === "plate" ? "metal" : outfit === "fur" ? "hide" : "pants";
         P.rect(10, 25, 3, 6, pm, (x) => 0.15 - (x - 10) * 0.12);
         if (peg) P.rect(16, 25, 1, 7, "wood", 0); else P.rect(15, 25, 3, 6, pm, (x) => -0.2 - (x - 15) * 0.12);
@@ -1490,6 +1518,7 @@
       P.rect(Math.round(fx - 1), Math.round(fy - 1), 2, 2, "skin", (x) => 0.3 - (x - fx) * 0.3);
       P.rect(6, 24, 2, 2, gaunt ? "pk" : "skin", (x) => 0.2 - (x - 6) * 0.3);
     }
+    if (o.seated) { P.layer = 10; saddleTop(P); }
     P.layer = 11;
     (K.rings || []).forEach((rg, i) => {
       const x = i === 0 ? 7 : 19, band = rg.art === "band" ? "copper" : "gold", gem = rg.glow ? null : rg.gem, bx = i === 0 ? x : x + 1, gx = i === 0 ? x + 1 : x;
@@ -1510,15 +1539,49 @@
     const aura = cl.aura || (o.legend ? "gold" : null);
     if (aura) {
       const ac = AURA[aura] || AURA.arcane, rr = rng(hash(aura) + (o.frame || 0) * 7919), edge = [];
-      for (let y = 0; y < 34; y++) for (let x = 0; x < 28; x++) if (P.mat[y * 28 + x] === null && g.px[y * 28 + x]) edge.push([x, y]);
+      for (let y = 0; y < BH; y++) for (let x = 0; x < 28; x++) if (P.mat[y * 28 + x] === null && g.px[y * 28 + x]) edge.push([x, y]);
       for (let k = 0; k < (o.legend ? 5 : 3); k++) {
         const [x, y] = edge[Math.floor(rr() * edge.length)] || [0, 0];
         const nx = x + (rr() < 0.5 ? -1 : 1) * (1 + Math.floor(rr() * 2)), ny = y + (aura === "fire" || aura === "holy" ? -1 : rr() < 0.5 ? -1 : 1) * (1 + Math.floor(rr() * 2));
         if (!g.get(nx, ny)) g.set(nx, ny, ac[Math.floor(rr() * ac.length)]);
       }
     }
-    if (o.frame === 1) { const n = new Grid(28, 34); for (let y = 0; y < 33; y++) for (let x = 0; x < 28; x++) n.px[(y + 1) * 28 + x] = g.px[y * 28 + x]; g = n; }
+    if (o.frame === 1) { const n = new Grid(28, BH); for (let y = 0; y < BH - 1; y++) for (let x = 0; x < 28; x++) n.px[(y + 1) * 28 + x] = g.px[y * 28 + x]; g = n; }
     return g;
+  }
+
+  // the saddle's raised cantle behind the rider and its small pommel ahead of the hip, drawn over everything held low (a
+  // weapon hanging at the side passes behind it) so the seat reads even at sprite size
+  function saddleTop(P) {
+    P.poly([[2.5, 23], [4.5, 23], [5.5, 25.5], [9, 26], [9, 28.5], [3, 28.5]], "leather", (x, y) => (y <= 23 || (y === 26 && x > 5) ? 0.6 : y >= 28 ? -0.35 : 0.1 - (y - 24) * 0.05) - (x - 3) * 0.04);
+    P.rect(19, 26, 2, 2, "leather", (x, y) => (y === 26 ? 0.55 : 0.05) - (x - 19) * 0.2);
+  }
+
+  // in the saddle, facing right: the near thigh drops steeply from the hip to a knee a little ahead of it, and the shin
+  // and boot hang straight down the flank to the sole row `sole` (about the mount's belly line), heel down and toe forward; the far
+  // leg is hidden behind the mount
+  function seatedLegs(P, outfit, base, bootM, peg, boots, sole) {
+    sole = Math.max(33, sole | 0);
+    // under the seat: a short drape in the hero's colour and the saddle's leather flap; the cantle and pommel go on later,
+    // over the torso's edge (saddleTop)
+    P.poly([[6.5, 28], [16, 28], [15.5, 31], [7, 31]], "favd", (x, y) => (y === 28 ? 0.3 : y === 30 ? -0.45 : 0) - (x - 7) * 0.02);
+    P.rect(5, 26, 15, 2, "leather", (x, y) => (y === 26 ? 0.35 : -0.15) - (x - 5) * 0.02);
+    P.poly([[5, 27], [11, 27], [10.5, 29.5], [5.5, 29.5]], "leather", (x, y) => -0.05 - (y - 27) * 0.1 - (x - 5) * 0.02);
+    if (ROBES.has(outfit)) {
+      P.poly([[9, 23], [19, 23], [21, 27], [20.5, sole - 1], [16, sole - 1], [15, 28.5], [9, 27.5]], base, (x, y) => 0.2 - (x - 14) * 0.04 - (y - 23) * 0.03 + (x === 17 && y > 28 ? -0.4 : 0));
+      P.rect(17, sole - 1, 4, 1, bootM, 0.1); P.rect(17, sole, 5, 1, bootM, -0.2);
+      if (boots) P.rect(17, sole - 1, 4, 1, bootM, 0.5);
+      return;
+    }
+    const pm = outfit === "plate" ? "metal" : outfit === "fur" ? "hide" : "pants";
+    // the thigh drops steeply from the hip to a knee only a little ahead of it; the shin hangs straight down under the knee
+    P.poly([[9, 25], [16, 25], [20.5, 28], [20.5, 31], [17, 31], [9, 28]], pm, (x, y) => 0.35 - (y - 25 - (x - 9) * 0.3) * 0.12 - (x - 9) * 0.01);
+    if (peg) { P.rect(18, 31, 1, sole - 30, "wood", 0.1); return; }
+    const top = Math.max(31, sole - (boots ? 3 : 2));
+    if (top > 31) P.rect(17, 31, 3, top - 31, pm, (x, y) => 0.05 - (x - 17) * 0.2 - (y - 31) * 0.03);
+    P.rect(17, top, 3, sole - top, bootM, (x, y) => (y === top ? 0.4 : 0.05) - (x - 17) * 0.15);
+    P.rect(17, sole, 5, 1, bootM, (x) => -0.05 - (x - 17) * 0.05);
+    if (boots) P.rect(17, top, 3, 1, bootM, 0.6);
   }
 
   // a child (look.child) is painted natively on a body two-thirds of an adult's; the head shrinks less than the body, as a child's does

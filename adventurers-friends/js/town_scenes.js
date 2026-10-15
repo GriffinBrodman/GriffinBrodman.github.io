@@ -407,7 +407,7 @@
     const pal = { w: o.col || "#f4ece0", r: "#d83a2a", y: "#e8a830", k: "#1a1220" };
     // three pixels tall: a hen comes up to a villager's knee, not their chest
     const stand = A.sprite(["...r.", "wwwky", ".y.y."], pal), peck = A.sprite([".....", "wwww.", ".y.wr"], pal);
-    return { z: o.y, draw(ctx, t) {
+    return { z: o.y, walker: true, draw(ctx, t) {
       const f = frac(t / 5 + ph), x = o.x + R(Math.sin(f * Math.PI * 2) * (o.range || 4));
       A.put(ctx, Math.floor(t * 2.5 + ph * 5) % 3 === 0 ? peck : stand, x, o.y, Math.cos(f * Math.PI * 2) < 0);
     } };
@@ -1230,7 +1230,7 @@
   function patrol(o) {
     const A = window.Anim, fr = goblinFrames(), ph = (o.seed || 0) * 0.37;
     const span = o.x1 - o.x0, speed = o.speed || 4, rest = 0.2, per = (2 * span / speed) / (1 - 2 * rest), a = 0.5 - rest;
-    return { z: o.y, draw(ctx, t) {
+    return { z: o.y, walker: true, draw(ctx, t) {
       const f = frac(t / per + ph);
       let u, moving = true, left;
       if (f < a) { u = f / a; left = false; } else if (f < 0.5) { u = 1; moving = false; left = (f - a) / rest > 0.55; }
@@ -1250,7 +1250,7 @@
   }
   function bonfire(o) {
     const A = window.Anim, cols = ["#b83a20", "#ec6a2a", "#ffac3e", "#ffe27a", "#fff8d8"];
-    return { z: o.y, draw(ctx, t) {
+    return { z: o.y, light: true, draw(ctx, t) {
       A.light(ctx, o.x, o.y - 2, 24, "255,150,60", 0.1 + 0.05 * Math.sin(t * 7.3));
       for (let i = -4; i <= 4; i++) {
         const ph = i * 2.3, base = 11 - Math.abs(i) * 1.8, hgt = Math.max(1, R(base * (0.72 + 0.2 * Math.sin(t * 8.7 + ph) + 0.12 * Math.sin(t * 21 + ph * 1.7))));
@@ -1467,18 +1467,78 @@
   const DUNGEON_SCENES = { goblin_camp };
   const WILD_SCENES = {};
 
-  function header(townId, w, h, opts) {
-    const fn = SCENES[townId] || DUNGEON_SCENES[townId] || WILD_SCENES[townId];
+  // the night version of a scene: the sky is painted in a key colour so it can be swapped for a night sky, everything else is
+  // graded to moonlight, and of the moving life only the lights (fires, torches, glows, eyes) carry on
+  const SKY_KEY = "#ff00fe", LIGHTS = new Set(["torch", "glow", "embers", "fireflies", "wisp"]);
+  function nightSky(y, h) { const t = Math.min(1, y / Math.max(1, h)); return [R(10 + 22 * t), R(15 + 26 * t), R(36 + 46 * t)]; }
+  function grade(cv, sky) {
+    const ctx = cv.getContext("2d"), im = ctx.getImageData(0, 0, cv.width, cv.height), d = im.data, mask = new Uint8Array(cv.width * cv.height);
+    const r = Art.rng(77), skyH = Math.max(1, sky || cv.height);
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const p = i >> 2, y = Math.floor(p / cv.width);
+      if (d[i] === 255 && d[i + 1] === 0 && d[i + 2] === 254) {
+        mask[p] = 1;
+        const [a, b, c] = nightSky(y, skyH), star = r() < 0.012 ? 120 + r() * 110 : 0;
+        d[i] = Math.min(255, a + star); d[i + 1] = Math.min(255, b + star); d[i + 2] = Math.min(255, c + star * 0.9);
+        continue;
+      }
+      // lava, lit windows and embers glow on through the dark
+      if (d[i] > 190 && d[i + 2] < 120 && d[i] - d[i + 2] > 110) { d[i] = R(d[i] * 0.92); d[i + 1] = R(d[i + 1] * 0.85); d[i + 2] = R(d[i + 2] * 0.8); continue; }
+      const l = d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15;
+      d[i] = R(8 + d[i] * 0.2 + l * 0.08); d[i + 1] = R(10 + d[i + 1] * 0.22 + l * 0.1); d[i + 2] = R(24 + d[i + 2] * 0.26 + l * 0.2);
+    }
+    ctx.putImageData(im, 0, 0);
+    return mask;
+  }
+  // a scene's still layers and moving life at width W (90 tall), for a header or for another view to frame (opts.night)
+  function build(id, W, opts) {
+    const fn = SCENES[id] || DUNGEON_SCENES[id] || WILD_SCENES[id];
     if (!fn || !window.Art || !window.Anim) return null;
     opts = opts || {};
-    w = Math.max(40, R(w || 600)); h = Math.max(30, R(h || 180));
-    const W = Math.max(150, R(w * IH / h)), seed = Art.hash("town:" + townId);
+    const seed = Art.hash("town:" + id), night = !!opts.night;
     const base = canvas(W, IH), over = canvas(W, IH);
     const k = kit(base.getContext("2d"), W, IH, seed);
     k.o = kit(over.getContext("2d"), W, IH, seed + 1);
+    let skyEnd = 0;
+    if (night) {
+      const grad = k.grad;
+      k.grad = (y0, y1, stops, x0, x1) => { if (y0 === 0) { skyEnd = Math.max(skyEnd, y1); stops = stops.map(() => SKY_KEY); } grad(y0, y1, stops, x0, x1); };
+      k.cloud = () => {};
+    }
     const acts = [];
-    k.add = (a) => { if (a) acts.push(a); };
-    fn(k, window.Anim);
+    k.add = (a) => { if (a && (!night || a.light)) acts.push(a); };
+    let A = window.Anim;
+    if (night) {
+      A = Object.create(window.Anim);
+      for (const name of LIGHTS) if (typeof window.Anim[name] === "function") A[name] = (o) => Object.assign(window.Anim[name](o), { light: true });
+    }
+    fn(k, A);
+    const sky = night ? grade(base, skyEnd) : null;
+    if (night) grade(over);
+    return { base, over, acts, W, H: IH, sky };
+  }
+  // the row each dungeon's way in stands on, so a view can set it on its own horizon
+  const FOOT = { goblin_camp: 66, wolf_den: 84, collapsed_mine: 76, cragtooth_warren: 72, ashveil_crypts: 76, thornmere_ruins: 74, frostspire: 66, sunken_vault: 78, emberdeep: 82 };
+  // the same, cut down to h rows from row y0 (default: the bottom of the scene, a few rows up), with the life moved to match
+  function frame(id, W, h, opts) {
+    const b = build(id, W, opts);
+    if (!b) return null;
+    opts = opts || {};
+    const y0 = Math.max(0, Math.min(IH - h, opts.y0 == null ? IH - h - 6 : opts.y0));
+    const cut = (src) => { const c = canvas(W, h); c.getContext("2d").drawImage(src, 0, -y0); return c; };
+    const acts = b.acts.map((a) => ({ z: a.z, light: a.light, walker: a.walker, draw(ctx, t) { ctx.save(); ctx.translate(0, -y0); a.draw(ctx, t); ctx.restore(); } }));
+    const sky = b.sky && ((x, y) => x >= 0 && x < W && y >= 0 && y < h && b.sky[(y + y0) * W + x] === 1);
+    return { base: cut(b.base), over: cut(b.over), acts, W, H: h, y0, sky };
+  }
+
+  function header(townId, w, h, opts) {
+    if (!window.Art || !window.Anim) return null;
+    opts = opts || {};
+    w = Math.max(40, R(w || 600)); h = Math.max(30, R(h || 180));
+    const b = build(townId, Math.max(150, R(w * IH / h)));
+    if (!b) return null;
+    const { base, over, acts, W } = b;
     const cv = canvas(W, IH);
     cv.className = "town-scene";
     cv.style.imageRendering = "pixelated";
@@ -1498,5 +1558,5 @@
     if (!list.includes(id)) list.push(id);
   }
   const actors = { pennant, sails, wheel, swing, rowboat, eel, surf, shore, beam, aurora, leaves, shafts, rope, chicken, ship, plume, walker, sparkle, raven, bonfire };
-  window.TownScenes = { header, THEME, TOWNS: Object.keys(SCENES), DUNGEONS, WILDS, register, kit, rect, ln, actors };
+  window.TownScenes = { header, build, frame, FOOT, THEME, TOWNS: Object.keys(SCENES), DUNGEONS, WILDS, register, kit, rect, ln, actors };
 })();

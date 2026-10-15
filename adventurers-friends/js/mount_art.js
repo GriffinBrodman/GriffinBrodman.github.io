@@ -3,7 +3,8 @@
   Two sizes, each drawn natively (never resampled): the pen size for the stables yard and the mount panels, and people scale
   (scene = true) for anywhere an animal stands beside a ~30px hero (the night scenes, the hero page), where a horse's back is
   above a person's chest and the horse is longer than a person is tall.
-  MountArt.mountGrid(kind, colour, frame, scene)   -> cached 1x canvas, facing right; frame 0/1 is the idle pair
+  MountArt.mountGrid(kind, colour, frame, scene)   -> cached 1x canvas, facing right; frame 0/1 is the idle pair; scene = "rider" is
+                                                      people scale with the small kinds (pony, donkey) drawn bigger, for fight replays
   MountArt.mountSprite(kind, colour, scale, opts)  -> a <canvas class="mount-px"> for the page, idling unless opts.animate === false;
                                                       opts.scene for people scale
   MountArt.wagonGrid(kind, puller, frame, scene)   -> cached 1x canvas of the wagon alone (shafts resting on the ground), or the
@@ -121,6 +122,9 @@
   // up to the hip, a donkey a little lower, a camel's head well over a person's
   const SCENE_K = { horse: 1.7, courser: 1.7, destrier: 1.75, unicorn: 1.7, skeleton: 1.7, kelpie: 1.7, stag: 1.7, pony: 1.5, donkey: 1.4, ox: 1.65, camel: 1.6, eagle: 1.6 };
   const WAGON_K = 1.7;
+  // in a fight a rider sits on the small kinds, so they are drawn bigger there (scene = "rider") or the rider hides them;
+  // still clearly smaller than a horse
+  const RIDER_K = { pony: 1.75, donkey: 1.65 };
   // a pony drawn at people scale stands a little longer in the leg than the pen's stocky one
   const SCENE_SHAPE = { pony: { leg: 1.15 } };
   function sized(p, k) {
@@ -706,13 +710,13 @@
   function rawMount(kind, colour, frame, scene) {
     kind = COLOURS[kind] ? kind : "horse";
     colour = colourOf(kind, colour);
-    const k = scene ? SCENE_K[kind] : 1;
+    const k = scene === "rider" ? RIDER_K[kind] || SCENE_K[kind] : scene ? SCENE_K[kind] : 1;
     const draw = (f) => kind === "ox" ? drawOx(colour, f, k) : kind === "camel" ? drawCamel(colour, f, k) : kind === "eagle" ? drawEagle(colour, f, k) : drawEquine(kind, colour, f, k);
-    return cached("r:" + kind + colour + (scene ? ":s" : ""), () => trim(draw(0), draw(1)))[frame ? 1 : 0];
+    return cached("r:" + kind + colour + (scene === "rider" ? ":r" : scene ? ":s" : ""), () => trim(draw(0), draw(1)))[frame ? 1 : 0];
   }
   function mountGrid(kind, colour, frame, scene) {
     const g = rawMount(kind, colour, frame, scene);
-    return cached("m:" + kind + colourOf(kind, colour) + (frame ? 1 : 0) + (scene ? ":s" : ""), () => g.toCanvas(1));
+    return cached("m:" + kind + colourOf(kind, colour) + (frame ? 1 : 0) + (scene === "rider" ? ":r" : scene ? ":s" : ""), () => g.toCanvas(1));
   }
   function wagonGrid(kind, puller, frame, scene) {
     const k = scene ? WAGON_K : 1, sk = scene ? ":s" : "";

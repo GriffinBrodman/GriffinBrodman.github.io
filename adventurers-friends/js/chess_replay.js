@@ -1050,6 +1050,8 @@
     rec.players = (rec.players || []).slice(0, 2);
     while (rec.players.length < 2) rec.players.push({ id: "p" + rec.players.length, name: rec.players.length ? "Rival" : "Hero" });
     rec.setting = SETTINGS[rec.setting] ? rec.setting : rec.yeti ? "lodge" : "camp";
+    // a Yeti game still being played by letter has no result yet; it must not end in a draw's bow
+    if (rec.yeti && !rec.result) { rec.result = "ongoing"; rec.winner = null; return rec; }
     rec.result = ["mate", "resign", "draw"].includes(rec.result) ? rec.result : rec.winner === 0 || rec.winner === 1 ? "resign" : "draw";
     rec.winner = rec.result === "draw" ? null : rec.winner === 0 || rec.winner === 1 ? rec.winner : null;
     if (rec.winner === null && rec.result !== "draw") rec.result = "draw";
@@ -1183,6 +1185,11 @@
   function ending(p, ev, mat) {
     const G = p.G, N = p.N, rec = p.rec, tI = p.tLast, last = G.plies[N - 1];
     const end = p.end = { kind: rec.result };
+    if (rec.result === "ongoing") {
+      p.tEnd = p.tResult = tI + 0.6;
+      p.dur = p.tEnd + 1.2;
+      return;
+    }
     const kingOf = (c) => { const st = p.G.states[N]; for (const [id, q] of st) if (q.t === "K" && q.c === c) return { id, sq: q.sq }; return null; };
     if (p.flip) {
       const k = kingOf(p.loser);
