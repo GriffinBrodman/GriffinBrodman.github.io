@@ -758,7 +758,8 @@
     }
     left.appendChild(panel("Stats", sg));
     const tp = panel("Personality");
-    for (const t of ["boldness", "risk"]) tp.appendChild(traitRow(t, h.traits[t], true));
+    const grew = h.grew || ((L.heroes || []).find((x) => x.id === h.id) || {}).grew || [];
+    for (const t of ["boldness", "risk"]) tp.appendChild(traitRow(t, h.traits[t], true, grew.filter((g) => g.trait === t), h.name));
     tp.appendChild(el("div", { style: { height: "6px" } }));
     for (const t of ["greed", "honor", "sociability", "curiosity", "temper", "loyalty"]) tp.appendChild(traitRow(t, h.traits[t]));
     tp.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } },
@@ -834,9 +835,20 @@
     if (o.reads && o.reads.read) p.appendChild(el("p", { class: "tiny dim" }, `Has read the cards ${o.reads.read} time${o.reads.read === 1 ? "" : "s"}; ${o.reads.hits} of ${o.reads.checked} omens came true.`));
     return p;
   }
-  function traitRow(t, v, big) {
-    return el("div", { class: "trait" + (big ? " big" : "") }, el("span", null, TRAIT_LABEL[t]),
-      el("div", { class: "tbar" }, el("i", { style: { left: ((v + 1) / 2) * 100 + "%" } })), el("span", { class: "word" }, traitWord(t, v)));
+  // a trait that has moved shows where it started (a hollow marker), the way it went, and on hover what moved it
+  const bandMid = (t, word) => { const i = TRAIT_WORDS[t].indexOf(word); return i < 0 ? null : -1 + 0.4 * i + 0.2; };
+  function traitRow(t, v, big, changes, who) {
+    const pos = (x) => ((x + 1) / 2) * 100;
+    const moved = (changes || []).length ? changes : null;
+    const v0 = moved ? (moved[0].v0 != null ? moved[0].v0 : bandMid(t, moved[0].from)) : null;
+    const bar = el("div", { class: "tbar" },
+      v0 != null ? el("i", { class: "was", style: { left: pos(v0) + "%" } }) : null,
+      v0 != null ? el("span", { class: "moved", style: { left: Math.min(pos(v0), pos(v)) + "%", width: Math.abs(pos(v) - pos(v0)) + "%" } }) : null,
+      el("i", { style: { left: pos(v) + "%" } }));
+    const row = el("div", { class: "trait" + (big ? " big" : "") + (moved ? " grew" : "") }, el("span", null, TRAIT_LABEL[t]), bar,
+      el("span", { class: "word" }, traitWord(t, v), moved ? el("span", { class: "gold" }, v > v0 ? " ↑" : " ↓") : null));
+    if (!moved) return row;
+    return tip(row, moved.map((g) => `Was ${g.from}, now ${g.to}.${g.day ? " Day " + g.day + ":" : ""} ${g.why || ""}.`).join(" "), `${who} grew ${moved[moved.length - 1].mood}`);
   }
   // the leaning first (where this hero's arc is heading), then what has grown it: affinity starts empty and fills from what they learn and do
   function affinityPanel(h) {

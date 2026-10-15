@@ -212,6 +212,9 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .trait .tbar i { position: absolute; top: -4px; width: 6px; height: 16px; background: var(--brass); border: 1px solid var(--wood0); transform: translateX(-3px); }
 .trait.big .tbar { height: 14px; }
 .trait.big .tbar i { height: 20px; }
+.trait .tbar i.was { background: transparent; border: 1px dashed var(--wood0); opacity: 0.65; }
+.trait .tbar .moved { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: var(--wood0); opacity: 0.45; }
+.trait.grew { cursor: help; }
 .trait .word { text-align: right; color: var(--gold); font-size: 16px; }
 .skill { background: var(--parch); border: 1px solid var(--edge); border-left: 4px solid var(--purple); border-radius: 2px; padding: 6px 8px; }
 .skill .nm { font-family: var(--px); font-size: 15px; }
