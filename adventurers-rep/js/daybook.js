@@ -216,6 +216,7 @@
   const ICONS = {}, NIGHT = {};
   for (const [k, rows] of Object.entries(ART)) ICONS[k] = make(rows);
   for (const k of ["spar", "hunt", "fair", "depart", "auction"]) ICONS[k] = make(FN[k]);
+  ICONS.song = ICONS.busk;
   const EXTRA = { compass: make(FN.compass), moon: make(FN.moon), sun: make(FN.sun) };
   const NIGHT_ICON = { inn: "bed", room: "key", stable: "hay", cell: "bars", dungeon: "torch", road: "bedroll" };
   const nightArt = {};
@@ -229,12 +230,12 @@
     busk: "Busking", service: "Service", confession: "Confession", blessing: "Blessing", poorhouse: "Poorhouse", church_work: "Church chores",
     infirmary: "Infirmary", bath: "Bathhouse", fishing: "Fishing", dice: "Dice", bakery: "Bakery", pet: "With the pet", mount: "With the mount",
     crew: "With the crew", meet: "A meeting", spar: "Sparring", odd_request: "Odd request", fair: "The fair", yeti: "Yeti!", auction: "Auction",
-    event: "Town event", wander: "Wandering", carousing: "Carousing", hunt: "Hunting", delve: "Delving", camp: "Camp",
+    event: "Town event", song: "Music", wander: "Wandering", carousing: "Carousing", hunt: "Hunting", delve: "Delving", camp: "Camp",
   };
   const KINDS = { inn: "At the inn", camp: "At camp", stable: "In the stables", room: "A rented room", dungeon: "Below ground", cell: "In the cells", road: "By the roadside" };
   const CAT = {
     road: "road", arrive: "road", depart: "road", wander: "road", camp: "road",
-    errands: "town", bakery: "town", bath: "town", dice: "town", fair: "town", auction: "town", event: "town", carousing: "town", meet: "town", odd_request: "town", busk: "town",
+    errands: "town", bakery: "town", bath: "town", dice: "town", fair: "town", auction: "town", event: "town", carousing: "town", meet: "town", odd_request: "town", busk: "town", song: "town",
     work: "craft", labour: "craft", forge: "craft", brew: "craft", study: "craft", forage: "craft", fishing: "craft", rest: "craft",
     train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms",
     service: "church", confession: "church", blessing: "church", poorhouse: "church", church_work: "church", infirmary: "church",

@@ -4,18 +4,19 @@
     { id, day, season, town, game, dealer, hero, name, nick, where: "day"|"night",
       outcome: "win"|"loss"|"big_win"|"big_loss"|"streak_hot"|"streak_cold"|"chase"|"walk_away"|"cheat_win"|"cheat_caught"|"banned"|"cells",
       net: copper won (+) or lost (-) over the whole sitting, purse: [copper before, copper after],
-      rounds: [ { stake: copper, won: bool, cheat?: bool, caught?: bool, show: {...per game, below} } ] }
+      rounds: [ { stake: copper, won: bool, net: copper this round paid (+), cost (-) or 0 for the stake back, cheat?: bool, caught?: bool,
+                  show: {...per game, below} } ] }
   The replay plays one round (by default a cheat round if any, else the last round that went the night's way) and shows the
-  night's net in the hold.
+  night's net in the hold. Every round was played out with the game's own pieces (league/gambling.py play_round).
   show, per game:
-    liars_dice       { mine: [5 faces], theirs: [5 faces], bid: [count, face], called_by: "table" }  won = the bid stood
-    crown_anchor     { pick: emblem, dice: [3 emblems] }  emblems: crown anchor heart diamond spade club
-    knucklebones     { mine: [5 of 1|3|4|6], house: [5 of 1|3|4|6] }
-    undertakers_lots { lot: 2..12, roll: [d6, d6] }  won = the roll's sum matches the lot
-    pig_races        { backed: 1..6, order: [six pig numbers, winner first] }
-    candle_stakes    { burn: [3..5 burn lengths], mine: index }  the longest burn is the last flame
+    liars_dice       { mine: [5 faces], theirs: [5 faces], bid: [count, face], called_by: "table"|"hero", bids }  the bidder wins if the bid stood
+    crown_anchor     { pick: emblem, dice: [3 emblems], matches }  pays once per matching die; emblems: crown anchor heart diamond spade club
+    knucklebones     { mine: [5 of 1|3|4|6], house: [5 of 1|3|4|6], rethrow?, house_rethrow? }  ties go to the house
+    undertakers_lots { lot: 2..12, roll: [d6, d6], off }  off 0 pays double, 1 even money, 2 the stake back
+    pig_races        { backed: 1..6, order: [six pig numbers, winner first], odds: [[num, den] per pig] }
+    candle_stakes    { burn: [3..5 burn lengths], mine: index, pot, tithe }  the longest burn is the last flame and takes the pot
     acorn_shells     { start: 0..2, swaps: [[a, b], ...], acorn: 0..2, guess: 0..2 }  positions left to right
-    toll_toss        { call: "heads"|"tails", landed: "heads"|"tails" }
+    toll_toss        { call: "heads"|"tails", landed: "heads"|"tails", toll }
 
   TablesReplay.player(rec, opts) -> <figure> that plays while on screen, holds on the result, replays on click.
     opts.round (index, default last), opts.scale (CSS px per pixel, default fluid to 100% width), opts.caption (bool)
@@ -280,8 +281,10 @@
     const s = Math.floor(cp / 10), c = cp % 10;
     if (!s) return `${c} COPPER`;
     if (c && s < 10) return `${s}S ${c}C`;
-    // the same rule as App.money and town.money: whole silver floors, thousands take a comma
-    return `${String(s).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} SILVER`;
+    // the same rule as App.coins and town.gold_words: gold pieces from 100 silver up, whole silver floors, thousands take a comma
+    const g = Math.floor(cp / 100), r = Math.floor((cp % 100) / 10);
+    if (cp >= 1000) return `${String(g).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} GOLD${r ? ` ${r} SILVER` : ""}`;
+    return `${s} SILVER`;
   }
   // a stake as coins: gold for each 10 silver, silver, then copper, at most a dozen
   function coinsFor(cp) {
@@ -521,6 +524,12 @@
     }
   }
 
+  // what a round paid: + won, - lost, 0 the stake came back (older records carry no net: even money, a cheat paid double)
+  function rnet(rd) {
+    if (rd.net !== undefined) return rd.net;
+    const k = rd.cheat ? 2 : 1;
+    return rd.won ? rd.stake * k : -rd.stake * k;
+  }
   // the stake slip tacked to the apron: who bet what, and once settled, how it went
   function slip(S, rec, rd, done, o) {
     o = o || {};
@@ -528,10 +537,10 @@
     const name = (rec.name || "A hero").toUpperCase();
     lines.push([o.first || `${name}: ${money(rd.stake)}`, [60, 40, 26]]);
     if (done > 0) {
-      const amt = rd.cheat ? rd.stake * 2 : rd.stake;
+      const n = rnet(rd);
       const when = rec.where === "day" ? "TODAY" : "NIGHT";
       const night = rec.net === undefined ? "" : rec.net === 0 ? `${when}: EVEN` : `${when} ${rec.net > 0 ? "+" : "-"}${money(rec.net)}`;
-      lines.push([rd.won ? `WINS ${money(amt)}` : `LOSES ${money(amt)}`, rd.won ? [40, 110, 50] : [150, 40, 30]]);
+      lines.push([n > 0 ? `WINS ${money(n)}` : n < 0 ? `LOSES ${money(-n)}` : "STAKE BACK", n > 0 ? [40, 110, 50] : n < 0 ? [150, 40, 30] : [96, 76, 56]]);
       if (night) lines.push([night, [96, 76, 56]]);
     }
     const w = Math.max(...lines.map((l) => textWidth(l[0]))) + 8, hgt = lines.length * 7 + 4;
@@ -573,11 +582,11 @@
   }
   // the stake and the house's matching pile; when the round settles, coins hop from loser to winner
   function piles(p, rd, hero, house) {
-    const kinds = coinsFor(rd.stake * (rd.cheat ? 2 : 1));
-    return { hero, house, kinds, houseKinds: coinsFor(rd.stake).concat(["s", "s", "g"]).slice(-12), won: rd.won };
+    const n = rnet(rd), kinds = coinsFor(Math.max(rd.stake, -n));
+    return { hero, house, kinds, houseKinds: coinsFor(Math.max(rd.stake, n)).concat(["s", "s", "g"]).slice(-12), won: n > 0, push: n === 0 };
   }
   function drawPiles(S, pl, t, tEnd, lamp, items) {
-    const moving = Math.min(pl.kinds.length, 8), step = 0.07;
+    const moving = pl.push ? 0 : Math.min(pl.kinds.length, 8), step = 0.07;
     const from = pl.won ? pl.house : pl.hero, to = pl.won ? pl.hero : pl.house;
     const left = (base) => base.length - (t > tEnd ? moving : 0);
     const heroBase = pl.kinds, houseBase = pl.houseKinds;
@@ -602,7 +611,7 @@
     }
   }
   function coinEvents(ev, pl, tEnd) {
-    const n = Math.min(pl.kinds.length, 8);
+    const n = pl.push ? 0 : Math.min(pl.kinds.length, 8);
     for (let i = 0; i < n; i++) ev.push([tEnd + i * 0.07 + 0.3, "coin", 0.8 - i * 0.05]);
   }
   function paintItems(items) { items.sort((a, b) => b.y - a.y).forEach((it) => it.draw()); }
@@ -637,9 +646,10 @@
   }
   function verdict(b, rd, t, tEnd, win, lose, y, x) {
     if (t < tEnd) return;
-    const word = rd.caught ? "CAUGHT!" : rd.won ? win : lose;
+    const push = !rd.caught && !rd.won && rnet(rd) === 0;
+    const word = rd.caught ? "CAUGHT!" : rd.won ? win : push ? "STAKE BACK" : lose;
     x = x === undefined ? W / 2 : x;
-    stamp(b, word, x, y === undefined ? 6 : y, rd.caught ? [236, 70, 50] : rd.won ? [252, 216, 112] : [226, 112, 84], t - tEnd);
+    stamp(b, word, x, y === undefined ? 6 : y, rd.caught ? [236, 70, 50] : rd.won ? [252, 216, 112] : push ? [214, 200, 160] : [226, 112, 84], t - tEnd);
     if (rd.cheat && !rd.caught && t > tEnd + 0.6) text(b, "...AND NOBODY SAW", x, (y === undefined ? 6 : y) + 13, [200, 190, 160], { center: true, outline: [20, 14, 10] });
   }
   const DICE_CAM = { pitch: 68, dist: 420, focal: 420 * 1.22, target: [0, 2, 0], cy: 54 };
@@ -664,7 +674,7 @@
   SCENES.liars_dice = {
     plan(rec, rd, r) {
       const show = rd.show || {}, mine = (show.mine || [3, 5, 2, 5, 6]).slice(0, 5), theirs = (show.theirs || [5, 1, 4, 5, 2]).slice(0, 5);
-      const bid = show.bid || [3, 5], face = bid[1];
+      const bid = show.bid || [3, 5], face = bid[1], heroCalls = show.called_by === "hero";
       const look = { col: [238, 228, 206], tex: pipTex(null, [34, 22, 16]), outline: [48, 30, 20] };
       const dice = [];
       const ms = spots(r, 0, -12, 5, 40, 9, 16), ts = spots(r, 0, 15, 5, 40, 8, 16);
@@ -679,7 +689,7 @@
       ev.push([tEnd, rd.won ? "winCoins" : "lose"]);
       const pl = piles(null, rd, [-40, -24], [40, 24]);
       coinEvents(ev, pl, tEnd);
-      return { dice, face, bid, counted, tBid, tLiar, tCount, step, tEnd, pl, dur: tEnd + 1.1, ev, cam: new Cam(DICE_CAM) };
+      return { dice, face, bid, heroCalls, counted, tBid, tLiar, tCount, step, tEnd, pl, dur: tEnd + 1.1, ev, cam: new Cam(DICE_CAM) };
     },
     base(p) {
       const S = new Scene(p.cam, { key: [-0.5, -0.1, 0.86], lo: [0.9, 0.78, 0.7] });
@@ -718,15 +728,15 @@
       const b = S.b;
       p.counted.forEach((d, i) => ringDie(S, d, t, p.tCount + i * p.step, i + 1, [255, 206, 96]));
       if (t > p.tBid) {
-        const who = `${(rec.name || "").toUpperCase().slice(0, 9)} BIDS`;
+        const who = p.heroCalls ? "THE TABLE BIDS" : `${(rec.name || "").toUpperCase().slice(0, 9)} BIDS`;
         slate(b, 4, 4, Math.max(44, textWidth(who) + 7), 19);
         text(b, who, 7, 6, [190, 196, 184]);
         text(b, `${p.bid[0]} x`, 8, 13, [240, 242, 232]);
         dieIcon(b, 22, 12, p.face, [236, 228, 208], [30, 20, 16]);
         if (t > p.tCount) text(b, `${Math.min(p.counted.length, Math.floor((t - p.tCount) / p.step) + 1)}`, 38, 13, [255, 214, 110]);
       }
-      if (t > p.tLiar && t < p.tEnd) stamp(b, "LIAR!", 124, 6, [240, 92, 60], t - p.tLiar);
-      verdict(b, rd, t, p.tEnd, "IT STANDS!", "LIAR INDEED", 6, 124);
+      if (t > p.tLiar && t < p.tEnd) stamp(b, p.heroCalls ? `${(rec.name || "").toUpperCase().slice(0, 9)}: LIAR!` : "LIAR!", 124, 6, [240, 92, 60], t - p.tLiar);
+      verdict(b, rd, t, p.tEnd, p.heroCalls ? "LIAR INDEED" : "IT STANDS!", p.heroCalls ? "IT STANDS!" : "LIAR INDEED", 6, 124);
       slip(S, rec, rd, t - p.tEnd);
     },
     lamps(p, t) {
@@ -1036,10 +1046,11 @@
       if (t > p.tSum) {
         slate(b, W - 50, 4, 46, 17, [70, 60, 50]);
         text(b, "ROLLED", W - 47, 6, [190, 196, 170]);
-        text(b, `${p.roll[0]}+${p.roll[1]}=${p.sum}`, W - 47, 12, p.sum === p.lot ? [250, 230, 140] : [230, 236, 200]);
-        p.dice.forEach((d) => ringDie(S, d, t, p.tSum, undefined, p.sum === p.lot ? [230, 220, 120] : [150, 70, 60]));
+        const off = Math.abs(p.sum - p.lot), near = off <= 1;
+        text(b, `${p.roll[0]}+${p.roll[1]}=${p.sum}`, W - 47, 12, near ? [250, 230, 140] : [230, 236, 200]);
+        p.dice.forEach((d) => ringDie(S, d, t, p.tSum, undefined, near ? [230, 220, 120] : off === 2 ? [190, 180, 140] : [150, 70, 60]));
       }
-      verdict(b, rd, t, p.tEnd, "YOUR LOT!", "NOT YOUR LOT", 6, 92);
+      verdict(b, rd, t, p.tEnd, Math.abs(p.sum - p.lot) === 0 ? "YOUR LOT! DOUBLE!" : "ONE AWAY!", "NOT YOUR LOT", 6, 92);
       slip(S, rec, rd, t - p.tEnd);
     },
     lamps(p, t) {
@@ -1248,7 +1259,8 @@
         p.order.slice(0, 3).forEach((n, i) => { b.rect(22 + i * 12, 6, 9, 7, LANECOL[n - 1], true); const lum = LANECOL[n - 1][1]; text(b, String(n), 25 + i * 12, 7, lum > 150 ? [30, 24, 20] : [250, 246, 236]); });
       }
       verdict(b, rd, t, p.tEnd, `#${p.backed} WINS!`, `#${p.backed} CAME ${["", "2ND", "3RD", "4TH", "5TH", "LAST"][p.place[p.backed]]}`, 6, 124);
-      slip(S, rec, rd, t - p.tEnd, { first: `${(rec.name || "").toUpperCase()}: ${money(rd.stake)} ON #${p.backed}` });
+      const od = ((rd.show || {}).odds || [])[p.backed - 1], price = od ? (od[0] === od[1] ? " EVENS" : ` AT ${od[0]}-${od[1]}`) : "";
+      slip(S, rec, rd, t - p.tEnd, { first: `${(rec.name || "").toUpperCase()}: ${money(rd.stake)} ON #${p.backed}${price}` });
     },
     lamps(p, t) { return { amb: [1.0, 0.98, 0.9], lamps: [{ x: 30, y: 10, r: 200, i: 0.18, c: [1, 0.9, 0.6] }] }; },
   };
@@ -1708,7 +1720,7 @@
   function roundOf(rec, opts) {
     const rs = rec.rounds || [];
     if (opts && opts.round !== undefined) return rs[clamp(opts.round, 0, rs.length - 1)] || { stake: 10, won: true, show: {} };
-    const pick = rs.filter((r) => r.cheat).pop() || (rec.net > 0 ? rs.filter((r) => r.won).pop() : rec.net < 0 ? rs.filter((r) => !r.won).pop() : null) || rs[rs.length - 1];
+    const pick = rs.filter((r) => r.cheat).pop() || (rec.net > 0 ? rs.filter((r) => r.won).pop() : rec.net < 0 ? rs.filter((r) => rnet(r) < 0).pop() : null) || rs[rs.length - 1];
     return pick || { stake: 10, won: true, show: {} };
   }
   function planFor(rec, opts) {
@@ -1877,29 +1889,30 @@
     if (opts.caption) {
       // the round on screen in words, for readers who can't make out the pixel slip on a small screen
       const rs = rec.rounds || [], i = rs.indexOf(p.rd), rd = p.rd, cap = doc.createElement("figcaption");
-      const m = (cp) => (root.App && root.App.money ? root.App.money(cp) : money(cp).toLowerCase());
-      const what = rd.cheat ? (rd.caught ? `is caught cheating and forfeits ${m(rd.stake * 2)}` : `cheats, nobody sees, and wins ${m(rd.stake * 2)}`)
-        : rd.won ? `wins ${m(rd.stake)}` : `loses ${m(rd.stake)}`;
+      const m = (cp) => (root.App && root.App.coins ? root.App.coins(cp) : money(cp).toLowerCase());
+      const n = rnet(rd);
+      const what = rd.cheat ? (rd.caught ? `is caught cheating and forfeits ${m(-n)}` : `cheats, nobody sees, and wins ${m(n)}`)
+        : n > 0 ? `wins ${m(n)}` : n < 0 ? `loses ${m(-n)}` : "gets the stake back";
       cap.className = "small muted";
       cap.textContent = `${rs.length > 1 && i >= 0 ? `Round ${i + 1} of ${rs.length}: ` : ""}${rec.name || "A hero"} ${what}. Click the scene to watch again.`;
       fig.appendChild(cap);
     }
-    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1;
+    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
     const evs = p.ev.slice().sort((a, b) => a[0] - b[0]);
     const paint = () => { const f = render(rec, t, opts); img.data.set(f.data); g.putImageData(img, 0, 0); };
-    const live = () => fig.isConnected && onscreen && !doc.hidden;
+    const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     function frame(ms) {
       raf = 0;
       if (!live()) { last = 0; return; }
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
-      t += dt;
+      t += dt * rate;
       while (fired < evs.length && evs[fired][0] <= t) { if (evs[fired][0] > t - 0.25) Snd.play(evs[fired][1], evs[fired][2]); fired++; }
       // the hold only needs the slow flicker of lamps and water, so it repaints a dozen times a second
       if (t < p.dur + 0.3 || t - lastDraw > 1 / 12) { paint(); lastDraw = t; }
       raf = root.requestAnimationFrame(frame);
     }
-    const wake = () => { if (!reduced() && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
+    const wake = () => { if ((forced || !reduced()) && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
     cv.addEventListener("click", () => { t = 0; fired = 0; lastDraw = -1; paint(); wake(); });
     if ("IntersectionObserver" in root) {
       const io = new root.IntersectionObserver((es) => {
@@ -1910,6 +1923,15 @@
       io.observe(fig);
     } else onscreen = true;
     doc.addEventListener("visibilitychange", wake);
+    // the page's shared control bar drives the player through this (replay.js); a press of Play also plays under reduced motion
+    fig.replay = {
+      get t() { return t; }, get dur() { return p.dur; }, get playing() { return !held && t < p.dur && (forced || !reduced()); },
+      play() { held = false; forced = true; wake(); },
+      pause() { held = true; },
+      restart() { held = false; forced = true; t = 0; fired = 0; lastDraw = -1; paint(); wake(); },
+      skip() { t = p.dur; fired = evs.length; lastDraw = -1; paint(); wake(); },
+      rate(s) { rate = s; },
+    };
     paint();
     wake();
     return fig;

@@ -96,11 +96,13 @@
       el("div", { class: "tiny muted" }, `A turning point: ${h.name} became this at level ${s.keystone}, and it stays for good.`
         + (s.uses ? ` It has come into play ${plural(s.uses, "time")}.` : "")));
   }
+  // a rank-up reads as mastery, the same words the level-up log uses (progression.MASTERY)
+  const mastery = (s) => (s.rank >= 3 ? ", mastered" : s.rank === 2 ? ", honed" : "");
   function skillCard(s, sig, most) {
     const kinds = { passive: "passive", trigger: "trigger", world: "world" };
     return el("div", { class: `skill ${kinds[s.type] || ""}${sig && s.id === sig.id ? " sig" : ""}`, style: { marginBottom: "5px" } },
-      el("div", { class: "row between" }, el("span", { class: "nm" }, sig && s.id === sig.id ? "★ " : "", s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
-        el("span", { class: "tiny dim" }, s.type === "world" ? "out of combat" : s.type === "passive" ? "always on" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet")),
+      el("div", { class: "row between" }, el("span", { class: "nm" }, sig && s.id === sig.id ? "★ " : "", s.name, mastery(s)),
+        el("span", { class: "tiny dim" }, (s.side ? "a hobby · " : "") + (s.type === "world" ? "out of combat" : s.type === "passive" ? "always on" : s.uses ? `used ${plural(s.uses, "time")}` : "not used yet"))),
       el("div", { class: "small muted" }, s.desc),
       s.uses && s.type !== "world" && s.type !== "passive" ? A.bar(s.uses, most, "gold") : null,
       s.school ? el("span", { class: "school" }, s.school.replace(/_/g, " ")) : null);
@@ -120,12 +122,12 @@
     }
     const road = all.filter((s) => s.type === "world" && !s.keystone);
     if (road.length) {
-      const names = road.map((s) => s.name.charAt(0).toLowerCase() + s.name.slice(1));
+      const names = road.map((s) => s.name.toLowerCase());
       sk.appendChild(el("details", { class: "also-good" }, el("summary", { class: "small" }, el("b", null, "Also good at: "), names.join(", ")),
         ...road.map((s) => skillCard(s, sig, most))));
     }
     if (!(h.skills || []).length) sk.appendChild(el("p", { class: "empty" }, "No skills yet."));
-    sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, `Every level brings a skill, picked by what ${h.name} has been doing. ${nextStep(h)}.`));
+    sk.appendChild(el("p", { class: "tiny dim", style: { marginTop: "6px" } }, `Every level brings a skill, pulled along by what ${h.name} already knows and has been through. ${nextStep(h)}.`));
     return sk;
   }
   function classTree(h) {
@@ -256,11 +258,11 @@
   // the Yeti Society's correspondence board: a tiny corner box in the paper, never a feed story
   function yetiCorner() {
     const y = L.yeti;
-    if (!y || !window.ChessReplay) return null;
-    let board = null;
-    try { board = ChessReplay.player(y, { scale: 1 }); } catch (e) { return null; }
+    if (!y) return null;
     const done = y.result ? (y.result === "draw" ? "Drawn." : y.players[y.winner].yeti ? "The footprint won." : "The Society won!") : `Move ${y.move}.`;
-    return el("a", { class: "yeti-corner", href: "#/map/frosthold" }, board, el("div", { class: "tiny dim yeti-note" }, `Yeti Society, day ${y.yeti.day}. ${done}`));
+    const box = el("a", { class: "yeti-corner", href: "#/map/frosthold" }, el("div", { class: "tiny dim yeti-note" }, `Yeti Society, day ${y.yeti.day}. ${done}`));
+    A.need(["chess_replay"]).then(() => { box.insertBefore(ChessReplay.player(y, { scale: 1 }), box.firstChild); }).catch(() => box.remove());
+    return box;
   }
 
   A.route(/^\/$/, (v) => {
@@ -490,7 +492,7 @@
     const grid = el("div", { class: "pick-grid" });
     const cards = pool.map((h) => {
       const b = el("button", { class: "pick" + (isMe(h) ? " me" : ""), title: `Pin ${h.name} to your Crier`, onclick: () => { A.toggleMine(h.id); A.toast(`${h.name} is yours. They'll be waiting here every time you check in.`); rerender(); } },
-        A.heroPortrait(h, 1), el("b", null, h.name), String(h.owner || "").startsWith(h.name) ? null : el("span", { class: "tiny dim" }, h.owner));
+        A.heroPortrait(h, 1), el("b", null, h.name), String(h.owner || "").toLowerCase().startsWith(h.name.toLowerCase()) ? null : el("span", { class: "tiny dim" }, h.owner));
       b.dataset.q = `${h.name} ${h.owner || ""}`.toLowerCase();
       grid.appendChild(b);
       return b;
@@ -605,7 +607,7 @@
         el("div", { class: "small" }, `Level ${h.level} `, el("span", { class: "has-tip", title: (S.classes[h.cls] || {}).desc || "" }, h.title), h.party ? [" of ", A.partyLink(h.party)] : " · solo"),
         el("div", { class: "small muted" }, h.npc ? "A league hero" : `${h.owner}'s hero`)),
       el("div", { class: "hero-details" },
-        (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by how " + h.name + " fights)" : ""}`) : null,
+        (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by the skills and the life " + h.name + " has had)" : ""}`) : null,
         keystoneBadges(h),
         wearingStrip(h),
         classStrip(h),
@@ -733,9 +735,12 @@
   function diaryTab(b, h) {
     const ul = el("ul", { class: "diary" });
     let lastD = null;
+    const meals = {};
+    for (const x of (h.table || {}).recent || []) meals[`${x.day}|${x.text}`] = x.meal;
     for (const [d, t] of h.diary.slice().reverse()) {
       if (d !== lastD) { ul.appendChild(el("li", { class: "daydiv", style: { listStyle: "none", marginLeft: "-18px" } }, A.when(d))); lastD = d; }
-      ul.appendChild(el("li", null, cap(t)));
+      const m = mealLink(meals[`${d}|${t}`]);
+      ul.appendChild(el("li", null, cap(t), m ? " " : null, m));
     }
     b.appendChild(panel("Diary", el("p", { class: "small dim" }, "The small stuff: shifts worked, dice lost, conversations had."), ul));
   }
@@ -761,29 +766,90 @@
       `Orders ${h.food === "milk" ? "a glass of milk" : h.food === "ale" ? "a big ale" : h.food === "wine" ? "red wine" : h.food === "mystery stew" ? "the mystery stew" : "whatever's cheapest"}.`,
       h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.mount ? ` Rides ${h.mount.name}, ${aOrAn(h.mount.colour + " " + h.mount.label)}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
     left.appendChild(tp);
+    const fp = foodPanel(h);
+    if (fp) left.appendChild(fp);
     if (h.mount) left.appendChild(mountPanel(h.mount));
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
     left.appendChild(classTree(h));
+    const mus = musicPanel(h);
+    if (mus) left.appendChild(mus);
+    const om = omensPanel(h);
+    if (om) right.appendChild(om);
     right.appendChild(skillsPanel(h));
     right.appendChild(affinityPanel(h));
     right.appendChild(gearPanel(h));
+  }
+  // what a hero eats: the favourite family (from the quiz's tavern order and traits), what they've had most, and the latest meals to watch
+  const mealIds = new Set(L.meals_index || []);
+  function mealLink(id) { return id && mealIds.has(id) ? el("a", { class: "watch", href: `#/meal/${id}` }, "▸ watch") : null; }
+  function foodPanel(h) {
+    const f = h.table;
+    if (!f) return null;
+    const p = panel("At the table");
+    p.appendChild(el("p", { class: "small" }, "Favourite: ", el("b", null, f.favourite_name), ".",
+      f.cooks || (f.cooks === undefined && f.cook) ? el("span", { class: "dim" }, " Does the cooking at camp.") : null,
+      el("span", { class: "dim" }, f.keeps_parts ? " Their crew keeps monster parts for the pot." : " Sells monster parts at market.")));
+    if (f.dishes.length) p.appendChild(el("p", { class: "small" }, "Eats most: ",
+      f.dishes.map((x, i) => [i ? ", " : "", x.name, x.n > 1 ? ` ×${x.n}` : "", x.love ? el("span", { class: "red", title: "their favourite kind of thing" }, " ♥") : null])));
+    const recent = f.recent.slice(0, 5);
+    if (recent.length) p.appendChild(el("ul", { class: "diary small" }, recent.map((x) => el("li", null, el("span", { class: "dim" }, A.when(x.day)), " ", x.text, " ", mealLink(x.meal)))));
+    return p;
+  }
+  // the cards a hero carries the shadow of: each omen with its card, what it does and how long it has left, then how past readings turned out
+  function omensPanel(h) {
+    const o = h.omens || {}, act = o.active || [], log = o.log || [];
+    if (!act.length && !log.length) return null;
+    const p = panel("Omens");
+    const cards = {};
+    ((S.tarot || {}).cards || []).forEach((c) => { cards[c.id] = c; });
+    if ((S.tarot || {}).drowned) cards.drowned = S.tarot.drowned;
+    if (act.length) {
+      const row = el("div", { class: "omen-row", style: { display: "flex", gap: "8px", flexWrap: "wrap" } });
+      for (const x of act) {
+        const cv = el("canvas", { width: 56, height: 92, style: { imageRendering: "pixelated", width: "56px", height: "92px", display: "block" } });
+        if (window.TarotCards) {
+          Promise.all([TarotCards.load(TarotCards.deckFor(x)), x.rev ? A.need(["tarot_replay"]) : null]).then(([d]) => {
+            const px = x.rev && window.TarotReplay ? TarotReplay.rot180(d.card(x.card), d.w, d.h) : d.card(x.card);
+            const g = cv.getContext("2d"), img = g.createImageData(d.w, d.h);
+            img.data.set(px);
+            for (let i = 3; i < img.data.length; i += 4) if (img.data[i] > 0) img.data[i] = 255;
+            g.putImageData(img, 0, 0);
+          }).catch(() => {});
+        }
+        const days = x.left === 0 ? "ends today" : `${x.left} day${x.left === 1 ? "" : "s"} left`;
+        row.appendChild(el("div", { style: { width: "120px" } }, cv,
+          el("div", { class: "small" }, el("b", null, x.name || (cards[x.card] || {}).name || x.card), x.rev ? el("span", { class: "dim" }, " upside down") : null),
+          el("div", { class: "small " + (x.secret ? "gold" : x.good ? "green" : "red") }, x.secret ? "a secret, until it ends" : x.says),
+          el("div", { class: "tiny dim" }, days, x.by ? [" · read by ", x.reading ? el("a", { href: `#/reading/${x.reading}` }, x.by) : x.by] : null)));
+      }
+      p.appendChild(row);
+    } else p.appendChild(el("p", { class: "empty" }, "No omens on them just now."));
+    if (log.length) {
+      p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Past readings"));
+      p.appendChild(el("ul", { class: "small" }, log.slice(0, 6).map((r) => el("li", null, `${(cards[r.card] || {}).name || r.card}${r.rev ? " upside down" : ""}: `,
+        el("span", { class: r.hit ? "green" : "dim" }, r.hit ? "came true" : "didn't come to pass"), r.by ? el("span", { class: "dim" }, ` (${r.by})`) : null))));
+    }
+    if (o.reads && o.reads.read) p.appendChild(el("p", { class: "tiny dim" }, `Has read the cards ${o.reads.read} time${o.reads.read === 1 ? "" : "s"}; ${o.reads.hits} of ${o.reads.checked} omens came true.`));
+    return p;
   }
   function traitRow(t, v, big) {
     return el("div", { class: "trait" + (big ? " big" : "") }, el("span", null, TRAIT_LABEL[t]),
       el("div", { class: "tbar" }, el("i", { style: { left: ((v + 1) / 2) * 100 + "%" } })), el("span", { class: "word" }, traitWord(t, v)));
   }
+  // the leaning first (where this hero's arc is heading), then what has grown it: affinity starts empty and fills from what they learn and do
   function affinityPanel(h) {
-    const top = Object.entries(h.aff).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    const top = Object.entries(h.lean_aff || h.aff).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 7);
     const max = top.length ? top[0][1] : 1;
-    const p = panel("What shapes them");
-    if (h.voice) p.appendChild(el("p", { class: "small" }, "Talks: ", el("b", null, voiceWord(h.voice)), el("span", { class: "dim" }, " (from the quiz, their traits and their class)")));
-    p.appendChild(el("p", { class: "small dim" }, "Every deed feeds these. They decide which skills come next and what this hero becomes."));
-    for (const [k, val] of top) p.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, cap(k)), A.bar(val, max, "blue"), el("span", { class: "word small" }, val.toFixed(1))));
+    const p = panel("Where they're heading");
     const nxt = nextClass(h);
-    if (nxt) p.appendChild(el("p", { class: "small", style: { marginTop: "8px" } }, `At level ${nxt.level}, the smart money says: `, el("b", { class: "gold" }, nxt.name),
-      nxt.alt ? el("span", { class: "dim" }, ` (or ${nxt.alt})`) : null));
+    if (nxt) p.appendChild(el("p", { class: "small" }, `Leaning toward `, el("b", { class: "gold" }, nxt.name), ` at level ${nxt.level}`,
+      nxt.alt ? el("span", { class: "dim" }, `, with ${nxt.alt} the other path`) : null, "."));
+    if (h.voice) p.appendChild(el("p", { class: "small" }, "Talks: ", el("b", null, voiceWord(h.voice)), el("span", { class: "dim" }, " (from the quiz, their traits and their class)")));
+    p.appendChild(el("p", { class: "small dim" }, top.length ? "What's grown so far. Skills learned count most; their work, their fights and what happens to them count too."
+      : "Nothing has pulled them one way yet. Their first few skills will."));
+    for (const [k, val] of top) p.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, cap(k)), A.bar(val, max, "blue"), el("span", { class: "word small" }, val.toFixed(1))));
     return p;
   }
   function nextClass(h) { return h.next_class || null; }
@@ -858,14 +924,16 @@
       }
       p.append(el("h4", { style: { marginTop: "10px" } }, "Also carrying"), row);
     }
-    if ((h.sets || []).length) {
+    for (const [label, sets] of [["Instruments", (h.sets || []).filter((s) => s.kind === "music")], ["Game sets", (h.sets || []).filter((s) => s.kind !== "music")]]) {
+      if (!sets.length) continue;
       const row = el("div", { class: "kit-curios" });
-      for (const s of h.sets) {
+      for (const s of sets) {
         const b = el("button", { class: "it curio", type: "button" }, Art.gearIcon({ slot: "pocket", art: s.art, name: s.name }, h.look).toCanvas(2), s.name);
         const go = () => {
           tiles.forEach((t) => t.classList.remove("on")); info.innerHTML = "";
           const lost = s.missing ? ` · ${s.missing} piece${s.missing > 1 ? "s" : ""} missing` : "";
-          info.append(el("div", { class: "nm" }, s.name), el("div", { class: "tiny dim" }, `Game set (${s.kind}) · ${s.condition}${lost} · ${s.games} game${s.games === 1 ? "" : "s"}`),
+          const sub = s.kind === "music" ? `Instrument (${s.inst}) · ${s.condition}${lost} · ${plural(s.games, "song")}` : `Game set (${s.kind}) · ${s.condition}${lost} · ${s.games} game${s.games === 1 ? "" : "s"}`;
+          info.append(el("div", { class: "nm" }, s.name), el("div", { class: "tiny dim" }, sub),
             el("p", { class: "small" }, s.desc));
           const hl = historyList(s.history);
           if (hl) info.appendChild(hl); else if (s.story) info.appendChild(el("p", { class: "tiny muted story" }, cap(s.story) + "."));
@@ -873,7 +941,7 @@
         b.addEventListener("mouseenter", go); b.addEventListener("focus", go); b.addEventListener("click", go);
         row.appendChild(b);
       }
-      p.append(el("h4", { style: { marginTop: "10px" } }, "Game sets"), row);
+      p.append(el("h4", { style: { marginTop: "10px" } }, label), row);
     }
     return p;
   }
@@ -1000,7 +1068,7 @@
   let tipBox = null;
   function skillTip(node, s, owner) {
     // DOM append prints a null as the word "null", so the optional lines are filtered out first
-    return attachTip(node, (box) => box.append(...[el("div", { class: "nm" }, s.keystone ? "✦ " : "", s.name, s.rank > 1 ? ` ${"I".repeat(s.rank)}` : ""),
+    return attachTip(node, (box) => box.append(...[el("div", { class: "nm" }, s.keystone ? "✦ " : "", s.name, mastery(s)),
       owner ? el("div", { class: "tiny gold" }, owner) : null,
       el("div", { class: "small" }, s.does || s.desc), s.does ? el("div", { class: "tiny dim" }, s.desc) : null,
       el("div", { class: "tiny dim" }, s.keystone ? `A keystone: a one-of-a-kind gift every hero earns at levels 10 and 20. Only one living hero holds each. This one came at level ${s.keystone}.`
@@ -1115,7 +1183,7 @@
       el("div", { class: "mount-art" }, mountArt(m, 4)),
       el("div", { style: { flex: 1, minWidth: "180px" } },
         el("h3", { style: { margin: 0 } }, m.name),
-        el("div", { class: "small muted" }, cap(`${m.colour} ${m.label}`) + (m.since != null ? ` · since day ${m.since}` : "")),
+        el("div", { class: "small muted" }, cap(`${m.colour} ${m.label}`) + (m.since > 0 ? ` · since ${A.when(m.since, true)}` : "")),
         el("p", { class: "small", style: { margin: "4px 0" } }, m.desc),
         m.does ? el("div", { class: "tiny dim" }, cap(m.does) + ".") : null, status)));
   }
@@ -1138,7 +1206,7 @@
       el("div", { class: "mount-art" }, wagonArt(w, 3)),
       el("div", { style: { flex: 1, minWidth: "200px" } },
         el("h3", { style: { margin: 0 } }, w.name),
-        el("div", { class: "small muted" }, `${cap(w.label)} · seats ${w.seats} · hauls ${w.haul} · ${comfort}` + (w.since != null ? ` · since day ${w.since}` : "")),
+        el("div", { class: "small muted" }, `${cap(w.label)} · seats ${w.seats} · hauls ${w.haul} · ${comfort}` + (w.since > 0 ? ` · since ${A.when(w.since, true)}` : "")),
         el("p", { class: "small", style: { margin: "4px 0" } }, w.desc),
         w.puller ? el("div", { class: "small" }, `Pulled by ${w.puller.name} the ${w.puller.label}` + (w.puller.owner ? `, ${w.puller.owner}'s` : "") + ".")
           : w.kind === "handcart" ? el("div", { class: "small" }, "Pushed by whoever lost the argument.")
@@ -1215,6 +1283,8 @@
       p.fallen.length ? el("p", { class: "small red", style: { marginTop: "8px" } }, "Fallen: ", p.fallen.map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null,
       p.former.length ? el("p", { class: "small dim" }, "Former members: ", p.former.filter((f) => !p.fallen.includes(f)).map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null));
     if (tac) v.appendChild(tac);
+    const an = anthemPanel(p);
+    if (an) v.appendChild(an);
     const g = el("div", { class: "grid2" });
     const list = p.events.map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
     g.appendChild(panel("History", A.feed(list, { dayHeaders: true })));
@@ -1233,68 +1303,41 @@
     el("p", null, el("a", { class: "btn", href: "#/parties" }, "The Parties"), " ", el("a", { class: "btn", href: "#/" }, "Back to the Crier")))); }));
 
   // ================= SONGBOOK & THE BARD =================
+  const sungTimes = (n) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
   const songs = () => (L.songs || []).slice().sort((a, b) => b.day - a.day);
   const MOOD = { glory: ["♪ glory", "gold"], sad: ["♪ lament", "dim"], shame: ["♪ ballad of shame", "red"] };
-  const BARD = { id: "bard", name: "The Bard", look: { skin: "#e8b088", hair: "#7a4424", style: 1, face: 2, fav: "#c8463a", scars: [] }, weapon: "lute", weapon_tier: 2, armor_tier: 1 };
 
   function bardStage(song, slides) {
     const box = el("div", { class: "bard" });
-    const cv = el("canvas", { class: "bard-stage" });
-    const W = 240, H = 84;
-    cv.width = W * 4; cv.height = H * 4;
-    const bg = Scenes.backdrop("tavern", W, H, Art.hash(song.id));
-    const bardCls = S.classes.bard || { look: { outfit: "fancy", head: "feather_cap", offhand: "lute" } };
-    const listeners = (song.heroes || []).map((id) => heroes[id]).filter((h) => h && h.alive !== false).slice(0, 3);
-    const ghost = song.dirge && heroes[song.dirge];
+    const cv = Ballad.scene(song, { W: 256 });
+    cv.className = "bard-stage";
     const slide = el("div", { class: "slide", hidden: !slides || !slides.length });
     const lyr = el("div", { class: "lyrics" });
     const lineEls = song.lyrics.map((line) => {
-      const row = el("div", { class: line === song.title ? "chorus" : "" });
-      for (const s of Sound.syllables(line)) row.appendChild(el("span", null, s));
+      const row = el("div", { class: Music.isChorus(song, line) ? "chorus" : "" });
+      for (const s of Music.syllables(line)) row.appendChild(el("span", null, s.end ? s.txt + " " : s.txt));
       lyr.appendChild(row);
       return row;
     });
-    let playing = false, frame = 0, raf = 0, notes = [];
-    const draw = () => {
-      const c = cv.getContext("2d"), off = document.createElement("canvas");
-      off.width = W; off.height = H;
-      const o = off.getContext("2d");
-      o.imageSmoothingEnabled = false;
-      o.drawImage(bg, 0, 0);
-      const ground = Math.round(H * 0.62) + 16;
-      const g = Art.heroGrid(BARD, playing ? frame : 0, bardCls);
-      o.fillStyle = "#3a2214"; o.fillRect(W / 2 - 10, ground - 6, 20, 6);
-      o.drawImage(g.toCanvas(1), Math.round(W / 2 - g.w / 2), ground - g.h - 4);
-      if (ghost) { o.globalAlpha = 0.45; const gg = Art.heroGrid(ghost, 0, A.heroLook(ghost)); o.drawImage(gg.toCanvas(1), W / 2 + 30, ground - gg.h - 10 - Math.round(Math.sin(Date.now() / 600) * 2)); o.globalAlpha = 1; }
-      listeners.forEach((h, i) => { const hg = Art.heroGrid(h, 0, A.heroLook(h)); o.drawImage((i % 2 ? hg : hg.flipX()).toCanvas(1), i % 2 ? W - 60 - i * 12 : 30 + i * 12, ground - hg.h); });
-      for (const n of notes) { o.fillStyle = n.c; o.fillRect(Math.round(n.x), Math.round(n.y), 2, 2); o.fillRect(Math.round(n.x) + 2, Math.round(n.y) - 4, 1, 5); }
-      c.imageSmoothingEnabled = false;
-      c.drawImage(off, 0, 0, cv.width, cv.height);
-    };
-    const tick = () => {
-      if (!cv.isConnected) { Sound.stopSong(); return; }
-      if (playing) {
-        if (Math.random() < 0.08) notes.push({ x: W / 2 + 6 + Math.random() * 10, y: H * 0.45, vx: (Math.random() - 0.3) * 0.4, c: ["#ffd86a", "#ffffff", "#e87a5a"][Math.floor(Math.random() * 3)], life: 80 });
-        for (const n of notes) { n.y -= 0.35; n.x += n.vx; n.life--; }
-        notes = notes.filter((n) => n.life > 0);
-      }
-      draw();
-      raf = requestAnimationFrame(tick);
-    };
+    let playing = false;
     const btn = el("button", { class: "btn primary" }, "▶ Ask the bard to play");
     const about = (song.heroes || []).map((id) => (heroes[id] || {}).name).filter(Boolean);
     const shareSong = A.shareBtn(`"${song.title}", a song${about.length ? " about " + about.slice(0, 3).join(", ") : ""}, sung in ${plural(song.towns.length, "town")}. ${song.lyrics.slice(0, 2).join(" / ")}`, `#/songs/${song.id}`, "Song copied with a link.");
-    const stop = () => { playing = false; Sound.stopSong(); btn.textContent = "▶ Play it again"; for (const r of lineEls) for (const s of r.children) s.classList.remove("on", "sung"); };
+    const stop = () => { playing = false; cv.ballad.playing(false); Music.stop(); btn.textContent = "▶ Play it again"; for (const r of lineEls) for (const s of r.children) s.classList.remove("on", "sung"); };
     btn.onclick = () => {
       if (playing) { stop(); return; }
       playing = true;
+      cv.ballad.playing(true);
       btn.textContent = "■ Stop";
-      let beatTimer = setInterval(() => { if (!playing) clearInterval(beatTimer); frame ^= 1; }, 280);
-      Sound.playSong(song, (li, si) => {
+      // the song stops when its stage leaves the page
+      const gone = setInterval(() => { if (!playing) clearInterval(gone); else if (!cv.isConnected) { clearInterval(gone); stop(); } }, 500);
+      const h = Music.playBallad(song, (li, si) => {
+        cv.ballad.strum();
         lineEls.forEach((r, i) => [...r.children].forEach((s, j) => { s.classList.toggle("on", i === li && j === si); s.classList.toggle("sung", i < li || (i === li && j < si)); }));
         if (slides && slides.length && si === 0) { slide.textContent = slides[li % slides.length]; slide.hidden = false; }
         lineEls[li].scrollIntoView({ block: "nearest", behaviour: "smooth" });
-      }, () => { playing = false; btn.textContent = "▶ Play it again"; });
+      }, () => { playing = false; cv.ballad.playing(false); btn.textContent = "▶ Play it again"; });
+      if (!h) { playing = false; cv.ballad.playing(false); btn.textContent = "▶ Ask the bard to play"; }
     };
     const [moodTxt, moodCls] = MOOD[song.mood] || MOOD.glory;
     box.append(
@@ -1305,7 +1348,6 @@
     const lies = Object.entries(song.versions || {});
     if (lies.length) box.appendChild(el("div", { class: "small muted", style: { marginTop: "6px" } }, "The song changes on the road: ",
       lies.map(([t, v], i) => [i ? "; " : "", `in ${A.nodeName(t, true)} they sing "${v.title}"`]), "."));
-    requestAnimationFrame(tick);
     return box;
   }
 
@@ -1313,7 +1355,8 @@
     const all = songs();
     v.appendChild(el("h1", null, "The Songbook"));
     v.appendChild(el("p", { class: "muted" }, "Every big moment in the league ends up as a song in some tavern. Songs travel the roads town to town. Heroes hear them. Some of them are proud of it."));
-    if (!all.length) { v.appendChild(panel("No songs yet", el("p", { class: "empty" }, "Nobody has done anything worth singing about. Give it a week."))); return; }
+    const fire = fireSongs();
+    if (!all.length) { v.appendChild(panel("No songs yet", el("p", { class: "empty" }, "Nobody has done anything worth singing about. Give it a week."))); if (fire) v.appendChild(fire); return; }
     const cur = all.find((s) => s.id === sid) || all[0];
     const stage = el("section", { class: "panel" }, bardStage(cur));
     v.appendChild(stage);
@@ -1325,7 +1368,126 @@
     if (fresh.length) list.append(el("h3", null, "On the road now"), ...fresh.map(row));
     if (old.length) list.append(el("h3", { style: { marginTop: "10px" } }, "Old songs"), ...old.map(row));
     v.appendChild(panel("All songs", list));
+    if (fire) v.appendChild(fire);
   });
+
+  // ▶ for one song in one hero's voice, the whole song; a second press, another song's ▶ or leaving the page stops it
+  let songPlaying = null;
+  function songBtn(song, w, lead, key) {
+    const btn = el("button", { class: "btn small", title: `${lead.name} sings it` }, "▶");
+    btn.onclick = () => {
+      if (songPlaying === btn) { Music.stop(); btn.textContent = "▶"; songPlaying = null; return; }
+      if (songPlaying) songPlaying.textContent = "▶";
+      const rec = { id: key, song, lead, joiners: [], outcome: lead.skill > 0.6 ? "sweet" : "rough" };
+      const spec = Music.specFor(rec, w, "full"), h = Music.perform(Music.plan(spec), { voices: Music.voices(spec), done: () => { btn.textContent = "▶"; if (songPlaying === btn) songPlaying = null; } });
+      if (!h) return;
+      songPlaying = btn; btn.textContent = "■";
+      const gone = setInterval(() => { if (songPlaying !== btn) clearInterval(gone); else if (!btn.isConnected) { clearInterval(gone); Music.stop(); songPlaying = null; } }, 500);
+    };
+    return btn;
+  }
+  const wordsOf = (w) => el("div", { class: "words" }, w.lines.map((ln, i) => el("div", { class: (w.chorus || []).includes(i) ? "chorus" : "" }, ln)));
+  const nightIds = () => new Set(L.nights_index || []);
+  const nightLink = (id, txt) => (nightIds().has(id) ? el("a", { class: "watch", href: `#/night/${id}` }, txt) : null);
+
+  function anthemPanel(p) {
+    const a = p.anthem;
+    if (!a || typeof a !== "object" || !window.Music || !a.lead) return null;
+    const w = Music.words(a);
+    if (!w) return null;
+    return panel("The crew's anthem", el("div", { class: "fire-song" }, songBtn(a, w, a.lead, "anthem:" + p.id),
+      el("div", null, el("b", null, `“${a.title}”`), el("span", { class: "tiny dim" }, ` · ${a.tone}`), a.by && heroes[a.by] ? el("span", { class: "small dim" }, " · written by ", A.heroLink(a.by)) : null,
+        el("div", { class: "why" }, a.day ? `Theirs since ${A.when(a.day, true)}` : "Theirs", a.n ? `, sung ${sungTimes(a.n)} at their fires` : "", ". ", nightLink(a.night, "✦ The night it became theirs ♪"))),
+      el("details", null, el("summary", { class: "small" }, "The words"), wordsOf(w))));
+  }
+  // the hero's Music card: how well they sing, what they play, what they know by heart, what they wrote, and the nights worth keeping
+  const CRAFT = { fine: "a fine song", plain: "a plain song", clumsy: "a clumsy song, lovingly" };
+  const HOW = { sing: "sang along to", clap: "clapped along to", pot: "drummed a pot to", inst: "played along to", over: "sang over" };
+  function musicPanel(h) {
+    const m = h.music;
+    if (!m || !window.Music) return null;
+    const n = m.n || {}, outs = (S.music || {}).outcomes || {};
+    if (!m.songs.length && !m.wrote.length && !Object.keys(n).length && !m.inst.length && !m.anthem) return null;
+    const inst = (m.inst || []).slice().sort((a, b) => b.tier - a.tier)[0];
+    const lead = Object.assign({ id: h.id, name: h.name, skill: m.band }, inst ? { inst: inst.inst } : {});
+    const p = panel("Music");
+    p.appendChild(el("div", { class: "music-skill" }, el("span", { class: "small" }, "Sings: ", el("b", null, m.label)), A.bar(m.band * 100, 100, "gold"),
+      el("div", { class: "tiny dim" }, "Heart most of all, then quick hands and a good head, and practice; a Bard's training and a good instrument on top.")));
+    if (m.inst.length) p.appendChild(el("p", { class: "small" }, "Plays ", m.inst.map((x, i) => [i ? (i === m.inst.length - 1 ? " and " : ", ") : "", el("b", null, x.name)]), "."));
+    const did = [n.led ? `has led ${plural(n.led, "song")}` + (n.rooms ? ` (${n.rooms} to a tavern room)` : "") : null, n.joined ? `joined in on ${n.led ? n.joined + " more" : plural(n.joined, "song")}` : null].filter(Boolean);
+    if (did.length || n.soaring || n.sore) p.appendChild(el("p", { class: "small muted" }, did.length ? cap(did.join(" and ")) + "." : "",
+      n.soaring ? ` ${n.soaring === 1 ? "One night" : n.soaring + " nights"} it soared.` : "", n.sore ? ` ${n.sore === 1 ? "One night" : n.sore + " nights"} it was sore on the ears.` : ""));
+    // music in town: the choir, busker duels, song contests, the travelling minstrel, the song the watch banned
+    const times = (k) => (k === 1 ? "once" : k === 2 ? "twice" : `${k} times`), duels = (n.duel_won || 0) + (n.duel_lost || 0);
+    const town = [n.choir ? `sang with a town choir ${times(n.choir)}` + (n.solo ? ` (the solo ${times(n.solo)})` : "") : null,
+      duels ? `took on a town busker ${times(duels)}` + (n.duel_won ? `, winning ${n.duel_won}` : ", and lost") : null,
+      n.contest_won ? `won ${n.contest_won === 1 ? "a song contest" : n.contest_won + " song contests"}` : n.contest ? `sang at ${n.contest === 1 ? "a song contest" : n.contest + " song contests"}` : null,
+      n.minstrel ? `learned ${n.minstrel === 1 ? "a song" : n.minstrel + " songs"} from a travelling minstrel` : null, n.banned ? "sang a song the watch had banned" : null].filter(Boolean);
+    if (town.length) p.appendChild(el("p", { class: "small muted" }, "In town: " + town.join("; ") + "."));
+    if (m.anthem) {
+      const w = Music.words(m.anthem);
+      p.appendChild(el("div", { class: "fire-song music-anthem" }, w ? songBtn(m.anthem, w, lead, "anthem:" + h.id) : el("span"),
+        el("div", null, el("div", { class: "tiny gold" }, "★ The crew's anthem"), el("b", null, `“${m.anthem.title}”`),
+          el("div", { class: "why" }, A.partyLink(m.anthem.party), m.anthem.day ? ` have sung it as their own since ${A.when(m.anthem.day, true)}` : " sing it as their own"))));
+    }
+    for (const x of m.moments || []) p.appendChild(el("p", { class: "small" }, "✦ Was at the fire ", A.when(x.day, "on"), ` when “${x.title}” became ${A.poss(x.crew, x.party)} anthem under the stars. `,
+      nightLink(x.id, "♪ listen")));
+    if (m.wrote.length) {
+      const box = el("div", { class: "fire-songs" });
+      for (const x of m.wrote) {
+        const w = Music.words({ src: "hero", id: x.id });
+        if (!w) continue;
+        const sg = Object.assign({ src: "hero", meter: ((L.hero_songs || []).find((s) => s.id === x.id) || {}).meter }, x);
+        box.appendChild(el("div", { class: "fire-song" }, songBtn(sg, w, lead, "wrote:" + x.id),
+          el("div", null, el("b", null, `“${x.title}”`), el("span", { class: "tiny dim" }, ` · ${x.tone}`),
+            el("div", { class: "why" }, `Written ${A.when(x.day, "on")}: ${CRAFT[x.craft] || "a song"}`, x.n ? ` · sung ${sungTimes(x.n)} so far` : " · not sung yet")),
+          el("details", null, el("summary", { class: "small" }, "The words"), wordsOf(w))));
+      }
+      if (box.children.length) p.append(el("h4", null, "Songs they wrote"), box);
+    }
+    const rep = m.songs.filter((s) => !m.wrote.some((x) => x.id === s.id));
+    if (rep.length) {
+      const list = el("div", { class: "music-rep" });
+      for (const s of rep) {
+        const w = Music.words(s);
+        list.appendChild(el("div", { class: "row small" }, w ? songBtn(s, w, lead, "rep:" + h.id + ":" + s.id) : el("span"),
+          el("div", { style: { flex: 1 } }, `“${s.title}”`, s.by && s.by !== h.id && heroes[s.by] ? el("span", { class: "dim" }, " by ", A.heroLink(s.by)) : null,
+            el("span", { class: "tiny dim" }, ` · ${s.tone}`), m.anthem && m.anthem.id === s.id ? el("span", { class: "tiny gold" }, " · ★ anthem") : null),
+          el("span", { class: "tiny " + (s.n ? "" : "dim") }, s.n ? `sung ${sungTimes(s.n)}` : "knows it")));
+      }
+      p.append(el("h4", null, "Knows by heart"), el("p", { class: "tiny dim" }, "Picked up at home, at other fires and in tavern rooms; the most recently sung first."), list);
+    }
+    const lately = (m.lately || []).filter((x) => nightIds().has(x.id));
+    // a run of nights that went the same way at the same fire says so once, then "again", not "by the fire, sweet" five times over
+    const spot = (x) => (x.where === "camp" ? "camp" : x.place), same = (x, i) => i > 0 && spot(lately[i - 1]) === spot(x) && lately[i - 1].outcome === x.outcome;
+    if (lately.length) p.append(el("h4", null, "Lately"), el("ul", { class: "diary" }, lately.map((x, i) => el("li", { class: "small" }, el("span", { class: "dim" }, A.when(x.day) + ": "),
+      x.role === "led" ? "Led " : [cap(HOW[x.role] || "joined in on"), " ", heroes[x.lead] ? A.heroLink(x.lead) : "someone", "'s "], `“${x.title}”`,
+      same(x, i) ? el("span", { class: "dim" }, ", the same again. ") : [x.where === "camp" ? " by the fire" : ` at ${x.place}`, el("span", { class: "dim" }, `, ${outs[x.outcome] || x.outcome}. `)], nightLink(x.id, "♪ listen")))));
+    return p;
+  }
+
+  // Round the fire: heroes' own written songs and crews' anthems, chosen by the sim (league/music.py fire_songs); never a folk tune,
+  // and no songbook song unless a crew made it its anthem
+  const TONE = { tender: "tender", funny: "funny", dark: "dark", rowdy: "rowdy", sad: "sad", heroic: "heroic", odd: "odd" };
+  function fireSongs() {
+    if (!window.Music) return null;
+    const rows = (L.fire_songs || []).map((r) => ({ r, w: Music.words(r.song) })).filter((x) => x.w && x.r.lead);
+    if (!rows.length) return null;
+    const box = el("div", { class: "fire-songs" });
+    for (const { r, w } of rows) {
+      const why = [];
+      if (r.parties.length) why.push(["The anthem of ", r.parties.map((pid, i) => [i ? " and " : "", A.partyLink ? A.partyLink(pid) : pid])]);
+      if (r.why.includes("written")) why.push(["Written by ", A.heroLink(r.by[0]), r.day ? ` ${A.when(r.day, "on")}` : ""]);
+      if (r.n) why.push(`sung ${sungTimes(r.n)}`);
+      const btn = songBtn(r.song, w, r.lead, "fire:" + r.id);
+      const lines = wordsOf(w);
+      box.appendChild(el("div", { class: "fire-song" }, btn,
+        el("div", null, el("b", null, `“${w.title}”`), el("span", { class: "tiny dim" }, ` · ${TONE[r.song.tone] || ""}`),
+          el("div", { class: "why" }, why.map((x, i) => [i ? " · " : "", x]))),
+        el("details", null, el("summary", { class: "small" }, "The words"), lines)));
+    }
+    return panel("Round the fire", el("p", { class: "small muted" }, "Songs from the fire: the ones heroes wrote about their own weeks, and the songs crews made their anthems."), box);
+  }
 
   function songsPanel() {
     const fresh = songs().filter((s) => L.meta.day - s.day <= 21).sort((a, b) => b.towns.length - a.towns.length).slice(0, 3);
@@ -1353,9 +1515,9 @@
       const what = {
         escort: `Guard ${c.cargo} to ${to}`,
         bounty: `${c.name}, ${aOrAn((c.what || "").replace(/^an? /, ""))}, last seen in ${to}`,
-        clear: `Clear ${c.need} ${c.mon ? (S.monsters[c.mon] || {}).name || "beasts" : "beasts"} out of ${to} by day ${c.deadline}`,
+        clear: `Clear ${c.need} ${c.mon ? (S.monsters[c.mon] || {}).name || "beasts" : "beasts"} out of ${to} by ${A.when(c.deadline, true)}`,
         retrieve: `Fetch ${c.item} from floor ${c.floor} of ${to}`,
-        defend: `Raiders expected on day ${c.night}. Hold the walls`,
+        defend: `Raiders expected ${A.when(c.night, "on")}. Hold the walls`,
       }[c.kind] || "Work going";
       const [icon, label] = JOB[c.kind] || ["📜", "Job"];
       return el("li", null, el("b", null, `${icon} ${label}: `), what, el("span", { class: "dim small" }, ` · ${c.pay} silver${c.kind === "bounty" ? "" : " each"} · ${left ? `${left} day${left > 1 ? "s" : ""} left` : "last day"}`));
@@ -1365,7 +1527,7 @@
     const wanted = (L.wanted || []).filter((b) => b.town === id);
     for (const b of wanted) {
       const hunters = b.takers.map((t) => heroes[t] ? A.heroLink(t) : parties[t] ? A.partyLink(t) : null).filter(Boolean);
-      p.appendChild(el("p", { class: "small" }, el("b", null, "WANTED: "), `${b.name}. ${b.pay} silver, until day ${b.until}. `,
+      p.appendChild(el("p", { class: "small" }, el("b", null, "WANTED: "), `${b.name}. ${b.pay} silver, until ${A.when(b.until, true)}. `,
         hunters.length ? ["Hunting it: ", hunters.map((x, i) => [i ? ", " : "", x])] : "Nobody has taken the job yet."));
     }
     if (shady) p.appendChild(el("p", { class: "small dim" }, "Someone in the back of the tavern is hiring for work that isn't on the board."));
@@ -1467,7 +1629,9 @@
     if (r) p.appendChild(el("p", { class: "small" }, el("b", null, `${r.title.replace(/\b\w/g, (c) => c.toUpperCase())}: ${r.name}`), ` (${r.mood}). This week: `,
       el("span", { class: r.edict === "nothing" ? "dim" : "gold" }, (S.edicts && S.edicts[r.edict]) || r.edict.replace(/_/g, " ")), r.banned_song ? ` (banned: "${r.banned_song}")` : ""));
     if (watch.length) p.appendChild(el("p", { class: "small" }, el("b", null, "The watch: "), watch.map((o, i) => [i ? ", " : "", `${o.title}${o.catches ? ` (${o.catches} arrests)` : ""}`])));
-    if (special) p.appendChild(el("p", { class: "small" }, el("b", null, "Tavern special: "), special));
+    if (special && special.name) p.appendChild(el("p", { class: "small" }, el("b", null, "Tavern special: "), el("span", { class: "gold", title: special.desc || null }, special.name),
+      special.price ? ` (${A.money(special.price)})` : "", special.desc ? el("span", { class: "dim" }, `. ${special.desc}`) : null,
+      special.meal && new Set(L.meals_index || []).has(special.meal) ? [" ", el("a", { class: "watch", href: `#/meal/${special.meal}` }, "▸ watch")] : null));
     const cult = Object.entries(L.cults || {}).find(([, c]) => c.town === id && !c.ended);
     if (cult) p.appendChild(el("p", { class: "small gold" }, el("b", null, "Shrine: "), `${cult[1].name} (${plural(cult[1].members, "member")}), devoted to `, A.heroLink(cult[0])));
     return p;

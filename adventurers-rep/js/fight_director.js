@@ -8,9 +8,11 @@
   const T = {
     title: 1.4, bossIntro: 1.3, hold: 2.8, cutin: 1.1, glint: 0.32, morale: 1.15, settle: 0.12,
     minorRate: 3, slowRate: 0.4, flagSlowRate: 0.7, mergeMax: 3, killFreeze: 0.55, turnFreeze: 0.42, critFreeze: 0.2,
+    // a boss going down: the world holds, then the death plays out in its own beat and the camera stays until the loot has settled
+    bossHold: 0.3, bossLinger: 1.1,
   };
-  const SUPPORT = { guard: "guard", buff: "buff", rally: "buff", fear: "curse", debuff: "curse", stealth: "buff", summon: "summon" };
-  const SHAPE = { rally: "shout", stealth: "vanish", fear: "dread", debuff: "hex" };
+  const SUPPORT = { guard: "guard", buff: "buff", rally: "buff", fear: "curse", debuff: "curse", parley: "curse", stealth: "buff", summon: "summon" };
+  const SHAPE = { rally: "shout", stealth: "vanish", fear: "dread", debuff: "hex", parley: "hex" };
 
   // ---------- what a skill looks like ----------
   function guess(e, unit, ranged) {
@@ -75,11 +77,13 @@
         case "down": if (e.t != null) alive[e.t] = false; // falls through
         case "thorns": case "flee": case "rout": case "surrender":
           if (e.fx === "flee") alive[e.a] = false;
+          // the last of a group running for it is a moment of its own, seen wide
+          if (e.bolt) { add({ kind: "flee", ev: [li], e }); cur = null; break; }
           if (cur && cur.kind === "act") cur.ev.push(li);
           else add({ kind: e.fx === "down" || e.fx === "thorns" ? "aside" : e.fx, ev: [li], e });
           break;
         case "summon": if (e.new) alive[e.new.i] = true; // falls through
-        case "guard": case "buff": case "rally": case "fear": case "debuff": case "stealth":
+        case "guard": case "buff": case "rally": case "fear": case "debuff": case "parley": case "stealth":
           cur = add({ kind: "act", a: e.a, e, ev: [li], support: e.fx, allies: units.filter((u) => u && u.side === (units[e.a] || {}).side && alive[u.i]).map((u) => u.i),
             foes: units.filter((u) => u && u.side !== (units[e.a] || {}).side && alive[u.i]).map((u) => u.i) });
           cur = null; break;
@@ -104,7 +108,7 @@
         // a crew buff plays on everyone it buffed; a status nobody fell for still reaches the other side and fizzles there
         const missed = e.fx === "debuff" && e.t != null && ![].concat(e.t).length;
         if (missed) b.whiff = true;
-        tgt = missed ? b.foes : e.fx === "debuff" && e.t ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
+        tgt = missed ? b.foes : (e.fx === "debuff" || e.fx === "parley") && e.t != null ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
           : e.fx === "summon" && e.new ? [e.new.i] : [b.a];
       }
       b.to = tgt.filter((i) => units[i]);
@@ -129,6 +133,9 @@
     let killLi = null;
     for (const b of bs) for (const li of b.ev) if (f.log[li].fx === "down" && units[f.log[li].t] && units[f.log[li].t].side === loser) { kill = b; killLi = li; }
     const turn = bs.find((b) => b.kind === "act" && f.log[b.ev[0]] && f.log[b.ev[0]].turn && b !== kill) || null;
+    // the beat that brings the boss down gets its own close-up and its own time, last blow of the fight or not
+    let bossKill = null;
+    for (const b of bs) for (const li of b.ev) { const e = f.log[li], u = e.fx === "down" && units[e.t]; if (u && u.boss && u.side === 1) bossKill = { b, li, who: e.t }; }
     const cutins = bs.filter((b) => b.kind === "act" && f.log[b.ev[0]] && f.log[b.ev[0]].cutin && units[b.a] && units[b.a].kind === "hero");
     // close-ups: the cleanest single-target crits and big hits, a few per fight
     const nClose = Math.max(1, Math.min(3, Math.round(acts.length / 7)));
@@ -136,11 +143,11 @@
       .sort((a, b) => (b.crit - a.crit) || (b.peak - a.peak)).slice(0, nClose);
     const slowFlag = acts.filter((b) => b.look.slow && !cutins.includes(b) && b !== kill && b !== turn).slice(0, 3);
     let st = { minorRate: T.minorRate, mergeMax: T.mergeMax, slowFlags: true, close };
-    let out = build(f, units, bs, { kill, killLi, turn, cutins, close, slowFlag, boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, st);
+    let out = build(f, units, bs, { kill, killLi, turn, bossKill, cutins, close, slowFlag, boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, st);
     // a long fight keeps moving: merge more, run the small stuff faster, drop the gentler slow-downs and close-ups
-    if (out.total > 18) out = build(f, units, bs, { kill, killLi, turn, cutins, close: close.slice(0, 2), slowFlag: [], boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, { minorRate: 4, mergeMax: 4, beatRate: 1.2 });
-    if (out.total > 24) out = build(f, units, bs, { kill, killLi, turn, cutins, close: close.slice(0, 1), slowFlag: [], boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, { minorRate: 5, mergeMax: 5, beatRate: 1.4 });
-    out.kill = kill; out.turn = turn;
+    if (out.total > 18) out = build(f, units, bs, { kill, killLi, turn, bossKill, cutins, close: close.slice(0, 2), slowFlag: [], boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, { minorRate: 4, mergeMax: 4, beatRate: 1.2 });
+    if (out.total > 24) out = build(f, units, bs, { kill, killLi, turn, bossKill, cutins, close: close.slice(0, 1), slowFlag: [], boss: units.find((u) => u && u.boss && u.side === 1), mounted: !!opts.mounted }, { minorRate: 5, mergeMax: 5, beatRate: 1.4 });
+    out.kill = kill; out.turn = turn; out.bossKill = bossKill;
     return out;
   }
 
@@ -157,7 +164,7 @@
     // a mount's own trick (the kelpie's lure, the stag's path) always gets a beat of its own, at the speed it was drawn for
     const signature = (b) => sel.mounted && /^(lure|path)$/.test((b.look && b.look.params && b.look.params.shape) || "");
     const isMinor = (b) => b.kind === "tick" || b.kind === "stun" || b.kind === "aside" ||
-      b.kind === "act" && !signature(b) && !b.crit && !b.downs.length && b.peak < 0.22 && !b.look.big && !sel.cutins.includes(b) && !sel.close.includes(b) && b !== sel.kill && b !== sel.turn && !sel.slowFlag.includes(b);
+      b.kind === "act" && !signature(b) && !b.crit && !b.downs.length && b.peak < 0.22 && !b.look.big && !sel.cutins.includes(b) && !sel.close.includes(b) && b !== sel.kill && b !== sel.turn && !sel.slowFlag.includes(b) && !(sel.bossKill && b === sel.bossKill.b);
     const at = (li, time) => { if (events[li] == null) events[li] = time; };
 
     // start: the title card, then a boss steps forward if there is one
@@ -178,9 +185,20 @@
         t += T.morale; i++; continue;
       }
       if (b.kind === "flee" || b.kind === "carry") {
-        slots.push({ kind: "move", t0: t, len: 0.8, members: [{ b, off: 0, knots: [[0, 0], [0.8, 0.8]] }] });
+        // a foe talked out of the fight walks off, and the replay gives it time to
+        const len = b.e && b.e.walk ? 1.8 : b.e && b.e.bolt ? 1.2 : 0.8;
+        slots.push({ kind: "move", t0: t, len, members: [{ b, off: 0, knots: [[0, 0], [len, len]] }] });
         for (const li of b.ev) at(li, t + 0.05);
-        t += 0.8; i++; continue;
+        t += len; i++; continue;
+      }
+      if (sel.bossKill && b === sel.bossKill.b && b.kind !== "act") {
+        // a boss felled by a burn or a thorn still falls in a beat of its own, seen wide
+        const len = T.bossHold + ((window.Deaths && Deaths.len(units[sel.bossKill.who])) || 1.4) + T.bossLinger;
+        const slot = { kind: "fall", t0: t, len, members: [], bossKill: { who: sel.bossKill.who, li: sel.bossKill.li, a: null } };
+        slots.push(slot);
+        for (const li of b.ev) at(li, t + 0.05);
+        impacts.push({ T: t + 0.05, li: sel.bossKill.li, t: sel.bossKill.who, kind: "down", slot, boss: true });
+        t += len; i++; continue;
       }
       if (isMinor(b)) {
         // a run of small trades plays as one beat, everyone at once, fast
@@ -205,8 +223,10 @@
       if (b === sel.kill) { slot.rate = T.slowRate; slot.kill = true; }
       else if (b === sel.turn) { slot.rate = T.slowRate; slot.turning = true; }
       else if (sel.slowFlag.includes(b)) slot.rate = T.flagSlowRate;
+      const bk = sel.bossKill && b === sel.bossKill.b ? sel.bossKill : null;
       if (sel.cutins.includes(b)) { slot.cutin = true; slot.pre = T.cutin; }
-      else if (sel.close.includes(b)) { slot.close = true; slot.pre = T.glint; }
+      else if (sel.close.includes(b) || bk) { slot.close = true; slot.pre = T.glint; }
+      if (bk) slot.bossKill = { who: bk.who, li: bk.li, a: b.a };
       const dur = b.time ? b.time.dur : 0.5, r = slot.rate;
       const knots = [[0, 0], [slot.pre, 0]];
       let u = slot.pre, tau = 0;
@@ -217,12 +237,14 @@
         u += (it - tau) / r; tau = it;
         knots.push([u, tau]);
         const kind = f.log[li].fx === "heal" || f.log[li].fx === "miss" ? null : hitKind(f, units, b, li);
-        const freeze = !kind ? 0 : slot.kill && kind === "ko" ? T.killFreeze : slot.turning ? T.turnFreeze : slot.close && kind !== "hit" ? T.critFreeze
+        const bossKo = slot.bossKill && kind === "ko" && f.log[slot.bossKill.li].t === f.log[li].t;
+        const freeze = !kind ? 0 : bossKo ? Math.max(T.bossHold, slot.kill ? T.killFreeze : 0) : slot.kill && kind === "ko" ? T.killFreeze : slot.turning ? T.turnFreeze : slot.close && kind !== "hit" ? T.critFreeze
           : (window.FightFX ? FightFX.hitStop(kind) : 0.08) || 0;
         if (freeze) { u += freeze; knots.push([u, tau]); }
       });
       u += Math.max(0, dur - tau) / r + T.settle;
       knots.push([u, dur + T.settle * r]);
+      if (slot.bossKill) u += T.bossHold + ((window.Deaths && Deaths.len(units[slot.bossKill.who])) || 1.4) + T.bossLinger;
       slot.len = u;
       slot.members.push({ b, off: 0, knots });
       slots.push(slot);
@@ -277,7 +299,7 @@
         at(li, last);
         impacts.push({ T: last, li, t: e.t, a: b.a, kind: e.fx, k, b, slot, crit: e.fx === "crit", heavy: e.v >= 0.2 * ((units[e.t] || {}).maxhp || 1) });
         k++;
-      } else if (e.fx === "down") { at(li, last + 0.03); impacts.push({ T: last + 0.03, li, t: e.t, kind: "down", b, slot, kill: !!slot.kill && li === sel.killLi }); }
+      } else if (e.fx === "down") { at(li, last + 0.03); impacts.push({ T: last + 0.03, li, t: e.t, kind: "down", b, slot, kill: !!slot.kill && li === sel.killLi, boss: !!slot.bossKill && li === slot.bossKill.li }); }
       else if (e.fx === "act" || e.fx === "summon") at(li, t0 + uAt(m.knots, 0));
       else if (SUPPORT[e.fx]) at(li, t0 + uAt(m.knots, b.time.impact || 0.3));
       else at(li, last + 0.08);

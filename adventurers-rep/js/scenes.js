@@ -474,6 +474,7 @@
   function vignette(e, W, H) {
     W = W || 200; H = H || 84;
     const { heroes, S } = App, A = window.Anim;
+    if (e.kind === "song" && S.towns[e.loc] && window.Ballad) return Ballad.vignette(e, W, H);
     const kind = locKind(e.loc), seed = hash(e.id);
     const indoors = S.towns[e.loc] && TAVERN_KINDS.has(e.kind) ? "tavern" : S.towns[e.loc] && e.kind === "crime" ? "jail" : null;
     const place = indoors ? null : placeAt(e.loc);

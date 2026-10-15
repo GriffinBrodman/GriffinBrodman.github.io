@@ -501,15 +501,218 @@
     S.box([st.x, st.y, st.z + h], [h, h, h], st.R, look.col, { tex: look.tex, outline: look.outline, edgeCol: look.edge });
   }
 
+  // ---------- dice as solids: one ray per pixel against the set's own shape (rounded, lumpy, tapered or cut), then its material ----------
+  const tmv = (A, v) => [A[0][0] * v[0] + A[1][0] * v[1] + A[2][0] * v[2], A[0][1] * v[0] + A[1][1] * v[1] + A[2][1] * v[2], A[0][2] * v[0] + A[1][2] * v[1] + A[2][2] * v[2]];
+  function hash3(x, y, z, s) {
+    let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177) + Math.imul(s | 0, 1013904223)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function noise3(x, y, z, s) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = smooth(x - xi), yf = smooth(y - yi), zf = smooth(z - zi);
+    const c = (i, j, k) => hash3(xi + i, yi + j, zi + k, s);
+    return lerp(lerp(lerp(c(0, 0, 0), c(1, 0, 0), xf), lerp(c(0, 1, 0), c(1, 1, 0), xf), yf), lerp(lerp(c(0, 0, 1), c(1, 0, 1), xf), lerp(c(0, 1, 1), c(1, 1, 1), xf), yf), zf);
+  }
+  function dieShape(sh, h, seed) {
+    const e = sh.ext || [1, 1, 1], rr = (sh.round || 0.1) * h, b = [h * e[0] - rr, h * e[1] - rr, h * e[2] - rr];
+    // each die's lumps are a few slow waves with its own phases, cheap enough to march every frame
+    const ph = [hash3(seed, 1, 0, 9) * 6.3, hash3(seed, 2, 0, 9) * 6.3, hash3(seed, 3, 0, 9) * 6.3], k0 = 2.1 / h, k1 = 2.4 / h, k2 = 1.9 / h;
+    return (p0) => {
+      const tk = sh.taper ? 1 + sh.taper * p0[2] / h : 1, p = sh.taper ? [p0[0] * tk, p0[1] * tk, p0[2]] : p0;
+      const ax = Math.abs(p[0]), ay = Math.abs(p[1]), az = Math.abs(p[2]);
+      const qx = ax - b[0], qy = ay - b[1], qz = az - b[2];
+      let d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - rr;
+      if (sh.corner) d = Math.max(d, (ax + ay + az) / 1.732 - sh.corner * h);
+      if (sh.edge) d = Math.max(d, (ax + ay) / 1.414 - sh.edge * h, (ay + az) / 1.414 - sh.edge * h, (ax + az) / 1.414 - sh.edge * h);
+      if (sh.worn) d = Math.max(d, (p[0] + p[1] - p[2]) / 1.732 - sh.worn * h);
+      if (sh.lump) d += (Math.sin(p[0] * k0 + ph[0]) * Math.sin(p[1] * k1 + ph[1]) + Math.sin(p[2] * k2 + ph[2]) * 0.6) * sh.lump * h * 0.3;
+      return d;
+    };
+  }
+  function faceAt(p, h, ext) {
+    const a = [Math.abs(p[0]) / ext[0], Math.abs(p[1]) / ext[1], Math.abs(p[2]) / ext[2]];
+    const ax = a[0] >= a[1] && a[0] >= a[2] ? 0 : a[1] >= a[2] ? 1 : 2, sg = p[ax] >= 0 ? 1 : -1;
+    const o2 = [0, 1, 2].filter((k) => k !== ax), u = p[o2[0]] / (h * ext[o2[0]]), v = p[o2[1]] / (h * ext[o2[1]]);
+    let pd = 9;
+    for (const [pu, pv] of PIPS[FACEVAL[ax + "," + sg]]) pd = Math.min(pd, Math.hypot(u - pu * 0.52, v - pv * 0.52));
+    return { ax, sg, u, v, pd, e: Math.max(Math.abs(u), Math.abs(v)), cn: Math.min(Math.abs(u), Math.abs(v)) };
+  }
+  // a die at rest draws the same pixels every frame, so its raster is kept and replayed
+  const DIE_CACHE = new Map();
+  function dieSolid(S, st, size, look, light) {
+    const h = size / 2, c = [st.x, st.y, st.z + h], R = st.R, cam = S.cam, seed = (st.seed || 0) * 13 + 3;
+    S.drop(st.x, st.y, st.z + h, h * 1.05, look.shadowF || 0.5, light);
+    const key = look.id + ":" + seed + ":" + c.map((v) => v.toFixed(2)).join(",") + ":" + R.map((r) => r.map((v) => v.toFixed(3)).join(",")).join(";") + ":" + cam.sx + "," + cam.sy;
+    let px = DIE_CACHE.get(key);
+    if (!px) {
+      px = dieRaster(S, c, h, R, look, seed);
+      if (DIE_CACHE.size > 64) DIE_CACHE.delete(DIE_CACHE.keys().next().value);
+      DIE_CACHE.set(key, px);
+    }
+    for (const [x, y, col, emit] of px) S.b.px(x, y, col, emit);
+  }
+  function dieRaster(S, c, h, R, look, seed) {
+    const cam = S.cam, sh = look.shape || {}, ext = sh.ext || [1, 1, 1], sdf = dieShape(sh, h, seed);
+    const pc = S.P(c[0], c[1], c[2]), rad = cam.scale(c[0], c[1], c[2]) * h * 2.1;
+    const x0 = Math.floor(pc[0] - rad), x1 = Math.ceil(pc[0] + rad), y0 = Math.floor(pc[1] - rad), y1 = Math.ceil(pc[1] + rad);
+    const wN = x1 - x0 + 1, hN = y1 - y0 + 1, face = new Int8Array(wN * hN).fill(-1), out = new Map();
+    const rel = [cam.pos[0] - c[0], cam.pos[1] - c[1], cam.pos[2] - c[2]], lo = tmv(R, rel);
+    // the ray only marches inside the die's bounding sphere
+    const rb = h * Math.max(...ext) * (1.74 + (sh.taper || 0)) + (sh.lump || 0) * h, rr2 = dot(rel, rel) - rb * rb;
+    const shadeM = (m, nw, V, x, y) => {
+      if (m.emit || m.flat) return m.col;
+      let col = S.shade(m.col, S.amb + S.dif * Math.max(0, dot(nw, S.key)));
+      if (m.spec) {
+        const nk = dot(nw, S.key), Rf = [2 * nk * nw[0] - S.key[0], 2 * nk * nw[1] - S.key[1], 2 * nk * nw[2] - S.key[2]];
+        const s = Math.pow(Math.max(0, dot(Rf, V)), m.shin || 12) * m.spec;
+        const k = Math.floor(clamp(s, 0, 1) * 3 + BAYER[(y & 3) * 4 + (x & 3)] * 0.9) / 3;
+        if (k > 0) col = mixc(col, m.specCol || [255, 250, 236], Math.min(1, k));
+      }
+      return col;
+    };
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = (x + 0.5 - cam.cx - cam.sx) / cam.focal, dy = (y + 0.5 - cam.cy - cam.sy) / cam.focal;
+      const D = norm([cam.f[0] + dx - cam.u[0] * dy, cam.f[1] - cam.u[1] * dy, cam.f[2] - cam.u[2] * dy]), ld = tmv(R, D);
+      const bq = dot(rel, D), disc = bq * bq - rr2;
+      if (disc < 0) continue;
+      let t = -bq - Math.sqrt(disc), p = null;
+      const tEnd = -bq + Math.sqrt(disc);
+      for (let i = 0; i < 40 && t < tEnd; i++) {
+        const q = [lo[0] + ld[0] * t, lo[1] + ld[1] * t, lo[2] + ld[2] * t], d = sdf(q);
+        if (d < 0.015) { p = q; break; }
+        t += Math.max(d * 0.9, 0.015);
+      }
+      if (!p) continue;
+      const e = 0.03, nl = norm([sdf([p[0] + e, p[1], p[2]]) - sdf([p[0] - e, p[1], p[2]]), sdf([p[0], p[1] + e, p[2]]) - sdf([p[0], p[1] - e, p[2]]), sdf([p[0], p[1], p[2] + e]) - sdf([p[0], p[1], p[2] - e])]);
+      const nw = norm(mv(R, nl)), V = [-D[0], -D[1], -D[2]], fc = faceAt(p, h, ext);
+      const m = DICE_MATS[look.mat](Object.assign(fc, { p, h, nl, nw, V, seed, x, y, S, key: S.key, fr: 1 - Math.abs(dot(nw, V)), isPip: false }));
+      const i = (y - y0) * wN + (x - x0);
+      out.set(i, [x, y, shadeM(m, nw, V, x, y), m.emit]);
+      face[i] = fc.ax * 2 + (fc.sg > 0 ? 1 : 0);
+    }
+    // pips are stamped where their centres project, one crisp pixel each, on faces turned toward the camera
+    const Vc = norm(rel);
+    for (let ax = 0; ax < 3; ax++) for (const sg of [1, -1]) {
+      const n = [0, 0, 0]; n[ax] = sg;
+      const nw = mv(R, n), facing = dot(nw, Vc);
+      if (facing < 0.2) continue;
+      const o2 = [0, 1, 2].filter((k) => k !== ax), val = FACEVAL[ax + "," + sg], fid = ax * 2 + (sg > 0 ? 1 : 0);
+      const at = (pu, pv) => { const l = [0, 0, 0]; l[ax] = sg * h * ext[ax] * 0.98; l[o2[0]] = pu * 0.52 * h * ext[o2[0]]; l[o2[1]] = pv * 0.52 * h * ext[o2[1]]; const w = mv(R, l); return S.P(c[0] + w[0], c[1] + w[1], c[2] + w[2]); };
+      const a0 = at(0, 0), a1 = at(1, 0), a2 = at(0, 1), step = Math.min(Math.hypot(a1[0] - a0[0], a1[1] - a0[1]), Math.hypot(a2[0] - a0[0], a2[1] - a0[1]));
+      if (step < 1.3) continue;
+      const big = val === 1 ? step >= 2.6 : step >= 3.6;
+      for (const [pu, pv] of PIPS[val]) {
+        const q = at(pu, pv), x = Math.floor(q[0]), y = Math.floor(q[1]), i = (y - y0) * wN + (x - x0);
+        if (x < x0 || y < y0 || x > x1 || y > y1 || face[i] !== fid) continue;
+        const l = [0, 0, 0]; l[ax] = sg * h; l[o2[0]] = pu * 0.52 * h; l[o2[1]] = pv * 0.52 * h;
+        const m = DICE_MATS[look.mat]({ isPip: true, big, p: l, h, nl: n, nw, V: Vc, seed, fr: 1 - facing, e: 0, cn: 0, pd: 0, x, y, S, key: S.key });
+        const col = shadeM(m, nw, Vc, x, y);
+        out.set(i, [x, y, col, m.emit, true]);
+        if (big) for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) { const j = i + dy * wN + dx; if (x + dx <= x1 && face[j] === fid) out.set(j, [x + dx, y + dy, col, m.emit, true]); }
+        else if (look.pipRing) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const j = i + dy * wN + dx, o = out.get(j);
+          if (x + dx >= x0 && x + dx <= x1 && face[j] === fid && o && !o[4]) o[2] = mixc(o[2], look.pipRing, 0.5);
+        }
+      }
+    }
+    const px = [...out.values()];
+    if (look.outline) {
+      const inside = (i, j) => i >= 0 && j >= 0 && i < wN && j < hN && face[j * wN + i] >= 0;
+      for (let j = -1; j <= hN; j++) for (let i = -1; i <= wN; i++) {
+        if (inside(i, j)) continue;
+        if (inside(i - 1, j) || inside(i + 1, j) || inside(i, j - 1) || inside(i, j + 1)) px.push([x0 + i, y0 + j, look.outline, false]);
+      }
+    }
+    return px;
+  }
+  // a small four-point star where a polished die catches the fire as it settles
+  function glintAt(S, d, t, col) {
+    if (!d.st) return;
+    const u = (t - d.T.ti[4] + 0.05) / 0.4;
+    if (u < 0 || u > 1) return;
+    const h = d.size / 2, c = S.P(d.st.x - h * 0.45, d.st.y - h * 0.5, d.st.z + d.size + 0.5), b = S.b, x = Math.round(c[0]), y = Math.round(c[1]);
+    const arm = u < 0.25 ? 1 : u < 0.6 ? 2 : 1;
+    b.px(x, y, [255, 255, 240], true);
+    for (let k = 1; k <= arm; k++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) b.px(x + dx * k, y + dy * k, k === arm && arm > 1 ? col : [255, 246, 214], true);
+  }
+
+  // ---------- dice materials, named by the set looks below; c carries the hit point, its face and the light ----------
+  const MIX = (a, b, t) => mixc(a, b, clamp(t, 0, 1));
+  const reflectV = (c) => { const k = 2 * dot(c.nw, c.V); return norm([k * c.nw[0] - c.V[0], k * c.nw[1] - c.V[1], k * c.nw[2] - c.V[2]]); };
+  const FIRE = norm([-0.55, -0.45, 0.35]);
+  // a polished surface shows what its reflection sees: the fire on one side, the dark camp everywhere else
+  const env = (c, dark, mid, lit) => { const f = dot(reflectV(c), FIRE); return f > 0.55 ? lit : f > 0.05 ? mid : dark; };
+  const N3 = (c, k, s) => noise3(c.p[0] / c.h * k, c.p[1] / c.h * k, c.p[2] / c.h * k, s);
+  const flatFace = (c) => Math.abs(c.nl[0]) > 0.95 || Math.abs(c.nl[1]) > 0.95 || Math.abs(c.nl[2]) > 0.95;
+  const DICE_MATS = {
+    bone: (c) => {
+      if (c.isPip) return { col: [56, 28, 14] };
+      let col = MIX([240, 228, 190], [214, 188, 132], N3(c, 1.8, c.seed) * 1.5 - 0.35);
+      if ((c.p[0] + c.p[1] - c.p[2]) / 1.732 > 1.05 * c.h) col = [246, 238, 210];
+      if (N3(c, 3.1, c.seed + 40) > 0.76) col = MIX(col, [168, 128, 78], 0.6);
+      return { col, spec: 0.12, shin: 5, specCol: [255, 246, 220] };
+    },
+    shell: (c) => {
+      if (c.isPip) return { col: [92, 140, 206] };
+      return { col: c.e > 0.8 ? [244, 204, 210] : [244, 240, 232], spec: 0.45, shin: 14 };
+    },
+    lampstone: (c) => {
+      if (c.isPip) return { col: [34, 22, 12] };
+      const core = 1 - c.e, smoke = N3(c, 2, 21);
+      if (core > 0.62 + smoke * 0.2) return { col: [255, 204, 116], emit: true };
+      if (core > 0.48 + smoke * 0.2) return { col: [244, 150, 56], emit: true };
+      if (c.e > 0.9) return { col: [190, 104, 34], spec: 0.8, shin: 26 };
+      return { col: MIX([140, 70, 20], [222, 138, 48], core * 1.6 - smoke * 0.4), spec: 0.8, shin: 26, specCol: [255, 244, 210] };
+    },
+    jet: (c) => {
+      if (c.isPip) return { col: [240, 244, 252], flat: true };
+      if (!flatFace(c)) return { col: env(c, [58, 58, 70], [112, 112, 128], [236, 222, 206]), flat: true };
+      return { col: env(c, [26, 24, 32], [40, 38, 48], [70, 54, 50]), spec: 1.3, shin: 40, specCol: [250, 250, 255] };
+    },
+    gilt: (c) => {
+      if (c.isPip) return { col: [24, 16, 12], flat: true };
+      const lit = dot(c.nw, c.key);
+      if (c.cn > 0.8 + N3(c, 4, 2) * 0.15) return { col: lit > 0.6 ? [176, 130, 70] : [120, 86, 44], flat: true };
+      if (c.e > 0.86) return { col: lit > 0.3 ? [255, 246, 196] : [140, 90, 24], flat: true };
+      const f = dot(reflectV(c), FIRE) + N3(c, 2.5, 6) * 0.25;
+      return { col: lit > 0.75 ? (f > 0.45 ? [255, 236, 150] : [246, 196, 76]) : lit > 0.3 ? [192, 122, 30] : [100, 60, 18], flat: true };
+    },
+    garnet: (c) => {
+      if (c.isPip) return { col: [250, 204, 92], flat: true };
+      if (!flatFace(c)) return { col: env(c, [110, 14, 30], [226, 70, 84], [255, 196, 190]), flat: true };
+      return { col: MIX([112, 10, 28], [204, 40, 56], (1 - c.e) * 1.4 + (dot(reflectV(c), FIRE) > 0.6 ? 0.5 : 0)), spec: 1.3, shin: 40, specCol: [255, 236, 236] };
+    },
+    ivory: (c) => {
+      if (c.isPip) return { col: [168, 100, 18], spec: 1, shin: 8, specCol: [255, 226, 120] };
+      if (c.e > 0.8) return { col: dot(c.nw, c.key) > 0.55 ? [255, 214, 92] : [196, 136, 30], flat: true };
+      const grain = Math.sin((c.p[0] + c.p[2]) / c.h * 9 + noise3(c.p[0], c.p[1], c.p[2], 3) * 2);
+      return { col: MIX([250, 244, 228], [236, 226, 200], grain * 0.5 + 0.3), spec: 0.4, shin: 14 };
+    },
+    crystal: (c) => {
+      if (c.isPip) return { col: [34, 70, 170] };
+      if (!flatFace(c)) return dot(c.nw, c.key) > 0.3 ? { col: [206, 230, 246], emit: true } : { col: [150, 190, 226] };
+      if (N3(c, 3.4, 17) > 0.72) return { col: [176, 204, 226], emit: true };
+      const bg = c.S.b.get(c.x - Math.round(c.nw[0] * 3), c.y + Math.round(c.nw[1] * 3));
+      return { col: MIX(sc(bg, 0.7), [130, 200, 255], 0.55 + c.fr * 0.3), spec: 1.4, shin: 34, specCol: [255, 255, 255] };
+    },
+    tooth: (c) => {
+      if (c.isPip) return { col: c.big ? [255, 214, 120] : [255, 184, 72], emit: true };
+      const root = -c.p[2] / c.h * 0.5 + 0.5;
+      let col = MIX([244, 238, 214], [184, 140, 92], root * 1.2 - 0.3);
+      if (N3(c, 2.6, 31) > 0.76 && c.pd > 0.45) col = MIX(col, [70, 44, 30], 0.6);
+      return { col, spec: 0.5, shin: 14 };
+    },
+  };
+
   // dust kicked up where something lands: a few specks thrown outward, fading
-  function dust(S, x, y, t0, t, col, n) {
+  function dust(S, x, y, t0, t, col, n, emit) {
     const u = (t - t0) / 0.35;
     if (u < 0 || u > 1) return;
     const p = S.P(x, y, 0), r = rng(Math.floor(x * 31 + y * 17 + t0 * 100));
     for (let i = 0; i < (n || 5); i++) {
       const a = r() * Math.PI * 2, d = 3 + r() * 5;
       const px = p[0] + Math.cos(a) * d * ease(u), py = p[1] + Math.sin(a) * d * 0.5 * ease(u) - 2 * Math.sin(u * Math.PI);
-      if (r() > u) S.b.px(px, py, col);
+      if (r() > u) S.b.px(px, py, col, emit);
     }
   }
   // a stamped word across the scene: LIAR!, CAUGHT!, PHOTO!
@@ -539,10 +742,12 @@
     for (const d of list) {
       if (t < d.T.ti[0] - 0.02) continue;
       const st = tumbleAt(d.T, t, d.half || d.size / 2);
+      st.seed = list.indexOf(d);
       d.st = st;
       items.push({ y: st.y, draw: () => {
-        (d.drawFn || dieDraw)(S, st, d.size, d.look, lamp);
-        if (d.dustCol) dust(S, st.x, st.y, d.T.ti[1], t, d.dustCol, 4);
+        (d.drawFn || (d.look.mat ? dieSolid : dieDraw))(S, st, d.size, d.look, lamp);
+        if (d.dustCol && d.look.sparks) { dust(S, st.x, st.y, d.T.ti[1], t, d.dustCol, 8, true); dust(S, st.x, st.y, d.T.ti[2], t, d.dustCol, 5, true); }
+        else if (d.dustCol) dust(S, st.x, st.y, d.T.ti[1], t, d.dustCol, 4);
       } });
     }
   }
@@ -585,10 +790,22 @@
     cards_ledger: { kind: "cards", tier: 1, stock: [238, 230, 208], edge: [160, 150, 128], back: [234, 226, 202], ink: [52, 78, 136], red: [164, 40, 36], black: [30, 30, 36], ruled: [176, 198, 228] },
     cards_toll: { kind: "cards", tier: 2, stock: [228, 206, 158], edge: [146, 120, 80], back: [222, 198, 148], ink: [176, 48, 34], red: [174, 78, 36], black: [36, 92, 54] },
     cards_gilt: { kind: "cards", tier: 3, stock: [248, 243, 230], edge: [222, 172, 56], back: [32, 44, 94], ink: [232, 188, 76], red: [184, 28, 48], black: [32, 46, 116], gilt: true },
-    dice_knuckle: { kind: "dice", tier: 0, col: [228, 210, 168], pip: [74, 40, 22], outline: [100, 78, 52] },
-    dice_shell: { kind: "dice", tier: 1, col: [242, 238, 230], pip: [92, 140, 206], outline: [128, 116, 116], rim: [240, 204, 204] },
-    dice_lamp: { kind: "dice", tier: 2, col: [218, 150, 58], pip: [40, 26, 16], outline: [112, 64, 22], glow: [255, 176, 80] },
-    dice_jet: { kind: "dice", tier: 3, col: [40, 38, 46], pip: [222, 226, 234], outline: [8, 8, 10], rim: [104, 106, 118] },
+    // dice: shape and mat drive the solid renderer; col and pip still colour the set's icon; glint, glow, dust and sparks are the throw's effects
+    dice_knuckle: { kind: "dice", tier: 0, col: [228, 210, 168], pip: [74, 40, 22], outline: [82, 58, 36], mat: "bone", pipRing: [150, 104, 60],
+      shape: { ext: [1.07, 0.95, 0.92], round: 0.36, lump: 0.16, worn: 1.18 } },
+    dice_shell: { kind: "dice", tier: 1, col: [242, 238, 230], pip: [92, 140, 206], outline: [124, 112, 114], mat: "shell", shape: { round: 0.16 },
+      dust: [170, 150, 126] },
+    dice_lamp: { kind: "dice", tier: 2, col: [218, 150, 58], pip: [40, 26, 16], outline: [86, 42, 12], glow: [255, 176, 80], mat: "lampstone", shape: { round: 0.07 } },
+    dice_jet: { kind: "dice", tier: 3, col: [40, 38, 46], pip: [222, 226, 234], outline: [6, 6, 8], mat: "jet", shape: { round: 0.04, edge: 1.3 },
+      glint: [200, 214, 236], dust: [120, 100, 80] },
+    dice_gilt: { kind: "dice", tier: 3, col: [236, 186, 70], pip: [28, 18, 14], outline: [70, 42, 10], mat: "gilt", shape: { round: 0.1 }, glint: [255, 226, 130] },
+    dice_garnet: { kind: "dice", tier: 3, col: [178, 28, 46], pip: [250, 204, 92], outline: [48, 4, 12], mat: "garnet", shape: { round: 0.04, corner: 1.42, edge: 1.3 },
+      glint: [255, 190, 196] },
+    dice_ivory: { kind: "dice", tier: 3, col: [246, 238, 216], pip: [200, 140, 30], outline: [100, 82, 56], mat: "ivory", shape: { round: 0.16 }, glint: [255, 226, 130] },
+    dice_rime: { kind: "dice", tier: 3, col: [176, 214, 240], pip: [34, 70, 170], outline: [46, 70, 100], mat: "crystal", shape: { round: 0.05, edge: 1.32 },
+      glint: [214, 236, 255], dust: [214, 228, 240] },
+    dice_dragon: { kind: "dice", tier: 3, col: [226, 208, 170], pip: [255, 160, 50], outline: [56, 32, 20], mat: "tooth", pipRing: [36, 20, 12],
+      shape: { ext: [0.96, 0.96, 1.08], round: 0.26, lump: 0.07, taper: 0.16 }, dust: [255, 150, 60], sparks: true },
     checkers_button: { kind: "checkers", tier: 0, men: [[230, 216, 180], [200, 154, 62]], holes: true, board: "chalk" },
     checkers_slate: { kind: "checkers", tier: 1, men: [[234, 232, 222], [78, 88, 100]], board: "slate", dusty: true },
     checkers_living: { kind: "checkers", tier: 2, men: [[230, 220, 192], [116, 70, 42]], board: "bark", shoots: true },
@@ -1136,11 +1353,12 @@
     text(b, label, 7, 6, [150, 160, 150]);
     names.forEach((nm, i) => { text(b, nm, 7, 13 + i * 7, [214, 220, 206]); text(b, String(n[i]), 4 + Math.max(w, textWidth(label) + 8) - 7, 13 + i * 7, [255, 226, 150]); });
   }
-  function result(b, rec, t, tEnd, score) {
+  function result(b, rec, t, tEnd, score, y) {
     if (t < tEnd) return;
+    y = y || 54;
     const w = winnerOf(rec), word = w === null ? "A DRAW!" : `${nameOf(rec.players[w])} WINS!`;
-    stamp(b, word, W / 2, 54, [252, 216, 112], t - tEnd);
-    if (score && t > tEnd + 0.2) text(b, score, W / 2, 69, [236, 226, 200], { center: true, outline: [24, 14, 10] });
+    stamp(b, word, W / 2, y, [252, 216, 112], t - tEnd);
+    if (score && t > tEnd + 0.2) text(b, score, W / 2, y + 15, [236, 226, 200], { center: true, outline: [24, 14, 10] });
   }
   function peekAll(S, p, rec, t, wall, ax, lookX) {
     const g = goblinOf(rec);
@@ -1559,11 +1777,11 @@
       const ZONES = np <= 2 ? [[0, -12, 34, 6], [0, 13, 34, 6]] : [[-22, -12, 15, 6], [22, 13, 15, 6], [-22, 13, 15, 6], [22, -12, 15, 6]];
       const FROM = [[10, -70, 34], [-10, 70, 34], [-90, 10, 30], [90, -10, 30]];
       const tex = pipTex(null, look.pip, look.rim || null);
-      const lk = { col: look.col, tex, outline: look.outline };
+      const lk = look.mat ? look : { col: look.col, tex, outline: look.outline };
       const dice = [], throws = [], ev = [[0, "fire", 12]];
       rolls.forEach((rl, i) => {
         const t0 = 0.45 + i * gap, z = ZONES[i], sp = spots(r, z[0], z[1], rl.length, z[2], z[3], 12);
-        const ds = rl.map((v, k) => ({ v, who: i, size: 9, look: lk, dustCol: [150, 120, 84], T: tumble(r, { t0: t0 + k * 0.07 + r() * 0.04, sx: FROM[i][0] + (r() - 0.5) * 10, sy: FROM[i][1] + (r() - 0.5) * 6, sz: FROM[i][2], ex: sp[k][0], ey: sp[k][1], val: v, air: 0.42 + r() * 0.1, h1: 8 + r() * 4, flips: 2 }) }));
+        const ds = rl.map((v, k) => ({ v, who: i, size: 9, look: lk, dustCol: look.dust || [150, 120, 84], T: tumble(r, { t0: t0 + k * 0.07 + r() * 0.04, sx: FROM[i][0] + (r() - 0.5) * 10, sy: FROM[i][1] + (r() - 0.5) * 6, sz: FROM[i][2], ex: sp[k][0], ey: sp[k][1], val: v, air: 0.42 + r() * 0.1, h1: 8 + r() * 4, flips: 2 }) }));
         dice.push(...ds);
         const tSum = Math.max(...ds.map((d) => d.T.end)) + 0.05;
         throws.push({ who: i, t0, tSum, sum: rl.reduce((a, b) => a + b, 0), dice: ds });
@@ -1591,6 +1809,7 @@
       const b = S.b;
       campfire(b, ...firePx(S, p), wall, 1.25);
       if (look.glow) for (const d of p.dice) if (d.st && t > d.T.ti[0]) { const c = S.P(d.st.x, d.st.y, d.st.z + 4); glow(b, c[0], c[1], 8, look.glow, 0.28); }
+      if (look.glint) for (const d of p.dice) glintAt(S, d, t, look.glint);
       if (t > p.tEnd - 0.2 && p.w !== null) p.throws[p.w].dice.forEach((d, i) => ringDie(S, d, t, p.tEnd - 0.2 + i * 0.04, undefined, [255, 210, 100]));
       const names = rec.players.slice(0, p.throws.length).map(nameOf);
       const sw = Math.max(...names.map((s) => textWidth(s))) + 20, sh = 9 + names.length * 7;
@@ -1600,7 +1819,8 @@
         text(b, names[i], 7, 13 + i * 7, i === p.w && t > p.tEnd ? [255, 226, 150] : [214, 220, 206]);
         if (t > th.tSum) text(b, String(th.sum), 4 + Math.max(sw, 40) - 4 - textWidth(String(th.sum)), 13 + i * 7, i === p.w && t > p.tEnd ? [255, 226, 150] : [236, 240, 230]);
       });
-      result(b, Object.assign({}, rec, { winner: p.w }), t, p.tEnd, null);
+      // the dice lie in two rows across the middle of the board, so the word goes on the board's near edge below them
+      result(b, Object.assign({}, rec, { winner: p.w }), t, p.tEnd, null, 108);
       if (rec.stake) stakeToken(b, Object.assign({}, rec, { winner: p.w, _totals: p.totals }), look, t - p.tEnd - 0.3);
       peekAll(S, p, rec, t, wall, 96);
     },
@@ -1798,16 +2018,16 @@
     const g = cv.getContext("2d"), img = g.createImageData(W, H);
     const p = planFor(rec);
     if (!p) return fig;
-    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1;
+    let t = reduced() ? p.dur + 1 : 0, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
     const evs = p.ev.slice().sort((a, b) => a[0] - b[0]);
     const paint = () => { const f = render(rec, t); img.data.set(f.data); g.putImageData(img, 0, 0); };
-    const live = () => fig.isConnected && onscreen && !doc.hidden;
+    const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     function frame(ms) {
       raf = 0;
       if (!live()) { last = 0; return; }
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
-      t += dt;
+      t += dt * rate;
       // a bed that should already be running (the fire, the room) starts late rather than not at all
       while (fired < evs.length && evs[fired][0] <= t) {
         const e = evs[fired], late = t - e[0];
@@ -1818,7 +2038,7 @@
       if (t < p.dur + 0.3 || t - lastDraw > 1 / 12) { paint(); lastDraw = t; }
       raf = root.requestAnimationFrame(frame);
     }
-    const wake = () => { if (!reduced() && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
+    const wake = () => { if ((forced || !reduced()) && !raf && live()) { last = 0; raf = root.requestAnimationFrame(frame); } };
     cv.addEventListener("click", () => { t = 0; fired = 0; lastDraw = -1; paint(); wake(); });
     if ("IntersectionObserver" in root) {
       const io = new root.IntersectionObserver((es) => {
@@ -1829,6 +2049,15 @@
       io.observe(fig);
     } else onscreen = true;
     doc.addEventListener("visibilitychange", wake);
+    // the page's shared control bar drives the player through this (replay.js); a press of Play also plays under reduced motion
+    fig.replay = {
+      get t() { return t; }, get dur() { return p.dur; }, get playing() { return !held && t < p.dur && (forced || !reduced()); },
+      play() { held = false; forced = true; wake(); },
+      pause() { held = true; },
+      restart() { held = false; forced = true; t = 0; fired = 0; lastDraw = -1; paint(); wake(); },
+      skip() { t = p.dur; fired = evs.length; lastDraw = -1; paint(); wake(); },
+      rate(s) { rate = s; },
+    };
     paint();
     wake();
     return fig;

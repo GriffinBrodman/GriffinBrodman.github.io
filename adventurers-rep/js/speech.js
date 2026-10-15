@@ -255,7 +255,7 @@
         while (l.next < l.words.length && l.plan[l.next].at <= el2) {
           const i = l.next++, w = l.words[i], node = l.nodes[i];
           if (node) node.classList.add("on");
-          if (audible) voice(w, l.plan[i], i, l.words.length, l.v, l.beast, l);
+          if (audible && !l.mute) voice(w, l.plan[i], i, l.words.length, l.v, l.beast, l);
           if (node && fxOf(w).has("slam") && !reduced()) { l.node.classList.remove("thud"); void l.node.offsetWidth; l.node.classList.add("thud"); }
         }
         const end = l.plan.length ? l.plan[l.plan.length - 1].end : 0;
@@ -264,7 +264,7 @@
           if (!l.out) { l.out = el2; l.node.classList.add("out"); }
           if (el2 - l.out > 0.3) { drop(l); continue; }
         }
-        if (l.next < l.words.length) soon = 0;
+        if (l.next < l.words.length) soon = Math.min(soon, Math.max(0, l.plan[l.next].at - el2));
         else {
           if (l.done) soon = Math.min(soon, end + 0.35 - el2);
           soon = Math.min(soon, l.out ? l.out + 0.32 - el2 : end + l.hold - el2);
@@ -295,6 +295,29 @@
         const l = { a, node, words, nodes, plan: p, v, beast, next: 0, t0: clock(), done: done || null, pitch: beast ? 0.85 + (hash(a.name || "") % 40) / 100 : 1,
           bang: /!\s*$/.test(strip(text)), hold: pinned ? Infinity : Math.min(4.8, Math.max(1.8, 1.1 + n * 0.14)) };
         lines.push(l);
+        T.place();
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        frame();
+      },
+      // a sung line: each word lands at its time in seconds from now (the song's own timing, music.js), with no talking blips;
+      // o: { cls (a second outline colour for sing-alongs), color, hold (secs after the last word), from (secs already elapsed), who }
+      sing(a, text, times, o) {
+        const op = o || {};
+        if (!text) return;
+        for (const l of lines.slice()) if (l.a === a) drop(l);
+        while (lines.length >= 3) drop(lines[0]);
+        const words = parse(text, pref("effects", true));
+        const node = el("div", "say sung" + (op.cls ? " " + op.cls : ""));
+        node.style.setProperty("--c", op.color || tint(a));
+        const txt = el("span", "say-txt"), nodes = words.map(wordEl);
+        nodes.forEach((n, i) => { if (n) { if (txt.childNodes.length) txt.append(" "); txt.append(n); } else nodes[i] = null; });
+        node.append(el("b", "say-who", op.who === false ? "" : a.name || ""), txt);
+        box.append(node);
+        let k = 0, last = 0;
+        const p = words.map((w) => { const at = w.parts ? (last = times[Math.min(k++, times.length - 1)] || last) : last; return { at, dur: 0.12, end: at + 0.12 }; });
+        const pinned = op.hold >= 999 || (op.hold == null && calm());
+        lines.push({ a, node, words, nodes, plan: p, v: null, beast: null, next: 0, t0: clock() - (op.from || 0), done: null, pitch: 1, bang: false, mute: true,
+          hold: pinned ? Infinity : op.hold == null ? 2.5 : op.hold });
         T.place();
         if (raf) { cancelAnimationFrame(raf); raf = 0; }
         frame();
