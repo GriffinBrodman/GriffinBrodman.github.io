@@ -1157,10 +1157,17 @@
     const today = L.meta.day;
     const kept = h.daybook_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).daybook_days || [];
     const days = kept.filter((d) => d !== today).concat([today]).sort((a, b) => a - b);
-    const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginTop: "6px" } });
+    const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginBottom: "6px" } });
+    let readOpen = false;
     const draw = (d, db) => {
       let out = null;
       try { out = db ? Daybook.render(db) : null; } catch (e) { out = null; }
+      // an open "Read the day" stays open while paging, so a reader comparing days isn't made to reopen it every time
+      const fold = out && out.querySelector("details.db-more");
+      if (fold) {
+        fold.open = readOpen;
+        fold.addEventListener("toggle", () => { readOpen = fold.open; });
+      }
       body.replaceChildren(out || el("p", { class: "small muted" }, `Nothing was written down for day ${d}.`));
       const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
       nav.replaceChildren(
@@ -1170,7 +1177,8 @@
     // past days load on demand from their own small files (export.save_daybook)
     const go = (d) => (d === today ? draw(d, h.daybook) : A.load(`daybook/${h.id}/${d}`).then((db) => draw(d, db), () => draw(d, null)));
     draw(today, h.daybook);
-    return el("div", null, body, days.length > 1 ? nav : null);
+    // the buttons sit above the day, so they don't move when a day is taller or shorter than the last
+    return el("div", null, days.length > 1 ? nav : null, body);
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
