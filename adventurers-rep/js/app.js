@@ -186,20 +186,20 @@
   // turns plain story text into nodes with hero & party names linked, and the first mention of each town and dungeon
   function richText(text, heroIds, partyIds) {
     const names = [];
-    for (const id of heroIds || []) if (heroes[id]) names.push([heroes[id].name, `#/hero/${id}`]);
+    for (const id of heroIds || []) if (heroes[id]) names.push([heroes[id].name, `#/hero/${id}`, false, true]);
     for (const id of partyIds || []) if (parties[id]) names.push([parties[id].name, `#/party/${id}`]);
     for (const [nm, href] of places()) names.push([nm, href, true]);
     names.sort((a, b) => b[0].length - a[0].length);
     let parts = [String(text == null ? "" : text)];
     const word = /[\p{L}\p{N}]/u;
-    for (const [nm, href, once] of names) {
+    for (const [nm, href, once, hero] of names) {
       if (!nm) continue;
       let done = false;
       const next = [];
       for (const p of parts) {
         if (typeof p !== "string" || done) { next.push(p); continue; }
         let rest = p, i;
-        while (!done && (i = indexOfWord(rest, nm, word, once)) >= 0) {
+        while (!done && (i = indexOfWord(rest, nm, word, once, hero)) >= 0) {
           if (i > 0) next.push(rest.slice(0, i));
           next.push(el("a", { href }, nm));
           rest = rest.slice(i + nm.length);
@@ -219,13 +219,14 @@
     return [storyText(text == null ? x.text : text), link ? [" ", link] : null];
   }
   // a place name that opens a longer proper name ("the Saltmarrow Shell Dice", "Ironhaven Lullaby") names a thing, not the place
-  function indexOfWord(s, nm, word, place) {
+  // a hero's name straight after another name's possessive is part of a longer name ("Varun's Hunter's Mark"), not the hero Mark
+  function indexOfWord(s, nm, word, place, hero) {
     let from = 0;
     for (;;) {
       const i = s.indexOf(nm, from);
       if (i < 0) return -1;
       const before = i > 0 ? s[i - 1] : "", after = s[i + nm.length] || "";
-      const named = place && /^ [A-Z]/.test(s.slice(i + nm.length, i + nm.length + 2));
+      const named = (place && /^ [A-Z]/.test(s.slice(i + nm.length, i + nm.length + 2))) || (hero && /[A-Z][a-z]+'s $/.test(s.slice(Math.max(0, i - 16), i)));
       if (!(before && word.test(before)) && !(after && word.test(after)) && !named) return i;
       from = i + 1;
     }
