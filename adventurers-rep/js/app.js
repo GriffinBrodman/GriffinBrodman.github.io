@@ -133,10 +133,11 @@
     if (copper < 1000 || !g) return money(copper);
     return `${g.toLocaleString("en-US")} gold piece${g > 1 ? "s" : ""}` + (rest ? ` and ${money(rest)}` : "");
   }
-  // a sitting at a town table, as the day box and the calendar show it: "Lost 3 silver at Liar's Dice ▸ watch"
+  // a sitting at a town table, a night's game, a reading or a meal, as the day box and the calendar show it: "Lost 3 silver at Liar's Dice ▶ watch"
   function tableLink(x) {
     if (!x || !x.table) return null;
-    return el("span", { class: "table-line" }, x.table, x.game ? [" ", el("a", { href: `#/${x.route || "table"}/${x.game}` }, "▸ watch")] : null);
+    const route = x.route || "table";
+    return el("span", { class: "table-line" }, x.table, kept(route, x.game) ? [" ", el("a", { class: "watch", href: `#/${route}/${x.game}` }, "▶ watch")] : null);
   }
 
   function heroLink(id, opts) {
@@ -148,30 +149,61 @@
     const p = parties[id];
     return p ? el("a", { href: `#/party/${id}` }, p.name) : el("span", null, "a party");
   }
+  // ---------- links to what a story line tells ----------
+  // an event, diary line or snippet carries the ids of the records it is about (league/export.py LINKS); the link shows only while that record is kept
+  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"]];
+  function kept(route, id) {
+    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds }[route];
+    return !!id && !!ids && ids.has(id);
+  }
+  function storyHref(x) {
+    if (!x) return null;
+    for (const [k, route] of ROUTES) if (x[k] && kept(route, x[k])) return [`#/${route}/${x[k]}`, k === "night" && (x.music || x.anthem) ? "♪ listen" : "▶ watch"];
+    if (x.song && songIds.has(x.song)) return [`#/songs/${x.song}`, "♪ hear it"];
+    const by = x.hero_song && heroSongBy[x.hero_song];
+    if (by && heroes[by]) return [`#/hero/${by}/character`, "♪ hear it"];
+    return null;
+  }
+  function storyLink(x) {
+    const h = storyHref(x);
+    return h ? el("a", { class: "watch", href: h[0] }, h[1]) : null;
+  }
+
   function nodeName(id, mid) {
     if (!id) return "";
     const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || { name: id }).name;
     return mid && n.startsWith("The ") ? "the" + n.slice(3) : n;
   }
   function clsName(id) { return (S.classes[id] || { name: id }).name; }
-  // turns plain event text into nodes with hero & party names linked
+  // towns and dungeons by the name a sentence uses ("the Collapsed Mine" mid-sentence), longest first so "Old Ironhaven Mine" beats "Ironhaven"
+  let placeNames = null;
+  function places() {
+    if (placeNames) return placeNames;
+    placeNames = [];
+    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), `#/map/${id}`]);
+    return placeNames;
+  }
+  // turns plain story text into nodes with hero & party names linked, and the first mention of each town and dungeon
   function richText(text, heroIds, partyIds) {
     const names = [];
     for (const id of heroIds || []) if (heroes[id]) names.push([heroes[id].name, `#/hero/${id}`]);
     for (const id of partyIds || []) if (parties[id]) names.push([parties[id].name, `#/party/${id}`]);
+    for (const [nm, href] of places()) names.push([nm, href, true]);
     names.sort((a, b) => b[0].length - a[0].length);
-    let parts = [text];
+    let parts = [String(text == null ? "" : text)];
     const word = /[\p{L}\p{N}]/u;
-    for (const [nm, href] of names) {
+    for (const [nm, href, once] of names) {
       if (!nm) continue;
+      let done = false;
       const next = [];
       for (const p of parts) {
-        if (typeof p !== "string") { next.push(p); continue; }
+        if (typeof p !== "string" || done) { next.push(p); continue; }
         let rest = p, i;
-        while ((i = indexOfWord(rest, nm, word)) >= 0) {
+        while (!done && (i = indexOfWord(rest, nm, word, once)) >= 0) {
           if (i > 0) next.push(rest.slice(0, i));
           next.push(el("a", { href }, nm));
           rest = rest.slice(i + nm.length);
+          done = !!once;
         }
         if (rest) next.push(rest);
       }
@@ -179,13 +211,22 @@
     }
     return parts;
   }
-  function indexOfWord(s, nm, word) {
+  // a story line anyone wrote (a diary entry, a snippet, a letter): every hero, crew, town and dungeon it names is linked
+  function storyText(text) { return richText(text, Object.keys(heroes), Object.keys(parties)); }
+  // one story line as the site shows it everywhere: its names linked, then a link to the replay, song or reading it tells, while that is kept
+  function storyLine(x, text) {
+    const link = storyLink(x);
+    return [storyText(text == null ? x.text : text), link ? [" ", link] : null];
+  }
+  // a place name that opens a longer proper name ("the Saltmarrow Shell Dice", "Ironhaven Lullaby") names a thing, not the place
+  function indexOfWord(s, nm, word, place) {
     let from = 0;
     for (;;) {
       const i = s.indexOf(nm, from);
       if (i < 0) return -1;
       const before = i > 0 ? s[i - 1] : "", after = s[i + nm.length] || "";
-      if (!(before && word.test(before)) && !(after && word.test(after))) return i;
+      const named = place && /^ [A-Z]/.test(s.slice(i + nm.length, i + nm.length + 2));
+      if (!(before && word.test(before)) && !(after && word.test(after)) && !named) return i;
       from = i + 1;
     }
   }
@@ -229,30 +270,28 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     for (const id of hs) who.appendChild(heroPortrait(heroes[id], 1, { noGray: true }));
     const meta = [];
     if (!opts.noDay) meta.push(dayLabel(e));
-    if (e.loc) meta.push(nodeName(e.loc));
+    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: `#/map/${e.loc}` }, nodeName(e.loc)) : nodeName(e.loc));
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
-    const fightLink = e.fight && LD_has("fight", e.fight) ? el("a", { class: "watch", href: `#/fight/${e.fight}` }, " ▶ watch")
-      : e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, " ♪ hear it")
-      : e.night && nightIds.has(e.night) ? el("a", { class: "watch", href: `#/night/${e.night}` }, e.music || e.anthem ? " ♪ listen" : " ▶ watch")
-      : e.meal && mealIds.has(e.meal) ? el("a", { class: "watch", href: `#/meal/${e.meal}` }, " ▶ watch")
-      : e.reading && readingIds.has(e.reading) ? el("a", { class: "watch", href: `#/reading/${e.reading}` }, " ▶ watch") : null;
+    const fightLink = storyLink(e) || (e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, "♪ hear it") : null);
     const ks = e.kind === "keystone", tag = ks ? "✦ Keystone" : e.sk ? `✧ ${e.sk}` : null;
     const share = !opts.noShare && (SHARE_KINDS.has(e.kind) || e.imp >= 5) ? shareBtn(e.text, eventHash(e)) : null;
     const jump = (movesOf[e.id] || []).filter((m) => heroes[m.hero] || parties[m.party]);
     const chips = jump.slice(0, 3).map((m) => el("span", { class: "jump", title: `${m.from ? ordinal(m.from) : "unranked"} to ${ordinal(m.to)}` },
       `${heroes[m.hero] ? heroes[m.hero].name : parties[m.party].name} +${m.gain}${m.to < m.from ? " ▲" + (m.from - m.to) : ""}`));
     return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}` }, who,
-      el("div", { class: "body" }, el("div", { class: "text" }, richText(e.text, e.heroes, e.parties), fightLink ? " " : "", fightLink),
+      el("div", { class: "body" }, el("div", { class: "text" }, storyText(e.text), fightLink ? " " : "", fightLink),
         chips.length ? el("div", { class: "jumps" }, chips) : null,
-        el("div", { class: "meta" }, tag ? el("span", { class: "ks-tag" }, tag) : null, tag && meta.length ? " · " : null, meta.join(" · "), share ? [" ", share] : null)));
+        el("div", { class: "meta" }, tag ? el("span", { class: "ks-tag" }, tag) : null, tag && meta.length ? " · " : null, meta.map((x, i) => [i ? " · " : "", x]), share ? [" ", share] : null)));
   }
   // a "+N renown" line names the story that caused it, so the jump can sit on that story as chips
   const movesOf = {};
   for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   const fightIds = new Set((L && L.fights_index) || []), nightIds = new Set((L && L.nights_index) || []), mealIds = new Set((L && L.meals_index) || []), readingIds = new Set((L && L.readings_index) || []);
-  function LD_has(kind, id) { return kind !== "fight" || fightIds.has(id); }
+  const catchIds = new Set((L && L.catches_index) || []), gameIds = new Set((L && L.games_index) || []), songIds = new Set(((L && L.songs) || []).map((s) => s.id));
+  const heroSongBy = {};
+  for (const s of (L && L.hero_songs) || []) heroSongBy[s.id] = s.author;
   function feed(list, opts) {
     const ul = el("ul", { class: "feed" });
     let lastDay = null;
@@ -412,7 +451,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, eventRow, feed, load, need, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
     animated, money, coins, tableLink, poss,
   };
 })();

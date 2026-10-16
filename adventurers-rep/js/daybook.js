@@ -264,7 +264,7 @@
       else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
       else n.setAttribute(k, v);
     }
-    for (const c of kids.flat()) if (c != null && c !== false) n.append(c);
+    for (const c of kids.flat(Infinity)) if (c != null && c !== false) n.append(c);
     return n;
   }
   function clock(t) {
@@ -308,9 +308,19 @@
     try { starsUrl = g.toCanvas(1).toDataURL(); } catch (e) { starsUrl = ""; }
     return starsUrl;
   }
-  // a sitting at a town table: what it came to, and a link to its replay while the script is kept
+  // a sitting at a town table: what it came to, and a link to its replay while the script is kept (a past day's file can outlive it)
+  const kept = (route, id) => !!id && (!window.App || App.kept(route, id));
   function tableLink(b) {
-    return h("span", null, b.table, b.game ? [" ", h("a", { href: `#/${b.route || "table"}/${b.game}` }, "▸ watch")] : null);
+    return h("span", null, b.table, kept(b.route || "table", b.game) ? [" ", h("a", { class: "watch", href: `#/${b.route || "table"}/${b.game}` }, "▶ watch")] : null);
+  }
+  // names in a line link to their pages when the site is around it (a gallery page draws the daybook alone)
+  const txt = (s) => (window.App && App.storyText ? App.storyText(s) : s);
+  // the fights of a stretch of the day, each linked to its replay while it is kept
+  function fightLinks(b) {
+    const own = b.ref && window.App ? App.storyLink(b.ref) : null;
+    if (own) return [" ", own];
+    const ids = (b.fights || []).filter((id) => kept("fight", id));
+    return ids.flatMap((id, i) => [" ", h("a", { class: "watch", href: `#/fight/${id}` }, ids.length > 1 ? `▶ fight ${i + 1}` : "▶ watch")]);
   }
   let uid = 0;
   function render(db, opts) {
@@ -333,8 +343,8 @@
       const parts = spanParts(from, to), when = parts.join("–"), mid = (from + to) / 2, tipId = `${id}-t${i}`;
       const say = b.line || label;
       const cap = h("li", { class: "db-cap" }, icon(act, 1), h("b", { class: "db-when" }, when),
-        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, label), b.line ? [h("span", { class: "db-dash" }, " · "), b.line] : null,
-          b.table ? [h("span", { class: "db-dash" }, " · "), tableLink(b)] : null));
+        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, label), b.line ? [h("span", { class: "db-dash" }, " · "), txt(b.line)] : null,
+          fightLinks(b), b.table ? [h("span", { class: "db-dash" }, " · "), tableLink(b)] : null));
       caps.append(cap);
       const right = mid > start + (end - start) * 0.55;
       const li = h("li", {
@@ -349,7 +359,7 @@
         class: "db-btn", type: "button", "aria-describedby": tipId, "aria-label": `${when}: ${label}${b.line ? ". " + b.line : ""}`,
         onclick: (e) => { const open = !li.classList.contains("open"); for (const o of li.parentNode.querySelectorAll(".db-b.open")) o.classList.remove("open"); li.classList.toggle("open", open); e.stopPropagation(); },
       }, icon(act, 2), h("span", { class: "db-txt" }, h("span", { class: "db-lbl" }, label), h("span", { class: "db-hrs" }, parts[0] + "–", h("wbr"), parts[1]))),
-      b.line ? h("p", { class: "db-line" }, b.line) : null,
+      b.line ? h("p", { class: "db-line" }, txt(b.line), fightLinks(b)) : null,
       b.table ? h("p", { class: "db-line db-table" }, tableLink(b)) : null,
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
       rows.push(li);
@@ -379,12 +389,12 @@
         h("div", { class: "db-moon" }, icon("moon", 2)),
         h("div", { class: "db-ntxt" }, h("span", { class: "db-nt" }, "Night"), h("span", { class: "db-nk" }, kind)),
         NIGHT[ev.kind] ? h("div", { class: "db-nico" }, nightIcon(ev.kind, 2)) : null,
-        ev.line ? h("p", { class: "db-line" }, ev.line) : null,
+        ev.line ? h("p", { class: "db-line" }, txt(ev.line)) : null,
         ev.table ? h("p", { class: "db-line db-table" }, tableLink(ev)) : null,
         ...(ev.more || []).map((x) => h("p", { class: "db-line db-table" }, tableLink(x))),
         ev.line ? h("span", { class: "db-tip", role: "tooltip" }, h("b", null, "Night"), h("i", null, ` ${kind.toLowerCase()}`), h("br"), ev.line) : null);
       caps.append(h("li", { class: "db-cap db-cap-night" }, icon("moon", 1), h("b", { class: "db-when" }, "night"),
-        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, kind), ev.line ? [h("span", { class: "db-dash" }, " · "), ev.line] : null,
+        h("span", { class: "db-cap-txt" }, h("span", { class: "db-cap-act" }, kind), ev.line ? [h("span", { class: "db-dash" }, " · "), txt(ev.line)] : null,
           ev.table ? [h("span", { class: "db-dash" }, " · "), tableLink(ev)] : null,
           (ev.more || []).map((x) => [h("span", { class: "db-dash" }, " · "), tableLink(x)]))));
     }

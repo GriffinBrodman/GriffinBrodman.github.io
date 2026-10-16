@@ -243,6 +243,23 @@
     }
     return img;
   }
+  // a softer edge than an outline: the shape's own edge pixels darkened, on the side away from the light only
+  function rimShade(img, k) {
+    k = k === undefined ? 0.45 : k;
+    const src = img.d.slice(), w = img.w, h = img.h, A = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : src[(y * w + x) * 4 + 3]);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (A(x, y) < 100 || (A(x + 1, y) >= 100 && A(x, y + 1) >= 100 && A(x + 1, y + 1) >= 100)) continue;
+      const o = (y * w + x) * 4;
+      img.d[o] = src[o] * (1 - k); img.d[o + 1] = src[o + 1] * (1 - k); img.d[o + 2] = src[o + 2] * (1 - k);
+    }
+    return img;
+  }
+  // a bite taken out of a soft food's outline from above: everything over a ragged curve that dips depth px below ytop at its middle and
+  // comes back up to ytop at its ends, so the outline loses a scoop with no stray horns left at its sides; b = [cx, ytop, rx, depth, seed]
+  function notchAt(x, y, b) {
+    const u = (x - b[0]) / b[2];
+    return Math.abs(u) < 1 && y < b[1] + b[3] * Math.sqrt(1 - u * u) * (1 + (fbm(u * 3 + 5, 0.5, b[4]) - 0.5) * 0.35);
+  }
   function shadow(img, cx, cy, rx, ry, a, col) {
     const E = ell(cx, cy, rx, ry);
     for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
@@ -392,6 +409,29 @@
         if (u % 2 === 0 && d > 0.97) img.px(x, y, ramp[ramp.length - 1]);
       }
     }
+  }
+  // a slice of steak leaning back on its neighbour: the cut face a rounded oblong turned by ang, seared crust along its top and bottom (the
+  // two faces that were in the pan), a grey band inside that, rosy pink in the middle with its grain and a wet shine; its edge below it
+  function steakSlice(img, x, y, w, h, ang, look, seed) {
+    const lay = new Img(img.w, img.h), ca = Math.cos(ang), sa = Math.sin(ang), PINK = look.pink || P.pink, CRUST = look.crust || P.crust, GREY = look.grey || P.grey;
+    const loc = (xx, yy) => [(xx - x) * ca + (yy - y) * sa, -(xx - x) * sa + (yy - y) * ca];
+    const inside = (xx, yy) => { const [u, v] = loc(xx, yy), wob = (fbm(u / 4, 3, seed) - 0.5) * 2; if (Math.abs(u) > w / 2 + wob * 0.5 || Math.abs(v) > h / 2 + wob * 0.6) return null; const r = 3, cu = Math.abs(u) - (w / 2 - r), cv = Math.abs(v) - (h / 2 - r); if (cu > 0 && cv > 0 && Math.hypot(cu, cv) > r) return null; return [u, v, h / 2 - Math.abs(v), w / 2 - Math.abs(u)]; };
+    const R0 = Math.hypot(w, h) / 2 + 3;
+    for (let yy = Math.floor(y - R0); yy <= y + R0 + 3; yy++) for (let xx = Math.floor(x - R0); xx <= x + R0; xx++) { if (inside(xx + 0.5, yy + 0.5)) continue; for (let k = 1; k <= 3; k++) if (inside(xx + 0.5, yy + 0.5 - k)) { lay.px(xx, yy, k === 3 ? CRUST[1] : pick(CRUST, 0.3, xx, yy)); break; } }
+    hrender(lay, [x - R0, y - R0, x + R0, y + R0], (xx, yy) => { const q = inside(xx, yy); return q ? Math.min(2, Math.min(q[2], q[3]) * 0.6) : null; }, (xx, yy, i) => {
+      const q = inside(xx + 0.5, yy + 0.5);
+      if (!q) return null;
+      const [u, v, ev, eu] = q, lit = 0.35 + i.diff * 0.5;
+      if (ev < 2.6 || eu < 1.2) return pick(CRUST, 0.15 + lit * 0.5 + (fbm(xx / 2, yy, seed) - 0.5) * 0.4, xx, yy, 0.35);
+      if (ev < 3.8) return pick(GREY, 0.3 + lit * 0.4, xx, yy, 0.3);
+      if (look.marbleC && marble(xx * 1.4, yy * 2, seed, 1)) return look.marbleC;
+      let t = 0.2 + lit * 0.3 + Math.min(1, (ev - 3.8) / (h / 2 - 3.8)) * 0.45;
+      if (Math.sin(u * 0.9 + v * 0.3 + fbm(xx / 3, yy / 2, seed) * 2) > 0.8) t -= 0.12;
+      if (lit > 0.65 && Math.abs(v + 1) < 1.2 && Math.abs(u + w * 0.15) < 4 && h2(xx, yy, seed) > 0.4) return "#ffe8e0";
+      return pick(PINK, t, xx, yy, 0.25);
+    }, { k: 30 });
+    outline(lay, "#1a0806");
+    img.paste(lay, 0, 0);
   }
   // a cut slice: the crust rim (thick on top), a thin grey band, a rosy centre
   function sliceFace(img, x, y, w, h, seed, tilt, look) {
@@ -572,6 +612,20 @@
     return img;
   }
 
+  // ---------- eating: while a plate is drawn for the eating beats, what has been taken and where everything sits ----------
+  // EAT = { gone: Set of item keys, zones: [[x, y, r]], carved, items: [], geo: {} }; serves call item() for each thing a hand or fork
+  // could take, skip what taken() says is gone, and put their bowls and mounds in geo, so food_eat.js can plan any dish
+  let EAT = null;
+  function taken(key, x, y) {
+    if (!EAT) return false;
+    if (EAT.gone.has(key)) return true;
+    if (x !== undefined) for (const [zx, zy, zr] of EAT.zones) if (Math.hypot(x - zx, (y - zy) * 1.5) < zr) return true;
+    return false;
+  }
+  function item(key, x, y, r, kind, extra) { if (EAT) EAT.items.push(Object.assign({ key, x, y, r, kind }, extra || {})); }
+  function geo(k, v) { if (EAT) EAT.geo[k] = v; }
+  const eating = () => EAT;
+
   // ---------- the plates: how each kind of dish is drawn ----------
   // piece(look) -> { draw(img, cx, cy, s, stage, seed), at }: the thing in the pan at a stage (raw, sear, cook, baste, burnt), s = 1.5 fills the frame
   // serve(spec, o) -> a full-frame Img of the dish served (o.burnt for the disaster)
@@ -611,13 +665,14 @@
       const m = new Img(W, H);
       slab(m, { cx: 186, cy: 74, rx: 33, ry: 21, thick: 12, s: 1.5, seed: 5, done: 1, glaze: 1, look });
       img.paste(m, 0, 0);
-      for (let i = 0; i < 6; i++) {
-        const f = new Img(W, H), sx = 146 - i * 20, sy = 80 + i * 6;
-        shadow(img, sx - 2, sy + 9, 24, 5, 0.35, "#1a0806");
-        sliceFace(f, sx, sy, 24, 13, i, 0.3, look);
-        outline(f, "#1a0806");
-        img.paste(f, 0, 0);
-        img.px(sx - 13, sy - 4, "#ffffff"); img.px(sx - 12, sy - 4, "#ffe8e0", 0.8); img.px(sx + 22, sy + 3, "#ff8a7a", 0.8);
+      geo("inside", look.pink || P.pink);
+      // sliced across and fanned out like shingles, each slice leaning on the last: seared top and bottom, a grey band, rosy in the middle
+      for (let i = 0; i < 5; i++) {
+        const sx = 40 + i * 21, sy = 98 + i * 4 - Math.abs(i - 2) * 2, ang = -0.42 + i * 0.16;
+        item("s" + i, sx, sy, 16, "slice", { z: i, box: [sx - 20, sy - 14, sx + 20, sy + 14] });
+        if (taken("s" + i)) continue;
+        shadow(img, sx + 3, sy + 8, 18, 4, 0.4, "#1a0806");
+        steakSlice(img, sx, sy, 30, 15, ang, look, i);
       }
       flakes(img, 4, 50, 93, 69, 69, 21);
       if (look.pepper) peppers(img, 6, 80, 120, 80, 90, 24);
@@ -666,6 +721,36 @@
     drake: { scales: true, garnish: "moonpetal" },
     beef: { jus: ["#2a0c06", "#4a1a0a", "#6a2a10", "#8a4018", "#b05a24"] },
     yeti: { pepper: 0.16, raw: R(["#40121a", "#661a26", "#8e2c36", "#b04048", "#cc5a5c", "#e47a76", "#f49e94"]), fat: R(["#c8b8ac", "#e0d4ca", "#f2eae2", "#ffffff"]) },
+    // the fish specials (league/content/food.py CATCH_DISHES): a whole fish's skin raw and cooked, back and belly, its fins and flesh
+    pike: { cardK: 1, fish: { rawBack: R(["#101808", "#1c2a0c", "#2c4014", "#3e561c", "#546e26", "#6e8a34"]), rawBelly: R(["#5a5a3a", "#86825a", "#b4ac80", "#dad2a8", "#f2ecd0"]),
+      back: R(["#141206", "#26220c", "#3a3414", "#50481c", "#6a5e26", "#867834", "#a49648"]), belly: R(["#6a5a34", "#94804c", "#bca46a", "#dcc690", "#f2e2b8"]),
+      spot: R(["#8a8044", "#b8aa5e", "#dccc80", "#f4e4a0"]), fin: R(["#2a1a08", "#4a2e10", "#74481a", "#a06424", "#c88834", "#e8ac50"]) } },
+    grayling: { cardK: 1, fish: { rawBack: R(["#16181c", "#2a2e34", "#444a50", "#626a6a", "#86887c", "#aeac90"]), rawBelly: R(["#7a7a70", "#a4a496", "#c8c8b8", "#e4e2d4", "#f8f6ec"]),
+      back: R(["#2a1806", "#4a2c0a", "#704412", "#9a641e", "#c48a30", "#e4b04c", "#f8d47a"]), belly: R(["#8a6a30", "#b89048", "#dcb468", "#f2d490", "#fff0c0"]),
+      fin: R(["#1c0a12", "#321422", "#4a2032", "#622e44", "#7c3e56", "#96526a"]), finSpot: "#f0a0b4", finEdge: R(["#4a0806", "#7a140c", "#a82216", "#d03a20"]),
+      fin2: R(["#2a2008", "#4a3a10", "#6e581c", "#94782a", "#b89a40", "#d8bc60"]), speckN: 0.975 } },
+    goldcarp: { cardK: 1, fish: { rawBack: R(["#4a2202", "#7a3c04", "#ac6008", "#d88a12", "#f4b42a", "#ffdc70"]), rawBelly: R(["#b88c40", "#dcb060", "#f2d488", "#fff0bc"]),
+      back: R(["#2e1402", "#562804", "#844008", "#b0620e", "#d8881a", "#f0b032", "#fcd868"]), belly: R(["#9a6414", "#c48a24", "#e4b040", "#f6d470", "#fff0b0"]),
+      fin: R(["#4a1c04", "#7a3008", "#a84c10", "#d06e1c", "#f09a34", "#ffc464"]), glaze: true } },
+    trout: { cardK: 1, fish: { rawBack: R(["#16160c", "#2a2816", "#444022", "#625a30", "#847a44", "#a89c5c"]), rawBelly: R(["#8a8468", "#b0aa8a", "#d0caa8", "#ece6cc", "#fbf8ec"]),
+      back: R(["#1e1206", "#36220c", "#523614", "#704c1e", "#90662a", "#b0843c", "#d0a65a"]), belly: R(["#8a6a3a", "#b08c54", "#d0ae74", "#ead098", "#fbecc4"]),
+      fin: R(["#24160a", "#3e2812", "#5e3e1c", "#7e5828", "#a07438", "#c0944e"]), speck: "#1a0e06", red: "#d0401e" } },
+    mackerel: { cardK: 1, fish: { rawBack: R(["#04121a", "#08222c", "#0e3640", "#164c54", "#20686a", "#348a80"]), rawBelly: R(["#6a7078", "#9aa0a8", "#c4cad0", "#e4e8ec", "#ffffff"]),
+      back: R(["#030608", "#08141a", "#0e2428", "#163638", "#224c48", "#346a5c"]), belly: R(["#4a4434", "#7a705a", "#a89c80", "#d0c6aa", "#f0e8d4"]),
+      fin: R(["#06080a", "#121a1e", "#1e2c30", "#2e4244", "#465c5a"]), bar: "#020404", char: 0.62, grill: true,
+      ash: R(["#2a2826", "#4a4642", "#6a6560", "#8a847c", "#aaa49a"]) } },
+    legend: { cardK: 1, fish: { rawBack: R(["#06101a", "#0c1c2a", "#14303e", "#1e4852", "#2c6466", "#428a80"]), rawBelly: R(["#3a4a4a", "#5e7270", "#86a098", "#b4ccc0", "#e0f0e4"]),
+      back: R(["#040506", "#0a0c0e", "#121618", "#1c2224", "#283230", "#38463e"]), belly: R(["#160f0a", "#2a1e14", "#42301e", "#5c462c", "#7a603c", "#9a7c4e"]),
+      fin: R(["#060404", "#140a08", "#24120c", "#3a1e12", "#56301a", "#784824"]), sheen: "#5ad0b4", char: 0.6, eyeC: "gold" } },
+    salmon: { plank: { flesh: R(["#6a1e0e", "#a03a1a", "#cc5a2a", "#e8803e", "#f8a462", "#ffc890"]), fat: "#ffe2c8", pins: "twig" } },
+    char: { cardK: 1, fish: { rawBack: R(["#0e1416", "#1a2428", "#2a383a", "#3e4e4c", "#56665e"]), rawBelly: R(["#6a1a0a", "#9a2c10", "#c84a1c", "#e8702e", "#fc9a50"]),
+      back: R(["#0e0c08", "#1c1810", "#2e2818", "#443c22", "#5e5230", "#786a40"]), belly: R(["#5a1406", "#8a240c", "#b43c16", "#d85c24", "#f07e3a", "#ffa460"]),
+      spot: R(["#c8a888", "#e2c8a8", "#f4e2c8", "#fff4e4"]), fin: R(["#2a0e06", "#4a1a0a", "#7a2c12", "#a8441c", "#d0662c"]), fin2: R(["#3a0e06", "#6a1c0a", "#a03414", "#cc5220", "#ee7a3a"]) } },
+    moonfish: { cardK: 1, steak: { skin: R(["#1e2232", "#3a4258", "#62708a", "#94a2b8", "#c8d2e0", "#f4f8ff"]), raw: R(["#8e8c9c", "#b0aebc", "#cecbd6", "#e6e4ec", "#f8f6fc"]),
+      flesh: R(["#a49a92", "#c6bab0", "#e2d8cc", "#f4ece4", "#fffaf4", "#ffffff"]), sear: R(["#3a2210", "#64401e", "#906230", "#ba8a4c", "#dcb478"]), glow: "#cfe2ff" } },
+    crystal: { broth: R(["#4a6a5e", "#6a8e7c", "#90b49c", "#b8d4b6", "#dcecce", "#f6fff0"]), hi: "#ffffff", dot: "#fffff0", oil: 0.12, ware: "glaze", herbN: 70, herbC: "#4a8a2a", clear: true, glowC: "#b8ffe0", bowlRx: 104, bowlRy: 44,
+      bits: [["eelcoil", 6, 13], ["leafy", 7, 4]], sprig: true, cardK: 1, drop: 2.6 },
+    lantern: { cardK: 1, fry: { kind: "minnows", vessel: "plate", glow: "#d8ff5a", batter: R(["#3a2604", "#664408", "#946a12", "#c0921e", "#e2b838", "#f6dc6c", "#fff8be"]) } },
   };
   const DISH = {
     spice_pilaf: { look: { vessel: "platter", ware: "glaze", mound: 22 } },
@@ -691,10 +776,14 @@
     return Object.assign({}, p, { flip: p.flip !== undefined ? p.flip : ["slab", "bun", "stew"].includes(spec.plate) && spec.method === "iron",
       draw(img, o) { const st = has.includes(o.stage) ? o.stage : { sear: "raw", baste: "cook" }[o.stage] || "cook"; p.draw(img, Object.assign({ f: { cx: o.cx, cy: o.cy, rx: 70 * (o.s || 1), ry: 28 * (o.s || 1) } }, o, { stage: st, real: o.stage })); } });
   }
+  // o.eat: { gone: [keys], zones: [[x, y, r]], carved } draws the dish part-eaten; o.info gets { items, geo } back
   function plate(spec, stage, o) {
     o = o || {};
     const P0 = PLATES[spec.plate] || PLATES.slab;
-    const img = P0.serve(spec, { burnt: stage === "burnt", seed: o.seed || 1, legendary: o.legendary });
+    const was = EAT;
+    EAT = o.eat || o.info ? { gone: new Set((o.eat && o.eat.gone) || []), zones: (o.eat && o.eat.zones) || [], carved: (o.eat && o.eat.carved) || 0, bites: (o.eat && o.eat.bites) || [], items: [], geo: {} } : null;
+    let img;
+    try { img = P0.serve(spec, { burnt: stage === "burnt", seed: o.seed || 1, legendary: o.legendary }); } finally { if (o.info && EAT) { o.info.items = EAT.items; o.info.geo = EAT.geo; } EAT = was; }
     if (o.legendary) showpiece(img);
     vignette(img, o.legendary ? 0.45 : 0.55);
     return img;
@@ -715,7 +804,7 @@
   root.FoodArt = root.FoodArt || {};
   Object.assign(root.FoodArt, {
     W, H, dish, piece, plate, part, PLATES, PARTS, DISH, LOOKS,
-    kit: { W, H, Img, C, mix, R, pick, rng, hash, h2, vnoise, fbm, bay, clamp, lerp, smooth, TAU, hrender, ell, dome, norm3, KEY, glow, light, vignette, bokeh, steam, star, outline, shadow, text, textWidth, CAP, P, BURNT },
+    kit: { W, H, Img, C, mix, R, pick, rng, hash, h2, vnoise, fbm, bay, clamp, lerp, smooth, TAU, hrender, ell, dome, norm3, KEY, glow, light, vignette, bokeh, steam, star, outline, rimShade, notchAt, shadow, text, textWidth, CAP, P, BURNT, taken, item, geo, eating },
     bits: { slab, sliceFace, scaleStrip, butter, garlic, garlicBulb, moonpetal, flakes, peppers, saltPouch, drakeScale, skillet, skilletWide, board, macroBack },
   });
 })(typeof window !== "undefined" ? window : globalThis);

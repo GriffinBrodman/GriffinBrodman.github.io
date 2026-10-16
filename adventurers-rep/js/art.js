@@ -730,7 +730,7 @@
     map: "#e4d4a8", bell: "#d8a838", candle: "#ece4cc", charm: "#5aa04a", pipe: "#7a5232", spoon: "#c4cad4", button: "#a8443a", acorn: "#a87a44", egg: "#e8dcc4",
     pebble: "#9a9488", whistle: "#c4cad4", compass: "#c8963e", cards: "#ece4d4", comb: "#d8c8a0", mirror: "#d8a838", ribbon: "#c83a4a", skull_small: "#e0d8c4",
     crystal: "#9ad8f0", horn: "#d8ccb0", lens: "#c8963e", doll: "#c86a6a", flute: "#9a6a3a", ink: "#2a2a44", gauntlet: "#8a92a0", belt: "#6a3a2a", boots: "#5a3a26",
-    eye: "#4aa0c8", pearl: "#f0ece4", scarf: "#a8443a" };
+    eye: "#4aa0c8", pearl: "#f0ece4", scarf: "#a8443a", rod: "#8a6a3a" };
   const NOGEM = "#d8a838";
   function iconFit(draw, mats, maxS) {
     const T = new Paint.Paint(64, 64);
@@ -845,6 +845,8 @@
       case "horn": P.tube([[3.5, 4.5], [5, 8], [7.5, 10.5], [10.5, 11.5], [13, 10.5], [14.5, 8.5]], 3.4, 0.9, "ivory", 0.25); P.rect(5, 4, 1, 6, "gold", 0.4); P.rect(6, 5, 1, 6, "gold", 0); P.ell(3.4, 4.2, 2.6, 2.4, "#3a2a1e"); P.px(4, 11, W); break;
       case "lens": P.line(9.5, 9.5, 14, 14, "wood", 0, 0.9); P.ell(6.5, 6.5, 4.8, 4.8, "c", { s: 0.2 }); P.ell(6.5, 6.5, 3.4, 3.4, "glass", { s: 0.45 }); px(5, 4, W); break;
       case "doll": P.poly([[5, 7], [11, 7], [13, 15], [3, 15]], "c", (x) => 0.3 - (x - 3) * 0.06); P.ell(8, 4.5, 3, 3, "cream", { s: 0.2 }); px(7, 4, "#1e1824"); px(9, 4, "#1e1824"); P.rect(3, 8, 2, 1, "cream", 0); P.rect(11, 8, 2, 1, "cream", -0.2); P.rect(5, 1.5, 6, 1.5, "wood", 0); break;
+      case "rod": P.line(1.5, 14.5, 13.5, 1.5, "c", 0.2, 1); P.rect(1, 12, 3, 3, "#3a2a1a", 0); P.ell(4.5, 11.5, 1.6, 1.6, "gold", { s: 0.2 });
+        for (let y = 2; y < 13; y++) px(14, y, "#e8e0c8", -0.2); px(14, 13, "#c43a30"); px(14, 14, "#f0ece4"); break;
       case "flute": P.line(2, 14, 14, 2, "c", 0.15, 1); for (const k of [0.35, 0.5, 0.65, 0.8]) px(2 + 12 * k, 14 - 12 * k, "#2a1a10"); break;
       case "ink": P.ell(7, 11.5, 4.5, 3.5, "c", { s: 0.1 }); P.rect(5, 7, 4, 2, "c", 0.2); P.line(8, 7, 13, 1, "feather", 0.3, 0.9); P.line(9, 8, 14, 2.5, "feather", -0.2); px(5, 10, W); break;
       case "gauntlet": P.rect(3, 9, 6, 5, "c", (x) => 0.3 - (x - 3) * 0.1); P.poly([[4, 3], [12, 3], [13, 9], [4, 9]], "c", (x, y) => 0.35 - (x - 4) * 0.06 - (y - 3) * 0.03); for (const x of [6, 8, 10]) P.rect(x, 3, 1, 4, "c", -0.5); P.rect(2.5, 9, 7, 1, "c", 0.6); P.ell(13, 6.5, 1.6, 1.8, "c", { s: 0.1 }); break;
@@ -1078,9 +1080,125 @@
   }
   function itemGrid(id) { return cached("i:" + id, () => drawItem(id)); }
   function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, look && look.fav]), () => drawGearIcon(item, look)); }
+  // ---------- trophies: the boss's own sprite, cut at the neck and mounted on a walnut shield plaque ----------
+  // the head's box [x, y, w, h] in each boss body's standing sprite; a body not listed mounts its upper part around the bulk
+  const TROPHY_HEAD = {
+    goblin_big: [11, 0, 29, 25], bear: [26, 1, 19, 20], spider_big: [21, 0, 25, 26], chest: [0, 0, 32, 27], human: [9, 0, 17, 18],
+    hag: [10, 0, 24, 18], troll: [18, 0, 20, 19], kraken: [3, 0, 38, 25], dragon: [26, 0, 22, 17],
+  };
+  // a boss whose head crop reads poorly at card size mounts a drawn keepsake instead
+  const TROPHY_ART = { spider_big: drawFangs };
+  function drawFangs() {
+    const W = 26, H = 24, g = new Grid(W, H);
+    const ivory = ["#fffaea", "#f2e6c4", "#d8caa4", "#9a8e80", "#4e4250", "#1e1624"];
+    const curve = (t, s) => {
+      const u = 1 - t, a = u * u, b = 2 * u * t, c = t * t;
+      const x = a * 7.5 + b * 2.5 + c * 10, y = a * 3.5 + b * 13 + c * 20;
+      return [s < 0 ? x : W - x, y];
+    };
+    for (const s of [-1, 1]) {
+      const pts = [];
+      for (let i = 0; i <= 100; i++) pts.push([i / 100, ...curve(i / 100, s)]);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let best = 1e9, bt = 0, bx = 0;
+        for (const [t, qx, qy] of pts) { const d = Math.hypot(px - qx, py - qy); if (d < best) { best = d; bt = t; bx = px - qx; } }
+        if (best > 2.4 * Math.pow(1 - bt, 0.7) + 0.4) continue;
+        // ivory most of the way down, then darkening fast into the tip; lit from the top-left like every sprite
+        let k = bt < 0.5 ? 0 : bt < 0.66 ? 1 : bt < 0.77 ? 2 : bt < 0.86 ? 3 : bt < 0.94 ? 4 : 5;
+        if (bx > 0.8 && k < 5) k++;
+        else if (bx < -0.8 && k > 0) k--;
+        g.set(x, y, ivory[k]);
+      }
+      // a brass ferrule caps each root, as a taxidermist mounts tusks
+      const [rx] = curve(0, s), fx = Math.round(rx) - 3, brass = ramp("#c8963e");
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 6; x++) g.set(fx + x, y, y === 0 ? brass[4] : y === 3 ? brass[0] : x === 0 ? brass[3] : x === 5 ? brass[1] : brass[2]);
+      g.set(fx + 2, 1, brass[0]); g.set(fx + 3, 2, brass[4]);
+    }
+    const [tx, ty] = curve(1, 1), dx = Math.floor(tx) - 1, dy = Math.floor(ty) + 1;
+    for (const [x, y, c] of [[1, 0, "#7ae84a"], [0, 1, "#7ae84a"], [1, 1, "#4ab832"], [2, 1, "#3a9a2a"], [0, 2, "#4ab832"], [1, 2, "#3a9a2a"], [2, 2, "#2a7a22"], [1, 3, "#1e5a18"]])
+      g.set(dx + x, dy + y, c);
+    g.set(dx, dy + 1, "#e0ffc0");
+    for (const s of [-1, 1]) { const [x, y] = curve(0.97, s); g.set(Math.floor(x), Math.floor(y), "#5ac83a"); }
+    g.outline(OUTLINE);
+    g.noSink = true;
+    return g;
+  }
+  function trophyHead(m) {
+    if (TROPHY_ART[m.body]) return TROPHY_ART[m.body]();
+    const src = monsterGrid(m, 0);
+    let r = TROPHY_HEAD[m.body];
+    if (!r) {
+      const h = Math.min(src.h, 26);
+      let sx = 0, n = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < src.w; x++) if (src.get(x, y)) { sx += x; n++; }
+      const w = Math.min(src.w, 34), cx = n ? sx / n : src.w / 2;
+      r = [Math.max(0, Math.min(src.w - w, Math.round(cx - w / 2))), 0, w, h];
+    }
+    const [x0, y0, w, h] = r, g = new Grid(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) g.set(x, y, src.get(x0 + x, y0 + y));
+    return g;
+  }
+  function drawTrophy(m) {
+    const head = trophyHead(m);
+    const W = 46, H = 48, cx = W / 2, hw = Math.max(13, Math.min(20, Math.ceil(head.w / 2) + 3));
+    const top = 7, shoulder = 31, tip = 45, g = new Grid(W, H);
+    // the shield's half-width at row y: square shoulders with clipped corners, then a curve to the point
+    const half = (y) => {
+      if (y < top || y > tip) return -1;
+      if (y < top + 2) return hw - (top + 2 - y);
+      if (y <= shoulder) return hw;
+      const t = (y - shoulder) / (tip - shoulder);
+      return hw * Math.sqrt(Math.max(0, 1 - t * t * 0.96)) * (1 - t * 0.25);
+    };
+    const inside = (x, y) => { const k = half(y); return k >= 0 && Math.abs(x + 0.5 - cx) <= k; };
+    const wood = ramp("#7a4a2c"), brass = ramp("#c8963e"), rnd = rng(hash("plaque" + m.name));
+    const grain = [];
+    for (let i = 0; i < 6; i++) grain.push([4 + rnd() * 38, rnd() * 6.28, 0.6 + rnd() * 1.2]);
+    const edge = (x, y) => !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+    const near = (x, y, d) => { for (let j = -d; j <= d; j++) for (let i = -d; i <= d; i++) if (!inside(x + i, y + j)) return true; return false; };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!inside(x, y)) continue;
+      const fx = (x + 0.5 - cx) / hw, fy = (y - top) / (tip - top);
+      if (edge(x, y)) { g.set(x, y, "#2a1408"); continue; }
+      // a bevelled rim lit from the top-left, then a brass inlay line inside it
+      if (near(x, y, 2)) { g.set(x, y, (!inside(x - 2, y) || !inside(x, y - 2)) && fy < 0.75 ? wood[3] : fy > 0.6 || fx > 0.5 ? wood[0] : wood[1]); continue; }
+      if (near(x, y, 3)) { g.set(x, y, fx < -0.2 || fy < 0.15 ? brass[3] : brass[1]); continue; }
+      let v = 2 - (fx * 0.6 + fy * 0.9) * 0.9;
+      for (const [gy, ph, a] of grain) if (Math.abs(y - gy - Math.sin(x * 0.35 + ph) * a) < 0.5) v -= 0.9;
+      g.set(x, y, wood[Math.max(0, Math.min(4, Math.round(v)))]);
+    }
+    // the brass nameplate and its two pins
+    const py = 37, pw = Math.min(8, hw - 4);
+    for (let y = py; y < py + 4; y++) for (let x = Math.round(cx - pw); x < Math.round(cx + pw); x++)
+      g.set(x, y, y === py ? brass[4] : y === py + 3 ? brass[0] : x === Math.round(cx - pw) ? brass[3] : x === Math.round(cx + pw) - 1 ? brass[1] : brass[2]);
+    for (let x = Math.round(cx - pw) + 2; x < Math.round(cx + pw) - 2; x++) if ((x * 7) % 5 > 1) g.set(x, py + 2, brass[0]);
+    g.set(Math.round(cx - pw) + 1, py + 1, brass[0]); g.set(Math.round(cx + pw) - 2, py + 1, brass[0]);
+    // the hanging ring on its nail above the shield
+    for (const [x, y, c] of [[-1, 1, 1], [0, 0, 3], [1, 1, 1], [-2, 2, 1], [2, 2, 0], [-2, 3, 2], [2, 3, 0], [-1, 4, 1], [1, 4, 0], [0, 5, 2], [0, 6, 0]])
+      g.set(Math.floor(cx) + x, top - 6 + y, brass[c]);
+    // the head: centred on the board above the nameplate, with a shadow cast down-right onto the wood
+    const hx = Math.round(cx - head.w / 2), hy = Math.max(0, Math.min(py - 1 - head.h, Math.round((top + py) / 2 - head.h / 2 + 2)));
+    for (let y = 0; y < head.h; y++) for (let x = 0; x < head.w; x++) {
+      if (!head.get(x, y)) continue;
+      for (const [dx, dy] of [[1, 2], [2, 2], [1, 1]]) {
+        const X = hx + x + dx, Y = hy + y + dy;
+        if (inside(X, Y) && !edge(X, Y) && !head.get(X - hx, Y - hy) && Y < py) g.set(X, Y, mix(g.get(X, Y), "#140a04", 0.5));
+      }
+    }
+    for (let y = 0; y < head.h; y++) for (let x = 0; x < head.w; x++) {
+      const c = head.get(x, y);
+      if (!c) continue;
+      // the cut sinks into the board: the last rows darken toward the mount
+      const sink = head.noSink ? 0 : Math.max(0, y - (head.h - 3)) / 3;
+      g.set(hx + x, hy + y, sink && c !== OUTLINE ? mix(c, "#1a0e06", sink * 0.7) : c);
+    }
+    return g;
+  }
+  function trophyGrid(m) { return cached("t:" + m.body + m.pal + m.name, () => drawTrophy(m)); }
   function graveGrid() { return cached("grave", () => drawGrave()); }
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, trophyGrid, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();
