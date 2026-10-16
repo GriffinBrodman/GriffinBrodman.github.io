@@ -1078,9 +1078,86 @@
   }
   function itemGrid(id) { return cached("i:" + id, () => drawItem(id)); }
   function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, look && look.fav]), () => drawGearIcon(item, look)); }
+  // ---------- trophies: the boss's own sprite, cut at the neck and mounted on a walnut shield plaque ----------
+  // the head's box [x, y, w, h] in each boss body's standing sprite; a body not listed mounts its upper part around the bulk
+  const TROPHY_HEAD = {
+    goblin_big: [11, 0, 29, 25], bear: [26, 1, 19, 20], spider_big: [21, 0, 25, 26], chest: [0, 0, 32, 27], human: [9, 0, 17, 18],
+    hag: [10, 0, 24, 18], troll: [18, 0, 20, 19], kraken: [3, 0, 38, 25], dragon: [26, 0, 22, 17],
+  };
+  function trophyHead(m) {
+    const src = monsterGrid(m, 0);
+    let r = TROPHY_HEAD[m.body];
+    if (!r) {
+      const h = Math.min(src.h, 26);
+      let sx = 0, n = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < src.w; x++) if (src.get(x, y)) { sx += x; n++; }
+      const w = Math.min(src.w, 34), cx = n ? sx / n : src.w / 2;
+      r = [Math.max(0, Math.min(src.w - w, Math.round(cx - w / 2))), 0, w, h];
+    }
+    const [x0, y0, w, h] = r, g = new Grid(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) g.set(x, y, src.get(x0 + x, y0 + y));
+    return g;
+  }
+  function drawTrophy(m) {
+    const head = trophyHead(m);
+    const W = 46, H = 48, cx = W / 2, hw = Math.max(13, Math.min(20, Math.ceil(head.w / 2) + 3));
+    const top = 7, shoulder = 31, tip = 45, g = new Grid(W, H);
+    // the shield's half-width at row y: square shoulders with clipped corners, then a curve to the point
+    const half = (y) => {
+      if (y < top || y > tip) return -1;
+      if (y < top + 2) return hw - (top + 2 - y);
+      if (y <= shoulder) return hw;
+      const t = (y - shoulder) / (tip - shoulder);
+      return hw * Math.sqrt(Math.max(0, 1 - t * t * 0.96)) * (1 - t * 0.25);
+    };
+    const inside = (x, y) => { const k = half(y); return k >= 0 && Math.abs(x + 0.5 - cx) <= k; };
+    const wood = ramp("#7a4a2c"), brass = ramp("#c8963e"), rnd = rng(hash("plaque" + m.name));
+    const grain = [];
+    for (let i = 0; i < 6; i++) grain.push([4 + rnd() * 38, rnd() * 6.28, 0.6 + rnd() * 1.2]);
+    const edge = (x, y) => !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+    const near = (x, y, d) => { for (let j = -d; j <= d; j++) for (let i = -d; i <= d; i++) if (!inside(x + i, y + j)) return true; return false; };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!inside(x, y)) continue;
+      const fx = (x + 0.5 - cx) / hw, fy = (y - top) / (tip - top);
+      if (edge(x, y)) { g.set(x, y, "#2a1408"); continue; }
+      // a bevelled rim lit from the top-left, then a brass inlay line inside it
+      if (near(x, y, 2)) { g.set(x, y, (!inside(x - 2, y) || !inside(x, y - 2)) && fy < 0.75 ? wood[3] : fy > 0.6 || fx > 0.5 ? wood[0] : wood[1]); continue; }
+      if (near(x, y, 3)) { g.set(x, y, fx < -0.2 || fy < 0.15 ? brass[3] : brass[1]); continue; }
+      let v = 2 - (fx * 0.6 + fy * 0.9) * 0.9;
+      for (const [gy, ph, a] of grain) if (Math.abs(y - gy - Math.sin(x * 0.35 + ph) * a) < 0.5) v -= 0.9;
+      g.set(x, y, wood[Math.max(0, Math.min(4, Math.round(v)))]);
+    }
+    // the brass nameplate and its two pins
+    const py = 37, pw = Math.min(8, hw - 4);
+    for (let y = py; y < py + 4; y++) for (let x = Math.round(cx - pw); x < Math.round(cx + pw); x++)
+      g.set(x, y, y === py ? brass[4] : y === py + 3 ? brass[0] : x === Math.round(cx - pw) ? brass[3] : x === Math.round(cx + pw) - 1 ? brass[1] : brass[2]);
+    for (let x = Math.round(cx - pw) + 2; x < Math.round(cx + pw) - 2; x++) if ((x * 7) % 5 > 1) g.set(x, py + 2, brass[0]);
+    g.set(Math.round(cx - pw) + 1, py + 1, brass[0]); g.set(Math.round(cx + pw) - 2, py + 1, brass[0]);
+    // the hanging ring on its nail above the shield
+    for (const [x, y, c] of [[-1, 1, 1], [0, 0, 3], [1, 1, 1], [-2, 2, 1], [2, 2, 0], [-2, 3, 2], [2, 3, 0], [-1, 4, 1], [1, 4, 0], [0, 5, 2], [0, 6, 0]])
+      g.set(Math.floor(cx) + x, top - 6 + y, brass[c]);
+    // the head: centred on the board above the nameplate, with a shadow cast down-right onto the wood
+    const hx = Math.round(cx - head.w / 2), hy = Math.max(0, Math.min(py - 1 - head.h, Math.round((top + py) / 2 - head.h / 2 + 2)));
+    for (let y = 0; y < head.h; y++) for (let x = 0; x < head.w; x++) {
+      if (!head.get(x, y)) continue;
+      for (const [dx, dy] of [[1, 2], [2, 2], [1, 1]]) {
+        const X = hx + x + dx, Y = hy + y + dy;
+        if (inside(X, Y) && !edge(X, Y) && !head.get(X - hx, Y - hy) && Y < py) g.set(X, Y, mix(g.get(X, Y), "#140a04", 0.5));
+      }
+    }
+    for (let y = 0; y < head.h; y++) for (let x = 0; x < head.w; x++) {
+      const c = head.get(x, y);
+      if (!c) continue;
+      // the cut sinks into the board: the last rows darken toward the mount
+      const sink = Math.max(0, y - (head.h - 3)) / 3;
+      g.set(hx + x, hy + y, sink && c !== OUTLINE ? mix(c, "#1a0e06", sink * 0.7) : c);
+    }
+    return g;
+  }
+  function trophyGrid(m) { return cached("t:" + m.body + m.pal + m.name, () => drawTrophy(m)); }
   function graveGrid() { return cached("grave", () => drawGrave()); }
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, trophyGrid, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

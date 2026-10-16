@@ -117,16 +117,29 @@
     return Object.values(S.towns || {}).filter((t) => t.game && t.game.rules).map((t) => [`${t.game.name} (${t.name})`,
       `${t.game.rules} Dealt by ${t.game.dealer}.${t.game.edge ? ` The house keeps about ${Math.max(1, Math.round((2 * t.game.edge - 1) * 100))} in every 100 staked.` : ""}`]);
   }
-  A.route(/^\/guide$/, (v) => {
+  const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  A.route(/^\/guide(?:\/([\w-]+))?$/, (v, focus) => {
     v.appendChild(el("h1", null, "The Guide"));
     v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page."));
+    const jump = (id) => (ev) => {
+      const t = document.getElementById(`guide-${id}`);
+      if (!t || location.hash !== `#/guide/${id}`) return;
+      ev.preventDefault();
+      t.scrollIntoView({ block: "start" });
+    };
+    v.appendChild(el("div", { class: "panel tight guide-toc", role: "navigation", "aria-label": "Contents" }, el("h4", null, "Contents"),
+      el("ol", null, ...GUIDE.map(([title]) => el("li", null, el("a", { href: `#/guide/${slug(title)}`, onclick: jump(slug(title)) }, title))))));
     const g = el("div", { class: "grid2 even" });
     for (const [title, base] of GUIDE) {
       const dl = el("dl", { class: "kv guide" });
       const items = title === "The tables" ? base.slice(0, 2).concat(tableGames(), base.slice(2)) : base;
       for (const [k, txt] of items) dl.append(el("dt", null, k), el("dd", null, txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", "))));
-      g.appendChild(panel(title, dl));
+      const sec = panel(title, dl);
+      sec.id = `guide-${slug(title)}`;
+      g.appendChild(sec);
     }
     v.appendChild(g);
+    const target = focus && document.getElementById(`guide-${focus}`);
+    if (target) setTimeout(() => target.scrollIntoView({ block: "start" }), 0);
   });
 })();
