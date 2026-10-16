@@ -63,6 +63,10 @@
       ["Stop-loss", "Heroes bring a bankroll, not the purse: the money for beds and food stays put, and careful heroes hold back what they're saving for a horse or a house. Reckless ones may chase a bad night once."],
       ["Cheats", "Rogues and the dishonest sometimes cheat. A cheat who gets away with it wins double; a caught one forfeits double, is banned from that table for a week or two, and now and then spends a night in the cells. Dealers remember, and nickname their regulars."],
       ["Watch", "Every sitting is kept as a replay for a fortnight. \"Lost 30 silver at Pig Racing ▸ watch\" in a hero's day opens it, with every round listed underneath."],
+      ["Lady Luck's Ledger", "A weekly column on the Digest page about the town tables: the week's biggest win or loss, the longest run of losses at one table, any cheat caught (or an honest week), and a crew that sat down together. A sleepy week at the tables gets one line."],
+      ["The fine dice", "Four fine dice sets (Gilt, Garnet, Ivory and Rime) are never sold. Each is won or given as a favour, once per league, during an hour at its own town's table; heroes who love dice are likelier to be the one."],
+      ["Monsters who'd rather play", "Now and then a talking monster on the road offers a game instead of a fight, if the crew carries loot worth playing for. The crew's best player sits down: a loss hands over some of the carried loot (never silver, gear or sets), a win earns a curio the monster made."],
+      ["Table keystones", "Poker Face, Gambler's Nerve, Read the Table and Gambit change how a hero plays at the tables (watched less and quicker to quit, never chasing, a touch sharper, a bold first bet), never the house's share. Each also does something in a fight."],
     ]],
     ["By the fire", [
       ["Game sets", "Cards, dice, checkers, chess and tarot decks are real kit: bought at markets (cheapest in the town that makes them), found in dungeons, won and lost. Sets wear out and lose pieces; a pebble stands in for the missing rook. A hero carries three at most."],

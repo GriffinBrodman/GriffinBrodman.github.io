@@ -821,7 +821,7 @@
 
   // ---------- the record, made safe: the goblin always takes the far seat ----------
   // Cousin Orm goes by his name, not his title
-  const nameOf = (pl) => { const w = String((pl && (pl.name || pl.id)) || "SOMEONE").toUpperCase().replace(/[^A-Z0-9 '!.,-]/g, "").split(" ").filter(Boolean); return ((pl && pl.goblin === "orm" ? w[w.length - 1] : w[0]) || "SOMEONE").slice(0, 10); };
+  const nameOf = (pl) => { const w = String((pl && (pl.name || pl.id)) || "SOMEONE").toUpperCase().replace(/[^A-Z0-9 '!.,-]/g, "").split(" ").filter(Boolean); return ((pl && (pl.goblin === "orm" || pl.goblin === "monster") ? w[w.length - 1] : w[0]) || "SOMEONE").slice(0, 10); };
   function seated(rec) {
     const ps = (rec.players || []).slice();
     while (ps.length < 2) ps.push({ id: "p" + ps.length, name: ps.length ? "Rival" : "Hero" });
@@ -1158,7 +1158,8 @@
     NOSE.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const ch = row[i]; if (ch !== ".") b.px(nx0 - 3 + i, ny0 + j, ch === "d" ? DK : ch === "g" ? [100, 146, 66] : [146, 194, 100]); } });
     b.px(nx0, ny0 + 2, [196, 226, 150]);
   }
-  const goblinOf = (rec) => { const g = rec.players[1] && rec.players[1].goblin; return g === "orm" ? "orm" : g ? "nib" : null; };
+  // a talking monster from the road borrows Orm's seat until its own art lands (owner picks the concept first)
+  const goblinOf = (rec) => { const g = rec.players[1] && rec.players[1].goblin; return g === "orm" || g === "monster" ? "orm" : g ? "nib" : null; };
   function peekMood(rec, p, t) {
     const w = winnerOf(rec);
     if (t > p.tEnd) return w === 1 ? "glee" : w === 0 ? "sad" : "watch";

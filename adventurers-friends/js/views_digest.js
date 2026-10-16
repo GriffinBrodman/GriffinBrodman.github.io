@@ -69,6 +69,14 @@
       ["bond", "New bonds"], ["brawl", "Brawls"], ["pvp", "Hero vs hero"], ["robbery", "Robberies"], ["body_sold", "Bodies sold"], ["crime", "Arrests & crimes"], ["funeral", "Funerals"]])
       if (c[k]) kv.append(el("dt", null, lab), el("dd", null, c[k]));
     right.appendChild(panel("By the numbers", kv));
+    // Lady Luck's Ledger: plain until the owner picks a concept sheet (gaming.md phase 6)
+    const lg = d.ledger;
+    if (lg && lg.header) {
+      const lp = panel("Lady Luck's Ledger", el("p", { class: "tiny dim" }, "The week at the town tables: the biggest swing, the longest cold streak at one table, cheats caught and a crew at the tables."),
+        el("p", { class: "small", style: { fontStyle: "italic" } }, lg.header));
+      for (const r of lg.rows || []) lp.appendChild(el("p", { class: "small" }, A.richText(r.text, r.heroes || [], r.party ? [r.party] : [])));
+      right.appendChild(lp);
+    }
     const m = panel("Market report");
     m.appendChild(el("p", { class: "small" }, "Hot: ", d.market_hot.map((x, i) => [i ? ", " : "", el("span", { class: "green" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));
     m.appendChild(el("p", { class: "small" }, "Glutted: ", d.market_cold.map((x, i) => [i ? ", " : "", el("span", { class: "red" }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)])));

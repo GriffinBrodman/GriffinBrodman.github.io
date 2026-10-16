@@ -68,7 +68,9 @@
   const ROW_TIP = { front: "Front row: stands in front with a blade, axe, mace, daggers or a spear, and takes the hits first.",
     back: "Back row: fights from behind the line with a bow, crossbow, staff or wand, where foes have a harder time reaching." };
   function classStrip(h) {
-    const path = basePath(h.cls), sig = signature(h), row = rowOf(h);
+    // a class with several parents (Bard, Quartermaster, Rider) fights the way the hero started
+    const first = ((h.class_history || [])[0] || [])[1];
+    const path = PATH[first] ? first : basePath(h.cls), sig = signature(h), row = rowOf(h);
     return el("div", { class: "class-strip" }, classIcon(path, 2),
       tip(el("span", { class: "pill" }, row === "front" ? "Front row" : "Back row"), ROW_TIP[row]),
       el("span", { class: "pill" }, `Fights with ${PATH[path].word}`),
@@ -861,7 +863,7 @@
     if (nxt) p.appendChild(el("p", { class: "small" }, `Leaning toward `, el("b", { class: "gold" }, nxt.name), ` at level ${nxt.level}`,
       nxt.alt ? el("span", { class: "dim" }, `, with ${nxt.alt} the other path`) : null, "."));
     if (h.voice) p.appendChild(el("p", { class: "small" }, "Talks: ", el("b", null, voiceWord(h.voice)), el("span", { class: "dim" }, " (from the quiz, their traits and their class)")));
-    p.appendChild(el("p", { class: "small dim" }, top.length ? "What's grown so far. Skills learned count most; their work, their fights and what happens to them count too."
+    p.appendChild(el("p", { class: "small dim" }, top.length ? "What's grown so far, one number per calling (higher pulls harder). The strongest decide the class at levels 9 and 18. Skills learned count most; their work, their fights and what happens to them count too."
       : "Nothing has pulled them one way yet. Their first few skills will."));
     for (const [k, val] of top) p.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, cap(k)), A.bar(val, max, "blue"), el("span", { class: "word small" }, val.toFixed(1))));
     return p;
@@ -1461,7 +1463,7 @@
     const lead = Object.assign({ id: h.id, name: h.name, skill: m.band }, inst ? { inst: inst.inst } : {});
     const p = panel("Music");
     p.appendChild(el("div", { class: "music-skill" }, el("span", { class: "small" }, "Sings: ", el("b", null, m.label)), A.bar(m.band * 100, 100, "gold"),
-      el("div", { class: "tiny dim" }, "Heart most of all, then quick hands and a good head, and practice; a Bard's training and a good instrument on top.")));
+      el("div", { class: "tiny dim" }, "What makes a singer: heart most of all, then quick hands, a good head and practice. Being a Bard, or owning a fine instrument, helps on top.")));
     if (m.inst.length) p.appendChild(el("p", { class: "small" }, "Plays ", m.inst.map((x, i) => [i ? (i === m.inst.length - 1 ? " and " : ", ") : "", el("b", null, x.name)]), "."));
     const did = [n.led ? `has led ${plural(n.led, "song")}` + (n.rooms ? ` (${n.rooms} to a tavern room)` : "") : null, n.joined ? `joined in on ${n.led ? n.joined + " more" : plural(n.joined, "song")}` : null].filter(Boolean);
     if (did.length || n.soaring || n.sore) p.appendChild(el("p", { class: "small muted" }, did.length ? cap(did.join(" and ")) + "." : "",
