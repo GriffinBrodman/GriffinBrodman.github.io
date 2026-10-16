@@ -1134,9 +1134,97 @@
       if (r.legendary) godrays(img, t);
       nameCard(img, r.name || p.name || "", t - 0.5, { legendary: r.legendary, sub: r.disaster ? "(more or less)" : null });
     }, sfx: [[0.05, r.disaster ? "sad" : r.legendary ? "fanfare" : "reveal", 1], [0.55, "swish", 1]] });
+    const dig = r.disaster ? pokeBeat(r, ctx) : eatBeat(r, ctx, { n: Math.min(3, ctx.cast.length) });
+    if (dig) beats.push(dig);
     beats.push(verdictBeat(r, ctx));
     if (r.disaster) beats.push(punchBeat(r, ctx));
     return beats;
+  }
+  // the eating (food_eat.js): the dish on the table, eaten the way it should be, each of the crew's mouthfuls in turn going from the dish
+  // in place. The part-eaten dish is drawn ahead (prep), a step a frame
+  function eatPlan(r, ctx, o) {
+    const key = "eat:" + o.n;
+    if (!ctx.cache.has(key)) ctx.cache.set(key, FA.eat.plan(ctx.spec, { n: o.n, seed: r.seed, legendary: r.legendary }));
+    return ctx.cache.get(key);
+  }
+  const FADE_IN = 0.17;
+  function eatBeat(r, ctx, o) {
+    if (!FA.eat) return null;
+    o = o || {};
+    const P = () => eatPlan(r, ctx, o), pl = P(), tail = o.tail || 0.35;
+    return { id: o.id || "dig", dur: pl.dur + tail, prep: pl.steps.slice(), base: () => P().states[0].copy(), draw: (img, t) => {
+      // nothing comes in while the beat is still fading up from black
+      if (t < FADE_IN) return {};
+      const res = FA.eat.draw(img, P(), Math.min(t, pl.dur + 0.01));
+      if (res.word) sfx(img, res.word[0], res.word[1], res.word[2], res.word[3], { k: 3, center: true, shake: 2, fade: 0.7 });
+      if (o.after) o.after(img, t - pl.dur, P());
+      return { shake: res.shake };
+    }, sfx: pl.sfx.slice() };
+  }
+  // a supper gone wrong: someone's fork scrapes at it, and a lump of it crumbles to ash
+  // a jelly gone wrong doesn't crumble: a fork prods it, it shudders, then sags and slumps flat, spreading over the plate in a puddle
+  function sagBeat(r, ctx) {
+    const info = {}, plate = () => FA.plate(ctx.spec, "burnt", { seed: r.seed, info });
+    plate();
+    const ref = FA.eat.jellyless(ctx.spec, "burnt", r.seed), box = (info.geo && info.geo.mound && info.geo.mound.wobble) || [60, 30, 180, 110], cx = (box[0] + box[2]) / 2, bot = box[3] - 2, hw = (box[2] - box[0]) / 2;
+    return { id: "poke", dur: 3.0, base: plate, draw: (img, t) => {
+      const inn = ease3(seg(t, 0, 0.4)), out = easeIn(seg(t, 2.3, 2.8)), sag = ease3(seg(t, 1.2, 2.4)), shiver = t > 0.5 && t < 1.2 ? Math.sin(t * 40) * 1.5 : 0;
+      const sy = 1 - sag * 0.62, sx = 1 + sag * 0.3;
+      if (sag > 0) for (let y = Math.floor(bot - 3); y < bot + 3 + 9 * sag; y++) for (let x = Math.floor(cx - hw * 1.1 * sx); x < cx + hw * 1.1 * sx; x++) {
+        const d = Math.hypot((x - cx) / (hw * 1.02 * sx), (y - bot - 1) / (3 + 7 * sag));
+        if (d < 1) img.px(x, y, d > 0.88 ? "#2e3e22" : K.h2(x, y, 3) > 0.9 ? "#34482a" : "#1a2412");
+      }
+      if (sag > 0 || shiver) FA.eat.moveJelly(img, ref, box, (x, y) => [cx + (x - cx) / sx - (y < bot ? shiver * (bot - y) / (bot - box[1]) : 0), bot - (bot - y) / sy]);
+      FA.eat.tools.fork(img, cx + 6, box[1] + (box[3] - box[1]) * (0.45 + sag * 0.3) - 4 - (1 - inn) * 10 - out * 14, 0.47, 0.88, inn * (1 - out));
+      sfx(img, "sqlch", 120, 30, t - 0.5, { k: 2, center: true, fade: 0.9, fill: () => "#d8f0c8" });
+      sfx(img, "...sag.", 120, 30, t - 1.4, { k: 2, center: true, fade: 1.2, fill: () => "#c8d8b8" });
+      return {};
+    }, sfx: [[0.05, "swish", 1], [0.55, "squish", 1], [0.9, "wobble", 1], [1.3, "squish", 1], [1.6, "splat", 1], [1.9, "groan", 0]] };
+  }
+  function pokeBeat(r, ctx) {
+    if (!FA.eat || !FA.eat.tools) return null;
+    if (ctx.spec.plate === "jelly") return sagBeat(r, ctx);
+    const x0 = 116, y0 = 86;
+    return { id: "poke", dur: 3.0, base: () => FA.plate(ctx.spec, "burnt", { seed: r.seed }), draw: (img, t) => {
+      const inn = ease3(seg(t, 0, 0.4)), out = easeIn(seg(t, 2.3, 2.8)), scr = t > 0.4 && t < 1.5 ? Math.sin((t - 0.4) * 18) * 6 : 0;
+      if (t > 1.5) {
+        // a whole side of it gives way: the crust caves in, black lumps tumble off it, grey ash puffs up
+        const a = t - 1.5, cave = ease3(clamp(a / 0.35, 0, 1));
+        // a wide jagged pit where the crust fell in, black inside with a dull ember or two at the bottom, its broken lip crumbled to
+        // pale ash so it stands out against the char; irregular charred chunks, ash-flecked on top, tip and slide into it
+        const PX = 60, PY = 24;
+        for (let j = -PY - 2; j <= PY + 2; j++) for (let i = -PX - 3; i <= PX + 3; i++) {
+          const ang = Math.atan2(j / PY, i / PX), jag = 0.78 + 0.22 * K.h2(Math.floor((ang + 4) * 5), 1, r.seed), d = Math.hypot(i / PX, j / PY) / (cave * jag);
+          if (d >= 1.12) continue;
+          const em = K.h2(Math.floor((x0 + i) / 2), Math.floor((y0 + j) / 2), r.seed + 9);
+          let c;
+          if (d >= 1) c = K.h2(i, j, 5) > 0.3 + (d - 1) * 4 ? (K.h2(i, j, 6) > 0.45 ? "#c0b8ae" : "#8a8278") : null;
+          else if (d > 0.9) c = j < 0 ? "#2a2420" : "#141010";
+          else if (d < 0.5 && j > 0 && em > 0.93) c = Math.sin(t * 7 + em * 20) > 0 ? "#c84a14" : "#7a2408";
+          else c = d < 0.7 ? "#020101" : "#070505";
+          if (c) img.px(x0 + i, y0 + j, c);
+        }
+        const rp = rng(r.seed + 5);
+        for (let k = 0; k < 10; k++) {
+          const ang = rp() * Math.PI * 2, rad = 0.55 + rp() * 0.35, cr = 5 + rp() * 5, sink = cave * (0.3 + rp() * 0.5), sd = rp() * 50;
+          const kx = x0 + Math.cos(ang) * PX * rad * (1 - sink * 0.5), ky = y0 + Math.sin(ang) * PY * rad * (1 - sink * 0.5) + sink * 6;
+          const inC = (i, j) => { const a2 = Math.atan2(j, i * 0.8); return Math.hypot(i * 0.8, j * 1.25) < cr * (0.75 + 0.35 * K.h2(Math.floor((a2 + 4) * 2.2), k, sd)); };
+          for (let j = -cr * 1.2; j <= cr * 1.2; j++) for (let i = -cr * 1.5; i <= cr * 1.5; i++) {
+            if (!inC(i, j)) { if (inC(i - 1, j) || inC(i, j - 1) || inC(i + 1, j) || inC(i, j + 1)) img.px(kx + i, ky + j, "#000000"); continue; }
+            const top = !inC(i, j - 2), up = j < cr * 0.15;
+            img.px(kx + i, ky + j, top ? "#7a7066" : up ? (K.h2(i + 40, j, k) > 0.78 ? "#b0a89e" : "#2c2420") : "#100c0a");
+          }
+        }
+        const rr = rng(r.seed + 2);
+        for (let k = 0; k < 44; k++) { const ang = -Math.PI * (0.1 + rr() * 0.8), v = 30 + rr() * 55, sz = 1 + Math.floor(rr() * 3); img.rect(x0 + (rr() - 0.5) * 60 + Math.cos(ang) * v * a, y0 + Math.sin(ang) * v * a + 90 * a * a, sz, sz, rr() < 0.5 ? "#1a1412" : rr() < 0.5 ? "#8a827a" : "#c8c0b4"); }
+        for (let k = 0; k < 7; k++) glow(img, x0 - 36 + k * 12, y0 - 6 - a * 34 - (k % 2) * 6, 14 + a * 18, "#b0aca4", 0.55 * Math.max(0, 1 - a * 0.8), 9 + a * 9);
+      } else if (t > 0.45) for (let k = 0; k < 3; k++) img.px(x0 + scr + k * 2 - 2, y0 + 2 + ((t * 30 + k) % 3), "#2a2420");
+      // a fork floats down onto it, scrapes, and lifts away as it gives
+      if (t >= FADE_IN) FA.eat.tools.fork(img, x0 + scr, y0 - 4 - (1 - inn) * 10 - out * 14 + (t > 1.5 ? 3 : 0), 0.47, 0.88, inn * (1 - out));
+      sfx(img, "scrrrk", 120, 30, t - 0.5, { k: 2, center: true, fade: 0.9, fill: () => "#e8e8d8" });
+      sfx(img, "...crumble.", 120, 30, t - 1.6, { k: 2, center: true, fade: 1.2, fill: () => "#c8c8b8" });
+      return { shake: t > 1.5 && t < 1.8 ? [Math.sin(t * 70) > 0 ? 2 : -2, 2] : null };
+    }, sfx: [[0.05, "swish", 1], [0.5, "saw", 1], [0.85, "saw", 1], [1.2, "saw", 1], [1.52, "rumble", 1], [1.55, "crunch", 1], [1.8, "groan", 0]] };
   }
   function godrays(img, t) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -1357,7 +1445,7 @@
     const b = p.beats[i], lt = t - b.t0;
     const img = baseOf(p, b).copy();
     const info = b.draw(img, lt, p) || {};
-    const out = new Uint8ClampedArray(W * H * 4), sh = info.shake || [0, 0], fade = i > 0 && lt < 0.16 ? lt / 0.16 : 1;
+    const out = new Uint8ClampedArray(W * H * 4), sh = info.shake || [0, 0], fade = i > 0 && lt < FADE_IN ? lt / FADE_IN : 1;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const sx = clamp(x - sh[0], 0, W - 1), sy = clamp(y - sh[1], 0, H - 1), s = (sy * W + sx) * 4, o = (y * W + x) * 4;
       if (fade < 1 && bay(x, y) > fade) { out[o] = 6; out[o + 1] = 4; out[o + 2] = 3; out[o + 3] = 255; continue; }
@@ -1368,8 +1456,10 @@
   // warms the next beat's still layers while the current one plays, so a cut never stalls
   function warm(rec, t, opts) {
     const p = planFor(rec, opts);
-    const nx = p.beats.find((b) => b.t0 > t && !p.ctx.cache.has(b.id));
-    if (nx) baseOf(p, nx);
+    const nx = p.beats.find((b) => b.t0 > t && (!p.ctx.cache.has(b.id) || (b.prep && b.prep.length)));
+    if (!nx) return;
+    if (!p.ctx.cache.has(nx.id)) baseOf(p, nx);
+    else nx.prep.shift()();
   }
 
   // ---------- sound: its own WebAudio context, following audio.js's "al.sound" settings and first-click unlock ----------
@@ -1441,6 +1531,12 @@
       clink: (t) => { ring(t, 2400, 0.3, 0.05); },
       crunch: (t) => { for (let i = 0; i < 4; i++) noise(t + i * 0.03, 0.05, 0.3, "bandpass", 1600 + Math.random() * 2000, 1.5); tone(t, 160, 70, 0.08, 0.2); },
       slurp: (t) => { noise(t, 0.35, 0.12, "bandpass", 700, 4, 1800, 0.05); },
+      saw: (t) => { noise(t, 0.16, 0.1, "bandpass", 2600, 3, 1400, 0.04); noise(t + 0.18, 0.14, 0.08, "bandpass", 1500, 3, 2600, 0.04); },
+      squish: (t) => { tone(t, 220, 120, 0.12, 0.1, "sine", 0.01); noise(t, 0.1, 0.08, "lowpass", 700, 1, 300); },
+      crack: (t) => { noise(t, 0.05, 0.4, "highpass", 1800, 1); tone(t, 900, 300, 0.05, 0.1, "square"); },
+      tear: (t) => { noise(t, 0.3, 0.12, "bandpass", 1200, 2, 3000, 0.08); },
+      wobble: (t) => { for (let i = 0; i < 4; i++) tone(t + i * 0.09, 260 - i * 30, 200 - i * 30, 0.09, 0.08, "sine", 0.01); },
+      chomp: (t) => { tone(t, 150, 70, 0.1, 0.25); noise(t, 0.08, 0.18, "lowpass", 1100); noise(t + 0.12, 0.06, 0.08, "lowpass", 900); },
       chime: (t) => { ring(t, 1568, 0.8, 0.05); ring(t + 0.1, 2093, 0.7, 0.04); },
       rumble: (t) => { tone(t, 70, 55, 0.6, 0.12, "sawtooth", 0.1); noise(t, 0.5, 0.06, "lowpass", 200); },
       gasp: (t) => { noise(t, 0.25, 0.08, "bandpass", 1400, 2, 2400, 0.05); },
@@ -1534,6 +1630,6 @@
     beats: (rec, opts) => planFor(rec, opts).beats.map((b) => ({ id: b.id, t0: b.t0, t1: b.t1 })),
     events: (rec, opts) => planFor(rec, opts).ev.slice(),
     sound: Snd,
-    kit: { wrap, campWide, flame, embers, stones, logs, flick, mask, lit, sfx, blit, sparkleAt, twinkles, darken, bubble, nameCard, note, firelit, heart, godrays, sky, castOf },
+    kit: { wrap, campWide, flame, embers, stones, logs, flick, mask, lit, sfx, blit, sparkleAt, twinkles, darken, bubble, nameCard, note, firelit, heart, godrays, sky, castOf, eatBeat, eatPlan },
   };
 })(typeof window !== "undefined" ? window : globalThis);

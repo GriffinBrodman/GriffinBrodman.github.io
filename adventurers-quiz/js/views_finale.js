@@ -2,7 +2,7 @@
 (function () {
   const A = App;
   const { L, cap, el, events, heroes, parties, plural } = A;
-  const { fightSet, panel, rivalryPanel, runnerUp } = Views;
+  const { panel, rivalryPanel, runnerUp } = Views;
 
   A.route(/^\/finale(?:\/(\d+))?$/, (v, n) => {
     const all = L.seasons || [];
@@ -18,7 +18,7 @@
       el("div", { class: "finale-kicker" }, `The Season ${s.season} Ceremony`),
       el("h1", null, s.theme),
       el("p", null, `${plural((s.end_day - (s.start_day || s.end_day - 27)) + 1, "day")} · ${num.events ? plural(num.events, "story", "stories") : "? stories"} · ${num.deaths || 0} fallen · ${plural(num.bosses || 0, "boss", "bosses")} slain`)));
-    if (s.recap) v.appendChild(panel("The season, as the Crier tells it", ...s.recap.split(/\n\s*\n/).map((t) => el("p", { class: "epilogue" }, t))));
+    if (s.recap) v.appendChild(panel("The season, as the Crier tells it", ...s.recap.split(/\n\s*\n/).map((t) => el("p", { class: "epilogue" }, A.storyText(t)))));
 
     const spot = el("div", { class: "grid2 even finale-spot" });
     if (champ) spot.appendChild(el("section", { class: "panel laurel" },
@@ -74,10 +74,10 @@
           el("span", { class: "mark" }, g.done ? "✔" : "○"), g.party ? A.partyLink(g.party) : g.hero && heroes[g.hero] ? A.heroLink(g.hero) : g.name, " ", g.text,
           g.done ? null : el("span", { class: "tiny dim" }, ` (${g.progress})`))))));
     }
-    if (sFeuds.length) side.appendChild(panel("Feuds of the season", el("ul", { class: "diary" }, sFeuds.slice(0, 6).map((e) => el("li", null, A.richText(e.text, e.heroes, e.parties))))));
+    if (sFeuds.length) side.appendChild(panel("Feuds of the season", el("ul", { class: "diary" }, sFeuds.slice(0, 6).map((e) => el("li", null, A.storyLine(e))))));
     if (cal.length) side.appendChild(panel("The season, week by week", el("ol", { class: "timeline small" }, cal.map((dg) => {
       const top = (dg.top || []).map((id) => events[id]).filter(Boolean)[0];
-      return el("li", null, el("span", { class: "when" }, `Week ${dg.week}`), el("div", null, top ? A.richText(top.text, top.heroes, top.parties) : "A quiet week."));
+      return el("li", null, el("span", { class: "when" }, `Week ${dg.week}`), el("div", null, top ? A.storyLine(top) : "A quiet week."));
     }))));
     v.appendChild(el("div", { class: "grid2" }, panel("The final table", el("div", { class: "scrollx" }, ft)), side));
     if (s.lines) {
@@ -86,7 +86,7 @@
         el("ul", { class: "diary everyone" }, rows.map((r) => { const m = s.lines[r.hero], h = heroes[r.hero];
           return el("li", null, el("span", { class: "row", style: { gap: "6px" } }, A.heroPortrait(h, 1, { cls: "mini" }), el("b", null, A.heroLink(h.id)),
             el("span", { class: "tiny dim" }, `${h.npc ? "" : h.owner + "'s · "}#${s.standings.indexOf(r) + 1}`)),
-            el("div", null, A.richText(m.text, m.heroes, m.parties))); }))));
+            el("div", null, A.storyLine(m))); }))));
     }
 
     const hall = el("div", { class: "cols", style: { gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))" } });
@@ -110,7 +110,7 @@
     if ((s.moments || []).length) {
       const tl = el("ol", { class: "timeline" });
       for (const m of s.moments) tl.appendChild(el("li", null, el("span", { class: "when" }, `Day ${m.sday || "?"}`),
-        el("div", null, A.richText(m.text, m.heroes, m.parties), m.fight && fightSet.has(m.fight) ? el("a", { class: "watch", href: `#/fight/${m.fight}` }, "  ▶ watch") : null)));
+        el("div", null, A.storyLine(m))));
       v.appendChild(panel("Moments of the season", tl));
     }
 

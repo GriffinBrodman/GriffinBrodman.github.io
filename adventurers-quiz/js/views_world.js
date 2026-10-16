@@ -8,6 +8,7 @@
     v.appendChild(el("h1", null, "The World"));
     v.appendChild(factionsPanel());
     v.appendChild(legendsPanel());
+    v.appendChild(panel("The waters", el("p", { class: "small" }, "Twelve waters, twenty-four kinds of fish and a legend in every one: ", el("a", { href: "#/creel" }, "the Creel Book"), ".")));
     const moods = Object.entries(L.town_mood || {});
     if (moods.length || L.pip) v.appendChild(panel("Town life",
       moods.length ? el("p", { class: "small" }, moods.map(([t, m], i) => [i ? " · " : "", el("a", { href: `#/map/${t}` }, S.towns[t].name), `: ${m.word}` + ((m.deals || []).length ? " (deals)" : "")])) : null,

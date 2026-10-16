@@ -30,7 +30,7 @@
       const h = heroes[m.id];
       mem.appendChild(el("div", { class: "grave-row" }, Art.graveGrid().toCanvas(3), h ? A.heroPortrait(h, 1) : null,
         el("div", null, el("b", null, A.heroLink(m.id)), el("div", { class: "small muted" }, `Level ${m.level} ${A.clsName(m.cls)} · ${m.owner}'s hero`),
-          el("div", { class: "small" }, `Died ${m.cause} in ${m.place}, season ${m.season}.`))));
+          el("div", { class: "small" }, A.storyText(`Died ${m.cause} in ${m.place}, season ${m.season}.`)))));
     }
     right.appendChild(mem);
     right.appendChild(treasuresPanel());

@@ -8,9 +8,11 @@
                                          or the stump by the fire,
       set: { id: "cards_gilt", tier: 0..3, missing?: men lost from a checkers set (pebbles stand in for them) },
            the look comes from the set id in league/content/night_games.py SETS; an unknown id falls back to its game and tier,
-      players: [ { id, name, nick?, goblin?: "nib" | "orm" }, ... ]
+      players: [ { id, name, nick?, goblin?: "nib" | "orm" | "monster", monster?: monster id }, ... ]
            players[0] sits at the near edge (the bottom of the frame), players[1] at the far edge (the top), where a goblin or
-           troll peeks over; if players[0] is the goblin the seats are swapped. Dice may have 3 or 4 players (left, right),
+           troll peeks over; if players[0] is the goblin the seats are swapped. Dice may have 3 or 4 players (left, right).
+           A talking monster from the road (goblin "monster") gets its own staging from MonsterGameArt: the stump by the road
+           (A) or the board on a bridge rail (B), the hero's bust across from its own,
       winner: index into players, or null for a draw,
       loser?: index of whoever pays the stake (default: the other player; at crew dice, the lowest total),
       stake: "first_watch" | "cooks_tomorrow" | "carries_pack" | "names_pet" | "washes_pots"   paid by the loser, shown as a token,
@@ -90,6 +92,9 @@
       const a = (o.pitch || 70) * Math.PI / 180, tg = o.target || [0, 0, 0];
       this.f = [0, Math.cos(a), -Math.sin(a)];
       this.u = [0, Math.sin(a), Math.cos(a)];
+      this.r = [1, 0, 0];
+      // yaw turns the camera about the vertical, so a table can be seen from its side (the bridge rail)
+      if (o.yaw) { const Y = Rz(o.yaw * Math.PI / 180); this.f = mv(Y, this.f); this.u = mv(Y, this.u); this.r = mv(Y, this.r); }
       this.pos = [tg[0] - this.f[0] * o.dist, tg[1] - this.f[1] * o.dist, tg[2] - this.f[2] * o.dist];
       this.focal = o.focal || o.dist;
       this.cx = W / 2; this.cy = o.cy || H / 2;
@@ -97,14 +102,14 @@
     }
     p(x, y, z) {
       const r = [x - this.pos[0], y - this.pos[1], z - this.pos[2]], d = dot(r, this.f);
-      return [this.cx + this.sx + r[0] * this.focal / d, this.cy + this.sy - dot(r, this.u) * this.focal / d, d];
+      return [this.cx + this.sx + dot(r, this.r) * this.focal / d, this.cy + this.sy - dot(r, this.u) * this.focal / d, d];
     }
     scale(x, y, z) { return this.focal / dot([x - this.pos[0], y - this.pos[1], z - this.pos[2]], this.f); }
     facing(pt, n) { return dot([this.pos[0] - pt[0], this.pos[1] - pt[1], this.pos[2] - pt[2]], n) > 0; }
     // the point on a world plane (axis k = v) seen through a pixel centre
     unproject(sx, sy, k, v) {
       const dx = (sx - this.cx - this.sx) / this.focal, dy = (sy - this.cy - this.sy) / this.focal;
-      const D = [this.f[0] + dx - this.u[0] * dy, this.f[1] - this.u[1] * dy, this.f[2] - this.u[2] * dy];
+      const D = [this.f[0] + dx * this.r[0] - this.u[0] * dy, this.f[1] + dx * this.r[1] - this.u[1] * dy, this.f[2] + dx * this.r[2] - this.u[2] * dy];
       const s = (v - this.pos[k]) / D[k];
       return [this.pos[0] + D[0] * s, this.pos[1] + D[1] * s, this.pos[2] + D[2] * s];
     }
@@ -821,7 +826,7 @@
 
   // ---------- the record, made safe: the goblin always takes the far seat ----------
   // Cousin Orm goes by his name, not his title
-  const nameOf = (pl) => { const w = String((pl && (pl.name || pl.id)) || "SOMEONE").toUpperCase().replace(/[^A-Z0-9 '!.,-]/g, "").split(" ").filter(Boolean); return ((pl && pl.goblin === "orm" ? w[w.length - 1] : w[0]) || "SOMEONE").slice(0, 10); };
+  const nameOf = (pl) => { const w = String((pl && (pl.name || pl.id)) || "SOMEONE").toUpperCase().replace(/[^A-Z0-9 '!.,-]/g, "").split(" ").filter(Boolean); return ((pl && (pl.goblin === "orm" || pl.goblin === "monster") ? w[w.length - 1] : w[0]) || "SOMEONE").slice(0, 10); };
   function seated(rec) {
     const ps = (rec.players || []).slice();
     while (ps.length < 2) ps.push({ id: "p" + ps.length, name: ps.length ? "Rival" : "Hero" });
@@ -944,12 +949,14 @@
     return spr;
   }
   // a sprite drawn at a screen centre, turned by a, squeezed across by sx (a flip), scaled by k; tint scales its colours
+  // the monster scenes look at their tables lower than the camp does, so a card lying there is squashed this much more
+  let cardSy = 1;
   function blit(b, spr, x, y, a, sx, k, tint) {
     const c = Math.cos(a), s = Math.sin(a), hw = spr.w / 2, hh = spr.h / 2, R = Math.ceil(Math.hypot(hw * k, hh * k)) + 1;
     x = Math.round(x * 2) / 2; y = Math.round(y * 2) / 2;
     for (let py = Math.floor(y - R); py <= y + R; py++) for (let px = Math.floor(x - R); px <= x + R; px++) {
       const dx = px + 0.5 - x, dy = py + 0.5 - y;
-      const u = Math.floor((dx * c + dy * s) / (k * sx) + hw), v = Math.floor((-dx * s + dy * c) / k + hh);
+      const u = Math.floor((dx * c + dy * s) / (k * sx) + hw), v = Math.floor((-dx * s + dy * c) / (k * cardSy) + hh);
       if (u < 0 || v < 0 || u >= spr.w || v >= spr.h) continue;
       const col = spr.px[v * spr.w + u];
       if (!col) continue;
@@ -1084,16 +1091,20 @@
     if (t > 0.45) {
       const who = nameOf(rec.players[lo]);
       const word = kind === "silver" ? `PAYS ${money(rec.stake_cp || 10)}` : STAKE_WORDS[kind];
-      const lines = [who, word], tw = Math.max(textWidth(lines[0]), textWidth(lines[1])) + 6;
-      let tx = Math.round(box.x + box.w + 4), ty = Math.round(y - 16);
-      if (tx + tw > W - 2) tx = Math.round(box.x - tw - 4);
-      const slide = Math.round((1 - ease3(clamp((t - 0.45) / 0.25, 0, 1))) * 6);
-      b.rect(tx + 1, ty + 1 + slide, tw, 16, [16, 10, 6], true);
-      b.rect(tx, ty + slide, tw, 16, [232, 214, 170], true);
-      for (let i = 0; i < tw; i += 3) b.px(tx + i, ty + 15 + slide, [206, 186, 142], true);
-      text(b, lines[0], tx + 3, ty + 2 + slide, [70, 46, 28]);
-      text(b, lines[1], tx + 3, ty + 9 + slide, [150, 44, 30]);
+      paperTag(b, box, y, [who, word], t - 0.45);
     }
+  }
+  // a paper tag beside a token (right of it, or left when there's no room), sliding up into place
+  function paperTag(b, box, y, lines, t, left) {
+    const tw = Math.max(textWidth(lines[0]), textWidth(lines[1])) + 6;
+    let tx = Math.round(box.x + box.w + 4), ty = Math.round(y - 16);
+    if (left || tx + tw > W - 2) tx = Math.round(box.x - tw - 4);
+    const slide = Math.round((1 - ease3(clamp(t / 0.25, 0, 1))) * 6);
+    b.rect(tx + 1, ty + 1 + slide, tw, 16, [16, 10, 6], true);
+    b.rect(tx, ty + slide, tw, 16, [232, 214, 170], true);
+    for (let i = 0; i < tw; i += 3) b.px(tx + i, ty + 15 + slide, [206, 186, 142], true);
+    text(b, lines[0], tx + 3, ty + 2 + slide, [70, 46, 28]);
+    text(b, lines[1], tx + 3, ty + 9 + slide, [150, 44, 30]);
   }
 
   // ---------- the goblin and the troll, peeking over the far edge ----------
@@ -1158,7 +1169,8 @@
     NOSE.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const ch = row[i]; if (ch !== ".") b.px(nx0 - 3 + i, ny0 + j, ch === "d" ? DK : ch === "g" ? [100, 146, 66] : [146, 194, 100]); } });
     b.px(nx0, ny0 + 2, [196, 226, 150]);
   }
-  const goblinOf = (rec) => { const g = rec.players[1] && rec.players[1].goblin; return g === "orm" ? "orm" : g ? "nib" : null; };
+  // a talking monster from the road takes Orm's seat only when its own scenes (MonsterGameArt) aren't loaded
+  const goblinOf = (rec) => { const g = rec.players[1] && rec.players[1].goblin; return g === "orm" || g === "monster" ? "orm" : g ? "nib" : null; };
   function peekMood(rec, p, t) {
     const w = winnerOf(rec);
     if (t > p.tEnd) return w === 1 ? "glee" : w === 0 ? "sad" : "watch";
@@ -1281,7 +1293,7 @@
       deck: [-36, 0],
     },
     draw(S, p, rec, look, t, wall) {
-      const b = S.b, sp = SCENES.cards_camp.spots, P = (q, z) => S.P(q[0], q[1], z || 0);
+      const b = S.b, sp = p.spots || SCENES.cards_camp.spots, P = (q, z) => S.P(q[0], q[1], z || 0);
       const dealt = p.deal.filter((d) => t >= d.t).length;
       const dk = P(sp.deck);
       drawDeck(b, look, dk[0], dk[1], p.deckN - dealt, true);
@@ -1326,13 +1338,10 @@
     after(S, p, rec, look, t, wall) {
       const b = S.b, sp = SCENES.cards_camp.spots;
       campfire(b, ...firePx(S, p), wall, 1.25);
-      for (const pl of p.plays) if (t > pl.tGlint && t < pl.tSweep + 0.05) {
-        const q = S.P(sp.mid(pl.taker)[0], sp.mid(pl.taker)[1], 0), u = seg(t, pl.tGlint, pl.tGlint + 0.3);
-        sparkle(b, q[0] + 5 - u * 6, q[1] - 7 + u * 4, u < 0.5 ? 2 : 1, [255, 226, 130]);
-      }
+      trickGlints(S, p, t);
       if (look.gilt) giltGlints(S, p, b, wall);
       // the score slate, counting tricks as they're swept
-      const n = [0, 1].map((who) => p.won0[who] + p.plays.filter((pl) => pl.taker === who && t >= pl.tSweep + 0.32).length);
+      const n = trickCounts(p, t);
       scoreSlate(b, rec, n, "TRICKS");
       const wi = winnerOf(rec) === 1 ? 1 : 0;
       result(b, rec, t, p.tEnd, `${n[wi]} TO ${n[1 - wi]}`);
@@ -1341,6 +1350,14 @@
     },
     lamps(p, t, wall) { return campLamps(p, wall); },
   };
+  function trickGlints(S, p, t) {
+    const sp = p.spots || SCENES.cards_camp.spots;
+    for (const pl of p.plays) if (t > pl.tGlint && t < pl.tSweep + 0.05) {
+      const q = S.P(sp.mid(pl.taker)[0], sp.mid(pl.taker)[1], 0), u = seg(t, pl.tGlint, pl.tGlint + 0.3);
+      sparkle(S.b, q[0] + 5 - u * 6, q[1] - 7 + u * 4, u < 0.5 ? 2 : 1, [255, 226, 130]);
+    }
+  }
+  const trickCounts = (p, t) => [0, 1].map((who) => p.won0[who] + p.plays.filter((pl) => pl.taker === who && t >= pl.tSweep + 0.32).length);
   function firePx(S, p) { const c = S.P(p.fire[0], p.fire[1], CAMP.GZ + 4); return [c[0], c[1]]; }
   function giltGlints(S, p, b, wall) {
     const k = Math.floor(wall * 1.6) % 7, u = (wall * 1.6) % 1;
@@ -1583,34 +1600,7 @@
         const x0 = Math.cos(a) * (STUMP - 6), y0 = Math.sin(a) * (STUMP - 6);
         S.box([x0 * 1.14, y0 * 1.14, GZS + 4], [6, 3.5, 4], Rz(a), [96, 68, 44], { outline: [44, 30, 18] });
       }
-      const B = 4 * SQ, style = look.board;
-      const sq = (x, y) => [Math.floor(x / SQ + 4), Math.floor(y / SQ + 4)];
-      const cap = S.cyl([0, 0, GZS], STUMP, -GZS, [100, 72, 46], { n: 56, sideFn: (i, nn, c) => sc(c, (i % 4 === 0 ? 0.62 : i % 4 === 2 ? 1.08 : 0.88) * (0.9 + n(i, 3) * 0.2)), capFn: () => (sx, sy) => {
-        const wpt = S.cam.unproject(sx + 0.5, sy + 0.5, 2, 0), x = wpt[0], y = wpt[1], rad = Math.hypot(x, y);
-        if (rad > STUMP - 2.5) return sc([150, 108, 66], 0.82 + n(x * 0.3, y * 0.3) * 0.2);
-        const d = Math.hypot(x - 4, y + 3) + (n(x * 0.15, y * 0.15) - 0.5) * 4, ring = d % 4.6 < 0.9;
-        let wood = sc([214, 170, 112], (ring ? 0.84 : 1) * (0.92 + n(x * 0.8, y * 0.8) * 0.12));
-        if (Math.abs(Math.atan2(y + 3, x - 4) + 2.1) < 0.025 && d > 10) wood = [128, 88, 52];
-        if (Math.abs(x) > B + 2.4 || Math.abs(y) > B + 2.4) return wood;
-        if (Math.abs(x) > B + 0.6 || Math.abs(y) > B + 0.6) return style === "pearl" ? [176, 136, 60] : sc(wood, 0.5);
-        const [c, r] = sq(x, y), dark = (c + r) % 2 === 0, fx = (x / SQ + 4) % 1, fy = (y / SQ + 4) % 1;
-        const groove = fx < 0.06 || fy < 0.06;
-        let col;
-        if (style === "pearl") {
-          col = dark ? sc([82, 50, 32], 0.85 + n(x * 0.2, y * 1.4) * 0.3) : mixc([236, 230, 216], n(x * 0.5, y * 0.5) > 0.6 ? [240, 214, 208] : n(x * 0.5 + 9, y * 0.5) > 0.62 ? [210, 232, 222] : [236, 230, 216], 0.6);
-          if (groove) col = [150, 116, 56];
-        } else if (style === "bark") {
-          col = dark ? sc([96, 66, 44], 0.7 + (Math.sin(x * 1.3 + n(x, y) * 3) > 0.3 ? 0.35 : 0) + n(x * 0.3, y * 0.3) * 0.2) : wood;
-          if (groove) col = sc(wood, 0.55);
-        } else if (style === "slate") {
-          col = dark ? sc([86, 58, 40], 0.8 + n(x * 0.6, y * 0.6) * 0.3) : mixc(wood, [230, 224, 210], n(x * 0.7, y * 0.7) > 0.62 ? 0.4 : 0.1);
-          if (groove) col = sc(wood, 0.5);
-        } else {
-          col = dark ? sc([108, 76, 50], 0.8 + n(x * 0.6, y * 0.6) * 0.3) : mixc(wood, [222, 198, 150], 0.5 + (n(x * 0.9, y * 0.9) > 0.68 ? 0.3 : 0));
-          if (groove) col = [224, 218, 196];
-        }
-        return col;
-      } });
+      const cap = S.cyl([0, 0, GZS], STUMP, -GZS, [100, 72, 46], { n: 56, sideFn: (i, nn, c) => sc(c, (i % 4 === 0 ? 0.62 : i % 4 === 2 ? 1.08 : 0.88) * (0.9 + n(i, 3) * 0.2)), capFn: stumpCap(S, n, STUMP, look.board) });
       void cap;
       p.mask = new Uint8Array(W * H);
       const m = new Buf(), ring = [];
@@ -1623,7 +1613,7 @@
     },
     manAt(p, m, t) {
       if (m.cap !== null && t >= m.cap) {
-        const side = m.pileSide, slot = m.pileSlot, pile = pileXY(side, slot), u = seg(t, m.cap, m.cap + 0.5);
+        const side = m.pileSide, slot = m.pileSlot, pile = (p.pile || pileXY)(side, slot), u = seg(t, m.cap, m.cap + 0.5);
         const from = sqXY(m.segs.length ? m.segs[m.segs.length - 1].to[0] : m.c0, m.segs.length ? m.segs[m.segs.length - 1].to[1] : m.r0);
         void from;
         const start = m.capFrom;
@@ -1656,7 +1646,7 @@
       }
       // men lost before tonight's key moves sit captured beside the board
       for (const side of [0, 1]) for (let k = 0; k < p.lost[side]; k++) {
-        const pos = pileXY(1 - side, k);
+        const pos = (p.pile || pileXY)(1 - side, k);
         items.push({ y: pos[1], draw: () => drawMan(S, look, { side, id: 100 + side * 20 + k, pebble: false }, { x: pos[0], y: pos[1], z: pos[2], king: false }, fire, t) });
       }
       paintItems(items);
@@ -1668,13 +1658,7 @@
     after(S, p, rec, look, t, wall) {
       const b = S.b, fp = S.P(p.fire[0], p.fire[1], GZS + 4);
       campfire(b, fp[0], fp[1], wall, 1.1);
-      for (const bu of p.bursts) burst(S, bu, t);
-      for (const m of p.men) if (m.kingAt !== null && m.kingAt > 0 && t > m.kingAt - 0.05 && t < m.kingAt + 1.4) {
-        const st = SCENES.checkers.manAt(p, m, t), c = S.P(st.x, st.y, 7), u = t - m.kingAt;
-        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + u * 3, rr = 6 + u * 10; if (u < 0.9) sparkle(b, c[0] + Math.cos(a) * rr, c[1] + Math.sin(a) * rr * 0.7, u < 0.3 ? 2 : 1, [255, 222, 110]); }
-        if (u < 0.8) crownIcon(b, c[0], c[1] - 6 - Math.round(ease(Math.min(1, u * 3)) * 3), [255, 214, 90]);
-      }
-      for (const [i, s] of p.stamps.entries()) if (t > s.t && t < Math.min(s.t + 0.9, (p.stamps[i + 1] || {}).t || 99) && t < p.tEnd) stamp(b, s.word, W / 2, 62, s.word === "KING!" ? [255, 214, 90] : [255, 236, 170], t - s.t);
+      checkersShine(S, p, t, 62);
       const names = [nameOf(rec.players[0]), nameOf(rec.players[1])];
       const sw = Math.max(textWidth(names[0]), textWidth(names[1])) + 18;
       slate(b, 3, H - 22, sw, 19, [104, 74, 44]);
@@ -1693,6 +1677,52 @@
       return { amb: [0.26, 0.28, 0.36], lamps: [{ x: c[0], y: c[1], r: 240 * fl, i: 1.05, c: [1.1, 0.8, 0.52], p: 1.1, sy: 1 }], glows };
     },
   };
+  function checkersShine(S, p, t, y) {
+    const b = S.b;
+    for (const bu of p.bursts) burst(S, bu, t);
+    for (const m of p.men) if (m.kingAt !== null && m.kingAt > 0 && t > m.kingAt - 0.05 && t < m.kingAt + 1.4) {
+      const st = SCENES.checkers.manAt(p, m, t), c = S.P(st.x, st.y, 7), u = t - m.kingAt;
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + u * 3, rr = 6 + u * 10; if (u < 0.9) sparkle(b, c[0] + Math.cos(a) * rr, c[1] + Math.sin(a) * rr * 0.7, u < 0.3 ? 2 : 1, [255, 222, 110]); }
+      if (u < 0.8) crownIcon(b, c[0], c[1] - 6 - Math.round(ease(Math.min(1, u * 3)) * 3), [255, 214, 90]);
+    }
+    for (const [i, s] of p.stamps.entries()) if (t > s.t && t < Math.min(s.t + 0.9, (p.stamps[i + 1] || {}).t || 99) && t < p.tEnd) stamp(b, s.word, W / 2, y, s.word === "KING!" ? [255, 214, 90] : [255, 236, 170], t - s.t);
+  }
+  // a stump's cut top: bark rim, growth rings and a crack, with a checkers board carved into it when style names one
+  function stumpCap(S, n, R, style, tone) {
+    return () => (sx, sy) => {
+      const wpt = S.cam.unproject(sx + 0.5, sy + 0.5, 2, 0), x = wpt[0], y = wpt[1], rad = Math.hypot(x, y);
+      if (rad > R - 2.5) return sc([150, 108, 66], 0.82 + n(x * 0.3, y * 0.3) * 0.2);
+      const d = Math.hypot(x - 4, y + 3) + (n(x * 0.15, y * 0.15) - 0.5) * 4, ring = d % 4.6 < 0.9;
+      let wood = sc([214, 170, 112], (ring ? 0.84 : 1) * (0.92 + n(x * 0.8, y * 0.8) * 0.12));
+      if (Math.abs(Math.atan2(y + 3, x - 4) + 2.1) < 0.025 && d > 10) wood = [128, 88, 52];
+      if (tone) wood = [wood[0] * tone[0], wood[1] * tone[1], wood[2] * tone[2]];
+      return (style && boardPx(n, style, x, y, wood)) || wood;
+    };
+  }
+  // the board's colour at a point on it (null off the board): its frame, then dark and light squares in the set's style
+  function boardPx(n, style, x, y, wood) {
+    const B = 4 * SQ;
+    const sq = (x, y) => [Math.floor(x / SQ + 4), Math.floor(y / SQ + 4)];
+    if (Math.abs(x) > B + 2.4 || Math.abs(y) > B + 2.4) return null;
+    if (Math.abs(x) > B + 0.6 || Math.abs(y) > B + 0.6) return style === "pearl" ? [176, 136, 60] : sc(wood, 0.5);
+    const [c, r] = sq(x, y), dark = (c + r) % 2 === 0, fx = (x / SQ + 4) % 1, fy = (y / SQ + 4) % 1;
+    const groove = fx < 0.06 || fy < 0.06;
+    let col;
+    if (style === "pearl") {
+      col = dark ? sc([82, 50, 32], 0.85 + n(x * 0.2, y * 1.4) * 0.3) : mixc([236, 230, 216], n(x * 0.5, y * 0.5) > 0.6 ? [240, 214, 208] : n(x * 0.5 + 9, y * 0.5) > 0.62 ? [210, 232, 222] : [236, 230, 216], 0.6);
+      if (groove) col = [150, 116, 56];
+    } else if (style === "bark") {
+      col = dark ? sc([96, 66, 44], 0.7 + (Math.sin(x * 1.3 + n(x, y) * 3) > 0.3 ? 0.35 : 0) + n(x * 0.3, y * 0.3) * 0.2) : wood;
+      if (groove) col = sc(wood, 0.55);
+    } else if (style === "slate") {
+      col = dark ? sc([86, 58, 40], 0.8 + n(x * 0.6, y * 0.6) * 0.3) : mixc(wood, [230, 224, 210], n(x * 0.7, y * 0.7) > 0.62 ? 0.4 : 0.1);
+      if (groove) col = sc(wood, 0.5);
+    } else {
+      col = dark ? sc([108, 76, 50], 0.8 + n(x * 0.6, y * 0.6) * 0.3) : mixc(wood, [222, 198, 150], 0.5 + (n(x * 0.9, y * 0.9) > 0.68 ? 0.3 : 0));
+      if (groove) col = [224, 218, 196];
+    }
+    return col;
+  }
   function pileXY(side, slot) {
     const col = Math.floor(slot / 6), k = slot % 6;
     return [-STUMP + 13 + col * 6, side === 0 ? -20 - col * 2 : 18 + col * 2, k * 2.1];
@@ -1808,9 +1838,7 @@
     after(S, p, rec, look, t, wall) {
       const b = S.b;
       campfire(b, ...firePx(S, p), wall, 1.25);
-      if (look.glow) for (const d of p.dice) if (d.st && t > d.T.ti[0]) { const c = S.P(d.st.x, d.st.y, d.st.z + 4); glow(b, c[0], c[1], 8, look.glow, 0.28); }
-      if (look.glint) for (const d of p.dice) glintAt(S, d, t, look.glint);
-      if (t > p.tEnd - 0.2 && p.w !== null) p.throws[p.w].dice.forEach((d, i) => ringDie(S, d, t, p.tEnd - 0.2 + i * 0.04, undefined, [255, 210, 100]));
+      diceShine(S, p, look, t);
       const names = rec.players.slice(0, p.throws.length).map(nameOf);
       const sw = Math.max(...names.map((s) => textWidth(s))) + 20, sh = 9 + names.length * 7;
       slate(b, 4, 4, Math.max(sw, 40), sh, [104, 74, 44]);
@@ -1826,9 +1854,364 @@
     },
     lamps(p, t, wall) { return campLamps(p, wall); },
   };
+  function diceShine(S, p, look, t) {
+    if (look.glow) for (const d of p.dice) if (d.st && t > d.T.ti[0]) { const c = S.P(d.st.x, d.st.y, d.st.z + 4); glow(S.b, c[0], c[1], 8, look.glow, 0.28); }
+    if (look.glint) for (const d of p.dice) glintAt(S, d, t, look.glint);
+    if (t > p.tEnd - 0.2 && p.w !== null) p.throws[p.w].dice.forEach((d, i) => ringDie(S, d, t, p.tEnd - 0.2 + i * 0.04, undefined, [255, 210, 100]));
+  }
+
+  // ===== a talking monster's game on the road (MonsterGameArt has the busts): A, the stump by the road in late sun, for the road
+  // folk; B, the board on a bridge rail at dusk, for trolls, the siren and the yeti. The offer comes first (the monster's bubble
+  // over the laid-out game), then the game plays out move for move as it would at camp, then the prize or the loot changes hands =====
+  const OFFER = 1.1;
+  const monsterOf = (rec) => { const m = (rec.players || [])[1]; return m && m.goblin === "monster" ? m.monster || String(m.id || "").replace(/^mon_/, "") : null; };
+  const innerOf = (rec) => (rec.game === "dice" ? "dice_camp" : rec.game === "checkers" ? "checkers" : "cards_camp");
+  const VOICE = { kobold: "yip", kobold_slinger: "yip", bandit: "chuckle", bandit_captain: "chuckle", cave_troll: "rumble", swamp_troll: "rumble", siren: "hum", yeti: "huff" };
+  const GLOAT = { kobold: "HEE HEE!", kobold_slinger: "HEE HEE!", bandit: "MINE!", bandit_captain: "MINE, MATEY!", cave_troll: "HURR HURR!", swamp_troll: "HURR!", siren: "MINE!", yeti: "HRUMF!" };
+  const MG_ICONS = {
+    parcel: { rows: ["..k..", ".pkp.", "ppkpp", "ppkpp", ".ppp."], pal: { p: [176, 112, 70], k: [236, 198, 96] } },
+    sack: { rows: [".kk..", "..s..", ".sss.", "sssss", "sssss", ".sss."], pal: { s: [168, 140, 98], k: [96, 70, 40] } },
+  };
+
+  // colours from a Paint grid ("#rrggbb"), parsed once per grid
+  const gridCols = new WeakMap();
+  function gridPx(g) {
+    let a = gridCols.get(g);
+    if (!a) { a = g.px.map((c) => (!c ? null : Array.isArray(c) ? c : c[0] === "#" ? hex(c) : (String(c).match(/\d+/g) || [0, 0, 0]).slice(0, 3).map(Number))); gridCols.set(g, a); }
+    return a;
+  }
+  function blitGrid(b, g, x, y, mask) {
+    const px = gridPx(g);
+    x = Math.round(x); y = Math.round(y);
+    for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
+      const c = px[j * g.w + i], X = x + i, Y = y + j;
+      if (!c || X < 0 || Y < 0 || X >= W || Y >= H || (mask && mask[Y * W + X])) continue;
+      b.px(X, Y, c);
+    }
+  }
+  // the hero's own bust portrait when the site has them (App.heroes and Paint), else a cloaked shape
+  function heroBust(pl) {
+    const A = root.App || {}, heroes = A.heroes || {}, S0 = A.S || (root.LD && root.LD.static) || {}, h = pl && heroes[pl.id];
+    if (!h || !h.look || !root.Paint) return null;
+    try { return root.Paint.portraitGrid(h, (A.heroLook && A.heroLook(h)) || (S0.classes || {})[h.cls] || (S0.classes || {}).warrior, { bg: false }); } catch (e) { return null; }
+  }
+  function cloaked(b, x, y, mask) {
+    const put = (px, py, c) => { if (px >= 0 && py >= 0 && px < W && py < H && !(mask && mask[Math.floor(py) * W + Math.floor(px)])) b.px(px, py, c); };
+    b.ell(x + 20, y + 36, 17, 10, (nx, ny, px, py) => put(px, py, sc([92, 74, 58], 0.7 + 0.4 * clamp(-nx * 0.5 - ny * 0.5, 0, 1))));
+    b.ell(x + 20, y + 18, 10, 12, (nx, ny, px, py) => put(px, py, sc([104, 84, 64], 0.7 + 0.45 * clamp(-nx * 0.5 - ny * 0.6, 0, 1))));
+    b.ell(x + 21, y + 21, 6, 7, (nx, ny, px, py) => put(px, py, [34, 26, 22]));
+  }
+  // a speech bubble: parchment with an ink edge and a tail toward the speaker
+  function bubble(b, x, y, w, h, tx, ty) {
+    x = Math.round(clamp(x, 1, W - w - 1)); y = Math.round(clamp(y, 1, H - h - 1));
+    const ink = [40, 26, 18], paper = [246, 236, 210];
+    const tail = [[tx, ty], [clamp(tx, x + 3, x + w - 6), y + h - 1], [clamp(tx, x + 3, x + w - 6) + 4, y + h - 1]];
+    b.poly(tail.map((q) => [q[0] + 0.5, q[1] + 0.5]), ink, true);
+    b.rect(x, y + 1, w, h - 2, ink, true); b.rect(x + 1, y, w - 2, h, ink, true);
+    b.rect(x + 1, y + 2, w - 2, h - 4, paper, true); b.rect(x + 2, y + 1, w - 4, h - 2, paper, true);
+    b.poly([[tail[0][0] + (tail[0][0] < tail[1][0] ? 1.5 : -0.5), tail[0][1] - 1], [tail[1][0] + 1.5, y + h - 1.5], [tail[2][0] - 0.5, y + h - 1.5]], paper, true);
+    b.rect(x + 2, y + h - 2, w - 4, 1, [214, 196, 160], true);
+    return { x, y, w, h };
+  }
+  function gameGlyph(b, game, look, x, y) {
+    if (game === "dice") { dieIcon(b, x, y, 5, [240, 232, 210], [60, 34, 22]); b.rect(x, y + 9, 9, 1, [40, 26, 18], true); return 9; }
+    if (game === "checkers") { b.ell(x + 4.5, y + 5, 4.5, 3.4, (nx, ny, px, py) => b.px(px, py, nx * nx + ny * ny > 0.62 ? [60, 40, 26] : ny < -0.1 ? [214, 160, 80] : [176, 120, 60], true)); b.rect(x + 1, y + 6, 8, 2, [120, 80, 40], true); return 9; }
+    b.rect(x, y, 7, 10, [60, 40, 26], true); b.rect(x + 1, y + 1, 5, 8, [250, 246, 232], true); b.rect(x + 3, y + 3, 1, 3, [184, 40, 40], true); b.rect(x + 2, y + 4, 3, 1, [184, 40, 40], true);
+    return 7;
+  }
+
+  // ----- A: the road at late afternoon, sun low on the left, a hedge and trees, the road running off to the right -----
+  function roadBackdrop(b, seed) {
+    const n = vnoise(seed), r = rng(seed), th = (x, y) => BAYER[(y & 3) * 4 + (x & 3)];
+    const SKY = [[246, 214, 140], [244, 196, 120], [240, 178, 104], [234, 160, 92], [226, 146, 86]];
+    for (let y = 0; y < 60; y++) for (let x = 0; x < W; x++) {
+      const v = clamp(y / 50 + (n(x * 0.04, y * 0.08) - 0.5) * 0.12, 0, 0.999) * (SKY.length - 1);
+      const k = Math.floor(v + th(x, y) * 0.9 - 0.45);
+      let col = SKY[clamp(k, 0, SKY.length - 1)];
+      const d = Math.hypot(x - 24, (y - 18) * 1.1);
+      if (d < 26) col = mixc(col, [255, 240, 196], Math.floor((1 - d / 26) * 4 + th(x, y)) / 5);
+      b.px(x, y, col, true);
+    }
+    b.ell(24, 18, 7, 7, (nx, ny, x, y) => b.px(x, y, nx * nx + ny * ny > 0.7 ? [255, 236, 170] : [255, 250, 226], true));
+    for (let i = 0; i < 4; i++) { const cx = 60 + i * 38 + r() * 10, cy = 8 + r() * 10, w = 14 + r() * 12; for (let x = -w; x <= w; x++) if ((x + i) % 3) b.px(cx + x, cy + Math.round(Math.sin(x * 0.3) * 0.6), [252, 222, 166], true); }
+    for (let x = 0; x < W; x++) {
+      const hy = 38 + Math.round(n(x * 0.025, 3) * 8);
+      for (let y = hy; y < 60; y++) b.px(x, y, mixc([196, 136, 92], [168, 116, 80], (y - hy) / 14), true);
+    }
+    const TREE = [[42, 40, 20], [62, 58, 26], [90, 80, 36], [122, 104, 46]];
+    for (let i = 0; i < 17; i++) {
+      const cx = i * 12 + r() * 6 - 4, cy = 44 + r() * 5, rr = 6 + r() * 6;
+      b.ell(cx, cy, rr, rr * 0.92, (nx, ny, x, y) => {
+        const wob = n(x * 0.4, y * 0.4) * 0.5, li = -nx * 0.6 - ny * 0.55 + wob - 0.15;
+        b.px(x, y, TREE[clamp(Math.floor(li * 2.2 + 1.4 + th(x, y) * 0.8), 0, 3)], true);
+      });
+      if (r() < 0.4) b.rect(Math.round(cx), Math.round(cy + rr - 1), 1, 6, [44, 32, 20], true);
+    }
+    const vp = [150, 55];
+    for (let y = 52; y < H; y++) for (let x = 0; x < W; x++) {
+      const u = (y - 52) / (H - 52), half = 3 + u * 44, mid = vp[0] - u * 18, road = Math.abs(x - mid) < half + (n(x * 0.3, y * 0.3) - 0.5) * 3;
+      const g = n(x * 0.12 * (1.4 - u), y * 0.25), k = clamp(Math.floor((0.3 + u * 0.45 + (g - 0.5) * 0.5) * 4 + th(x, y) * 0.7), 0, 3);
+      let col = road ? [[118, 84, 50], [146, 108, 66], [176, 136, 84], [198, 160, 104]][k] : [[54, 70, 26], [74, 92, 32], [98, 116, 40], [126, 138, 50]][k];
+      if (road && Math.abs(Math.abs(x - mid) - half * 0.45) < 0.6 + u) col = sc(col, 0.82);
+      if (!road && n(x * 0.9 + 40, y * 0.9) > 0.78 && u > 0.2) col = (x * 7 + y) % 3 ? [228, 206, 92] : [240, 236, 222];
+      if (!road && y % 3 === 0 && (x * 5 + y) % 7 === 0) col = sc(col, 1.2);
+      b.px(x, y, col, true);
+    }
+    for (let x = 4; x < W; x += 13) { if (x > 116 && x < 166) continue; b.rect(x, 50, 2, 8, [70, 48, 30], true); b.px(x, 50, [140, 104, 64], true); }
+    for (let x = 0; x < W; x++) if (x < 117 || x > 165) { b.px(x, 52, [96, 66, 40], true); b.px(x, 55, [86, 58, 36], true); }
+  }
+  // ----- B: dusk on a river, a town on the far bank, a lantern on the rail; the water and the sky change with who lives here -----
+  const RIVERS = {
+    cave_troll: { sky: [[30, 36, 66], [58, 56, 90], [118, 76, 92], [192, 104, 84], [236, 150, 92]], bank: [24, 22, 34], water: [[60, 70, 104], [34, 44, 74], [20, 28, 50]], glint: [236, 150, 92] },
+    swamp_troll: { sky: [[34, 44, 50], [62, 72, 66], [118, 112, 80], [178, 140, 82], [220, 170, 96]], bank: [22, 30, 24], water: [[60, 78, 52], [36, 52, 34], [20, 32, 22]], glint: [210, 168, 96], reeds: true, mist: [150, 168, 140] },
+    siren: { sky: [[26, 40, 70], [50, 70, 104], [120, 94, 112], [206, 124, 104], [240, 170, 120]], bank: [20, 28, 40], water: [[50, 104, 124], [26, 66, 88], [12, 40, 58]], glint: [250, 190, 140], rocks: true, prop: "shell" },
+    yeti: { sky: [[36, 50, 86], [70, 88, 124], [130, 136, 164], [196, 170, 168], [236, 206, 184]], bank: [30, 38, 56], water: [[70, 88, 112], [44, 58, 80], [26, 36, 54]], glint: [236, 216, 200], snow: true, prop: "snow" },
+  };
+  function riverBackdrop(b, seed, R, waterTo) {
+    const n = vnoise(seed), r = rng(seed), th = (x, y) => BAYER[(y & 3) * 4 + (x & 3)];
+    for (let y = 0; y < 50; y++) for (let x = 0; x < W; x++) {
+      const v = clamp(y / 46 + (n(x * 0.03, y * 0.1) - 0.5) * 0.1, 0, 0.999) * (R.sky.length - 1);
+      b.px(x, y, R.sky[clamp(Math.floor(v + th(x, y) * 0.9 - 0.45), 0, R.sky.length - 1)], true);
+    }
+    for (let i = 0; i < 14; i++) { const x = Math.floor(r() * W), y = Math.floor(r() * 18); b.px(x, y, i % 4 ? [214, 220, 240] : [255, 250, 230], true); }
+    for (let i = 0; i < 3; i++) { const cx = 20 + i * 64 + r() * 20, cy = 22 + r() * 10, w = 18 + r() * 14; for (let x = -w; x <= w; x++) if ((x + i) % 4) b.px(cx + x, cy, mixc(R.sky[3], R.sky[4], 0.5), true); }
+    for (let x = 0; x < W; x++) {
+      const hy = 40 + Math.round(n(x * 0.05, 9) * 6 + (R.snow ? Math.abs(((x * 7) % 11) - 5) * 0.8 : 0));
+      for (let y = hy; y < 52; y++) b.px(x, y, R.snow && y - hy < 2 && x % 3 ? [196, 206, 222] : R.bank, true);
+    }
+    for (let i = 0; i < 6; i++) {
+      const x0 = 18 + i * 31 + Math.floor(r() * 8), w = 9 + Math.floor(r() * 6), y0 = 41 + Math.floor(r() * 3);
+      for (let j = 0; j < 5; j++) b.rect(x0 + j, y0 - j, w - j * 2, 1, sc(R.bank, 1.3), true);
+      b.rect(x0, y0 + 1, w, 9, sc(R.bank, 1.15), true);
+      if (r() < 0.8) { b.rect(x0 + 2 + Math.floor(r() * (w - 4)), y0 + 3, 2, 2, [255, 196, 110], true); }
+      if (R.snow) b.rect(x0 + 1, y0 - 4, w - 2, 1, [214, 222, 236], true);
+    }
+    for (let y = 50; y < waterTo; y++) for (let x = 0; x < W; x++) {
+      const u = (y - 50) / Math.max(1, waterTo - 50), wv = n(x * 0.06, y * 0.9) + Math.sin(y * 1.7 + x * 0.05) * 0.2;
+      let col = R.water[clamp(Math.floor(u * 2.6 + th(x, y) * 0.8 - 0.2), 0, 2)];
+      if (u < 0.45 && wv > 0.72) col = mixc(col, R.glint, 0.55 - u);
+      else if (wv > 0.8) col = sc(col, 1.25);
+      b.px(x, y, col, true);
+    }
+    for (let x = 0; x < W; x++) b.px(x, 50, mixc(R.bank, R.glint, 0.25), true);
+    if (R.reeds) for (let i = 0; i < 26; i++) { const x = Math.floor(r() * W), h = 4 + Math.floor(r() * 7); for (let j = 0; j < h; j++) b.px(x + (j > h - 3 ? 1 : 0), 51 - j, [30, 42, 26], true); }
+    if (R.rocks) for (const [x, y, w] of [[30, 58, 9], [150, 54, 6], [70, 62, 5]]) b.ell(x, y, w, w * 0.45, (nx, ny, px, py) => b.px(px, py, ny < -0.2 ? [70, 86, 96] : [36, 46, 58], true));
+    if (R.snow) for (let i = 0; i < 9; i++) { const x = r() * W, y = 54 + r() * (waterTo - 58), w = 3 + r() * 6; b.ell(x, y, w, w * 0.3, (nx, ny, px, py) => b.px(px, py, ny < 0 ? [226, 234, 244] : [176, 192, 214], true)); }
+  }
+
+  function monsterStage(stage) {
+    const road = stage === "road";
+    const tableOf = (rec) => (rec.game === "checkers" ? { R: 62, D: 50, s: road ? 0.78 : 0.8 } : { R: 46, D: 36, s: road ? 0.88 : 1.04 });
+    return {
+      monster: true,
+      cam(rec) { const T = tableOf(rec); return road ? { pitch: 40, dist: 420, focal: 420 * T.s, target: [-14, 0, 0], cy: 88 } : { pitch: 40, yaw: 90, dist: 420, focal: 420 * T.s, target: [0, 0, 0], cy: 100 }; },
+      plan(rec, r, look) {
+        const gid = innerOf(rec), G = SCENES[gid], g = G.plan(rec, r, look), mon = monsterOf(rec) || "", T = tableOf(rec);
+        g.fire = road ? [-150, 110] : [-20, 30];
+        // a hand of cards runs longest, so it plays a touch quicker here to keep the whole game under eight seconds
+        const speed = gid === "cards_camp" ? 1.15 : 1, at = (x) => x / speed + OFFER;
+        const tEnd = at(g.tEnd), dur = tEnd + 1.6, w = winnerOf(rec);
+        const DROP = { fire: 1, rumble: 1, hee: 1, sniff: 1, token: 1 };
+        const ev = g.ev.filter((e) => !DROP[e[1]]).map((e) => [at(e[0]), e[1], e[2]]);
+        const voice = VOICE[mon] || "chuckle";
+        ev.push([0, road ? "meadow" : "river", dur + 3], [0.18, "flip"], [0.3, voice, 0.8]);
+        ev.push([tEnd + 0.3, w === 1 ? voice : voice === "rumble" || voice === "huff" ? voice : "sniff", w === 1 ? 1 : 0.5]);
+        ev.push([tEnd + 0.95, w === 0 ? "glint" : "token", w === 0 ? undefined : "carries_pack"]);
+        const moods = (g.moods || []).map((m) => [at(m[0]), m[1]]);
+        if (gid === "cards_camp") g.plays.forEach((pl) => moods.push([at(pl.tSweep), pl.taker === 1 ? "glee" : "sad"]));
+        if (gid === "dice_camp") g.throws.forEach((th, i) => { if (i > 0) moods.push([at(th.tSum), th.sum >= g.throws[0].sum ? "glee" : "sad"]); });
+        return { g, gid, mon, stage, T, tEnd, dur, ev, moods, speed, seed: hash(String(rec.id || "mg")) };
+      },
+      base(p, rec, look) {
+        const S = new Scene(p.cam, road ? { key: [-0.75, 0.35, 0.56], lo: [0.86, 0.82, 0.9], hi: [1.1, 1.0, 0.82], ambF: 0.6, difF: 0.6 } : { key: [0.2, 0.75, 0.62], lo: [0.82, 0.84, 0.96], hi: [1.08, 0.98, 0.86], ambF: 0.58, difF: 0.55 });
+        const n = vnoise(p.seed % 997 + 11), T = p.T, mask = new Uint8Array(W * H), into = (pts) => { const m = new Buf(); m.poly(pts, [1, 1, 1]); for (let i = 0; i < W * H; i++) if (m.c[i * 3]) mask[i] = 1; };
+        if (road) {
+          roadBackdrop(S.b, p.seed % 9973 + 3);
+          const Hs = 30, base = S.P(14, -8, -Hs), k = S.cam.scale(0, 0, -Hs);
+          S.b.shadow(base[0] + 10, base[1] - 2, T.R * k * 1.15, T.R * k * 0.42, 0.62, 0.3);
+          for (const a of [-2.7, -1.9, -0.6, 0.4, 2.9]) {
+            const x0 = Math.cos(a) * (T.R - 4), y0 = Math.sin(a) * (T.R - 4);
+            S.box([x0 * 1.12, y0 * 1.12, -Hs + 3], [7, 3.6, 3.4], Rz(a), [100, 70, 44], { outline: [44, 30, 18] });
+          }
+          const cap = S.cyl([0, 0, -Hs], T.R, Hs, [104, 74, 46], { n: 60, sideFn: (i, nn, c) => sc(c, (i % 4 === 0 ? 0.6 : i % 4 === 2 ? 1.1 : 0.88) * (0.9 + n(i, 3) * 0.2)), capFn: stumpCap(S, n, T.R, rec.game === "checkers" ? look.board : null, [0.7, 0.66, 0.64]) });
+          into(cap.map((q) => S.P(q[0], q[1], q[2])));
+          const side = [];
+          for (let i = 0; i <= 32; i++) { const a = Math.PI + (i / 32) * Math.PI; side.push(S.P(Math.cos(a) * T.R, Math.sin(a) * T.R, 0)); }
+          for (let i = 32; i >= 0; i--) { const a = Math.PI + (i / 32) * Math.PI; side.push(S.P(Math.cos(a) * T.R, Math.sin(a) * T.R, -Hs)); }
+          into(side);
+          p.far = Math.round(S.P(0, T.R, 0)[1]);
+          p.mx = Math.round(S.P(0, T.R, 0)[0]) + 4; p.hx = 10; p.hy = H - 40;
+        } else {
+          const R = RIVERS[p.mon] || RIVERS.cave_troll;
+          p.river = R;
+          const far = S.P(-T.D, 0, 0)[1];
+          riverBackdrop(S.b, p.seed % 9973 + 5, R, Math.ceil(far) + 2);
+          const stone = (x, y, joints) => {
+            const bx = Math.floor((y + 400) / 38), off = bx * 17.3, u = ((y + 400) % 38) / 38;
+            let f = 0.82 + n(x * 0.12 + off, y * 0.12) * 0.3 + ((bx * 5) % 3) * 0.04;
+            if (joints && (u < 0.03 || u > 0.985)) f *= 0.55;
+            if (n(x * 0.5 + off, y * 0.5) > 0.8) f *= 0.86;
+            let col = sc([142, 134, 122], f);
+            if (joints && (u < 0.05 || u > 0.975) && n(x * 0.4, y) > 0.55) col = R.reeds ? [70, 96, 52] : [86, 104, 62];
+            if (R.snow && (n(x * 0.07 + 70, y * 0.05) > 0.5 || Math.abs(x) > T.D - 3 - n(y * 0.2, 5) * 4)) col = n(x * 0.2, y * 0.2) > 0.55 ? [236, 242, 250] : [208, 220, 236];
+            return col;
+          };
+          S.plane([[T.D, -400, 0], [T.D, 400, 0], [T.D, 400, -90], [T.D, -400, -90]], 0, T.D, (x, y, z) => {
+            const row = Math.floor(-z / 9), yy = y + (row % 2) * 19, u = ((yy + 400) % 38) / 38, v = (-z % 9) / 9;
+            let f = 0.62 + n(yy * 0.1 + row * 7, z * 0.2) * 0.25 - (-z) * 0.002;
+            if (v < 0.1 || u < 0.03) f *= 0.6;
+            if (z > -2.5) f = 0.95;
+            return sc([128, 120, 110], f);
+          });
+          S.plane([[-T.D, -400, 0], [T.D, -400, 0], [T.D, 400, 0], [-T.D, 400, 0]], 2, 0, (x, y) => (rec.game === "checkers" && boardPx(n, look.board, x, y, stone(x, y, false))) || stone(x, y, true));
+          const top = [[-T.D, -400], [T.D, -400], [T.D, 400], [-T.D, 400]].map((q) => S.P(q[0], q[1], 0));
+          into(top);
+          into([[T.D, -400, 0], [T.D, 400, 0], [T.D, 400, -90], [T.D, -400, -90]].map((q) => S.P(q[0], q[1], q[2])));
+          const ly = rec.game === "checkers" ? 84 : 72, lx = -T.D + 5;
+          S.box([lx, ly, 24], [1.6, 1.6, 24], I3, [40, 34, 32], { outline: [16, 12, 12] });
+          S.box([lx, ly, 51], [4.2, 4.2, 1], I3, [52, 42, 36], { outline: [16, 12, 12] });
+          S.box([lx, ly, 61], [4.6, 4.6, 1], I3, [52, 42, 36], { outline: [16, 12, 12] });
+          const lamp = [S.P(lx, ly - 4.6, 62), S.P(lx, ly + 4.6, 62), S.P(lx, ly + 4.2, 48), S.P(lx, ly - 4.2, 48)];
+          into(lamp);
+          into([S.P(lx, ly - 1.6, 48), S.P(lx, ly + 1.6, 48), S.P(lx, ly + 1.6, 0), S.P(lx, ly - 1.6, 0)]);
+          p.lamp = S.P(lx, ly, 56); p.lampBox = lamp;
+          const jar = [T.D - 14, rec.game === "checkers" ? -74 : -64];
+          S.drop(jar[0], jar[1], 4, 5, 0.6, [jar[0], 80, 60]);
+          S.cyl([jar[0], jar[1], 0], 4, 8, [150, 170, 160], { n: 14, capCol: [120, 96, 70], rim: [90, 104, 100] });
+          p.jar = S.P(jar[0], jar[1], 5);
+          const pr = [-T.D + 10, rec.game === "checkers" ? 56 : 36], pc = S.P(pr[0], pr[1], 0), pk = S.cam.scale(pr[0], pr[1], 0), kind = R.prop || "mug";
+          if (kind === "mug") {
+            S.drop(pr[0], pr[1], 5, 7, 0.55, [pr[0], 120, 60]);
+            S.box([pr[0], pr[1] + 7, 6], [1.2, 2.2, 3], I3, [78, 56, 38], { outline: [30, 20, 14] });
+            S.cyl([pr[0], pr[1], 0], 5.5, 12, [112, 80, 52], { n: 16, capCol: [236, 228, 200], rim: [70, 50, 34], sideFn: (i, nn, c) => (i % 4 === 0 ? sc(c, 0.7) : c) });
+            into([S.P(pr[0], pr[1] - 6, 0), S.P(pr[0], pr[1] + 10, 0), S.P(pr[0], pr[1] + 10, 13), S.P(pr[0], pr[1] - 6, 13)]);
+          } else if (kind === "shell") {
+            S.b.shadow(pc[0] + 2, pc[1] + 1, 8 * pk, 3 * pk, 0.6);
+            S.b.ell(pc[0], pc[1] - 3, 8 * pk, 4.4 * pk, (nx, ny, x, y) => { const ridge = Math.floor((nx + 1) * 4 + ny * 2) % 2; S.b.px(x, y, S.shade([232, 176, 150], 0.8 + 0.5 * clamp(-nx * 0.4 - ny * 0.7, 0, 1) - ridge * 0.12)); });
+            S.b.ell(pc[0] - 6 * pk, pc[1] - 3, 2.6 * pk, 2.4 * pk, (nx, ny, x, y) => S.b.px(x, y, nx * nx + ny * ny > 0.5 ? [236, 200, 180] : [196, 110, 104]));
+            for (let i = 0; i < 4; i++) S.b.px(pc[0] + 4 + i * 2, pc[1] + 1, [244, 238, 222]);
+            into([[pc[0] - 10, pc[1] - 8], [pc[0] + 12, pc[1] - 8], [pc[0] + 12, pc[1] + 3], [pc[0] - 10, pc[1] + 3]]);
+          } else {
+            for (const [dx, dy, r] of [[-5, 0, 4.2], [4, 1, 4], [0, -3.4, 3.6]]) {
+              const c = [pc[0] + dx * pk, pc[1] + dy * pk - r];
+              S.b.ell(c[0], c[1], r * pk, r * pk * 0.92, (nx, ny, x, y) => S.b.px(x, y, S.shade([232, 240, 250], 0.75 + 0.45 * clamp(-nx * 0.5 - ny * 0.6, 0, 1))));
+            }
+            into([[pc[0] - 10, pc[1] - 14], [pc[0] + 10, pc[1] - 14], [pc[0] + 10, pc[1] + 2], [pc[0] - 10, pc[1] + 2]]);
+          }
+          into([S.P(jar[0], jar[1] - 4, 0), S.P(jar[0], jar[1] + 4, 0), S.P(jar[0], jar[1] + 4, 8), S.P(jar[0], jar[1] - 4, 8)]);
+          p.far = Math.round(far);
+          p.mx = Math.round(p.lamp[0]) - 32; p.hx = 10; p.hy = p.far - 36;
+          p.g.pile = (side, slot) => [-6 + Math.floor(slot / 6) * 9, (side === 0 ? -1 : 1) * 58, (slot % 6) * 2.1];
+          // the rail turns the camp's near and far seats into left and right, so the cards lie along it
+          p.g.spots = { hand: (who, k) => [-15 + k * 12, who === 0 ? -48 : 48], mid: (who) => (who === 0 ? [-2, -9] : [2, 9]), pile: (who) => [17, who === 0 ? -27 : 27], deck: [-18, 0] };
+        }
+        p.mask = mask;
+        return S;
+      },
+      draw(S, p, rec, look, t, wall) {
+        const b = S.b, MA = root.MonsterGameArt, w = winnerOf(rec);
+        const mood = t < OFFER ? "offer" : t > p.tEnd ? (w === 1 ? "glee" : w === 0 ? "sad" : "watch") : (p.moods.find((m) => t >= m[0] && t < m[0] + 0.9) || [0, "watch"])[1];
+        const glance = t < OFFER ? -1 : p.g.lookX !== undefined ? (p.g.lookX < p.mx - 14 ? -1 : p.g.lookX > p.mx + 14 ? 1 : 0) : Math.floor(wall / 1.9) % 3 === 0 ? -1 : 0;
+        const bu = MA.bust(p.mon, { mood, blink: (wall % 3.4) < 0.13 && mood !== "glee", look: glance });
+        const hop = mood === "glee" ? Math.round(-Math.abs(Math.sin(wall * 9)) * 2) : (Math.sin(wall * 1.7) > 0.4 ? 1 : 0);
+        const sink = Math.round(bu.h * (road ? 0.14 : 0.26));
+        // kobolds come in twos: the other one looks on from the road, cheering its friend's luck
+        const pal = road && { kobold: "kobold_slinger", kobold_slinger: "kobold" }[p.mon];
+        if (pal) {
+          const bp = MA.bust(pal, { mood: mood === "offer" ? "watch" : mood, blink: ((wall + 1.7) % 3.9) < 0.13, look: -1 }), hp = mood === "glee" ? Math.round(-Math.abs(Math.sin(wall * 9 + 1)) * 2) : 0;
+          blitGrid(b, bp.grid, Math.round(p.mx + 44 - bp.w / 2), p.far + sink + 2 - bp.h + hp, p.mask);
+        }
+        p.bust = { x: Math.round(p.mx - bu.w / 2), y: p.far + sink - bu.h + hop, b: bu };
+        blitGrid(b, bu.grid, p.bust.x, p.bust.y, p.mask);
+        if (!road) this.hero(b, p, rec, true);
+        cardSy = 0.68;
+        let info;
+        try { info = SCENES[p.gid].draw(S, p.g, rec, look, (t - OFFER) * p.speed, wall) || {}; } finally { cardSy = 1; }
+        if (road) this.hero(b, p, rec, false);
+        return info;
+      },
+      hero(b, p, rec, masked) {
+        if (p.heroGrid === undefined) p.heroGrid = heroBust(rec.players[0]);
+        if (p.heroGrid) blitGrid(b, p.heroGrid, p.hx, p.hy, masked ? p.mask : null);
+        else cloaked(b, p.hx, p.hy, masked ? p.mask : null);
+      },
+      after(S, p, rec, look, t, wall) {
+        const b = S.b, g = p.g, tg = (t - OFFER) * p.speed, w = winnerOf(rec), R = p.river;
+        if (road) {
+          for (const [k, col] of [[0, [248, 224, 112]], [1, [240, 240, 255]], [2, [236, 176, 96]]]) {
+            const x = 40 + k * 52 + Math.sin(wall * (0.5 + k * 0.13) + k * 2) * 30, y = 30 + k * 9 + Math.sin(wall * (1.1 + k * 0.2) + k) * 8, up = Math.floor(wall * 9 + k) % 2;
+            b.px(x, y, sc(col, 0.7), true); b.px(x - 1, y - up, col, true); b.px(x + 1, y - up, col, true); if (!up) { b.px(x - 1, y - 1, col, true); b.px(x + 1, y - 1, col, true); }
+          }
+          for (let i = 0; i < 7; i++) { const ph = (wall * 0.12 + i * 0.37) % 1, x = 30 + i * 21 + Math.sin(wall * 0.7 + i) * 6, y = 70 - ph * 50; if (ph < 0.8 && (i + Math.floor(wall * 3)) % 3) b.px(x, y, [255, 240, 190], true); }
+        } else {
+          const fl = 0.85 + Math.sin(wall * 13) * 0.08 + Math.sin(wall * 5.1) * 0.07;
+          b.poly(p.lampBox.map((q) => [q[0], q[1]]), sc([255, 206, 120], fl), true);
+          flame(b, p.lamp[0], p.lamp[1] + 3, 1, wall);
+          flame(b, p.jar[0], p.jar[1] + 1, 0.8, wall + 1.3);
+          for (let y = 52; y < p.far; y += 2) {
+            const k = (y - 52) / Math.max(1, p.far - 52), wid = Math.round(1 + k * 3 + Math.sin(wall * 3 + y) * 1.2), xx = Math.round(p.lamp[0] + Math.sin(wall * 2.2 + y * 0.7) * (1 + k * 2));
+            if ((y + Math.floor(wall * 6)) % 3) for (let i = -wid; i <= wid; i++) if (!p.mask[y * W + xx + i]) b.px(xx + i, y, mixc([255, 206, 120], R.water[1], Math.abs(i) / (wid + 1) * 0.7), true);
+          }
+          for (let i = 0; i < 10; i++) { const ph = (wall * 0.35 + i * 0.29) % 1, x = (i * 41 + wall * 6) % W, y = 53 + (i * 7) % Math.max(4, p.far - 56); if (ph < 0.4 && !p.mask[Math.floor(y) * W + Math.floor(x)]) { b.px(x, y, R.glint, true); b.px(x + 1, y, R.glint, true); } }
+          if (R.mist) for (let x = 0; x < W; x++) for (let y = 54; y < 62; y++) if (((x + Math.floor(wall * 4)) * 3 + y * 5) % 7 === 0 && !p.mask[y * W + x]) b.blend(x, y, R.mist, 0.35);
+          if (R.snow) for (let i = 0; i < 26; i++) { const x = (i * 37 + Math.sin(wall + i) * 6 + wall * 4) % W, y = (i * 23 + wall * (10 + (i % 3) * 4)) % H; b.px(x, y, [236, 242, 255], true); }
+        }
+        if (p.gid === "cards_camp") { trickGlints(S, g, tg); if (look.gilt) giltGlints(S, g, b, wall); }
+        else if (p.gid === "dice_camp") diceShine(S, g, look, tg);
+        else checkersShine(S, g, tg, 18);
+        const names = [nameOf(rec.players[0]), nameOf(rec.players[1])];
+        let n, label;
+        if (p.gid === "cards_camp") { n = trickCounts(g, tg); label = "TRICKS"; }
+        else if (p.gid === "dice_camp") { n = g.throws.map((th) => (tg > th.tSum ? th.sum : "-")); label = "THROWS"; }
+        else { n = [0, 1].map((side) => g.men.filter((m) => m.side === side && !(m.cap !== null && tg >= m.cap)).length); label = "MEN"; }
+        const sw = Math.max(textWidth(names[0]), textWidth(names[1]), textWidth(label)) + Math.max(...n.map((v) => textWidth(String(v)))) + 9, sx = road ? W - sw - 4 : 4, sy = road ? H - 30 : 4;
+        slate(b, sx, sy, sw, 26, [104, 74, 44]);
+        text(b, label, sx + 3, sy + 2, [150, 160, 150]);
+        names.forEach((nm, i) => { text(b, nm, sx + 3, sy + 9 + i * 7, [214, 220, 206]); text(b, String(n[i]), sx + sw - 3 - textWidth(String(n[i])), sy + 9 + i * 7, [255, 226, 150]); });
+        const bu = p.bust, head = [bu.x + bu.b.head[0], bu.y + bu.b.head[1]];
+        if (t > 0.15 && t < OFFER + 0.25) {
+          const u = ease3(seg(t, 0.15, 0.32)), bw = Math.round(22 * u) || 1, bx = head[0] - 30, by = Math.max(2, head[1] - 22);
+          if (u > 0.6) { const box = bubble(b, bx, by, 24, 16, head[0] - 4, head[1] - 2); const gw = gameGlyph(b, rec.game, look, box.x + 4, box.y + 3); text(b, "?", box.x + 6 + gw, box.y + 5, [60, 34, 22]); }
+          else b.rect(bx + 12 - bw / 2, by + 6, bw, 4, [246, 236, 210], true);
+        }
+        if (t > p.tEnd + 0.3) {
+          const word = w === 1 ? GLOAT[p.mon] || "MINE!" : "...", tw = textWidth(word) + 8, mouth = [bu.x + bu.b.mouth[0], bu.y + bu.b.mouth[1]];
+          const box = bubble(b, mouth[0] - tw - 10, mouth[1] - 16, tw, 11, mouth[0] - 2, mouth[1] - 2);
+          text(b, word, box.x + 4, box.y + 3, [60, 34, 22]);
+        }
+        if (t > p.tEnd + 0.15) {
+          const hc = [p.hx + 20, p.hy + 12], u = t - p.tEnd - 0.15;
+          if (w === 0) for (let i = 0; i < 5; i++) { const a = i * 1.26 + wall * 2, rr = 15 + Math.sin(wall * 3 + i) * 3; if ((Math.floor(wall * 8) + i) % 3) sparkle(b, hc[0] + Math.cos(a) * rr, hc[1] + Math.sin(a) * rr * 0.8, u < 0.5 && i % 2 ? 2 : 1, [255, 226, 130]); }
+          else if (w === 1) { const dy = Math.min(4, u * 6); b.ell(hc[0] + 11, hc[1] - 4 + dy, 1.4, 2.2, (nx, ny, x, y) => b.px(x, y, ny < -0.3 ? [255, 255, 255] : [168, 216, 240], true)); }
+        }
+        if (t >= p.tEnd) {
+          const word = w === null ? "A DRAW!" : `${names[w]} WINS!`, x0 = road ? 4 : sx + sw + 4, k = textWidth(word, 2) > W - 4 - x0 ? 1 : 2;
+          stamp(b, word, (x0 + W - 4) / 2, road ? 12 : 14, [252, 216, 112], t - p.tEnd, k);
+        }
+        if (w !== null && t > p.tEnd + 0.55) {
+          const u = ease(seg(t, p.tEnd + 0.55, p.tEnd + 0.95)), from = w === 0 ? [p.mx, p.far - 4] : [p.hx + 26, p.hy + 30], to = w === 0 ? [p.hx + 38, road ? p.hy + 6 : p.far + 4] : [p.mx - 16, p.far + 16];
+          const x = lerp(from[0], to[0], u), y = lerp(from[1], to[1], u) - Math.sin(u * Math.PI) * 18;
+          const box = drawIcon(b, MG_ICONS[w === 0 ? "parcel" : "sack"], x, y, 2);
+          if (u >= 1 && w === 0 && Math.floor(wall * 5) % 2) sparkle(b, box.x + box.w, box.y, 1, [255, 236, 170]);
+          if (u >= 1) paperTag(b, box, y + (road || w === 1 ? 0 : 8), w === 0 ? [names[0], "WINS A KEEPSAKE"] : [names[1], "HELPS ITSELF"], t - p.tEnd - 0.95, w === 1);
+        }
+      },
+      lamps(p, t, wall) {
+        if (road) return { amb: [0.9, 0.86, 0.8], lamps: [{ x: 22, y: 14, r: 300, i: 0.42, c: [1.0, 0.78, 0.46], p: 1.1 }, { kind: "dapple", t: wall, i: 0.14, c: [0.5, 0.4, 0.2] }] };
+        const fl = 1 + Math.sin(wall * 13) * 0.04 + Math.sin(wall * 4.9) * 0.04;
+        const fj = 1 + Math.sin(wall * 17) * 0.05 + Math.sin(wall * 7.7) * 0.05;
+        return { amb: [0.5, 0.52, 0.66], lamps: [{ x: p.lamp[0], y: p.lamp[1], r: 170 * fl, i: 0.85, c: [1.1, 0.76, 0.42], p: 1.25 }, { x: p.jar[0], y: p.jar[1] - 4, r: 70 * fj, i: 0.75, c: [1.1, 0.8, 0.5], p: 1.3 }, { x: 40, y: 10, r: 200, i: 0.28, c: [0.62, 0.52, 0.6], p: 1.2 }],
+          glows: [[p.lamp[0], p.lamp[1], 12 * fl, [255, 180, 90], 0.5], [p.jar[0], p.jar[1] - 2, 6 * fj, [255, 190, 100], 0.45]] };
+      },
+    };
+  }
+  SCENES.monster_road = monsterStage("road");
+  SCENES.monster_bridge = monsterStage("bridge");
 
   // ---------- rendering a frame ----------
   function sceneOf(rec) {
+    const mon = monsterOf(seated(rec));
+    if (mon && root.MonsterGameArt) return root.MonsterGameArt.stageOf(mon) === "bridge" ? "monster_bridge" : "monster_road";
     if (rec.game === "cards") return rec.where === "tavern" ? "cards_tavern" : "cards_camp";
     if (rec.game === "checkers") return "checkers";
     if (rec.game === "dice") return "dice_camp";
@@ -1844,12 +2227,12 @@
     const rec = seated(rec0), look = lookOf(rec), sc0 = SCENES[sid];
     p = { src: rec0, rec, look, sid, scene: sc0 };
     Object.assign(p, sc0.plan(rec, rng(hash(key)), look));
-    p.cam = new Cam(sc0.cam);
+    p.cam = new Cam(typeof sc0.cam === "function" ? sc0.cam(rec) : sc0.cam);
     const S = sc0.base(p, rec, look);
     p.baseScene = S;
     p.baseBuf = S.b.clone();
     const g = goblinOf(rec);
-    if (g) {
+    if (g && !sc0.monster) {
       p.ev.push([0.4, g === "orm" ? "rumble" : "hee", 0.5]);
       p.ev.sort((a, b) => a[0] - b[0]);
     }
@@ -1865,7 +2248,7 @@
     const info = sc0.draw(S, p, rec, p.look, at, t) || {};
     const L = sc0.lamps(p, at, t);
     const lamps = L.lamps.slice();
-    if (goblinOf(rec) && p.peekY !== undefined) lamps.push({ x: 96, y: p.peekY - 6, r: 60, i: 0.45, c: [1.0, 0.8, 0.55], p: 1.4 });
+    if (goblinOf(rec) && p.peekY !== undefined && !sc0.monster) lamps.push({ x: 96, y: p.peekY - 6, r: 60, i: 0.45, c: [1.0, 0.8, 0.55], p: 1.4 });
     light(S.b, lamps, L.amb, L.levels);
     for (const gl of L.glows || []) glow(S.b, gl[0], gl[1], gl[2], gl[3], gl[4]);
     sc0.after(S, p, rec, p.look, at, t, info);
@@ -1983,6 +2366,32 @@
       },
       sniff: (t) => { noise(t, 0.09, 0.08, "bandpass", 2600, 2); noise(t + 0.16, 0.12, 0.09, "bandpass", 2300, 2); },
       rumble: (t, v) => { const o = tone(t, 72, 64, 0.6, 0.16 * (v || 1), "sawtooth", 0.08); void o; noise(t, 0.5, 0.08 * (v || 1), "lowpass", 220); },
+      // the road monsters: a kobold's yip, a bandit's chuckle, the siren's hum, the yeti's huff
+      yip: (t, v) => {
+        v = v || 1;
+        for (const [d, f0, f1] of [[0, 1300, 2100], [0.09, 1500, 2300], [0.2, 1250, 1900]]) {
+          const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+          o.type = "square"; o.frequency.setValueAtTime(f0, t + d); o.frequency.exponentialRampToValueAtTime(f1, t + d + 0.05);
+          f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 2.5;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.linearRampToValueAtTime(0.05 * v, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0006, t + d + 0.07);
+          o.connect(f); f.connect(g); g.connect(out); o.start(t + d); o.stop(t + d + 0.1);
+        }
+      },
+      chuckle: (t, v) => { v = v || 1; for (let i = 0; i < 3; i++) { const at = t + i * 0.15; noise(at, 0.09, 0.14 * v, "bandpass", 700 - i * 60, 4); tone(at, 170 - i * 10, 130, 0.09, 0.1 * v, "sawtooth"); } },
+      hum: (t, v) => { v = v || 1; for (const [d, f0, f1] of [[0, 523, 659], [0.35, 659, 587]]) { tone(t + d, f0, f1, 0.5, 0.05 * v, "sine", 0.06); tone(t + d, f0 * 2.002, f1 * 2.002, 0.45, 0.015 * v, "sine", 0.06); } },
+      huff: (t, v) => { v = v || 1; noise(t, 0.35, 0.18 * v, "lowpass", 380, 0.8, 160); tone(t, 96, 70, 0.3, 0.12 * v, "sawtooth", 0.04); },
+      // the road in late sun: a breeze through the hedge and birds; the bridge: the river under it and a lap now and then
+      meadow: (t, secs) => {
+        secs = Math.min(14, secs || 8);
+        noise(t, secs, 0.025, "lowpass", 420, 0.6);
+        for (let at = t + 0.4; at < t + secs - 0.4; at += 0.6 + Math.random() * 1.4) { const f = 3200 + Math.random() * 1400; for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) tone(at + i * 0.09, f, f * (1.1 + Math.random() * 0.2), 0.06, 0.018, "sine"); }
+      },
+      river: (t, secs) => {
+        secs = Math.min(14, secs || 8);
+        noise(t, secs, 0.05, "lowpass", 520, 0.5);
+        noise(t, secs, 0.012, "bandpass", 1600, 0.8);
+        for (let at = t + 0.5; at < t + secs - 0.4; at += 0.8 + Math.random() * 1.6) { noise(at, 0.18, 0.05, "bandpass", 700 + Math.random() * 300, 3); if (Math.random() < 0.4) tone(at + 0.05, 820, 1250, 0.07, 0.025); }
+      },
     };
     function render(evs, secs, sr) {
       const OAC = root.OfflineAudioContext || root.webkitOfflineAudioContext, rate = sr || 22050;
@@ -2005,7 +2414,7 @@
   })();
 
   // ---------- the player ----------
-  const LONG = { fire: 1, tavern: 1 };
+  const LONG = { fire: 1, tavern: 1, meadow: 1, river: 1 };
   const reduced = () => !!(root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches);
   function player(rec, opts) {
     opts = opts || {};

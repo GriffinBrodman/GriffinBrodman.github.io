@@ -12,8 +12,8 @@
 
   // ---------- the players load with their first page (A.need); the words below each one still tell it if one can't ----------
   const KIT = {
-    fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "meal_replay", "meal_tavern"],
-    reading: ["tarot_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
+    fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "food_eat", "meal_replay", "meal_tavern"],
+    reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
   };
   const kit = (k) => A.need(KIT[k]).catch((e) => { if (window.console) console.error(e); });
 
@@ -140,6 +140,31 @@
     if (dish.desc) p.appendChild(el("p", { class: "small dim" }, dish.desc));
     v.appendChild(p);
   }).catch(() => fadedPage(v, "That meal isn't on file", "The kitchen has no record of it.")));
+
+  // a fishing session: the pixel player (FishReplay) draws it when loaded, otherwise it is told in words. Catch files are never deleted,
+  // so a trophy's link always plays
+  A.route(/^\/catch\/(\w+)$/, (v, id) => A.load(`catch/${id}`).then((g) => kit("catch").then(() => g)).then((g) => {
+    const F = S.fish || {}, sp = (F.species || {})[g.species] || {}, lg = g.legend ? (F.legends || {})[g.legend.id] || {} : null;
+    const title = g.outcome === "legend_caught" ? `${g.legend.name}, landed` : g.outcome === "legend_away" ? `${g.legend.name} got away`
+      : g.outcome === "catch" ? `${sp.name || "A fish"}, ${g.size} cm` : g.outcome === "strange" ? { whiskers: "Old Whiskers", letter: "A letter in a bottle", key: "A drowned key" }[g.strange]
+      : { nothing: "Nothing bit", away: "The one that got away", junk: "Not a fish", stolen: "Stolen from the bank" }[g.outcome] || "Fishing";
+    const where = g.where === "contest" ? ` at the ${A.nodeName(g.place)} fishing contest` : ` ${g.at || "at " + A.nodeName(g.place, true)}`;
+    const p = el("section", { class: "panel" }, el("h2", null, title),
+      el("p", { class: "small muted" }, A.heroLink(g.hero), " fished", where, (g.crew || []).length ? [" with ", ...lineup(g.crew.map((x) => A.heroLink(x.id))), " watching"] : "",
+        `, ${A.when(g.day, "on")}${g.night ? ", after dark" : ""}.`, g.rod ? ` ${g.rod.name}${g.lure ? " and a " + ((F.lures || {})[g.lure] || {}).name : ""}.` : " A hand line."));
+    if (window.FishReplay) {
+      try { stage(p, FishReplay.player(g), { share: () => `${title}${g.text ? ": " + g.text : ""}\n${A.shareUrl("#/catch/" + g.id)}`, shared: "The catch and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (g.text) p.appendChild(el("p", null, g.text));
+    if (g.said) p.appendChild(el("p", { class: "small" }, `Old Whiskers says: “${g.said}”`));
+    if (g.letter) p.appendChild(el("p", { class: "small" }, "The letter, in ", g.letter.from && (A.heroes || {})[g.letter.from] ? A.heroLink(g.letter.from) : g.letter.name, `'s hand: “${g.letter.text}”`));
+    if (g.key) p.appendChild(el("p", { class: "small dim" }, `It looks like a key to ${g.key.name}. Nothing it opens has been found yet.`));
+    if (g.outcome === "catch" && g.rank != null) p.appendChild(el("p", { class: "small dim" }, g.first ? "The first of its kind the league has landed." : `Bigger than ${g.rank}% of the league's ${(sp.name || "fish").toLowerCase()}.`));
+    if (lg && lg.desc) p.appendChild(el("p", { class: "small dim" }, lg.desc));
+    else if (sp.desc) p.appendChild(el("p", { class: "small dim" }, sp.desc));
+    p.appendChild(el("p", { class: "small" }, el("a", { href: "#/creel" }, "The Creel Book →")));
+    v.appendChild(p);
+  }).catch(() => fadedPage(v, "That catch isn't on file", "The anglers' book has no record of it.")));
 
   // a tarot reading; the pixel player (TarotReplay) draws it when loaded, otherwise the spread is told in words.
   // It opens on the laid table under a title plate, before the deal
@@ -1419,7 +1444,8 @@
       ctx.fillStyle = "#120c18"; ctx.fillRect(x - B, y - B, w + 2 * B, 5 * B);
       ctx.fillStyle = "#3a2822"; ctx.fillRect(x, y, w, 3 * B);
       ctx.fillStyle = q.side === 0 ? "#6ccf7a" : "#e2645c"; ctx.fillRect(x, y, w * clamp(s.hp / q.maxhp, 0, 1), 3 * B);
-      txt(marks[q.i] + " " + q.name, x, y - 2 * B, 5, "#f6ebd0", "left", B);
+      // the mark in brackets: a bare "A Gruk the Warchief" reads as an article, not as the key to the list below
+      txt(`[${marks[q.i]}] ${q.name}`, x, y - 2 * B, 5, "#f6ebd0", "left", B);
     }
     function cutin(slot, u, B, K, X, Y) {
       const cvw = cv.width, cvh = cv.height, b = slot.members[0].b, a = units[b.a], an = anchors[b.a] || { x: a.x, y: a.y, top: a.y - a.sh };
@@ -1576,6 +1602,8 @@
     if (f.outcome === "stalemate" || f.winner == null) return "Stalemate";
     // fled_label (league/fights.py) names only the ones who ran, so a boss cut down before the rest fled isn't said to flee
     const w = f.winner === 0 ? L0 : L1, l = (f.winner === 0 && f.fled_label) || (f.winner === 0 ? L1 : L0);
+    // when some fell and only the rest ran, the win comes first: "The Verdant Sigil wins; a Goblin Shaman flees"
+    if (f.outcome === "fled" && f.winner === 0 && f.fled_label) return `${vb(w, "wins", "win")}; ${vb(l, "flees", "flee")}`;
     return { wiped: vb(w, "wins", "win"), fled: vb(l, "flees", "flee"), surrender: vb(l, "surrenders", "surrender") }[f.outcome] || vb(w, "wins", "win");
   }
 })();

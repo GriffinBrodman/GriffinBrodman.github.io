@@ -63,6 +63,10 @@
       ["Stop-loss", "Heroes bring a bankroll, not the purse: the money for beds and food stays put, and careful heroes hold back what they're saving for a horse or a house. Reckless ones may chase a bad night once."],
       ["Cheats", "Rogues and the dishonest sometimes cheat. A cheat who gets away with it wins double; a caught one forfeits double, is banned from that table for a week or two, and now and then spends a night in the cells. Dealers remember, and nickname their regulars."],
       ["Watch", "Every sitting is kept as a replay for a fortnight. \"Lost 30 silver at Pig Racing ▸ watch\" in a hero's day opens it, with every round listed underneath."],
+      ["Lady Luck's Ledger", "A weekly column on the Digest page about the town tables: the week's biggest win or loss, the longest run of losses at one table, any cheat caught (or an honest week), and a crew that sat down together. A sleepy week at the tables gets one line."],
+      ["The fine dice", "Four fine dice sets (Gilt, Garnet, Ivory and Rime) are never sold. Each is won or given as a favour, once per league, during an hour at its own town's table; heroes who love dice are likelier to be the one."],
+      ["Monsters who'd rather play", "Now and then a talking monster on the road offers a game instead of a fight, if the crew carries loot worth playing for. The crew's best player sits down: a loss hands over some of the carried loot (never silver, gear or sets), a win earns a curio the monster made."],
+      ["Table keystones", "Poker Face, Gambler's Nerve, Read the Table and Gambit change how a hero plays at the tables (watched less and quicker to quit, never chasing, a touch sharper, a bold first bet), never the house's share. Each also does something in a fight."],
     ]],
     ["By the fire", [
       ["Game sets", "Cards, dice, checkers, chess and tarot decks are real kit: bought at markets (cheapest in the town that makes them), found in dungeons, won and lost. Sets wear out and lose pieces; a pebble stands in for the missing rook. A hero carries three at most."],
@@ -113,16 +117,29 @@
     return Object.values(S.towns || {}).filter((t) => t.game && t.game.rules).map((t) => [`${t.game.name} (${t.name})`,
       `${t.game.rules} Dealt by ${t.game.dealer}.${t.game.edge ? ` The house keeps about ${Math.max(1, Math.round((2 * t.game.edge - 1) * 100))} in every 100 staked.` : ""}`]);
   }
-  A.route(/^\/guide$/, (v) => {
+  const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  A.route(/^\/guide(?:\/([\w-]+))?$/, (v, focus) => {
     v.appendChild(el("h1", null, "The Guide"));
     v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page."));
+    const jump = (id) => (ev) => {
+      const t = document.getElementById(`guide-${id}`);
+      if (!t || location.hash !== `#/guide/${id}`) return;
+      ev.preventDefault();
+      t.scrollIntoView({ block: "start" });
+    };
+    v.appendChild(el("div", { class: "panel tight guide-toc", role: "navigation", "aria-label": "Contents" }, el("h4", null, "Contents"),
+      el("ol", null, ...GUIDE.map(([title]) => el("li", null, el("a", { href: `#/guide/${slug(title)}`, onclick: jump(slug(title)) }, title))))));
     const g = el("div", { class: "grid2 even" });
     for (const [title, base] of GUIDE) {
       const dl = el("dl", { class: "kv guide" });
       const items = title === "The tables" ? base.slice(0, 2).concat(tableGames(), base.slice(2)) : base;
       for (const [k, txt] of items) dl.append(el("dt", null, k), el("dd", null, txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", "))));
-      g.appendChild(panel(title, dl));
+      const sec = panel(title, dl);
+      sec.id = `guide-${slug(title)}`;
+      g.appendChild(sec);
     }
     v.appendChild(g);
+    const target = focus && document.getElementById(`guide-${focus}`);
+    if (target) setTimeout(() => target.scrollIntoView({ block: "start" }), 0);
   });
 })();
