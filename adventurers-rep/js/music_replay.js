@@ -555,11 +555,12 @@
     function hearIn() {
       if (t > P.len - 0.5 || isStill()) return;
       const E = window.Sound && Sound.engine ? Sound.engine() : null;
-      if (E && E.live) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), from: Math.max(0, t) });
+      if (E && E.live) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), now: Math.max(0, t) });
     }
     function frame(ms) {
       raf = 0;
-      if (!live()) { last = 0; stopSound(); return; }
+      if (!live()) { last = 0; stopSound(); if (talk) talk.hold(true); return; }
+      if (talk) talk.hold(false);
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
       if (!handle && !ended) hearIn();
@@ -620,10 +621,10 @@
           if (ended || !playing) { start(P === full ? full : short, true); return; }
           paused = false; last = 0;
           const E = window.Sound && Sound.engine ? Sound.engine() : null;
-          if (E && E.live && !isStill()) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), from: t });
+          if (E && E.live && !isStill()) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), now: t });
           if (!raf && live() && !isStill()) raf = requestAnimationFrame(frame);
         },
-        pause() { paused = true; stopSound(); },
+        pause() { paused = true; stopSound(); if (talk) talk.hold(true); },
         restart() { start(P === full ? full : short, true); },
         skip() {
           stopSound(); paused = false; playing = true; ended = false; shown = P.lines.length - 1; t = P.len + 1.6;

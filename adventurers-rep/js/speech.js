@@ -241,10 +241,11 @@
     const clock = () => performance.now() / 1000;
     function drop(l) { const i = lines.indexOf(l); if (i >= 0) lines.splice(i, 1); l.node.remove(); if (l.done) { const d = l.done; l.done = null; d(); } }
     // frames only while words are landing; waits between (the line's hold, the pause before done) are plain timeouts
-    let timer = 0, placed = false, tries = 0;
+    let timer = 0, placed = false, tries = 0, held = 0;
     function frame() {
       raf = 0;
       if (timer) { clearTimeout(timer); timer = 0; }
+      if (held) return;
       // a scene says its first line before it is on the page; wait for it, but let go of one that has left
       if (!wrap.isConnected) { if (placed || ++tries > 50) lines.length = 0; else timer = setTimeout(frame, 120); return; }
       if (!placed) { placed = true; T.place(); }
@@ -325,7 +326,12 @@
       speaking(a) { return lines.some((l) => l.a === a && !l.out); },
       get count() { return lines.length; },
       prune() {},
-      clear() { for (const l of lines.slice()) drop(l); },
+      clear() { held = 0; for (const l of lines.slice()) drop(l); },
+      // a paused replay holds its lines where they are; letting go slides their clocks on by the time they were held
+      hold(on) {
+        if (on && !held) { held = clock(); if (raf) { cancelAnimationFrame(raf); raf = 0; } if (timer) { clearTimeout(timer); timer = 0; } }
+        else if (!on && held) { const d = clock() - held; held = 0; for (const l of lines) l.t0 += d; frame(); }
+      },
       place() {
         const cw = wrap.clientWidth, rects = [];
         for (const l of lines) {

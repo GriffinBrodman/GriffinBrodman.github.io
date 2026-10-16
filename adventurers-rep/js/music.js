@@ -504,9 +504,11 @@
     comp.threshold.value = -14; comp.ratio.value = 3;
     out.gain.value = o.vol == null ? 1 : o.vol;
     out.connect(comp); comp.connect(E.out);
-    const from = o.from || 0, t0 = c.currentTime + 0.12 - from, st = { n: 0, h: 0, from, voices: o.voices || {} }, timers = [];
+    // o.now joins a song already under way: what plays next is heard exactly where the scene has got to
+    const lag = (c.outputLatency || 0) + (c.baseLatency || 0), from = o.now != null ? o.now + lag + 0.12 : o.from || 0;
+    const t0 = o.now != null ? c.currentTime - lag - o.now : c.currentTime + 0.12 - from, st = { n: 0, h: 0, from, voices: o.voices || {} }, timers = [];
     // a note marked cue calls onNote as it is sung, for a karaoke line that follows the voice
-    if (o.onNote) st.cue = (n, at) => timers.push(setTimeout(() => { if (current === h) o.onNote(n); }, Math.max(0, (at - c.currentTime) * 1000)));
+    if (o.onNote) st.cue = (n, at) => timers.push(setTimeout(() => { if (current === h) o.onNote(n); }, Math.max(0, (at + lag - c.currentTime) * 1000)));
     E.duck(true);
     // scheduled in slices, so a long song doesn't build every node up front and Stop is instant
     let timer = 0;
@@ -517,7 +519,8 @@
       timer = setTimeout(pump, 250);
     }
     function end() { if (current === h) { current = null; clearTimeout(timer); E.duck(false); setTimeout(() => out.disconnect(), 2500); if (o.done) o.done(); } }
-    const h = { t0, ctx: c, get t() { return c.currentTime - t0; }, stop() { clearTimeout(timer); timers.forEach(clearTimeout); out.gain.setTargetAtTime(0, c.currentTime, 0.05); setTimeout(() => out.disconnect(), 400); if (current === h) { current = null; E.duck(false); } } };
+    // t is the song time reaching the speakers, which trail the context clock by the output latency (most on Bluetooth)
+    const h = { t0, ctx: c, get t() { return c.currentTime - lag - t0; }, stop() { clearTimeout(timer); timers.forEach(clearTimeout); out.gain.setTargetAtTime(0, c.currentTime, 0.05); setTimeout(() => out.disconnect(), 400); if (current === h) { current = null; E.duck(false); } } };
     current = h;
     pump();
     return h;
