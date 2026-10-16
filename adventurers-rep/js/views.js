@@ -1084,7 +1084,14 @@
   }
   function hobbyPanel(h) {
     const sets = h.sets || [], info = () => el("div", { class: "kit-info hobby-info" });
-    const tab = {};
+    // every hero gets all four tabs, so each corner of the chart opens one; a hobby they haven't taken up says so
+    const empty = (...t) => el("div", { class: "hobby-empty" }, t.map((x) => el("p", { class: "small" + (t.length > 1 && x === t[t.length - 1] ? " dim" : "") }, x)));
+    const tab = {
+      fishing: ["Fishing", empty("Has never wet a line.", "No rod in the pack either; the first try will be a hand line, a bent pin on a bit of string."), true],
+      gaming: ["Gaming", empty("Carries no game set.", "They can still sit in at a crewmate's board by the fire; who they play is on the People tab."), true],
+      cooking: ["Cooking", empty("Has not cooked for the crew yet."), true],
+      music: ["Music", empty("Hasn't sung or played at a fire yet.", "Carries no instrument; for now it would be voice alone."), true],
+    };
     const fish = fishTab(h, sets.filter((s) => s.kind === "rod"));
     if (fish) tab.fishing = ["Fishing", fish];
     const games = sets.filter((s) => s.kind !== "music" && s.kind !== "rod");
@@ -1105,16 +1112,16 @@
       const i = info();
       tab.music = ["Music", el("div", null, inst.length ? [el("h4", null, "Instruments"), setTiles(h, inst, i), i] : null, mus)];
     }
-    const keys = Object.keys(tab);
+    const keys = Object.keys(tab), real = keys.filter((k) => !tab[k][2]);
     const bar = el("div", { class: "tabs hobby-tabs" }), body = el("div");
     const show = (k) => { if (!tab[k]) return; for (const b of bar.children) b.classList.toggle("on", b.dataset.k === k); body.innerHTML = ""; body.appendChild(tab[k][1]); };
-    for (const k of keys) bar.appendChild(el("button", { type: "button", "data-k": k, onclick: () => show(k) }, tab[k][0]));
+    for (const k of keys) bar.appendChild(el("button", { type: "button", "data-k": k, class: tab[k][2] ? "empty" : null, onclick: () => show(k) }, tab[k][0]));
     const chart = pastimeChart(h, show);
-    if (!keys.length && !chart) return null;
-    if (!keys.length) { chart.querySelector("h4").remove(); return panel("Pastimes", chart); }
+    if (!real.length && !chart) return null;
     const keen = (h.pastimes || {}).keen || {};
-    const fav = PASTIMES.filter((p) => tab[p.tab]).sort((a, b) => (keen[b.k] || 0) - (keen[a.k] || 0))[0];
-    show(fav ? fav.tab : keys[0]);
+    const fav = PASTIMES.filter((p) => !tab[p.tab][2]).sort((a, b) => (keen[b.k] || 0) - (keen[a.k] || 0))[0]
+      || PASTIMES.slice().sort((a, b) => (keen[b.k] || 0) - (keen[a.k] || 0))[0];
+    show(fav.tab);
     return panel("Hobby equipment", el("div", { class: "hobby-wrap" + (chart ? "" : " solo") }, chart, el("div", { class: "hobby-kit" }, bar, body)));
   }
   // fishing: the rod and tackle, the angler's ledger and the trophy wall (a plaque for each species' best, gold for a legend)
