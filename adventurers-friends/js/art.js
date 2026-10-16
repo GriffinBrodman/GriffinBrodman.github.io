@@ -1084,7 +1084,46 @@
     goblin_big: [11, 0, 29, 25], bear: [26, 1, 19, 20], spider_big: [21, 0, 25, 26], chest: [0, 0, 32, 27], human: [9, 0, 17, 18],
     hag: [10, 0, 24, 18], troll: [18, 0, 20, 19], kraken: [3, 0, 38, 25], dragon: [26, 0, 22, 17],
   };
+  // a boss whose head crop reads poorly at card size mounts a drawn keepsake instead
+  const TROPHY_ART = { spider_big: drawFangs };
+  function drawFangs() {
+    const W = 26, H = 24, g = new Grid(W, H);
+    const ivory = ["#fffaea", "#f2e6c4", "#d8caa4", "#9a8e80", "#4e4250", "#1e1624"];
+    const curve = (t, s) => {
+      const u = 1 - t, a = u * u, b = 2 * u * t, c = t * t;
+      const x = a * 7.5 + b * 2.5 + c * 10, y = a * 3.5 + b * 13 + c * 20;
+      return [s < 0 ? x : W - x, y];
+    };
+    for (const s of [-1, 1]) {
+      const pts = [];
+      for (let i = 0; i <= 100; i++) pts.push([i / 100, ...curve(i / 100, s)]);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let best = 1e9, bt = 0, bx = 0;
+        for (const [t, qx, qy] of pts) { const d = Math.hypot(px - qx, py - qy); if (d < best) { best = d; bt = t; bx = px - qx; } }
+        if (best > 2.4 * Math.pow(1 - bt, 0.7) + 0.4) continue;
+        // ivory most of the way down, then darkening fast into the tip; lit from the top-left like every sprite
+        let k = bt < 0.5 ? 0 : bt < 0.66 ? 1 : bt < 0.77 ? 2 : bt < 0.86 ? 3 : bt < 0.94 ? 4 : 5;
+        if (bx > 0.8 && k < 5) k++;
+        else if (bx < -0.8 && k > 0) k--;
+        g.set(x, y, ivory[k]);
+      }
+      // a brass ferrule caps each root, as a taxidermist mounts tusks
+      const [rx] = curve(0, s), fx = Math.round(rx) - 3, brass = ramp("#c8963e");
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 6; x++) g.set(fx + x, y, y === 0 ? brass[4] : y === 3 ? brass[0] : x === 0 ? brass[3] : x === 5 ? brass[1] : brass[2]);
+      g.set(fx + 2, 1, brass[0]); g.set(fx + 3, 2, brass[4]);
+    }
+    const [tx, ty] = curve(1, 1), dx = Math.floor(tx) - 1, dy = Math.floor(ty) + 1;
+    for (const [x, y, c] of [[1, 0, "#7ae84a"], [0, 1, "#7ae84a"], [1, 1, "#4ab832"], [2, 1, "#3a9a2a"], [0, 2, "#4ab832"], [1, 2, "#3a9a2a"], [2, 2, "#2a7a22"], [1, 3, "#1e5a18"]])
+      g.set(dx + x, dy + y, c);
+    g.set(dx, dy + 1, "#e0ffc0");
+    for (const s of [-1, 1]) { const [x, y] = curve(0.97, s); g.set(Math.floor(x), Math.floor(y), "#5ac83a"); }
+    g.outline(OUTLINE);
+    g.noSink = true;
+    return g;
+  }
   function trophyHead(m) {
+    if (TROPHY_ART[m.body]) return TROPHY_ART[m.body]();
     const src = monsterGrid(m, 0);
     let r = TROPHY_HEAD[m.body];
     if (!r) {
@@ -1149,7 +1188,7 @@
       const c = head.get(x, y);
       if (!c) continue;
       // the cut sinks into the board: the last rows darken toward the mount
-      const sink = Math.max(0, y - (head.h - 3)) / 3;
+      const sink = head.noSink ? 0 : Math.max(0, y - (head.h - 3)) / 3;
       g.set(hx + x, hy + y, sink && c !== OUTLINE ? mix(c, "#1a0e06", sink * 0.7) : c);
     }
     return g;
