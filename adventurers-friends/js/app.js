@@ -151,9 +151,9 @@
   }
   // ---------- links to what a story line tells ----------
   // an event, diary line or snippet carries the ids of the records it is about (league/export.py LINKS); the link shows only while that record is kept
-  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"]];
+  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"]];
   function kept(route, id) {
-    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds }[route];
+    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds }[route];
     return !!id && !!ids && ids.has(id);
   }
   function storyHref(x) {
@@ -289,7 +289,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   const fightIds = new Set((L && L.fights_index) || []), nightIds = new Set((L && L.nights_index) || []), mealIds = new Set((L && L.meals_index) || []), readingIds = new Set((L && L.readings_index) || []);
-  const gameIds = new Set((L && L.games_index) || []), songIds = new Set(((L && L.songs) || []).map((s) => s.id));
+  const catchIds = new Set((L && L.catches_index) || []), gameIds = new Set((L && L.games_index) || []), songIds = new Set(((L && L.songs) || []).map((s) => s.id));
   const heroSongBy = {};
   for (const s of (L && L.hero_songs) || []) heroSongBy[s.id] = s.author;
   function feed(list, opts) {

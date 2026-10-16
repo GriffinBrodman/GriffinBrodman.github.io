@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h15/17"]={"day":17,"label":"Day 17","title":"Season 1, day 17, hour by hour","blocks":[{"act":"road","label":"On the road","from":6.0,"to":18.0,"line":"Started in Whitepeak Pass, ended in Frostspire."}],"evening":{"kind":"dungeon","line":"Camped in Frostspire"}};

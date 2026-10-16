@@ -730,7 +730,7 @@
     map: "#e4d4a8", bell: "#d8a838", candle: "#ece4cc", charm: "#5aa04a", pipe: "#7a5232", spoon: "#c4cad4", button: "#a8443a", acorn: "#a87a44", egg: "#e8dcc4",
     pebble: "#9a9488", whistle: "#c4cad4", compass: "#c8963e", cards: "#ece4d4", comb: "#d8c8a0", mirror: "#d8a838", ribbon: "#c83a4a", skull_small: "#e0d8c4",
     crystal: "#9ad8f0", horn: "#d8ccb0", lens: "#c8963e", doll: "#c86a6a", flute: "#9a6a3a", ink: "#2a2a44", gauntlet: "#8a92a0", belt: "#6a3a2a", boots: "#5a3a26",
-    eye: "#4aa0c8", pearl: "#f0ece4", scarf: "#a8443a" };
+    eye: "#4aa0c8", pearl: "#f0ece4", scarf: "#a8443a", rod: "#8a6a3a" };
   const NOGEM = "#d8a838";
   function iconFit(draw, mats, maxS) {
     const T = new Paint.Paint(64, 64);
@@ -845,6 +845,8 @@
       case "horn": P.tube([[3.5, 4.5], [5, 8], [7.5, 10.5], [10.5, 11.5], [13, 10.5], [14.5, 8.5]], 3.4, 0.9, "ivory", 0.25); P.rect(5, 4, 1, 6, "gold", 0.4); P.rect(6, 5, 1, 6, "gold", 0); P.ell(3.4, 4.2, 2.6, 2.4, "#3a2a1e"); P.px(4, 11, W); break;
       case "lens": P.line(9.5, 9.5, 14, 14, "wood", 0, 0.9); P.ell(6.5, 6.5, 4.8, 4.8, "c", { s: 0.2 }); P.ell(6.5, 6.5, 3.4, 3.4, "glass", { s: 0.45 }); px(5, 4, W); break;
       case "doll": P.poly([[5, 7], [11, 7], [13, 15], [3, 15]], "c", (x) => 0.3 - (x - 3) * 0.06); P.ell(8, 4.5, 3, 3, "cream", { s: 0.2 }); px(7, 4, "#1e1824"); px(9, 4, "#1e1824"); P.rect(3, 8, 2, 1, "cream", 0); P.rect(11, 8, 2, 1, "cream", -0.2); P.rect(5, 1.5, 6, 1.5, "wood", 0); break;
+      case "rod": P.line(1.5, 14.5, 13.5, 1.5, "c", 0.2, 1); P.rect(1, 12, 3, 3, "#3a2a1a", 0); P.ell(4.5, 11.5, 1.6, 1.6, "gold", { s: 0.2 });
+        for (let y = 2; y < 13; y++) px(14, y, "#e8e0c8", -0.2); px(14, 13, "#c43a30"); px(14, 14, "#f0ece4"); break;
       case "flute": P.line(2, 14, 14, 2, "c", 0.15, 1); for (const k of [0.35, 0.5, 0.65, 0.8]) px(2 + 12 * k, 14 - 12 * k, "#2a1a10"); break;
       case "ink": P.ell(7, 11.5, 4.5, 3.5, "c", { s: 0.1 }); P.rect(5, 7, 4, 2, "c", 0.2); P.line(8, 7, 13, 1, "feather", 0.3, 0.9); P.line(9, 8, 14, 2.5, "feather", -0.2); px(5, 10, W); break;
       case "gauntlet": P.rect(3, 9, 6, 5, "c", (x) => 0.3 - (x - 3) * 0.1); P.poly([[4, 3], [12, 3], [13, 9], [4, 9]], "c", (x, y) => 0.35 - (x - 4) * 0.06 - (y - 3) * 0.03); for (const x of [6, 8, 10]) P.rect(x, 3, 1, 4, "c", -0.5); P.rect(2.5, 9, 7, 1, "c", 0.6); P.ell(13, 6.5, 1.6, 1.8, "c", { s: 0.1 }); break;

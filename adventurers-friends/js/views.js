@@ -640,7 +640,7 @@
     v.appendChild(head);
     const cal = dayCalendar(h);
     if (cal) v.appendChild(el("section", { class: "panel daybook-panel" }, cal));
-    const tro = trophyShelf(h.trophies);
+    const tro = trophyShelf(h.trophies, (h.angler || {}).legends);
     if (tro) v.appendChild(tro);
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
     if (night) v.appendChild(panel(null, night));
@@ -770,20 +770,18 @@
       `Orders ${h.food === "milk" ? "a glass of milk" : h.food === "ale" ? "a big ale" : h.food === "wine" ? "red wine" : h.food === "mystery stew" ? "the mystery stew" : "whatever's cheapest"}.`,
       h.pet ? ` Travels with ${h.pet.name} the ${h.pet.kind}.` : "", h.mount ? ` Rides ${h.mount.name}, ${aOrAn(h.mount.colour + " " + h.mount.label)}.` : "", h.keepsake ? ` Carries ${h.keepsake}.` : ""));
     left.appendChild(tp);
-    const fp = foodPanel(h);
-    if (fp) left.appendChild(fp);
     if (h.mount) left.appendChild(mountPanel(h.mount));
     if (h.ambition || h.ambitions_done.length) left.appendChild(panel("Ambition",
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
     left.appendChild(classTree(h));
-    const mus = musicPanel(h);
-    if (mus) left.appendChild(mus);
     const om = omensPanel(h);
     if (om) right.appendChild(om);
     right.appendChild(skillsPanel(h));
     right.appendChild(affinityPanel(h));
     right.appendChild(gearPanel(h));
+    const hob = hobbyPanel(h);
+    if (hob) b.appendChild(hob);
   }
   // what a hero eats: the favourite family (from the quiz's tavern order and traits), what they've had most, and the latest meals to watch
   function mealLink(id) { return A.storyLink({ meal: id }); }
@@ -938,26 +936,113 @@
       }
       p.append(el("h4", { style: { marginTop: "10px" } }, "Also carrying"), row);
     }
-    for (const [label, sets] of [["Instruments", (h.sets || []).filter((s) => s.kind === "music")], ["Game sets", (h.sets || []).filter((s) => s.kind !== "music")]]) {
-      if (!sets.length) continue;
-      const row = el("div", { class: "kit-curios" });
-      for (const s of sets) {
-        const b = el("button", { class: "it curio", type: "button" }, Art.gearIcon({ slot: "pocket", art: s.art, name: s.name }, h.look).toCanvas(2), s.name);
-        const go = () => {
-          tiles.forEach((t) => t.classList.remove("on")); info.innerHTML = "";
-          const lost = s.missing ? ` · ${s.missing} piece${s.missing > 1 ? "s" : ""} missing` : "";
-          const sub = s.kind === "music" ? `Instrument (${s.inst}) · ${s.condition}${lost} · ${plural(s.games, "song")}` : `Game set (${s.kind}) · ${s.condition}${lost} · ${s.games} game${s.games === 1 ? "" : "s"}`;
-          info.append(el("div", { class: "nm" }, s.name), el("div", { class: "tiny dim" }, sub),
-            el("p", { class: "small" }, s.desc));
-          const hl = historyList(s.history);
-          if (hl) info.appendChild(hl); else if (s.story) info.appendChild(el("p", { class: "tiny muted story" }, cap(s.story) + "."));
-        };
-        b.addEventListener("mouseenter", go); b.addEventListener("focus", go); b.addEventListener("click", go);
-        row.appendChild(b);
-      }
-      p.append(el("h4", { style: { marginTop: "10px" } }, label), row);
-    }
     return p;
+  }
+  // ================= HOBBY EQUIPMENT: one tabbed panel for fishing, gaming, cooking and music (each tab only when it has something) =================
+  function setTiles(h, sets, info) {
+    const row = el("div", { class: "kit-curios" });
+    for (const s of sets) {
+      const b = el("button", { class: "it curio", type: "button" }, Art.gearIcon({ slot: "pocket", art: s.art, name: s.name }, h.look).toCanvas(2), s.name);
+      const go = () => {
+        row.querySelectorAll(".on").forEach((x) => x.classList.remove("on")); b.classList.add("on"); info.innerHTML = "";
+        const lost = s.missing ? ` · ${s.missing} piece${s.missing > 1 ? "s" : ""} missing` : "";
+        const sub = s.kind === "music" ? `Instrument (${s.inst}) · ${s.condition}${lost} · ${plural(s.games, "song")}`
+          : s.kind === "rod" ? `Fishing rod · ${s.condition} · ${plural(s.games, "session")}` : `Game set (${s.kind}) · ${s.condition}${lost} · ${s.games} game${s.games === 1 ? "" : "s"}`;
+        info.append(el("div", { class: "nm" }, s.name), el("div", { class: "tiny dim" }, sub), el("p", { class: "small" }, s.desc));
+        const hl = historyList(s.history);
+        if (hl) info.appendChild(hl); else if (s.story) info.appendChild(el("p", { class: "tiny muted story" }, cap(s.story) + "."));
+      };
+      b.addEventListener("mouseenter", go); b.addEventListener("focus", go); b.addEventListener("click", go);
+      row.appendChild(b);
+    }
+    return row;
+  }
+  // a panel's body without its own heading, so an old panel can sit inside a tab
+  function inner(p) {
+    if (!p) return null;
+    const h2 = p.querySelector(":scope > h2");
+    if (h2) h2.remove();
+    return el("div", { class: "hobby-inner" }, ...Array.from(p.childNodes));
+  }
+  function hobbyPanel(h) {
+    const sets = h.sets || [], info = () => el("div", { class: "kit-info hobby-info" });
+    const tab = {};
+    const fish = fishTab(h, sets.filter((s) => s.kind === "rod"));
+    if (fish) tab.fishing = ["Fishing", fish];
+    const games = sets.filter((s) => s.kind !== "music" && s.kind !== "rod");
+    if (games.length) {
+      const i = info();
+      tab.gaming = ["Gaming", el("div", null, el("h4", null, "Game sets"), setTiles(h, games, i), i,
+        el("p", { class: "tiny dim" }, "Who they play and how it goes is on the People tab, at the fire."))];
+    }
+    const food = inner(foodPanel(h)), cooked = (h.table || {}).cooked || [], specials = (h.table || {}).specials || [];
+    const cookedIds = new Set(cooked.map((x) => x.id)), toTry = specials.filter((x) => !cookedIds.has(x.id));
+    if (food || cooked.length) tab.cooking = ["Cooking", el("div", null,
+      el("h4", null, "Recipes known"),
+      cooked.length ? el("ul", { class: "small recipe-list" },
+        cooked.map((x) => el("li", null, el("b", null, x.name), ` · cooked ${x.n > 1 ? x.n + " times" : "once"}`)))
+        : el("p", { class: "small" }, "Has not cooked for the crew yet."),
+      toTry.length ? el("p", { class: "small recipe-try" }, "Fish specials to try: ",
+        toTry.map((x, i) => [i ? " · " : "", x.known ? el("b", null, x.name) : x.name, ` (${x.needs.replace(/a fresh |a /g, "")})`]),
+        toTry.some((x) => x.known) ? ". Bold: this hero can cook it." : ".") : null,
+      food)];
+    const inst = sets.filter((s) => s.kind === "music"), mus = inner(musicPanel(h));
+    if (inst.length || mus) {
+      const i = info();
+      tab.music = ["Music", el("div", null, inst.length ? [el("h4", null, "Instruments"), setTiles(h, inst, i), i] : null, mus)];
+    }
+    const keys = Object.keys(tab);
+    if (!keys.length) return null;
+    const bar = el("div", { class: "tabs hobby-tabs" }), body = el("div");
+    const show = (k) => { for (const b of bar.children) b.classList.toggle("on", b.dataset.k === k); body.innerHTML = ""; body.appendChild(tab[k][1]); };
+    for (const k of keys) bar.appendChild(el("button", { type: "button", "data-k": k, onclick: () => show(k) }, tab[k][0]));
+    show(keys[0]);
+    return panel("Hobby equipment", bar, body);
+  }
+  // fishing: the rod and tackle, the angler's ledger and the trophy wall (a plaque for each species' best, gold for a legend)
+  function fishPlaque(spec) {
+    const box = el("span", { class: "fish-plaque-art" });
+    A.need(["food_art", "fish_art"]).then(() => {
+      if (!window.FishArt || !FishArt.plaque) return;
+      const cv = FishArt.toCanvas(FishArt.plaque(spec), 2);
+      cv.setAttribute("aria-hidden", "true");
+      box.appendChild(cv);
+    }).catch(() => {});
+    return box;
+  }
+  function fishTab(h, rods) {
+    const f = h.angler;
+    if (!f && !rods.length) return null;
+    const F = S.fish || {}, box = el("div"), i = el("div", { class: "kit-info hobby-info" });
+    if (f && f.sessions) box.appendChild(el("div", { class: "music-skill" }, el("span", { class: "small" }, "Fishes: ", el("b", null, f.label)), A.bar(f.band * 100, 100, "gold"),
+      el("div", { class: "tiny dim" }, "What makes an angler: practice most of all (every hour with a line out), the Angler and Ice Fishing skills, and a good rod.")));
+    if (rods.length) box.append(el("h4", null, "Rod"), setTiles(h, rods, i), i);
+    else box.appendChild(el("p", { class: "small dim" }, "Fishes with a hand line: a bent pin on a bit of string."));
+    const tackle = [(f && f.lures || []).length ? `Lures: ${f.lures.join(", ")}` : null, (f && f.keys || []).length ? `Drowned ${f.keys.length === 1 ? "key" : "keys"}: ${f.keys.map((k) => k.name + " (it looks like it belongs to " + A.nodeName(k.dungeon, true) + ")").join("; ")}` : null].filter(Boolean);
+    if (tackle.length) box.appendChild(el("p", { class: "small" }, tackle.join(". ") + "."));
+    if (!f || !f.sessions) return box;
+    const odd = [f.junk && Object.keys(f.junk).length ? Object.entries(f.junk).map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ") : null,
+      f.letters ? plural(f.letters, "bottled letter") : null, f.whiskers ? `Old Whiskers ${f.whiskers === 1 ? "once" : f.whiskers + " times"}` : null].filter(Boolean);
+    box.append(el("h4", null, "The angler's ledger"), el("p", { class: "small" }, `${plural(f.sessions, "session")}: ${plural(f.caught, "fish", "fish")} landed, ${f.away} got away, ${f.nothing} blank, ${f.stolen} stolen from the bank.`,
+      odd.length ? ` Also fished up: ${odd.join("; ")}.` : "", f.contests && f.contests[1] ? ` Contests: ${f.contests[0]} won of ${f.contests[1]}.` : ""));
+    const wall = el("div", { class: "fish-wall" });
+    for (const x of f.legends || []) {
+      const lg = (F.legends || {})[x.id] || {};
+      wall.appendChild(el("div", { class: "fish-plaque legend" }, fishPlaque({ species: x.species, legend: x.id, name: x.name, size: x.size }),
+        el("div", null, el("b", { class: "gold" }, x.name), el("div", { class: "tiny dim" }, `${x.size} cm · landed ${A.when(x.day)}`, lg.water ? ` · ${A.nodeName((F.waters[lg.water] || {}).node)}` : ""),
+          A.kept("catch", x.rec) ? el("a", { class: "watch tiny", href: `#/catch/${x.rec}` }, "▶ watch") : null)));
+    }
+    for (const x of f.species || []) {
+      wall.appendChild(el("div", { class: "fish-plaque" + (x.rare ? " rare" : "") }, fishPlaque({ species: x.id, size: x.best }),
+        el("div", null, el("b", null, x.name), x.rare ? el("span", { class: "tiny gold" }, " rare") : null,
+          el("div", { class: "tiny dim" }, `best ${x.best} cm · ${plural(x.n, "caught", "caught")}`), A.kept("catch", x.rec) ? el("a", { class: "watch tiny", href: `#/catch/${x.rec}` }, "▶ watch") : null)));
+    }
+    if (wall.children.length) box.append(el("h4", null, "The trophy wall"), wall);
+    if ((f.lost || []).length) box.appendChild(el("p", { class: "small" }, "The ones that got away: ", f.lost.map((x, k) => [k ? ", " : "", el("b", null, x.name), ` (${A.when(x.day)})`]), "."));
+    const lately = (f.lately || []);
+    if (lately.length) box.append(el("h4", null, "Lately"), el("ul", { class: "diary small" }, lately.map((x) => el("li", null, el("span", { class: "dim" }, A.when(x.day) + ": "), x.text, " ", A.storyLink({ catch: x.id })))));
+    box.appendChild(el("p", { class: "small" }, el("a", { href: "#/creel" }, "The league's Creel Book →")));
+    return box;
   }
   // head-to-head at the fire: the running record against each crewmate, per game, and the camp nicknames earned
   function firePanel(h) {
@@ -1176,12 +1261,18 @@
     return cv;
   }
   // one trophy per boss brought down; a hero's shelf also says which crew they did it with
-  function trophyShelf(list) {
-    if (!(list || []).length) return null;
-    return panel(`Trophies (${list.length})`, el("div", { class: "trophies" }, ...list.map((t) =>
+  function trophyShelf(list, fish) {
+    list = list || [];
+    fish = fish || [];
+    if (!list.length && !fish.length) return null;
+    const F = S.fish || {};
+    return panel(`Trophies (${list.length + fish.length})`, el("div", { class: "trophies" }, ...list.map((t) =>
       el("div", { class: "trophy-card" }, trophyMount(t),
         el("div", null, el("b", { class: "gold" }, t.boss), el("div", { class: "tiny dim" }, A.storyText(`${t.place} · ${A.when(t.day)}${t.with ? " · with " + t.with : t.with === null ? " · alone" : ""}`)),
-          A.kept("fight", t.fight) ? el("a", { class: "watch tiny", href: `#/fight/${t.fight}` }, "▶ watch the kill") : null)))));
+          A.kept("fight", t.fight) ? el("a", { class: "watch tiny", href: `#/fight/${t.fight}` }, "▶ watch the kill") : null))),
+      ...fish.map((x) => el("div", { class: "trophy-card" }, fishPlaque({ species: x.species, legend: x.id, size: x.size }),
+        el("div", null, el("b", { class: "gold" }, x.name), el("div", { class: "tiny dim" }, `${x.size} cm · ${A.nodeName((((F.waters || {})[((F.legends || {})[x.id] || {}).water]) || {}).node)} · ${A.when(x.day)}`),
+          A.kept("catch", x.rec) ? el("a", { class: "watch tiny", href: `#/catch/${x.rec}` }, "\u25b6\u00a0watch it landed") : null)))));
   }
   function dayCalendar(h) {
     if (!window.Daybook || !h.daybook || !(h.daybook.blocks || []).length) return null;
@@ -1897,7 +1988,7 @@
   }
 
   // shared with the route files (views_*.js) loaded after this one
-  window.Views = { artifactsPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline,
+  window.Views = { fishPlaque, artifactsPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline,
     legendsPanel, moveMark, panel, partyCard, pendingPanel, rivalryPanel, runnerUp, sortedHeroes, stablesBlock,
     tellOnce, tip, townLedger, treasuresPanel };
 })();

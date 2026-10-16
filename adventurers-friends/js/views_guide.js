@@ -70,7 +70,7 @@
     ]],
     ["By the fire", [
       ["Game sets", "Cards, dice, checkers, chess and tarot decks are real kit: bought at markets (cheapest in the town that makes them), found in dungeons, won and lost. Sets wear out and lose pieces; a pebble stands in for the missing rook. A hero carries three at most."],
-      ["Night games", "Cooking comes first at camp: on a night someone cooks, the crew eats and that's the evening. Otherwise, if anyone carries a set, about half the time it comes out, and the game is whatever most of the people present like playing. The rest of the nights go to songs, talk and stories."],
+      ["Night games", "Supper comes first at camp: about one night in four (a little less for a crew of hopeless cooks, more when someone is hungry) somebody cooks. The rest of the nights go to whatever the crew enjoys, weighed by how much each of them likes it and how good they are at it: a game if anyone carries a set, a song, a line in the water when there is water nearby, talk and stories, or nothing much. A crew that loves something does it more, but never every night."],
       ["Stakes", "Crewmates never play each other for silver. The loser takes first watch, cooks tomorrow, washes up or carries the pack, and once in a while a set or a keepsake changes hands."],
       ["Head to head", "Every pair keeps a running record for each game. Winning streaks earn camp nicknames, sore losers demand rematches, and a hot-tempered loser may flip the board. The record shows on each hero's page under At the fire."],
     ]],
@@ -83,7 +83,15 @@
       ["Legendary meals", "Every boss drops something special: Gruk's smoked ham, a kraken tentacle, a dragon's tail. Cooked, it makes a legendary meal, which never goes wrong and which the crew talks about for years."],
       ["Favourites", "Every hero has a favourite kind of food, from their quiz: what they order at the tavern, and who they are. It never changes. It shows on their page under At the table, with what they've eaten."],
       ["Eating out", "Every town has four dishes of its own, at the tavern, the bakery or the food stall, and the tavern's weekly special is cooked from whatever the nearest dungeons drop (it's on the Map). Crews in town sometimes feast together. Street food costs a few copper; a tavern dish or the special can run to a silver or more. Nobody eats into the money for their bed."],
+      ["Fish specials", "Most fish go in the pot as plain fish. A few have recipes of their own: Pike Baked in Clay, Brown Trout in Brown Butter, Golden Grayling with Wild Thyme (rivers); Honey-Glazed Golden Carp (lakes); Fire-Blackened Mackerel, Moonfish Steaks and the Stargazing Eel Pie (the sea, and the bog eels of the swamps); Lantern Minnow Fritters (swamps); Frost-Red Salmon on a Plank and Arctic Char Smoked over Juniper (under the ice); Crystal Eel Broth (underground). One is cooked when the crew carries that fish from the last few days and someone at the fire knows how: they have made it before, they are a real cook, or they have landed a couple of that fish themselves. A landed legend is roasted whole for the whole camp: the Legend's Feast."],
       ["Watch", "Every meal is kept as a replay. \"▶ watch\" next to a meal in the Crier or a hero's day opens it."],
+    ]],
+    ["Fishing", [
+      ["Who fishes", "Every hero has a taste for fishing next to games, music and cooking, from who they are and from practice. Keen anglers buy a rod and a lure or two; the rest use a bent pin on a string. The Angler and Ice Fishing skills, practice and a good rod make a better angler."],
+      ["Where", "At camp by water (most roads have a stream; dungeon floors are dry except where they have a pool), for an hour or two in the water towns, on a hunt by a river or lake, and at each water town's fishing contest twice a season."],
+      ["What bites", "Twelve waters, four kinds of fish in each kind of water, one rare. A session can end in a catch measured against a ruler, nothing, the one that got away, an old boot, a heron (or the crew cat) running off with it, a bottle with a letter from another hero, a drowned key, or Old Whiskers the catfish, who will tell you something true about a dungeon if you put him back. Fishing is always safe."],
+      ["Legends", "Every water has one legendary fish. Each time it snaps a line the paper's story of it grows. Landed, it is gone from that water for good and hangs on the angler's trophy wall."],
+      ["Watch", "Every session is a replay: side on where the water hides its fish, or as a glass tank where you can watch them choose. The Creel Book on the World page lists every fish the league has landed."],
     ]],
     ["Music", [
       ["Music nights", "Some camp nights end in a song instead of a game, more often with a Bard or someone who really plays. One hero leads, and the rest sing, clap, bang a pot, play along or sing over the top. Some nights soar; some are a mess."],

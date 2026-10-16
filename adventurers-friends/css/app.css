@@ -837,3 +837,19 @@ table.boxscore { margin-bottom: 8px; }
 .guide-toc li::marker { color: var(--dim); }
 .grid2 > .panel[id^="guide-"] { scroll-margin-top: 12px; }
 @media (max-width: 600px) { .guide-toc ol { columns: 2; } }
+
+/* fishing: the hobby equipment tabs, the trophy wall of fish plaques, and the Creel Book */
+.hobby-tabs { margin-top: 2px; }
+.hobby-info { margin-top: 8px; }
+.fish-wall { display: flex; flex-wrap: wrap; gap: 8px; }
+.fish-plaque { display: flex; align-items: center; gap: 6px; min-width: 150px; background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 4px 8px 4px 4px; }
+.fish-plaque.rare { border-color: var(--brass2); }
+.fish-plaque.legend { border: 2px solid var(--brass2); background: var(--parch3); }
+.fish-plaque canvas, .creel-fish canvas, .creel-water canvas { image-rendering: pixelated; display: block; }
+.creel-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.creel-card { display: flex; gap: 8px; align-items: flex-start; background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 6px; }
+.creel-card.rare { border-color: var(--brass2); }
+.creel-fish { flex: 0 0 auto; min-width: 48px; }
+.creel-water { display: flex; gap: 8px; align-items: center; border-top: 1px dashed var(--edge); padding: 6px 0; }
+.recipe-list { margin: 4px 0 8px 18px; padding: 0; }
+.recipe-try { color: var(--ink, inherit); line-height: 1.5; }

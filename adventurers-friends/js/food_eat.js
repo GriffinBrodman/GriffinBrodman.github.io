@@ -29,10 +29,10 @@
   };
   const KIND_IN = { buns: "crumb", steamed: "white", breadslice: "grey", toast: "cheese", pasty: "potato", cake: "sponge", shard: "toffee", sardine: "white",
     fillets: "white", cod: "white", legs: "white", frogs: "white", wings: "meat", balls: "crumb", claw: "white", leg: "white", rope: "white", oyster: "white",
-    skewer: "meat", sausage: "pink", root: "root", egg: "yolk", chunk: "meat", drum: "meat", coil: "crumb", tip: "white", fish: "white" };
+    skewer: "meat", sausage: "pink", root: "root", egg: "yolk", chunk: "meat", drum: "meat", coil: "crumb", tip: "white", fish: "white", minnows: "white" };
   const WORD = { carve: "CHOMP", forkslice: "CHOMP", spoon: "SLURP", scoop: "NOM", wedge: "MMMF", cut: "CHOMP", flake: "NOM", tear: "MMMF", tearoff: "CHOMP",
-    pick: "CHOMP", dunk: "CHOMP", crack: "CRACK", stab: "CRUNCH", skewer: "CHOMP" };
-  const KIND_WORD = { cake: "MMMF", shard: "CRACK", legs: "CRUNCH", wings: "CRUNCH", frogs: "CRUNCH", balls: "CRUNCH", fillets: "CRUNCH", root: "CRUNCH", egg: "MMMF" };
+    pick: "CHOMP", dunk: "CHOMP", crack: "CRACK", stab: "CRUNCH", skewer: "CHOMP", portion: "CHOMP" };
+  const KIND_WORD = { cake: "MMMF", shard: "CRACK", legs: "CRUNCH", wings: "CRUNCH", frogs: "CRUNCH", balls: "CRUNCH", fillets: "CRUNCH", root: "CRUNCH", egg: "MMMF", minnows: "CRUNCH" };
 
   // ---------- how each dish is eaten ----------
   // a style is its tools ("fingers": no utensil, the piece just goes) and the action at the plate (saw, dip, dig, wedge, grab, tear, stab, crack)
@@ -51,6 +51,7 @@
     crack: { tools: ["mallet"], act: "crack", ACT: 1.1 },
     stab: { tools: ["fork"], act: "stab", ACT: 0.45 },
     skewer: { tools: ["fingers"], act: "grab", ACT: 0.4 },
+    portion: { tools: ["fork", "knife"], act: "saw", ACT: 1.1 },
   };
   const byZ = (a, b) => (b.z || 0) - (a.z || 0) || b.y - a.y;
   // the takes for a plate, in order: from the items and shapes the serve reported
@@ -75,7 +76,7 @@
       // the spoon goes for something in the broth: the chunk nearest each spot it aims at
       mound(Object.assign({}, G.f, { rx: G.f.rx * 0.8, ry: G.f.ry * 0.8 }), "spoon", n);
       const bits = it.filter((q) => q.kind === "bit" && q.bit !== "bean" && q.bit !== "leafy"), used = new Set();
-      for (const tk of out) { let best = null, bd = 1e9; for (const q of bits) { const d = Math.hypot(q.x - tk.x, (q.y - tk.y) * 1.5); if (!used.has(q) && d < bd && d < 26) { bd = d; best = q; } } if (best) { used.add(best); tk.x = best.x; tk.y = best.y; } }
+      for (const tk of out) { let best = null, bd = 1e9; for (const q of bits) { const d = Math.hypot(q.x - tk.x, (q.y - tk.y) * 1.5); if (!used.has(q) && d < bd && (d < 26 || spec.look.clear)) { bd = d; best = q; } } if (best) { used.add(best); tk.x = best.x; tk.y = best.y; } }
     }
     else if (plate === "bun") {
       if (ofKind("breadslice").length) items(G.dip ? "dunk" : "pick", ofKind("breadslice"), { dip: G.dip });
@@ -83,18 +84,22 @@
       else if (G.flat1) for (let i = 0; i < n; i++) { const f = i % 2 ? G.flat0 : G.flat1, a = [1.25, 2.3, 0.45, 3.0][i % 4]; out.push({ style: "tearoff", x: f.cx + Math.cos(a) * f.rx * 0.82, y: f.cy + Math.sin(a) * f.ry * 0.82, m: f, kind: "buns" }); }
       items("tear", ofKind("buns", "steamed"));
       if (G.mound && !out.length) mound(G.mound, "cut", n);
-    } else if (plate === "pie" || (plate === "sweet" && G.pie)) {
+    } else if (plate === "wholefish" || plate === "clayfish" || plate === "plankfish") items("forkslice", ofKind("flake"));
+    // a fish too big for one fork: each portion held with a fork and cut free with a knife, the crew round it
+    else if (plate === "bigfish") items("portion", ofKind("flake"));
+    else if (plate === "pie" || plate === "eelpie" || (plate === "sweet" && G.pie)) {
       if (G.pie) for (let i = 0; i < n; i++) { const a = [1.95, 1.2, 2.7, 0.55][i % 4]; out.push({ style: "wedge", x: G.pie.cx + Math.cos(a) * G.pie.rx * 0.5, y: G.pie.cy + Math.sin(a) * G.pie.ry * 0.5, m: G.pie, a }); }
       items("pick", ofKind("pasty"));
       if (G.mound && !out.length) mound(G.mound, G.mound.scoop ? "scoop" : "cut", n, G.mound.scoop ? { fork: true } : {});
     } else if (plate === "claws") { (G.meat || []).forEach((q) => out.push({ style: "scoop", fork: true, x: q.cx, y: q.cy, kind: "leg", m: q })); items("crack", ofKind("claw", "leg")); items(G.dip ? "dunk" : "pick", ofKind("rope"), { dip: G.dip, fork: true }); items("pick", ofKind("oyster")); }
-    else if (plate === "crisps") { items(G.dip ? "dunk" : "pick", it.filter((q) => q.kind !== "cod"), { dip: G.dip }); if (G.mound) mound(G.mound, "tearoff", n, { kind: "cod" }); }
+    else if (plate === "crisps") { items(G.dip ? "dunk" : it.some((q) => q.kind === "minnows") ? "forkslice" : "pick", it.filter((q) => q.kind !== "cod"), { dip: G.dip }); if (G.mound) mound(G.mound, "tearoff", n, { kind: "cod" }); }
     else if (plate === "skewer") { ofKind("fish").forEach((q) => out.push({ style: "flake", x: q.x, y: q.y - 1, kind: "fish", m: q.m })); items("pick", ofKind("chunk", "drum", "coil", "tip")); }
     else if (plate === "sausage" && G.coil) for (let i = 0; i < n; i++) { const a = TAU * (3.2 - i * 0.1), r0 = G.coil.R * (0.15 + (1 - i * 0.031) * 0.85); out.push({ style: "cut", x: G.coil.cx + Math.cos(a) * r0 - 3, y: G.coil.cy + Math.sin(a) * r0 * 0.45, disc: 9, kind: "sausage" }); }
     else if (plate === "salad" && G.leaves) { items("forkslice", ofKind("egg")); mound(Object.assign({}, G.leaves, { rx: G.leaves.rx * 0.75, ry: G.leaves.ry * 0.75 }), "stab", n); }
     else if (plate === "fillet") {
       // a fork flakes a piece off a fish on the plank; it doesn't carry off the whole fish
       ofKind("sardine").forEach((q) => out.push({ style: "flake", x: q.x + (q.m ? q.m.rx * 0.15 : 0), y: q.y - 1, kind: "sardine", m: q.m || { cx: q.x, cy: q.y, rx: 7.5, ry: 27, h: 6 } }));
+      ofKind("steak").forEach((q) => out.push({ style: "flake", x: q.x - 3, y: q.y + 2, kind: "steak", m: q.m }));
       items("forkslice", ofKind("slice")); if (G.mound) mound(G.mound, "flake", n);
     }
     else if (plate === "ice" && ofKind("scoop").length) ofKind("scoop").forEach((q) => out.push({ style: "scoop", x: q.mound.cx - 2, y: q.mound.cy - 1, m: q.mound }));
@@ -335,12 +340,15 @@
   }
   function knife(img, x, y, ux, uy, a) {
     seg2("knife", x, y, ux, uy);
-    const px = -uy, py = ux, Lb = 18, L = LEN.knife;
+    const px = -uy, py = ux, Lb = 19, L = LEN.knife;
+    // a carving knife: a broad bright blade, straight along its spine and curving to the point on its edge, a steel bolster, a dark
+    // handle with two rivets
     onLayer(img, (lay) => {
-      rod(lay, x + ux * (Lb + 2), y + uy * (Lb + 2), x + ux * L, y + uy * L, 3.6, 4.4, WOOD);
-      rod(lay, x + ux * Lb, y + uy * Lb, x + ux * (Lb + 2.5), y + uy * (Lb + 2.5), 4, 4, PEWTER, { dark: -0.1 });
-      const blade = [[x, y], [x + ux * Lb + px * 2, y + uy * Lb + py * 2], [x + ux * Lb - px * 2, y + uy * Lb - py * 2], [x + ux * 4 - px * 2, y + uy * 4 - py * 2]];
-      poly(lay, blade, (xx, yy) => { const across = ((xx + 0.5 - x) * px + (yy + 0.5 - y) * py) / 2; return pick(PEWTER, across > 0.55 ? 0.98 : 0.55 - across * 0.25, xx, yy); });
+      rod(lay, x + ux * (Lb + 3), y + uy * (Lb + 3), x + ux * L, y + uy * L, 4, 4.6, WOOD, { dark: 0.15 });
+      for (const k of [Lb + 6, Lb + 11]) lay.px(x + ux * k, y + uy * k, "#e8e8f0");
+      rod(lay, x + ux * Lb, y + uy * Lb, x + ux * (Lb + 3), y + uy * (Lb + 3), 6, 6, PEWTER, { dark: -0.05 });
+      const blade = [[x, y], [x + ux * Lb + px * 1.6, y + uy * Lb + py * 1.6], [x + ux * Lb - px * 4.2, y + uy * Lb - py * 4.2], [x + ux * (Lb * 0.55) - px * 4, y + uy * (Lb * 0.55) - py * 4], [x + ux * 5 - px * 2.4, y + uy * 5 - py * 2.4]];
+      poly(lay, blade, (xx, yy) => { const across = ((xx + 0.5 - x) * px + (yy + 0.5 - y) * py), d = across + 4.2; return d < 1 ? "#ffffff" : across > 0.6 ? pick(PEWTER, 0.6, xx, yy) : pick(PEWTER, 0.98 - (d / 6) * 0.3, xx, yy); });
     }, a);
   }
   function spoon(img, x, y, ux, uy, a, fill) {
@@ -434,7 +442,7 @@
       tk.gone = st.act === "carve" ? tk.sw + LIE_T : tk.sw;
       tk.dur = tk.gone + OUT_T;
       // the next carve starts once the last slice is gone, so there is only ever one knife; one side's crew take turns
-      const pv = p.takes[k - 1], knives = ["carve", "wedge", "cut"];
+      const pv = p.takes[k - 1], knives = ["carve", "wedge", "cut", "portion"];
       tk.t0 = k === 0 ? 0 : p.takes[0].carver ? p.takes[0].gone - 0.2 + (k - 1) * 0.3 : pv.t0 + (tk.style === "carve" ? pv.dur - IN_T * 0.5 : knives.includes(tk.style) && knives.includes(pv.style) ? pv.gone : Math.min(pv.dur, o.gap || 0.75));
       if (k) for (const q of p.takes) if (q.side === tk.side) tk.t0 = Math.max(tk.t0, q.t0 + q.dur - 0.05);
       tk.word = tk.m && tk.m.wobble ? "SQUISH" : KIND_WORD[tk.kind] || WORD[tk.style] || "CHOMP";

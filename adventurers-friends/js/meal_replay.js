@@ -243,7 +243,7 @@
       nameCard(img, words.slice(cut).join(" "), t, Object.assign({}, o, { line2: true, legendary: false }));
       return nameCard(img, words.slice(0, cut).join(" "), t, Object.assign({}, o, { line2: true, y: (o.y || (o.sub ? H - 22 : H - 12)) - 15, sub: null }));
     }
-    const u = ease3(clamp(t / 0.45, 0, 1)), k = textWidth(name, { k: 2, bold: true }) > W - 24 ? 1 : 2;
+    const u = ease3(clamp(t / 0.45, 0, 1)), k = o.k || (textWidth(name, { k: 2, bold: true }) > W - 24 ? 1 : 2);
     // it drops into place rather than sliding in from past the left edge, so no frame shows the name cut off
     const tw = textWidth(name, { k, bold: true }), x = 10, y = (o.y || (o.sub ? H - 22 : H - 12)) - Math.round((1 - u) * 8);
     const gold = o.legendary ? ["#fff6c8", "#ffe08a", "#f0b840", "#c8841c"] : ["#fff8e8", "#f8e2b0", "#e8c07a", "#c89048"];
@@ -1132,7 +1132,7 @@
       if (r.disaster) { for (let i = 0; i < 3; i++) steam(img, 80 + i * 40, 90, 70, t * 1.1 + i * 2, 0.45, 6, 6, "#6aa848"); }
       else twinkles(img, p.sparkles || [[96, 50, 3], [150, 44, 2], [60, 70, 2]], t, 1.3);
       if (r.legendary) godrays(img, t);
-      nameCard(img, r.name || p.name || "", t - 0.5, { legendary: r.legendary, sub: r.disaster ? "(more or less)" : null });
+      nameCard(img, r.name || p.name || "", t - 0.5, { legendary: r.legendary, k: p.look.cardK, sub: r.disaster ? "(more or less)" : r.catch && textWidth(r.catch) <= W - 16 ? r.catch : null });
     }, sfx: [[0.05, r.disaster ? "sad" : r.legendary ? "fanfare" : "reveal", 1], [0.55, "swish", 1]] });
     const dig = r.disaster ? pokeBeat(r, ctx) : eatBeat(r, ctx, { n: Math.min(3, ctx.cast.length) });
     if (dig) beats.push(dig);
