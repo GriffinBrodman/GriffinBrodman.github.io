@@ -137,12 +137,26 @@
     const sprite = (c) => A.spriteCanvas((f) => Art.heroGrid(Object.assign({}, h, { cls: c, legend: false, kit: null }), f, S.classes[c]), 2, "", false);
     h.class_history.forEach(([day, c], i) => {
       if (i) row.appendChild(el("div", { class: "arrow" }, "→"));
-      row.appendChild(el("div", { class: "step" }, sprite(c), el("div", { class: "small" }, S.classes[c].name), el("div", { class: "tiny dim" }, day ? A.when(day) : "")));
+      row.appendChild(el("div", { class: "step" }, sprite(c), el("div", { class: "small" }, S.classes[c].name, day ? el("span", { class: "tiny dim when" }, " " + A.when(day)) : null)));
     });
     p.appendChild(row);
-    p.appendChild(el("p", { class: "tiny dim" }, "Drawn in each class's own look; the Kit shows what they actually wear."));
     p.appendChild(el("p", { class: "small muted" }, S.classes[h.cls].desc));
+    const ahead = headingLine(h);
+    if (ahead) p.appendChild(ahead);
+    p.appendChild(el("p", { class: "tiny dim" }, "Drawn in each class's own look; the Kit shows what they actually wear."));
     return p;
+  }
+  // where the hero's arc is bending, told the way a friend would: the next class and what is drawing them to it
+  function headingLine(h) {
+    const nx = h.next_class;
+    if (!nx) return null;
+    const a = /^[aeiou]/i.test(nx.name) ? "an" : "a", why = nx.why || [];
+    const list = why.join(" and by ");
+    const verb = nx.level <= h.level + 1 ? "is on the verge of becoming" : "is growing into";
+    return el("p", { class: "small heading-line" },
+      why.length ? [`${h.name} ${verb} ${a} `, el("b", { class: "gold" }, nx.name), `, drawn by ${list}.`]
+        : [`${h.name} is still finding their way; for now the road bends toward `, el("b", { class: "gold" }, nx.name), ", and the next few things they learn will settle it."],
+      nx.alt ? el("span", { class: "dim" }, ` ${/^[aeiou]/i.test(nx.alt) ? "An" : "A"} ${nx.alt}'s road is still open to them.`) : null);
   }
   function sortedHeroes(list) { return list.slice().sort((a, b) => (b.alive - a.alive) || b.renown - a.renown || b.level - a.level); }
 
@@ -256,15 +270,6 @@
     });
   });
 
-  // the Yeti Society's correspondence board: a tiny corner box in the paper, never a feed story
-  function yetiCorner() {
-    const y = L.yeti;
-    if (!y) return null;
-    const done = y.result ? (y.result === "draw" ? "Drawn." : y.players[y.winner].yeti ? "The footprint won." : "The Society won!") : `Move ${y.move}.`;
-    const box = el("a", { class: "yeti-corner", href: "#/map/frosthold" }, el("div", { class: "tiny dim yeti-note" }, `Yeti Society, day ${y.yeti.day}. ${done}`));
-    A.need(["chess_replay"]).then(() => { box.insertBefore(ChessReplay.player(y, { scale: 1 }), box.firstChild); }).catch(() => box.remove());
-    return box;
-  }
 
   A.route(/^\/$/, (v) => {
     const meta = L.meta;
@@ -291,8 +296,6 @@
     if (picker) v.appendChild(picker);
     const wxs = weatherStrip();
     if (wxs) parch.appendChild(wxs);
-    const yb = yetiCorner();
-    if (yb) parch.appendChild(yb);
     const hb = hyperBanner();
     if (hb) v.appendChild(hb);
 
@@ -778,10 +781,9 @@
     const om = omensPanel(h);
     if (om) right.appendChild(om);
     right.appendChild(skillsPanel(h));
-    right.appendChild(affinityPanel(h));
     right.appendChild(gearPanel(h));
     const hob = hobbyPanel(h);
-    if (hob) b.appendChild(hob);
+    if (hob) left.appendChild(hob);
   }
   // what a hero eats: the favourite family (from the quiz's tavern order and traits), what they've had most, and the latest meals to watch
   function mealLink(id) { return A.storyLink({ meal: id }); }
@@ -807,25 +809,35 @@
     ((S.tarot || {}).cards || []).forEach((c) => { cards[c.id] = c; });
     if ((S.tarot || {}).drowned) cards.drowned = S.tarot.drowned;
     if (act.length) {
-      const row = el("div", { class: "omen-row", style: { display: "flex", gap: "8px", flexWrap: "wrap" } });
+      // one reading lays out a spread with one reader and one ending; the caption says so once, under its cards
+      const spreads = [];
       for (const x of act) {
-        const cv = el("canvas", { width: 56, height: 92, style: { imageRendering: "pixelated", width: "56px", height: "92px", display: "block" } });
-        if (window.TarotCards) {
-          Promise.all([TarotCards.load(TarotCards.deckFor(x)), x.rev ? A.need(["tarot_replay"]) : null]).then(([d]) => {
-            const px = x.rev && window.TarotReplay ? TarotReplay.rot180(d.card(x.card), d.w, d.h) : d.card(x.card);
-            const g = cv.getContext("2d"), img = g.createImageData(d.w, d.h);
-            img.data.set(px);
-            for (let i = 3; i < img.data.length; i += 4) if (img.data[i] > 0) img.data[i] = 255;
-            g.putImageData(img, 0, 0);
-          }).catch(() => {});
-        }
-        const days = x.left === 0 ? "ends today" : `${x.left} day${x.left === 1 ? "" : "s"} left`;
-        row.appendChild(el("div", { style: { width: "120px" } }, cv,
-          el("div", { class: "small" }, el("b", null, x.name || (cards[x.card] || {}).name || x.card), x.rev ? el("span", { class: "dim" }, " upside down") : null),
-          el("div", { class: "small " + (x.secret ? "gold" : x.good ? "green" : "red") }, x.secret ? "a secret, until it ends" : x.says),
-          el("div", { class: "tiny dim" }, days, x.by ? [" · read by ", x.reading ? el("a", { href: `#/reading/${x.reading}` }, x.by) : x.by] : null)));
+        const key = `${x.reading || x.by || ""}|${x.left}`;
+        let sp = spreads.find((g) => g.key === key);
+        if (!sp) spreads.push(sp = { key, by: x.by, reading: x.reading, left: x.left, cards: [] });
+        sp.cards.push(x);
       }
-      p.appendChild(row);
+      for (const sp of spreads) {
+        const row = el("div", { class: "omen-row" });
+        for (const x of sp.cards) {
+          const cv = el("canvas", { width: 56, height: 92, style: { imageRendering: "pixelated", width: "56px", height: "92px", display: "block" } });
+          if (window.TarotCards) {
+            Promise.all([TarotCards.load(TarotCards.deckFor(x)), x.rev ? A.need(["tarot_replay"]) : null]).then(([d]) => {
+              const px = x.rev && window.TarotReplay ? TarotReplay.rot180(d.card(x.card), d.w, d.h) : d.card(x.card);
+              const g = cv.getContext("2d"), img = g.createImageData(d.w, d.h);
+              img.data.set(px);
+              for (let i = 3; i < img.data.length; i += 4) if (img.data[i] > 0) img.data[i] = 255;
+              g.putImageData(img, 0, 0);
+            }).catch(() => {});
+          }
+          row.appendChild(el("div", { class: "omen-card" }, cv,
+            el("div", { class: "small" }, el("b", null, x.name || (cards[x.card] || {}).name || x.card), x.rev ? el("span", { class: "dim" }, " upside down") : null),
+            el("div", { class: "small " + (x.secret ? "gold" : x.good ? "green" : "red") }, x.secret ? "a secret, until it ends" : x.says)));
+        }
+        const days = sp.left === 0 ? "they end today" : `they last ${sp.left} more day${sp.left === 1 ? "" : "s"}`;
+        const who = sp.by ? ["Read by ", sp.reading ? el("a", { href: `#/reading/${sp.reading}` }, sp.by) : sp.by, "; "] : null;
+        p.append(row, el("p", { class: "tiny dim omen-by" }, who, sp.by ? days : cap(days), "."));
+      }
     } else p.appendChild(el("p", { class: "empty" }, "No omens on them just now."));
     if (log.length) {
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Past readings"));
@@ -850,21 +862,6 @@
     if (!moved) return row;
     return tip(row, moved.map((g) => `Was ${g.from}, now ${g.to}.${g.day ? " Day " + g.day + ":" : ""} ${g.why || ""}.`).join(" "), `${who} grew ${moved[moved.length - 1].mood}`);
   }
-  // the leaning first (where this hero's arc is heading), then what has grown it: affinity starts empty and fills from what they learn and do
-  function affinityPanel(h) {
-    const top = Object.entries(h.lean_aff || h.aff).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 7);
-    const max = top.length ? top[0][1] : 1;
-    const p = panel("Where they're heading");
-    const nxt = nextClass(h);
-    if (nxt) p.appendChild(el("p", { class: "small" }, `Leaning toward `, el("b", { class: "gold" }, nxt.name), ` at level ${nxt.level}`,
-      nxt.alt ? el("span", { class: "dim" }, `, with ${nxt.alt} the other path`) : null, "."));
-    if (h.voice) p.appendChild(el("p", { class: "small" }, "Talks: ", el("b", null, voiceWord(h.voice)), el("span", { class: "dim" }, " (from the quiz, their traits and their class)")));
-    p.appendChild(el("p", { class: "small dim" }, top.length ? "What's grown so far, one number per calling (higher pulls harder). The strongest decide the class at levels 9 and 18. Skills learned count most; their work, their fights and what happens to them count too."
-      : "Nothing has pulled them one way yet. Their first few skills will."));
-    for (const [k, val] of top) p.appendChild(el("div", { class: "trait" }, el("span", { class: "small" }, cap(k)), A.bar(val, max, "blue"), el("span", { class: "word small" }, val.toFixed(1))));
-    return p;
-  }
-  function nextClass(h) { return h.next_class || null; }
   // the paper doll: what the hero wears, slot by slot, with the story of each piece
   const KIT_SLOTS = { head: "Head", neck: "Neck", armor: "Armor", ring1: "Ring", back: "Back", offhand: "Off-hand", pocket: "Pocket", ring2: "Ring", weapon: "Weapon" };
   const QUALITY = ["plain", "decent", "fine", "masterwork"], QUALITY5 = ["", "battered", "plain", "good", "fine", "masterwork"];
@@ -957,6 +954,127 @@
     }
     return row;
   }
+  // ================= PASTIMES: a pixel pentagon of how keen a hero is on each evening pastime (h.pastimes.keen) and, dashed, how good (skill) =================
+  const PASTIMES = [
+    { k: "sing", name: "Singing", noun: "singing", verb: "sing", tab: "music" },
+    { k: "play", name: "Playing", noun: "playing music", verb: "play", tab: "music" },
+    { k: "game", name: "Gaming", noun: "games", verb: "play games", tab: "gaming" },
+    { k: "fish", name: "Fishing", noun: "fishing", verb: "fish", tab: "fishing" },
+    { k: "cook", name: "Cooking", noun: "cooking", verb: "cook", tab: "cooking" },
+  ];
+  const PT_PAL = { k: "#2e2116", K: "#5c3c24", r: "#9a2a20", R: "#c8574a", w: "#f1e3c2", d: "#3a1410", b: "#b07a3a", B: "#d9a45a", g: "#6b7a4a",
+    G: "#8fa064", s: "#a99a86", f: "#4f7f9a", F: "#8cb6c8", y: "#ecc56a", e: "#5a4a3a" };
+  const PT_ICON = {
+    sing: [".........k..", "..kkk....kk.", ".kRRRk...k.k", "kRwwwRk..k..", "kRdddRk.kk..", "kRdddrk.kk..", ".krrrk......", "..kkk......."],
+    play: [".........kk", "........kyk", ".......kk..", "......kKk..", "..kkkkkk...", ".kBBBBk....", "kBBkkBBk...", "kBBkkbBk...", "kBBBBbbk...", ".kbBbbk....", "..kkkk....."],
+    game: ["kkkkkkkkk", "kwwwwwwsk", "kwkwwwwsk", "kwwwwwwsk", "kwwwkwwsk", "kwwwwwwsk", "kwwwwwksk", "kssssssek", "kkkkkkkkk"],
+    fish: ["...........", "....kkkk...", "..kkFFFfk.k", ".kFFwkFffkk", "kFFFFFFffk.", ".kfffffffkk", "..kkfffkk.k", "....kkk...."],
+    cook: ["..s...s..", "...s...s.", "..s...s..", "kkkkkkkkk", "keGGGGGek", "kkgggggkk", ".kgggggk.", ".kgggggk.", "..kkkkk.."],
+  };
+  function ptIcon(k, px) {
+    const rows = PT_ICON[k], w = Math.max(...rows.map((r) => r.length));
+    const cv = el("canvas", { width: w, height: rows.length, class: "pt-icon", "aria-hidden": "true", style: { width: w * px + "px", height: rows.length * px + "px" } });
+    const g = cv.getContext("2d");
+    rows.forEach((r, y) => [...r].forEach((c, x) => { if (PT_PAL[c]) { g.fillStyle = PT_PAL[c]; g.fillRect(x, y, 1, 1); } }));
+    return cv;
+  }
+  const keenWord = (v) => (v >= 0.75 ? "loves it" : v >= 0.5 ? "keen" : v >= 0.3 ? "likes it" : v >= 0.15 ? "now and then" : "not for them");
+  const skillWord = (v) => (v >= 0.8 ? "gifted" : v >= 0.6 ? "good" : v >= 0.4 ? "decent" : v >= 0.2 ? "rough" : "no hand at it yet");
+  function pastimeLine(h, keen, skill) {
+    const hasInst = ((h.music || {}).inst || []).length > 0;
+    const order = PASTIMES.slice().sort((a, b) => keen[b.k] - keen[a.k] || PASTIMES.indexOf(a) - PASTIMES.indexOf(b));
+    const top = order[0], v = keen[top.k];
+    // with nothing to play, a low "playing" is the instrument missing, not a dislike
+    const low = order.slice().reverse().find((x) => x.k !== top.k && (x.k !== "play" || hasInst));
+    let s = v >= 0.75 ? `Loves ${top.noun}` : v >= 0.45 ? `Keenest on ${top.noun}` : v >= 0.25 ? `Likes ${top.noun} best` : `Not one for pastimes; ${top.noun}, if anything`;
+    if (low && keen[low.k] < 0.15) s += `; would rather not ${low.verb}`;
+    else if (low && keen[low.k] < 0.3) s += `; ${low.noun} least`;
+    const good = PASTIMES.slice().sort((a, b) => skill[b.k] - skill[a.k])[0];
+    const tail = skill[good.k] >= 0.4 && good.k !== top.k ? ` Best at ${good.noun} (${skillWord(skill[good.k])}).` : "";
+    return `${s}.${tail}`;
+  }
+  // drawn pixel by pixel on a small canvas shown at 2x, so edges stay hard like the rest of the art
+  function pastimeChart(h, pick) {
+    const P = h.pastimes;
+    if (!P) return null;
+    const W = 136, H = 124, cx = 68, cy = 64, R = 52, PX = 2, BW = 316;
+    const ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / PASTIMES.length;
+    const pt = (i, f) => [cx + Math.cos(ang(i)) * R * f, cy + Math.sin(ang(i)) * R * f];
+    const poly = (vals) => PASTIMES.map((p, i) => pt(i, Math.max(0.04, Math.min(1, vals[p.k] || 0))));
+    const cv = el("canvas", { width: W, height: H, class: "pt-canvas", style: { width: W * PX + "px", height: H * PX + "px" } });
+    const g = cv.getContext("2d"), img = g.createImageData(W, H), D = img.data;
+    const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const put = (x, y, hex, a) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 0 || y < 0 || x >= W || y >= H) return;
+      const c = rgb(hex), o = (y * W + x) * 4, t = a == null ? 1 : a;
+      for (let j = 0; j < 3; j++) D[o + j] = D[o + 3] ? Math.round(D[o + j] * (1 - t) + c[j] * t) : c[j];
+      D[o + 3] = 255;
+    };
+    const inside = (ps, x, y) => {
+      let c = false;
+      for (let i = 0, j = ps.length - 1; i < ps.length; j = i++) {
+        const [xi, yi] = ps[i], [xj, yj] = ps[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+      }
+      return c;
+    };
+    const fill = (ps, fn) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (inside(ps, x + 0.5, y + 0.5)) fn(x, y); };
+    const line = (a, b, fn) => {
+      let [x0, y0] = a.map(Math.round); const [x1, y1] = b.map(Math.round);
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy, n = 0;
+      for (;;) {
+        fn(x0, y0, n++);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+      }
+    };
+    const ring = (ps, fn) => ps.forEach((p, i) => line(p, ps[(i + 1) % ps.length], fn));
+    const rings = [1, 0.75, 0.5, 0.25].map((f) => PASTIMES.map((_, i) => pt(i, f)));
+    rings.forEach((ps, i) => fill(ps, (x, y) => put(x, y, i % 2 ? "#e8d6ae" : "#dcc597")));
+    PASTIMES.forEach((_, i) => line([cx, cy], pt(i, 1), (x, y, n) => { if (n % 2 === 0) put(x, y, "#b0915e"); }));
+    rings.slice(1).forEach((ps) => ring(ps, (x, y) => put(x, y, "#c9ad7c")));
+    const keen = poly(P.keen), skill = poly(P.skill);
+    fill(keen, (x, y) => put(x, y, (x + y) % 4 === 0 ? "#ecc56a" : "#c8963e", 0.78));
+    ring(keen, (x, y) => put(x, y, "#8e2a22"));
+    fill(skill, (x, y) => { if (x % 3 === 0 && y % 3 === 0 && !inside(keen, x + 0.5, y + 0.5)) put(x, y, "#2f5a7a", 0.6); });
+    ring(skill, (x, y, n) => { if (n % 4 < 3) put(x, y, "#2f5a7a"); });
+    ring(rings[0], (x, y) => put(x, y, "#5c3c24"));
+    for (const [x, y] of keen) {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) put(x + dx, y + dy, dx || dy ? "#2e2116" : "#ecc56a");
+    }
+    g.putImageData(img, 0, 0);
+    const box = el("div", { class: "pt-chart", style: { width: BW + "px" } });
+    const ox = (BW - W * PX) / 2, oy = 30;
+    cv.style.left = ox + "px"; cv.style.top = oy + "px";
+    box.appendChild(cv);
+    const detail = el("p", { class: "small pt-detail" });
+    const say = (p) => {
+      const hasInst = ((h.music || {}).inst || []).length > 0;
+      const sk = p.k === "play" && !hasInst ? "nothing to play" : skillWord(P.skill[p.k]);
+      detail.innerHTML = "";
+      detail.append(el("b", null, p.name), `: ${keenWord(P.keen[p.k])}`, el("span", { class: "dim" }, ` · skill: ${sk}`));
+    };
+    PASTIMES.forEach((p, i) => {
+      const a = ang(i), r = R * PX + 30;
+      const x = ox + cx * PX + Math.cos(a) * r, y = oy + cy * PX + Math.sin(a) * r;
+      const b = el("button", { type: "button", class: "pt-label", style: { left: x + "px", top: y + "px" },
+        title: `${p.name}: ${keenWord(P.keen[p.k])}` }, ptIcon(p.k, 3), el("span", null, p.name));
+      const go = () => say(p);
+      b.addEventListener("mouseenter", go); b.addEventListener("focus", go);
+      b.addEventListener("click", () => { go(); if (pick) pick(p.tab); });
+      box.appendChild(b);
+    });
+    const fav = PASTIMES.slice().sort((a, b) => P.keen[b.k] - P.keen[a.k])[0];
+    say(fav);
+    return el("div", { class: "pt-wrap" },
+      el("h4", null, "Pastimes"), el("p", { class: "pt-line" }, pastimeLine(h, P.keen, P.skill)),
+      box, detail,
+      el("div", { class: "pt-key tiny dim" }, el("span", { class: "pt-sw pt-keen" }), "how keen", el("span", { class: "pt-sw pt-good" }), "how good"));
+  }
   // a panel's body without its own heading, so an old panel can sit inside a tab
   function inner(p) {
     if (!p) return null;
@@ -975,16 +1093,12 @@
       tab.gaming = ["Gaming", el("div", null, el("h4", null, "Game sets"), setTiles(h, games, i), i,
         el("p", { class: "tiny dim" }, "Who they play and how it goes is on the People tab, at the fire."))];
     }
-    const food = inner(foodPanel(h)), cooked = (h.table || {}).cooked || [], specials = (h.table || {}).specials || [];
-    const cookedIds = new Set(cooked.map((x) => x.id)), toTry = specials.filter((x) => !cookedIds.has(x.id));
+    const food = inner(foodPanel(h)), cooked = (h.table || {}).cooked || [];
     if (food || cooked.length) tab.cooking = ["Cooking", el("div", null,
       el("h4", null, "Recipes known"),
       cooked.length ? el("ul", { class: "small recipe-list" },
         cooked.map((x) => el("li", null, el("b", null, x.name), ` · cooked ${x.n > 1 ? x.n + " times" : "once"}`)))
         : el("p", { class: "small" }, "Has not cooked for the crew yet."),
-      toTry.length ? el("p", { class: "small recipe-try" }, "Fish specials to try: ",
-        toTry.map((x, i) => [i ? " · " : "", x.known ? el("b", null, x.name) : x.name, ` (${x.needs.replace(/a fresh |a /g, "")})`]),
-        toTry.some((x) => x.known) ? ". Bold: this hero can cook it." : ".") : null,
       food)];
     const inst = sets.filter((s) => s.kind === "music"), mus = inner(musicPanel(h));
     if (inst.length || mus) {
@@ -992,12 +1106,16 @@
       tab.music = ["Music", el("div", null, inst.length ? [el("h4", null, "Instruments"), setTiles(h, inst, i), i] : null, mus)];
     }
     const keys = Object.keys(tab);
-    if (!keys.length) return null;
     const bar = el("div", { class: "tabs hobby-tabs" }), body = el("div");
-    const show = (k) => { for (const b of bar.children) b.classList.toggle("on", b.dataset.k === k); body.innerHTML = ""; body.appendChild(tab[k][1]); };
+    const show = (k) => { if (!tab[k]) return; for (const b of bar.children) b.classList.toggle("on", b.dataset.k === k); body.innerHTML = ""; body.appendChild(tab[k][1]); };
     for (const k of keys) bar.appendChild(el("button", { type: "button", "data-k": k, onclick: () => show(k) }, tab[k][0]));
-    show(keys[0]);
-    return panel("Hobby equipment", bar, body);
+    const chart = pastimeChart(h, show);
+    if (!keys.length && !chart) return null;
+    if (!keys.length) { chart.querySelector("h4").remove(); return panel("Pastimes", chart); }
+    const keen = (h.pastimes || {}).keen || {};
+    const fav = PASTIMES.filter((p) => tab[p.tab]).sort((a, b) => (keen[b.k] || 0) - (keen[a.k] || 0))[0];
+    show(fav ? fav.tab : keys[0]);
+    return panel("Hobby equipment", el("div", { class: "hobby-wrap" + (chart ? "" : " solo") }, chart, el("div", { class: "hobby-kit" }, bar, body)));
   }
   // fishing: the rod and tackle, the angler's ledger and the trophy wall (a plaque for each species' best, gold for a legend)
   function fishPlaque(spec) {
