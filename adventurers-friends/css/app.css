@@ -881,3 +881,17 @@ table.boxscore { margin-bottom: 8px; }
 .creel-fish { flex: 0 0 auto; min-width: 48px; }
 .creel-water { display: flex; gap: 8px; align-items: center; border-top: 1px dashed var(--edge); padding: 6px 0; }
 .recipe-list { margin: 4px 0 8px 18px; padding: 0; }
+
+/* the purse chart on the hero Record tab (views.js purseChart) */
+.purse-wrap { position: relative; max-width: 640px; }
+.purse-svg { width: 100%; height: auto; display: block; }
+.purse-grid { stroke: var(--parch3); stroke-width: 1; }
+.purse-ax { font: 11px var(--ui, sans-serif); fill: var(--ink2, #6e5a44); }
+.purse-area { fill: rgba(169, 119, 31, 0.18); }
+.purse-line { fill: none; stroke: var(--brass0, #a9771f); stroke-width: 2.5; stroke-linejoin: round; }
+.purse-dot { fill: var(--parch, #f7ecd5); stroke: var(--wood3, #4a2f1c); stroke-width: 2; }
+.purse-hit { fill: transparent; cursor: pointer; }
+.purse-pt { fill: var(--wood3); }
+.purse-pt.bare { fill: var(--parch3); stroke: var(--wood3); stroke-width: 1; }
+.purse-tip { position: absolute; top: 4px; min-width: 150px; max-width: 30%; background: var(--parch, #f7ecd5); border: 2px solid var(--wood3, #4a2f1c); padding: 6px 8px; font-size: 13px; pointer-events: none; box-shadow: 3px 3px 0 rgba(46, 33, 22, 0.25); }
+@media (max-width: 480px) { .purse-tip { max-width: 60%; } }

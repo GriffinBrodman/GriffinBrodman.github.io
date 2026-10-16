@@ -1237,7 +1237,59 @@
     if (!regs.length && !jobs.length) t.appendChild(el("p", { class: "empty" }, "No local ties yet."));
     b.appendChild(t);
   }
+  // the purse over the season: one point a day, and each day's ins and outs by reason on hover or tap (town.py purse_close)
+  function purseChart(h) {
+    const rows = (h.purse || []).filter((r) => r && r[1] != null);
+    if (rows.length < 2) return null;
+    const NS = "http://www.w3.org/2000/svg", W = 600, H = 150, P = { l: 34, r: 8, t: 10, b: 22 };
+    const sv = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
+    const d0 = rows[0][0], d1 = rows[rows.length - 1][0], top = Math.max(10, ...rows.map((r) => r[1] / 10));
+    const X = (d) => P.l + (d1 === d0 ? 0 : (d - d0) / (d1 - d0)) * (W - P.l - P.r), Y = (s) => H - P.b - (s / top) * (H - P.t - P.b);
+    const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "purse-svg", role: "img", "aria-label": `${h.name}'s silver, day by day` });
+    for (const f of [0, 0.5, 1]) {
+      svg.appendChild(sv("line", { x1: P.l, x2: W - P.r, y1: Y(top * f), y2: Y(top * f), class: "purse-grid" }));
+      const t = sv("text", { x: P.l - 4, y: Y(top * f) + 4, class: "purse-ax", "text-anchor": "end" });
+      t.textContent = Math.round(top * f);
+      svg.appendChild(t);
+    }
+    const pts = rows.map((r) => `${X(r[0]).toFixed(1)},${Y(r[1] / 10).toFixed(1)}`);
+    svg.appendChild(sv("polygon", { points: `${X(d0)},${Y(0)} ${pts.join(" ")} ${X(d1)},${Y(0)}`, class: "purse-area" }));
+    svg.appendChild(sv("polyline", { points: pts.join(" "), class: "purse-line" }));
+    for (const r of rows) svg.appendChild(sv("rect", { x: X(r[0]) - 2.5, y: Y(r[1] / 10) - 2.5, width: 5, height: 5, class: r[2] ? "purse-pt" : "purse-pt bare" }));
+    for (const [k, r] of [[0, rows[0]], [1, rows[rows.length - 1]]]) {
+      const t = sv("text", { x: X(r[0]), y: H - 6, class: "purse-ax", "text-anchor": k ? "end" : "start" });
+      t.textContent = A.when(r[0]);
+      svg.appendChild(t);
+    }
+    const dot = sv("circle", { r: 4, class: "purse-dot", visibility: "hidden" });
+    svg.appendChild(dot);
+    const tip = el("div", { class: "purse-tip", hidden: true });
+    const show = (r) => {
+      dot.setAttribute("cx", X(r[0])); dot.setAttribute("cy", Y(r[1] / 10)); dot.setAttribute("visibility", "visible");
+      tip.innerHTML = "";
+      tip.appendChild(el("b", null, `${A.when(r[0])}: ${A.money(r[1])}`));
+      const cats = r[2] ? Object.entries(r[2]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])) : null;
+      if (!cats) tip.appendChild(el("div", { class: "dim" }, "Before the ledger began: the end-of-day purse only."));
+      else if (!cats.length) tip.appendChild(el("div", { class: "dim" }, "No money changed hands."));
+      else for (const [k, v] of cats) tip.appendChild(el("div", { class: v > 0 ? "green" : "red" }, `${v > 0 ? "+" : "−"}${A.money(v)} ${k}`));
+      tip.hidden = false;
+      tip.style.left = `${Math.min(70, Math.max(0, (X(r[0]) / W) * 100 - 15))}%`;
+    };
+    const step = rows.length > 1 ? (X(d1) - X(d0)) / (rows.length - 1) : W;
+    for (const r of rows) {
+      const hit = sv("rect", { x: X(r[0]) - step / 2, y: 0, width: Math.max(4, step), height: H, class: "purse-hit" });
+      hit.addEventListener("pointerenter", () => show(r));
+      hit.addEventListener("click", () => show(r));
+      svg.appendChild(hit);
+    }
+    svg.addEventListener("pointerleave", () => { tip.hidden = true; dot.setAttribute("visibility", "hidden"); });
+    const now = rows[rows.length - 1];
+    return panel("Purse", el("p", { class: "small dim" }, `${A.money(now[1])} now. Hover or tap a day to see where the silver came from and went.`),
+      el("div", { class: "purse-wrap" }, svg, tip));
+  }
   function recordTab(b, h) {
+    const pc = purseChart(h);
+    if (pc) b.appendChild(pc);
     const keys = [["kills", "Kills"], ["bosses", "Bosses slain"], ["fights", "Fights"], ["wins", "Wins"], ["fled", "Retreats"], ["downed", "Times downed"], ["floors", "Dungeon floors"],
       ["delves", "Delves"], ["gold_earned", "Silver earned"], ["loot_sold", "Loot sold"], ["days_worked", "Days worked"], ["travel_days", "Days on the road"], ["injuries", "Injuries"],
       ["gambled", "Silver gambled"], ["pvp_wins", "Hero fights won"], ["pvp_losses", "Hero fights lost"], ["robberies", "Robberies committed"], ["robbed", "Silver lost to robbers"], ["corpses_sold", "Bodies sold"], ["levels", "Levels gained"]];
