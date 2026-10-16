@@ -12,7 +12,7 @@
 
   // ---------- the players load with their first page (A.need); the words below each one still tell it if one can't ----------
   const KIT = {
-    fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "meal_replay", "meal_tavern"],
+    fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "food_eat", "meal_replay", "meal_tavern"],
     reading: ["tarot_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
   };
   const kit = (k) => A.need(KIT[k]).catch((e) => { if (window.console) console.error(e); });

@@ -243,6 +243,23 @@
     }
     return img;
   }
+  // a softer edge than an outline: the shape's own edge pixels darkened, on the side away from the light only
+  function rimShade(img, k) {
+    k = k === undefined ? 0.45 : k;
+    const src = img.d.slice(), w = img.w, h = img.h, A = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : src[(y * w + x) * 4 + 3]);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (A(x, y) < 100 || (A(x + 1, y) >= 100 && A(x, y + 1) >= 100 && A(x + 1, y + 1) >= 100)) continue;
+      const o = (y * w + x) * 4;
+      img.d[o] = src[o] * (1 - k); img.d[o + 1] = src[o + 1] * (1 - k); img.d[o + 2] = src[o + 2] * (1 - k);
+    }
+    return img;
+  }
+  // a bite taken out of a soft food's outline from above: everything over a ragged curve that dips depth px below ytop at its middle and
+  // comes back up to ytop at its ends, so the outline loses a scoop with no stray horns left at its sides; b = [cx, ytop, rx, depth, seed]
+  function notchAt(x, y, b) {
+    const u = (x - b[0]) / b[2];
+    return Math.abs(u) < 1 && y < b[1] + b[3] * Math.sqrt(1 - u * u) * (1 + (fbm(u * 3 + 5, 0.5, b[4]) - 0.5) * 0.35);
+  }
   function shadow(img, cx, cy, rx, ry, a, col) {
     const E = ell(cx, cy, rx, ry);
     for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
@@ -392,6 +409,29 @@
         if (u % 2 === 0 && d > 0.97) img.px(x, y, ramp[ramp.length - 1]);
       }
     }
+  }
+  // a slice of steak leaning back on its neighbour: the cut face a rounded oblong turned by ang, seared crust along its top and bottom (the
+  // two faces that were in the pan), a grey band inside that, rosy pink in the middle with its grain and a wet shine; its edge below it
+  function steakSlice(img, x, y, w, h, ang, look, seed) {
+    const lay = new Img(img.w, img.h), ca = Math.cos(ang), sa = Math.sin(ang), PINK = look.pink || P.pink, CRUST = look.crust || P.crust, GREY = look.grey || P.grey;
+    const loc = (xx, yy) => [(xx - x) * ca + (yy - y) * sa, -(xx - x) * sa + (yy - y) * ca];
+    const inside = (xx, yy) => { const [u, v] = loc(xx, yy), wob = (fbm(u / 4, 3, seed) - 0.5) * 2; if (Math.abs(u) > w / 2 + wob * 0.5 || Math.abs(v) > h / 2 + wob * 0.6) return null; const r = 3, cu = Math.abs(u) - (w / 2 - r), cv = Math.abs(v) - (h / 2 - r); if (cu > 0 && cv > 0 && Math.hypot(cu, cv) > r) return null; return [u, v, h / 2 - Math.abs(v), w / 2 - Math.abs(u)]; };
+    const R0 = Math.hypot(w, h) / 2 + 3;
+    for (let yy = Math.floor(y - R0); yy <= y + R0 + 3; yy++) for (let xx = Math.floor(x - R0); xx <= x + R0; xx++) { if (inside(xx + 0.5, yy + 0.5)) continue; for (let k = 1; k <= 3; k++) if (inside(xx + 0.5, yy + 0.5 - k)) { lay.px(xx, yy, k === 3 ? CRUST[1] : pick(CRUST, 0.3, xx, yy)); break; } }
+    hrender(lay, [x - R0, y - R0, x + R0, y + R0], (xx, yy) => { const q = inside(xx, yy); return q ? Math.min(2, Math.min(q[2], q[3]) * 0.6) : null; }, (xx, yy, i) => {
+      const q = inside(xx + 0.5, yy + 0.5);
+      if (!q) return null;
+      const [u, v, ev, eu] = q, lit = 0.35 + i.diff * 0.5;
+      if (ev < 2.6 || eu < 1.2) return pick(CRUST, 0.15 + lit * 0.5 + (fbm(xx / 2, yy, seed) - 0.5) * 0.4, xx, yy, 0.35);
+      if (ev < 3.8) return pick(GREY, 0.3 + lit * 0.4, xx, yy, 0.3);
+      if (look.marbleC && marble(xx * 1.4, yy * 2, seed, 1)) return look.marbleC;
+      let t = 0.2 + lit * 0.3 + Math.min(1, (ev - 3.8) / (h / 2 - 3.8)) * 0.45;
+      if (Math.sin(u * 0.9 + v * 0.3 + fbm(xx / 3, yy / 2, seed) * 2) > 0.8) t -= 0.12;
+      if (lit > 0.65 && Math.abs(v + 1) < 1.2 && Math.abs(u + w * 0.15) < 4 && h2(xx, yy, seed) > 0.4) return "#ffe8e0";
+      return pick(PINK, t, xx, yy, 0.25);
+    }, { k: 30 });
+    outline(lay, "#1a0806");
+    img.paste(lay, 0, 0);
   }
   // a cut slice: the crust rim (thick on top), a thin grey band, a rosy centre
   function sliceFace(img, x, y, w, h, seed, tilt, look) {
@@ -572,6 +612,20 @@
     return img;
   }
 
+  // ---------- eating: while a plate is drawn for the eating beats, what has been taken and where everything sits ----------
+  // EAT = { gone: Set of item keys, zones: [[x, y, r]], carved, items: [], geo: {} }; serves call item() for each thing a hand or fork
+  // could take, skip what taken() says is gone, and put their bowls and mounds in geo, so food_eat.js can plan any dish
+  let EAT = null;
+  function taken(key, x, y) {
+    if (!EAT) return false;
+    if (EAT.gone.has(key)) return true;
+    if (x !== undefined) for (const [zx, zy, zr] of EAT.zones) if (Math.hypot(x - zx, (y - zy) * 1.5) < zr) return true;
+    return false;
+  }
+  function item(key, x, y, r, kind, extra) { if (EAT) EAT.items.push(Object.assign({ key, x, y, r, kind }, extra || {})); }
+  function geo(k, v) { if (EAT) EAT.geo[k] = v; }
+  const eating = () => EAT;
+
   // ---------- the plates: how each kind of dish is drawn ----------
   // piece(look) -> { draw(img, cx, cy, s, stage, seed), at }: the thing in the pan at a stage (raw, sear, cook, baste, burnt), s = 1.5 fills the frame
   // serve(spec, o) -> a full-frame Img of the dish served (o.burnt for the disaster)
@@ -611,13 +665,14 @@
       const m = new Img(W, H);
       slab(m, { cx: 186, cy: 74, rx: 33, ry: 21, thick: 12, s: 1.5, seed: 5, done: 1, glaze: 1, look });
       img.paste(m, 0, 0);
-      for (let i = 0; i < 6; i++) {
-        const f = new Img(W, H), sx = 146 - i * 20, sy = 80 + i * 6;
-        shadow(img, sx - 2, sy + 9, 24, 5, 0.35, "#1a0806");
-        sliceFace(f, sx, sy, 24, 13, i, 0.3, look);
-        outline(f, "#1a0806");
-        img.paste(f, 0, 0);
-        img.px(sx - 13, sy - 4, "#ffffff"); img.px(sx - 12, sy - 4, "#ffe8e0", 0.8); img.px(sx + 22, sy + 3, "#ff8a7a", 0.8);
+      geo("inside", look.pink || P.pink);
+      // sliced across and fanned out like shingles, each slice leaning on the last: seared top and bottom, a grey band, rosy in the middle
+      for (let i = 0; i < 5; i++) {
+        const sx = 40 + i * 21, sy = 98 + i * 4 - Math.abs(i - 2) * 2, ang = -0.42 + i * 0.16;
+        item("s" + i, sx, sy, 16, "slice", { z: i, box: [sx - 20, sy - 14, sx + 20, sy + 14] });
+        if (taken("s" + i)) continue;
+        shadow(img, sx + 3, sy + 8, 18, 4, 0.4, "#1a0806");
+        steakSlice(img, sx, sy, 30, 15, ang, look, i);
       }
       flakes(img, 4, 50, 93, 69, 69, 21);
       if (look.pepper) peppers(img, 6, 80, 120, 80, 90, 24);
@@ -691,10 +746,14 @@
     return Object.assign({}, p, { flip: p.flip !== undefined ? p.flip : ["slab", "bun", "stew"].includes(spec.plate) && spec.method === "iron",
       draw(img, o) { const st = has.includes(o.stage) ? o.stage : { sear: "raw", baste: "cook" }[o.stage] || "cook"; p.draw(img, Object.assign({ f: { cx: o.cx, cy: o.cy, rx: 70 * (o.s || 1), ry: 28 * (o.s || 1) } }, o, { stage: st, real: o.stage })); } });
   }
+  // o.eat: { gone: [keys], zones: [[x, y, r]], carved } draws the dish part-eaten; o.info gets { items, geo } back
   function plate(spec, stage, o) {
     o = o || {};
     const P0 = PLATES[spec.plate] || PLATES.slab;
-    const img = P0.serve(spec, { burnt: stage === "burnt", seed: o.seed || 1, legendary: o.legendary });
+    const was = EAT;
+    EAT = o.eat || o.info ? { gone: new Set((o.eat && o.eat.gone) || []), zones: (o.eat && o.eat.zones) || [], carved: (o.eat && o.eat.carved) || 0, bites: (o.eat && o.eat.bites) || [], items: [], geo: {} } : null;
+    let img;
+    try { img = P0.serve(spec, { burnt: stage === "burnt", seed: o.seed || 1, legendary: o.legendary }); } finally { if (o.info && EAT) { o.info.items = EAT.items; o.info.geo = EAT.geo; } EAT = was; }
     if (o.legendary) showpiece(img);
     vignette(img, o.legendary ? 0.45 : 0.55);
     return img;
@@ -715,7 +774,7 @@
   root.FoodArt = root.FoodArt || {};
   Object.assign(root.FoodArt, {
     W, H, dish, piece, plate, part, PLATES, PARTS, DISH, LOOKS,
-    kit: { W, H, Img, C, mix, R, pick, rng, hash, h2, vnoise, fbm, bay, clamp, lerp, smooth, TAU, hrender, ell, dome, norm3, KEY, glow, light, vignette, bokeh, steam, star, outline, shadow, text, textWidth, CAP, P, BURNT },
+    kit: { W, H, Img, C, mix, R, pick, rng, hash, h2, vnoise, fbm, bay, clamp, lerp, smooth, TAU, hrender, ell, dome, norm3, KEY, glow, light, vignette, bokeh, steam, star, outline, rimShade, notchAt, shadow, text, textWidth, CAP, P, BURNT, taken, item, geo, eating },
     bits: { slab, sliceFace, scaleStrip, butter, garlic, garlicBulb, moonpetal, flakes, peppers, saltPouch, drakeScale, skillet, skilletWide, board, macroBack },
   });
 })(typeof window !== "undefined" ? window : globalThis);

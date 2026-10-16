@@ -193,7 +193,6 @@
     const ca = C(a), cb = C(b);
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const ang = Math.atan2(y - cy, x - cx) + (twist || 0); img.px(x, y, Math.sin(ang * n) > 0.15 ? ca : cb); }
   }
-  const BITE = { fried: "CRUNCH", bread: "CRUNCH", pie: "CRUNCH", skewer: "CHOMP", steak: "CHOMP", roast: "CHOMP", stew: "SLURP", soup: "SLURP", grain: "NOM", seafood: "CRACK", sweet: "MMMF", greens: "CRUNCH", legendary: "...!!" };
   const LINES = { great: ["...unsettlingly good.", "oh. OH.", "I'd fight for this.", "more. please."], good: ["that's the stuff.", "good. really good.", "worth the coin."], plain: ["it's... food.", "fine. it's fine."], bad: ["...", "is it meant to taste like that?"] };
   const PANEL = [["#f8c860", "#f0a838"], ["#e86a4a", "#c84a30"], ["#5ab0a0", "#3a8a7e"], ["#f0d080", "#d8a850"]];
 
@@ -228,25 +227,19 @@
   }
   // one eater: the bite, then their face in a sunburst with the line
   function soloCut(r, ctx, kit) {
-    const cast = kit.cast, fam = kit.fam, line = kit.line;
-    return [{ id: "bite", dur: 2.4, base: () => new Img(W, H, "#000000"), draw: (img, t) => {
-      rays(img, 0, 0, W, H, 60, 75, "#f8d070", "#f0b040", 18, t * 0.4);
-      const split = (x, y) => x + (y - 75) * 0.35 > 128;
+    const cast = kit.cast, line = kit.line;
+    // the first mouthful, eaten the way this dish is eaten (food_eat.js), then their face slides in over the plate in shock
+    const after = (img, t) => {
+      if (t <= 0) return;
+      const u = ease3(clamp(t / 0.3, 0, 1)), off = (1 - u) * 150;
+      const split = (x, y) => x - off + (y - 75) * 0.35 > 128;
       const fc = face(cast[0], 3, "shock");
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (split(x, y)) img.px(x, y, Math.sin(Math.atan2(y - 75, x - 190) * 18 + t) > 0.15 ? "#4a8ac8" : "#2e6aa8");
-      blit(img, fc, 132, 14, 1, 1, (c, u, v, i, j) => (split(132 + i, 14 + j) ? c : null));
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const e = x + (y - 75) * 0.35 - 128; if (e >= 0 && e < 3) img.px(x, y, e < 1 ? "#1a1010" : "#fffaf0"); }
-      const src = kit.serve(), cx = 62, cy = 70, R0 = 34, bite = t > 0.5;
-      for (let y = -R0; y <= R0; y++) for (let x = -R0; x <= R0; x++) {
-        if (Math.hypot(x, y * 1.2) > R0) continue;
-        if (bite && Math.hypot(x - 22, y + 18) < 16) continue;
-        const p = src.get(120 + x * 0.9, 84 + y * 0.9);
-        if (p && !split(cx + x, cy + y)) img.px(cx + x, cy + y + Math.round(Math.sin(t * 6) * 2), p);
-      }
-      if (bite) { const r2 = rng(r.seed + 6), u = t - 0.5; for (let k = 0; k < 24; k++) { const a = r2() * TAU, sp = 30 + r2() * 50, x = cx + 22 + Math.cos(a) * sp * u, y = cy - 18 + Math.sin(a) * sp * u + 40 * u * u; img.rect(x, y, 2, 2, r2() < 0.5 ? "#e8b860" : "#a86a2a"); } }
-      sfx(img, BITE[fam] || "CRUNCH", 10, 138, t - 0.5, { k: 3, shake: 2 });
-      return { shake: t > 0.5 && t < 0.62 ? [1, 0] : null };
-    }, sfx: [[0.5, fam === "stew" || fam === "soup" ? "slurp" : "crunch", 1]] },
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (split(x, y)) img.px(x, y, Math.sin(Math.atan2(y - 75, x - 190 - off) * 18 + t) > 0.15 ? "#4a8ac8" : "#2e6aa8");
+      blit(img, fc, 132 + off, 14, 1, 1, (c, uu, vv, i, j) => (split(132 + off + i, 14 + j) ? c : null));
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const e = x - off + (y - 75) * 0.35 - 128; if (e >= 0 && e < 3) img.px(x, y, e < 1 ? "#1a1010" : "#fffaf0"); }
+    };
+    const bite = MK.eatBeat ? MK.eatBeat(r, ctx, { id: "bite", n: 1, tail: 1.3, after }) : null;
+    return [bite || { id: "bite", dur: 0.5, base: () => kit.serve().copy(), draw: () => {} },
     { id: "cutin", dur: 3.2, base: () => new Img(W, H, "#000000"), draw: (img, t) => {
       rays(img, 0, 0, W, H, 120, 160, "#f8d070", "#f0b848", 22, t * 0.3);
       const k = 3, fc = face(cast[0], k, kit.mode);
@@ -287,9 +280,8 @@
     const spec = ctx.spec, cast = ctx.cast.slice(0, 4), xs = seatsFor(cast.length), stand = where !== "tavern";
     const serve = () => { if (!ctx.cache.has("tv:serve")) ctx.cache.set("tv:serve", FA.plate(spec, "done", { seed: r.seed, legendary: r.legendary })); return ctx.cache.get("tv:serve"); };
     const roomImg = () => { if (!ctx.cache.has("tv:room")) { const im = room(r, where); table(im, where); ctx.cache.set("tv:room", im); } return ctx.cache.get("tv:room"); };
-    const fam = (r.family in BITE ? r.family : spec.plate === "claws" ? "seafood" : "steak");
     const pool = LINES[r.verdict === "bad" ? "plain" : r.verdict || "good"], line = r.line || pool[r.seed % pool.length];
-    const kit = { spec, serve, cast, fam, line, lk: lookOf(r.place.id), mode: r.verdict === "bad" ? "plain" : r.verdict === "great" ? "sparkle" : "bliss", hearts: r.verdict !== "bad" };
+    const kit = { spec, serve, cast, line, lk: lookOf(r.place.id), mode: r.verdict === "bad" ? "plain" : r.verdict === "great" ? "sparkle" : "bliss", hearts: r.verdict !== "bad" };
     if (ev === "contest" && r.verdict !== "great") { kit.mode = "plain"; kit.hearts = false; }
     if (ev) return eventBeats(r, ctx, ev, kit);
     const MW = feast ? 40 : 24, MH = feast ? 16 : 10, plateX = feast ? RW / 2 : xs[0];
@@ -327,6 +319,8 @@
     B.push(macroBeat(r, kit));
     if (!feast) B.push(...soloCut(r, ctx, kit));
     else {
+      const dig = MK.eatBeat ? MK.eatBeat(r, ctx, { n: cast.length }) : null;
+      if (dig) B.push(dig);
       B.push({ id: "hush", dur: 2.6, base: () => new Img(W, H, "#000000"), draw: (img, t) => {
         const { rm, heads } = scene(t + 4, { lean: (i) => (xs[i] < plateX ? -1 : 1) });
         emptyPlate(rm, plateX, TABLE + 2, true); emptyPlate(rm, plateX + 2, TABLE + 1, true);
@@ -600,6 +594,8 @@
       B.push(zoomBeat(r, ctx, kit, (t) => { const { rm } = scene(t + 2); plateAt(rm, mini(ctx, "mini" + MW, MW, MH, serve), plateX, TABLE + 2); return rm; }, plateX, cast.length > 1, (img, t) => { banner(img, t + 2); night(img); }));
       B.push(macroBeat(r, kit));
       if (cast.length > 1) {
+        const dig = MK.eatBeat ? MK.eatBeat(r, ctx, { n: cast.length }) : null;
+        if (dig) B.push(dig);
         B.push({ id: "hush", dur: 2.8, base: () => new Img(W, H, "#000000"), draw: (img, t) => {
           const { rm } = scene(t + 4, { cheer: t > 0.5 });
           emptyPlate(rm, plateX, TABLE + 2, true); emptyPlate(rm, plateX + 2, TABLE + 1, true);
@@ -626,8 +622,7 @@
         const me = figure(rm, hero, hx, t, { base: TABLE, stand: true, clip: TABLE + 1, dy: o.bounce && ((t * 3) % 1) < 0.5 ? -2 : 0 });
         const them = rival ? figure(rm, rival, rx, t, { base: TABLE, stand: true, clip: TABLE + 1, dy: o.rivalBounce && ((t * 3) % 1) < 0.5 ? -2 : 0 }) : null;
         clothTable(rm, 0, RW, TABLE, RH, "#efe9dc", lk.rug ? lk.rug[0] : "#8a2a24");
-        plateAt(rm, mini(ctx, "mini" + MW, MW, MH, serve), hx, TABLE + 1);
-        if (o.bite) for (let j = 0; j < 4; j++) for (let i = 0; i < 4 - j; i++) rm.px(hx + 8 - i, TABLE - 3 + j, "#efe9dc");
+        plateAt(rm, o.bite && MK.eatPlan ? mini(ctx, "minibite" + MW, MW, MH, () => FA.eat.state(MK.eatPlan(r, ctx, { n: 1 }), 1)) : mini(ctx, "mini" + MW, MW, MH, serve), hx, TABLE + 1);
         cake(rm, rx, TABLE + 2, (lk.bunting || ["#c8303a"])[0]);
         pie(rm, 72, TABLE + 2); loaf(rm, 88, TABLE + 1, "#a86a26"); pie(rm, 104, TABLE + 2, "#c8a050"); loaf(rm, 117, TABLE + 1);
         [[hx - 4, 1], [rx - 2, 2], [70, 3], [86, 4], [102, 5]].forEach(([x, n]) => numCard(rm, x, TABLE + 4, Math.min(4, n)));
