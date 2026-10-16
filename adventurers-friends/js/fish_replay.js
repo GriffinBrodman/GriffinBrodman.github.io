@@ -829,7 +829,13 @@
   // ---------- sound: its own WebAudio context, following audio.js's "al.sound" settings and first-click unlock ----------
   const Snd = (() => {
     let ctx = null, out = null, noiseBuf = null, unlocked = false;
-    const prefs = () => { try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; } };
+    // the site keeps the sound switch and levels in Settings (audio.js passes them on); review pages that load this file alone fall back to the old store
+    const prefs = () => {
+      if (root.Sound && root.Sound.fxPrefs) return root.Sound.fxPrefs();
+      try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; }
+    };
+    // a player fetched on first use loads after the click that opened its page, so the page's own unlock counts too
+    const open = () => unlocked || !!(root.Sound && root.Sound.unlocked);
     function init() {
       if (ctx) return ctx;
       const AC = root.AudioContext || root.webkitAudioContext;
@@ -845,7 +851,7 @@
     }
     function ok() {
       const pr = prefs();
-      if (!unlocked || !pr.on || !init()) return null;
+      if (!open() || !pr.on || !init()) return null;
       if (ctx.state === "suspended") ctx.resume();
       out.gain.value = pr.master * pr.sfx * 0.9;
       return ctx;
@@ -918,7 +924,7 @@
       root.document.addEventListener("pointerdown", () => { unlocked = true; }, { capture: true });
       root.document.addEventListener("visibilitychange", () => { if (ctx && root.document.hidden) ctx.suspend(); });
     }
-    return { play, render, FX };
+    return { play, render, FX, get ready() { return open() && prefs().on; } };
   })();
 
   // ---------- the player ----------
@@ -943,7 +949,7 @@
     }
     const g = cv.getContext("2d"), img = g.createImageData(W, H);
     const p = planFor(rec, opts), last = p.beats[p.beats.length - 1];
-    let t = reduced() ? last.t0 + Math.min(2.6, last.dur - 0.01) : 0, raf = 0, prev = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
+    let t = reduced() ? last.t0 + Math.min(2.6, last.dur - 0.01) : 0, raf = 0, prev = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false, heard = Snd.ready;
     const paint = () => { const f = render(rec, t, opts); img.data.set(f.data); g.putImageData(img, 0, 0); };
     const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     const LONG = { water: 1, waves: 1, cave: 1, reel: 1 };
@@ -953,6 +959,10 @@
       const dt = prev ? Math.min(0.1, (ms - prev) / 1000) : 0;
       prev = ms;
       t += dt * rate;
+      // sound unlocked mid-replay (the first tap on the page): the beds that should be running come in for what is left of them
+      const ready = Snd.ready;
+      if (ready && !heard) for (let i = 0; i < fired; i++) { const e = p.ev[i], left = e[2] - (t - e[0]); if (LONG[e[1]] && left > 1) Snd.play(e[1], left); }
+      heard = ready;
       while (fired < p.ev.length && p.ev[fired][0] <= t) {
         const e = p.ev[fired], late = t - e[0];
         if (late < 0.25 || (LONG[e[1]] && late < 1)) Snd.play(e[1], e[2]);
