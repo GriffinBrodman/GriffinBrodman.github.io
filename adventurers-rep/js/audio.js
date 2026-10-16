@@ -435,27 +435,42 @@
   if (window.Settings) Settings.watch((keys) => {
     levels();
     if (!keys.includes("sound")) return;
-    if (prefs.on) { if (started) ambience(scenery || page); else start(); } else stopAmb();
+    if (prefs.on) { const was = started; start(); if (was) ambience(scenery || page); wake(); } else stopAmb();
   });
+  // browsers keep audio locked until the page's first gesture, and a touch's pointerdown isn't one, so every gesture event retries
+  let gestured = false;
+  const waiting = new Set();
+  const live = () => !!(ctx && started && prefs.on && ctx.state === "running");
+  function wake() { if (!live()) return; for (const fn of Array.from(waiting)) { waiting.delete(fn); try { fn(); } catch (e) { console.error(e); } } }
   function start() {
-    if (started || !prefs.on) return;
-    if (!init()) return;
-    if (ctx.state === "suspended") ctx.resume();
+    if (!prefs.on || !init()) return;
+    if (!ctx.onstatechange) ctx.onstatechange = wake;
+    if (ctx.state === "suspended" && unlocked()) { const r = ctx.resume(); if (r && r.then) r.then(wake, () => {}); }
+    if (started) return;
     started = true;
     ambience(scenery || page || "town");
   }
+  function gesture() { gestured = true; start(); wake(); }
   document.addEventListener("pointerdown", (e) => {
-    start();
+    gesture();
     if (e.target.closest && e.target.closest(".btn, nav a, .tabs button, .choices button")) sfx("click");
   }, { capture: true });
-  document.addEventListener("keydown", start, { capture: true });
+  for (const k of ["pointerup", "touchend", "click", "keydown"]) document.addEventListener(k, gesture, { capture: true });
   document.addEventListener("DOMContentLoaded", controls);
   if (document.readyState !== "loading") setTimeout(controls, 0);
+  // a page shown after a gesture elsewhere on the site is already unlocked (the replay players load on first use, after the click)
+  const unlocked = () => gestured || !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+  // fn runs once sound really plays: now if it does, else on the gesture that unlocks it or when sound is turned back on
+  function whenLive(fn) { if (live()) { fn(); return () => {}; } waiting.add(fn); return () => waiting.delete(fn); }
 
   // music.js plays on this context: the Music bus, the shared ducking, and whether a first click has unlocked sound
   function engine() {
     if (!init()) return null;
-    return { ctx, out: bus.music, noiseBuf, duck, get live() { return !!(started && prefs.on && ctx.state === "running"); } };
+    if (prefs.on && unlocked()) start();
+    return { ctx, out: bus.music, noiseBuf, duck, get live() { return live(); } };
   }
-  window.Sound = { sfx, setPage, scene, townAmbience, blip, critter, engine, get on() { return prefs.on; }, get talking() { return voiceOn(); } };
+  // the replays' own contexts (night games, meals, catches, tables, tarot, chess) take their switch and levels from here
+  const fxPrefs = () => ({ on: !!prefs.on, master: pref("master"), sfx: pref("sfx") });
+  window.Sound = { sfx, setPage, scene, townAmbience, blip, critter, engine, whenLive, fxPrefs, get on() { return prefs.on; }, get talking() { return voiceOn(); },
+    get unlocked() { return unlocked(); }, get locked() { return !!prefs.on && !unlocked(); } };
 })();

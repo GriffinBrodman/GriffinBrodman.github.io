@@ -1757,7 +1757,13 @@
   // ---------- sound: its own WebAudio context, following audio.js's "al.sound" settings and first-click unlock ----------
   const Snd = (() => {
     let ctx = null, out = null, noiseBuf = null, unlocked = false;
-    const prefs = () => { try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; } };
+    // the site keeps the sound switch and levels in Settings (audio.js passes them on); review pages that load this file alone fall back to the old store
+    const prefs = () => {
+      if (root.Sound && root.Sound.fxPrefs) return root.Sound.fxPrefs();
+      try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; }
+    };
+    // a player fetched on first use loads after the click that opened its page, so the page's own unlock counts too
+    const open = () => unlocked || !!(root.Sound && root.Sound.unlocked);
     function init() {
       if (ctx) return ctx;
       const AC = root.AudioContext || root.webkitAudioContext;
@@ -1773,7 +1779,7 @@
     }
     function ok() {
       const pr = prefs();
-      if (!unlocked || !pr.on || !init()) return null;
+      if (!open() || !pr.on || !init()) return null;
       if (ctx.state === "suspended") ctx.resume();
       out.gain.value = pr.master * pr.sfx * 0.9;
       return ctx;
@@ -1870,7 +1876,7 @@
       root.document.addEventListener("pointerdown", () => { unlocked = true; }, { capture: true });
       root.document.addEventListener("visibilitychange", () => { if (ctx && root.document.hidden) ctx.suspend(); });
     }
-    return { play, render, FX, get ready() { return unlocked && prefs().on; } };
+    return { play, render, FX, get ready() { return open() && prefs().on; } };
   })();
 
   // ---------- the player ----------

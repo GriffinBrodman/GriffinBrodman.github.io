@@ -272,6 +272,14 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .replay-bar .spds .btn:last-child { border-radius: 0 3px 3px 0; }
 .replay-bar .btn[disabled] { opacity: 0.45; cursor: default; }
 .replay-shot { position: relative; }
+.snd-tap { position: absolute; right: 8px; bottom: 8px; z-index: 3; font-family: var(--px); font-size: 13px; line-height: 1; padding: 6px 10px 7px; cursor: pointer;
+  background: linear-gradient(#ecdcb4, #d8c28e); color: #3a1e08; border: 2px solid #8a6a34; border-radius: 3px; box-shadow: 0 0 0 2px #1a1008, 0 3px 0 #0008;
+  animation: snd-tap 1.6s ease-in-out infinite; }
+.snd-tap[hidden] { display: none; }
+.fight-stage .snd-tap { top: 12px; bottom: auto; }
+.snd-tap:hover { background: linear-gradient(#f6ead0, #e4d0a0); }
+@keyframes snd-tap { 50% { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .snd-tap { animation: none; } }
 @media (min-width: 601px) { .fit-screen { max-width: calc((100vh - 260px) * var(--ar)); margin-left: auto; margin-right: auto; } }
 .replay-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: max-content; max-width: 86%; text-align: center; font-family: var(--px);
   background: linear-gradient(#ecdcb4, #d8c28e); color: #2a1a0c; border: 3px solid #8a6a34; box-shadow: 0 0 0 2px #1a1008, 0 4px 0 #0008; padding: 6px 16px 7px;

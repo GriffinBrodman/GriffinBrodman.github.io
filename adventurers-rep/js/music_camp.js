@@ -407,7 +407,17 @@
 
   // ---------- the scene for a record ----------
   // seats round the fire: the lead stands on the far side, the joiners sit in join order round the circle, a pet near its owner
+  // the crew who only listened take the seats left after the players, sitting round the fire with no ring of their own
   const ANG = [126, 176, 52, 232, 300, 84, 266];
+  const instOf = (inst, how) => (inst === "flute" ? "whistle" : inst || (how === "clap" ? "claps" : how === "pot" ? "pot" : null));
+  function castOf(rec) {
+    const all = MusicReplay.castOf(rec), lead = all[0], joiners = all.filter((m) => m.how !== "lead" && m.how !== "listen").slice(0, 5);
+    const listeners = all.filter((m) => m.how === "listen").slice(0, ANG.length - 1 - joiners.length);
+    return [{ id: lead.id, name: lead.name, pose: "stand", inst: instOf(lead.inst), how: "lead" }]
+      .concat(joiners.map((j) => ({ id: j.id, name: j.name, pose: "seat", inst: instOf(j.how === "inst" ? j.inst : null, j.how), how: j.how })))
+      .concat(listeners.map((m) => ({ id: m.id, name: m.name, pose: "seat", inst: null, how: "listen" })))
+      .map((m, i) => Object.assign(m, { ang: ANG[i] }));
+  }
   function campScene(rec, P, words) {
     world();
     const joinT = {};
@@ -415,13 +425,12 @@
     const startT = P.lines.length ? P.lines[0].t0 : 0, endT = (P.cues.find((c) => c.kind === "end") || { t: P.len }).t;
     const chorusT = (P.cues.find((c) => c.kind === "chorus") || { t: endT }).t;
     const good = rec.outcome === "soaring" || rec.outcome === "sweet", rough = rec.outcome === "mess" || rec.outcome === "sore";
-    const instOf = (inst, how) => (inst === "flute" ? "whistle" : inst || (how === "clap" ? "claps" : how === "pot" ? "pot" : null));
-    const cast = [{ id: rec.lead.id, name: rec.lead.name, pose: "stand", inst: instOf(rec.lead.inst), how: "lead" }]
-      .concat((rec.joiners || []).slice(0, 5).map((j) => ({ id: j.id, name: j.name, pose: "seat", inst: instOf(j.how === "inst" ? j.inst : null, j.how), how: j.how })));
+    const cast = castOf(rec);
     const pet = (rec.pets || []).find((p) => App.heroes && App.heroes[p.owner] && App.heroes[p.owner].pet && /howl|bask/.test(p.does || ""));
-    cast.forEach((m, i) => { m.ang = ANG[i]; m.h = heroOf(m.id, m.name); m.fav = (m.h.look || {}).fav; });
+    cast.forEach((m) => { m.h = heroOf(m.id, m.name); m.fav = (m.h.look || {}).fav; });
     if (pet) cast.push({ id: "pet:" + pet.owner, pet: App.heroes[pet.owner].pet, owner: pet.owner, ang: 322, r: 0.86, how: "pet", fav: null });
-    const cols = ringColours(cast.map((m) => m.fav));
+    const ringed = cast.filter((m) => m.how !== "listen"), rc = ringColours(ringed.map((m) => m.fav));
+    const cols = cast.map((m) => rc[ringed.indexOf(m)] || null);
     const seats = cast.map((m, i) => {
       const a = m.ang * Math.PI / 180, wx = Math.cos(a) * RX * (m.r || 1), wy = Math.sin(a) * RY * (m.r || 1), [sx, sy] = CAM.p(wx, wy, 0);
       return Object.assign(m, { i, wx, wy, sx, sy, a, col: cols[i] });
@@ -430,7 +439,8 @@
     for (const s of seats) if (!s.pet && s.pose !== "stand") log(stage, s.wx * 1.04, s.wy * 1.04, s.a + Math.PI / 2, 8);
     const hit = MusicReplay.strikes(P);
     // the rough night: the last to join goes quiet in the final chorus, and a crow gives up on it
-    const quietId = rough && cast.length > 1 ? cast[cast.length - (cast[cast.length - 1].pet ? 2 : 1)].id : null;
+    const band = cast.filter((m) => m.how !== "listen"), last = band.filter((m) => !m.pet).pop();
+    const quietId = rough && band.length > 1 ? last.id : null;
     const lastCh = P.lines.filter((l) => l.chorus).slice(-1)[0], quietT = lastCh ? (lastCh.t0 + lastCh.t1) / 2 : endT;
     const crowT = rough ? chorusT + 0.5 : Infinity;
     const lit = (s, t) => (s.how === "lead" ? t >= startT - 0.6 : s.pet ? t >= chorusT : joinT[s.id] != null && t >= joinT[s.id]);
@@ -460,7 +470,7 @@
       light(b, { amb: roughNow ? [0.2, 0.22, 0.34] : [0.22, 0.26, 0.42], pools });
       canopies(b);
       const st = { calm };
-      for (const s of seats) ring(b, s, st, tv);
+      for (const s of seats) if (s.how !== "listen") ring(b, s, st, tv);
       if (linked) {
         const grow = calm ? 1 : clamp((t - endT) / 1.2, 0, 1);
         for (let k = 0; k < 260 * grow; k++) { const a = k / 260 * Math.PI * 2 + Math.PI / 2, [x, y] = CAM.p(Math.cos(a) * RX, Math.sin(a) * RY, 0); b.px(x, y + 1, [110, 80, 30]); b.px(x, y, !calm && (k + Math.floor(t * 40)) % 26 < 3 ? [255, 255, 230] : [255, 226, 140], true); }
@@ -512,5 +522,5 @@
   }
 
   MusicReplay.register("camp", campScene);
-  window.MusicCamp = { scene: campScene, W, H, ringColours };
+  window.MusicCamp = { scene: campScene, castOf, W, H, ringColours };
 })();

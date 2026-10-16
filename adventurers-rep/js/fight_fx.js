@@ -2738,6 +2738,8 @@
       if (S) return { on: S.get("sound"), master: S.get("master"), sfx: S.get("sfx") };
       try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; }
     };
+    // a player fetched on first use loads after the click that opened its page, so the page's own unlock counts too
+    const open = () => unlocked || !!(root.Sound && root.Sound.unlocked);
     function noiseBuf(c) { const b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
     function init() {
       if (ac) return ac;
@@ -2752,7 +2754,7 @@
     }
     function ok() {
       const pr = prefs();
-      if (!unlocked || !pr.on || !init()) return null;
+      if (!open() || !pr.on || !init()) return null;
       if (ac.state === "suspended") ac.resume();
       out.gain.value = pr.master * pr.sfx * 0.9;
       return ac;
@@ -2911,7 +2913,7 @@
     return {
       fam: (f, p, phase, delay) => play(() => fam(f, p, phase || "all", ac.currentTime + 0.01 + (delay || 0))),
       sting: (kind, sch, delay) => play(() => sting(kind, sch, ac.currentTime + 0.01 + (delay || 0))),
-      render, get ready() { return unlocked && prefs().on; }, unlock() { unlocked = true; },
+      render, get ready() { return open() && prefs().on; }, unlock() { unlocked = true; },
     };
   })();
 
