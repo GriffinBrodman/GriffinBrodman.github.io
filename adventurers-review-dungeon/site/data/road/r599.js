@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r599"]={"id":"r599","day":88,"kind":"meet","place":null,"road":"frostspire~whitepeak","biome":"snow","weather":"snow","tod":"morning","hour":11,"heroes":["h15","h3","h4","h5"],"lead":"h4","line":"Osk waves at Pickles for the fourth time from behind a cart and pretends to be part of it.","traveller":"osk","met":4,"outcome":"meet"};

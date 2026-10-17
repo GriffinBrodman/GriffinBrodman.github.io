@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Dungeon Maps Review</title>
+<style>
+:root{--bg:#1d150e;--panel:#2a1f15;--ink:#eedfc2;--muted:#b8a283;--brass:#d9a64a;--line:#4a3826}
+@media (prefers-color-scheme: light){:root{--bg:#efe2c6;--panel:#f7ecd5;--ink:#2b1d12;--muted:#6e5a44;--brass:#a9771f;--line:#d2bd95}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,serif}
+main{max-width:900px;margin:0 auto;padding:24px 16px 56px}h1{color:var(--brass);margin:0 0 4px}h2{font-size:1.1rem;color:var(--brass);margin:26px 0 8px}
+.lede,.why{color:var(--muted)}.why{display:block;font-size:.95rem}ol{padding-left:22px}li{margin:0 0 12px}a{color:var(--brass);font-weight:bold}
+img{width:100%;height:auto;border:1px solid var(--line);margin:6px 0 4px}figcaption{color:var(--muted);font-size:.9rem;margin-bottom:16px}
+</style></head><body><main>
+<h1>Dungeon maps, second pass</h1>
+<p class="lede">The fixes from your notes, on their own branch (not merged): a fresh 90-day demo league. The isometric stack is gone (kept in an <code>unused/</code> folder), floors are tabs, tapping a room shows what happened there, the map shows walked rooms plus the rooms one passage away and nothing else, and floor layouts are no longer straight lines.</p>
+
+<h2>1. Try it</h2>
+<ol>
+<li><a href="site/index.html#/dungeon/ashveil_crypts">Ashveil Crypts</a><span class="why">A crypt laid out on a processional axis with mirrored side chambers. Tap any inked room: its card opens with who cleared it and when, the story, notes and a ▸ watch for that day.</span></li>
+<li><a href="site/index.html#/dungeon/thornmere_ruins">Thornmere Ruins</a><span class="why">A courtyard hub with broken buildings around it.</span></li>
+<li><a href="site/index.html#/dungeon/frostspire">Frostspire</a> · <a href="site/index.html#/dungeon/sunken_vault">Sunken Vault</a> · <a href="site/index.html#/dungeon/emberdeep">Emberdeep</a><span class="why">The deep ones, partly mapped: a tower of rings, a vault, a cave. Check that pencilled "?" rooms are only ever one passage off a walked one.</span></li>
+<li><a href="site/index.html#/dungeon/cragtooth_warren">Cragtooth Warren</a><span class="why">A goblin warren: clusters of burrows with loops.</span></li>
+</ol>
+
+<h2>2. Layouts, before and after</h2>
+<figure><img src="img/compare_ash.png" alt="Ashveil before and after"><figcaption>Ashveil Crypts, before and after.</figcaption></figure>
+<figure><img src="img/compare_thorn.png" alt="Thornmere before and after"><figcaption>Thornmere Ruins, before and after.</figcaption></figure>
+
+<h2>3. The new floor plans (3 seeds × 2 floors each, as graphs)</h2>
+<figure><img src="img/layouts_mine_crypt.png" alt="Mine and crypt layouts"><figcaption>The mine (a main adit with cross-cuts looping between levels) and the crypt (symmetric axis, mirrored chambers, aisles as loops).</figcaption></figure>
+<figure><img src="img/layouts_ruin_tower_vault.png" alt="Ruin, tower and vault layouts"><figcaption>The ruin (courtyard hub), the tower (stacked rings) and the vault (rooms split into partitions).</figcaption></figure>
+<figure><img src="img/layouts_caves_warrens.png" alt="Cave and warren layouts"><figcaption>Caves (scattered chambers joined with a few loops) and warrens (burrow clusters).</figcaption></figure>
+<p class="why">96–100% of floors now have loops, with 2–5 per floor; there are hubs, branches and dead ends, and each dungeon still has its ~20 rooms per floor. Balance against main: rooms a day within ±3%, days to the first kill within about ±15%. Frostspire's boss now falls in 5 of 32 leagues, where on main it never did.</p>
+</main></body></html>

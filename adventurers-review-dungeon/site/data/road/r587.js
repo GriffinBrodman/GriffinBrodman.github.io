@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r587"]={"id":"r587","day":85,"kind":"ford","place":"wetfoot_ford","road":"bleakmarsh~thornmere_ruins","biome":"marsh","weather":"clear","tod":"afternoon","hour":15,"heroes":["h6","h9"],"lead":"h6","line":"Tobias steps onto a stone at Wetfoot Ford, which slides sideways with a gentle plop.","place_kind":"ford","tally":13,"outcome":"place"};

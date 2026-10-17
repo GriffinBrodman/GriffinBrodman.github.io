@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r528"]={"id":"r528","day":78,"kind":"meet","place":null,"road":"frostspire~whitepeak","biome":"snow","weather":"cloudy","tod":"morning","hour":11,"heroes":["h15","h3","h4","h5"],"lead":"h5","line":"Osk insists he is a cheese merchant, and has no cheese, when Morwen meets him for the first time.","traveller":"osk","met":1,"outcome":"meet"};
