@@ -376,6 +376,23 @@
     crab: ["#d85a3a", "#f0a080", "#1a1220"], drowned: ["#5a8a8a", "#2a4a5a", "#f0f0a0"], kraken: ["#8a3a6a", "#d87aa0", "#ffd84a"],
     salamander: ["#e86a2a", "#ffd04a", "#ffffff"], fire: ["#ff8a2a", "#ffe86a", "#ffffff"], lava: ["#4a3434", "#ff6a2a", "#ffd84a"],
     dragon: ["#a83a3a", "#e8b84a", "#ffd84a"],
+    toadstool: ["#c8402a", "#e8dcc0", "#1a1220"], stump: ["#8a6440", "#dcb47a", "#ffc83a"], bugbear: ["#7e4c2c", "#d8b080", "#ffd84a"],
+    ettercap: ["#5a5a3a", "#c8a85a", "#ff4a3a"], rats: ["#7a6656", "#b8a088", "#ff5a3a"], wolfrider: ["#6a5e52", "#b8a890", "#ffd84a"],
+    hob: ["#c8743a", "#a8322a", "#ffd84a"], hedge_knight: ["#e0b088", "#5a7a3a", "#3a3a3a"], bridge: ["#5e7a86", "#3e5058", "#ffd84a"],
+    batswarm: ["#6a5650", "#7a5e50", "#ff4a3a"], claim_jumper: ["#d8a078", "#7a5a3a", "#3a2a2a"], rust_sapper: ["#c86a3a", "#5a4a3a", "#f0d040"],
+    rock_jelly: ["#c8a858", "#f0dca0", "#2a1a10"], wyvern: ["#6a7a3a", "#d8c890", "#ffd84a"], croaker: ["#6a8a34", "#e0d890", "#ffd84a"],
+    strider: ["#5a4a32", "#c8a860", "#ff8a2a"], smuggler: ["#c89070", "#3a4a3a", "#2a2a2a"], peat: ["#6a4a30", "#3e2e22", "#c8e8a0"],
+    candle: ["#e0d4b0", "#8ae8b8", "#1a3a2a"], wrecker: ["#d0a080", "#2a3a4a", "#ffd84a"], hermit: ["#d8783a", "#f0b880", "#1a1220"],
+    wrack: ["#5a6428", "#a89a4a", "#f0f0a0"], frost_imp: ["#4a90c8", "#eaf6ff", "#ffe04a"], snowman: ["#e8f0f8", "#b8c8d8", "#2a2a30"],
+    rime_wight: ["#9ab8c8", "#2a3440", "#4af0ff"],
+  };
+  // the human foes of the wilds beyond the bandits: what each wears and carries
+  const HUMANS = {
+    hedge_knight: { head: "great_helm", outfit: "plate", weapon: "sword", off: "shield", tier: 2, face: 1 },
+    claim_jumper: { head: "leather_cap", outfit: "leather", weapon: "axe", off: "shovel", face: 2, hair: "#5a3a22", style: 9 },
+    smuggler: { head: "wide_hat", outfit: "cloak", weapon: "spear", face: 1, hair: "#3a2a1a" },
+    wrecker: { head: "hood", outfit: "cloak", weapon: "daggers", off: "lantern", face: 0 },
+    rime_wight: { head: "ice_crown", outfit: "plate_dark", weapon: "sword", tier: 2, aura: "ice", scars: ["pale"], hair: "#d8e8f0", style: 1 },
   };
 
   function drawMonster(body, pal, frame, boss, pose) {
@@ -394,6 +411,12 @@
         if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p, pose);
         const map = { bandit: ["hood", "leather", "sword"], bandit_archer: ["hood", "leather", "bow"], bandit_captain: ["tricorn", "fancy", "sword"],
           necromancer: ["skull_hood", "robe_dark", "staff"] };
+        if (HUMANS[pal]) {
+          g = humanoid(p[0], p[1], Object.assign({ style: 0 }, HUMANS[pal]));
+          // the wight's eyes burn with the cold that keeps it walking
+          if (pal === "rime_wight" && !pose) for (let y = 9; y < 12; y++) for (let x = 10; x < 18; x++) if (g.get(x, y) === "#b8c8e8") { g.set(x, y, E); g.set(x, y - 1, mix(E, "#ffffff", 0.5)); }
+          break;
+        }
         const [head, outfit, weapon] = map[pal] || ["none", "leather", "sword"];
         g = humanoid(p[0], p[1], { style: 0, head, outfit, weapon, face: pal === "bandit_captain" ? 2 : 1, aura: pal === "necromancer" ? "death" : null, off: pal === "necromancer" ? "skull" : "none", tier: pal === "bandit_captain" ? 3 : 1 });
         break;
@@ -911,6 +934,46 @@
         break;
     }
   }
+  // belt, boots and gloves found underground: one piece each, getting darker, better buckled and better riveted up the tiers
+  function delveIcon(P, slot, t) {
+    const metal = t >= 2 ? "gold" : "iron";
+    if (slot === "belt") {
+      // coiled on itself: the strap as a ring, the buckle at the front, the tail tucked through
+      P.ell(8, 7.5, 7.2, 5.2, "c", { s: 0.15, fn: (x, y, s) => (((x + 0.5 - 8) / 4.6) ** 2 + ((y + 0.5 - 7.3) / 2.6) ** 2 < 1 ? false : s + (t && (x + y) % 4 === 0 && y < 5 ? -0.35 : 0)) });
+      if (t >= 2) for (const [x, y] of [[3, 4], [6, 2], [10, 2], [13, 4], [2, 9], [14, 9]]) P.px(x, y, metal, 0.5);
+      P.poly([[9.5, 10], [14, 9.5], [14.5, 12], [10, 12.5]], "c", -0.2);
+      P.rect(4, 8, 6, 6, metal, (x, y) => 0.5 - (x - 4) * 0.12 - (y - 8) * 0.06);
+      P.rect(5, 9, 4, 4, "c", -0.1); P.rect(7, 9, 1, 4, metal, 0.7);
+      if (t === 3) P.ell(12.5, 11, 1.1, 1.1, "gem", { s: 0.4 });
+      return;
+    }
+    if (slot === "boots") {
+      P.rect(4, 1, 6, 9, "c", (x, y) => 0.35 - (x - 4) * 0.1 - (y - 1) * 0.02);
+      P.poly([[4, 9], [10, 9], [14.5, 11], [15, 14], [3.5, 14]], "c", (x, y) => 0.25 - (x - 4) * 0.04 - (y - 9) * 0.05);
+      P.rect(3, 1, 8, 2, "c", (x) => (t === 0 ? 0.2 : 0.6) - (x - 3) * 0.05);
+      P.rect(3, 14, 13, 1, "dk", -0.3);
+      if (t === 0) { P.px(8, 6, "c", -0.6); P.px(12, 12, "c", -0.6); P.px(9, 3, "c", -0.5); }
+      if (t >= 1) for (const x of [5, 8, 11, 14]) P.px(x, 15, "iron", 0.4);
+      if (t >= 2) { P.rect(4, 7, 6, 1, "dk", 0); P.rect(8, 7, 2, 1, metal, 0.5); }
+      if (t === 3) { P.rect(3, 1, 8, 1, "gold", 0.3); P.px(13, 11, "gold", 0.4); }
+      return;
+    }
+    // a glove, palm out: four fingers with dark seams between them, the thumb out to the side and a turned-back cuff
+    P.rect(3, 7, 8, 6, "c", (x, y) => 0.3 - (x - 3) * 0.06 - (y - 7) * 0.03);
+    const tall = t === 2 ? 2 : 5;
+    for (const [i, x] of [3, 5, 7, 9].entries()) {
+      const top = 7 - tall + (i === 0 || i === 3 ? 1 : 0);
+      P.rect(x, top, 2, 7 - top, "c", (xx) => 0.45 - (xx - x) * 0.25 - i * 0.05);
+      if (t === 2) P.rect(x, top - 1, 2, 1, "skin", 0.2);
+      if (i) for (let y = top + 1; y < 8; y++) P.px(x, y, "c", -0.8);
+    }
+    P.poly([[10.5, 9], [13.5, 6.5], [14.5, 7.5], [12, 11]], "c", -0.05);
+    P.rect(2, 12, 10, 3, "c", (x, y) => (t === 0 ? 0.15 : 0.6) - (y - 12) * 0.25 - (x - 2) * 0.03);
+    if (t === 0) P.px(6, 10, "c", -0.6);
+    if (t >= 2) { P.px(10, 13, metal, 0.5); P.px(4, 13, metal, 0.3); }
+    if (t === 3) for (const [x, y] of [[4, 9], [6, 9], [8, 9], [10, 9]]) P.px(x, y, "gold", 0.4);
+  }
+  const DELVE_SLOT = new Set(["belt", "boots", "gloves"]);
   function drawGearIcon(it, look) {
     look = Object.assign({ fav: "#a8443a", skin: "#e0b088", hair: "#4a3020" }, look || {});
     const G = Paint.Gear;
@@ -938,13 +1001,20 @@
     }, M, 1.3);
     else if (slot === "offhand") P = iconFit((Q) => G.offhand(Q, art, k.ot, c), M, 1.6);
     else if (slot === "back") { P = new Paint.Paint(16, 16); backIcon(P, art, k.bt); }
+    else if (DELVE_SLOT.has(slot)) {
+      P = new Paint.Paint(16, 16);
+      const t = Math.max(0, Math.min(3, it.tier || 0)), col = it.tint || G.DELVE_COL[slot][t];
+      Object.assign(M, { c: Paint.ramp(col), dk: Paint.ramp(mix(col, "#14101c", 0.5)) });
+      delveIcon(P, slot, t);
+    }
     else { P = new Paint.Paint(16, 16); if (slot === "ring") ringIcon(P, art, it.gem || it.glow); else if (slot === "neck") neckIcon(P, art); else curioIcon(P, art); }
     P.tf = null;
     const g = P.render(M, { outline: OUTLINE });
-    if (it.glow) {
+    const glow = it.glow || (DELVE_SLOT.has(slot) && G.GRADE_GLOW[it.grade]) || null;
+    if (glow) {
       const px = [];
       for (let i = 0; i < 256; i++) if (P.mat[i] !== null) px.push(i);
-      G.glowUp(g, P, px, it.glow, 0, { outline: OUTLINE, tint: 0.1, edgeAmt: 0.5 });
+      G.glowUp(g, P, px, glow, 0, { outline: OUTLINE, tint: 0.1, edgeAmt: 0.5 });
     }
     return g;
   }
@@ -1079,7 +1149,7 @@
     });
   }
   function itemGrid(id) { return cached("i:" + id, () => drawItem(id)); }
-  function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, look && look.fav]), () => drawGearIcon(item, look)); }
+  function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, item.grade, look && look.fav]), () => drawGearIcon(item, look)); }
   // ---------- trophies: the boss's own sprite, cut at the neck and mounted on a walnut shield plaque ----------
   // the head's box [x, y, w, h] in each boss body's standing sprite; a body not listed mounts its upper part around the bulk
   const TROPHY_HEAD = {

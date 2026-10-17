@@ -13,7 +13,7 @@
   // ---------- the players load with their first page (A.need); the words below each one still tell it if one can't ----------
   const KIT = {
     fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "food_eat", "meal_replay", "meal_tavern"],
-    reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
+    road: ["food_art", "road_scenes", "road_art", "road_replay"], reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
   };
   const kit = (k) => A.need(KIT[k]).catch((e) => { if (window.console) console.error(e); });
 
@@ -81,7 +81,9 @@
   const fadedPage = (v, title, why) => v.appendChild(el("section", { class: "panel faded" }, el("h2", null, title), el("p", null, why),
     el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
 
-  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => replayPage(v, f)).catch((err) => {
+  // a fight with a traveller in the line brings the road art, so they are drawn as themselves
+  const withTravellers = (f) => ((f.lineup || []).some((u) => u.kind === "traveller") && !window.RoadArt ? A.roadArt(["road_art"]).then(() => f, () => f) : f);
+  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => replayPage(v, f)).catch((err) => {
     if (window.console && err && err.stack && !/load/i.test(String(err))) console.error(err);
     const art = Scenes.backdrop("plains", 200, 50, Art.hash(id));
     art.className = "faded-art";
@@ -173,6 +175,27 @@
     v.appendChild(p);
   }).catch(() => fadedPage(v, "That catch isn't on file", "The anglers' book has no record of it.")));
 
+  // a stretch of road worth a vignette (league/roads.py records): a meeting, a place, a scene; RoadReplay dresses it, the words below still tell it
+  A.route(/^\/road\/(\w+)$/, (v, id) => A.load(`road/${id}`).then((g) => A.roadArt(KIT.road).then(() => g, () => g)).then((g) => {
+    const R = S.road || {}, place = (R.places || {})[g.place] || null, trav = (R.travellers || {})[g.traveller] || null;
+    const ends = (g.road || "").split("~").filter(Boolean).map((n) => A.nodeName(n));
+    const last = trav && g.arc_step && g.arc_step >= (g.arc_len || 99);
+    const title = trav ? (last ? `${trav.name.replace(/^./, (c) => c.toUpperCase())}, at the end of the road` : `${g.met > 1 ? "Again, " : ""}${trav.name}`)
+      : place ? place.name.replace(/^./, (c) => c.toUpperCase()) : "On the road";
+    const sub = trav ? trav.what : place ? `on the road between ${ends.join(" and ")}` : "";
+    const p = el("section", { class: "panel" }, el("h2", null, title),
+      el("p", { class: "small muted" }, ...lineup((g.heroes || []).map((x) => A.heroLink(x))), ends.length ? ` on the road between ${ends.join(" and ")}` : " on the road",
+        `, ${A.when(g.day, "on")}.`, trav && g.met > 1 ? ` They have met ${g.met} times now.` : ""));
+    if (window.RoadReplay) {
+      try { stage(p, RoadReplay.player(g), { title: [(window.RoadScenes ? RoadScenes.hourOf(g) : 12) >= 18 ? "Evening" : (window.RoadScenes ? RoadScenes.hourOf(g) : 12) >= 12.5 ? "Afternoon" : "Morning", title, sub], titleUntil: 1.2,
+        share: () => `${title}: ${g.line}\n${A.shareUrl("#/road/" + g.id)}`, shared: "The road and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (g.line) p.appendChild(el("p", null, A.storyText(g.line)));
+    // not "part 3 of 3": a reader may have seen only some of the steps, which other heroes took
+    if (trav && g.arc_step) p.appendChild(el("p", { class: "small dim" }, g.arc_step >= (g.arc_len || 99) ? `The end of ${trav.name}'s story on the roads.` : g.arc_step === 1 ? `Where ${trav.name}'s story on the roads begins.` : `A chapter of ${trav.name}'s story on the roads.`));
+    v.appendChild(p);
+  }).catch(() => fadedPage(v, "That stretch of road isn't on file", "Nobody wrote that part of the road down.")));
+
   // a tarot reading; the pixel player (TarotReplay) draws it when loaded, otherwise the spread is told in words.
   // It opens on the laid table under a title plate, before the deal
   const READING_PRE = 1.8;
@@ -235,7 +258,10 @@
   }
 
   function unitGrid(u, frame) {
+    if (u.kind === "traveller" && window.RoadArt) return RoadArt.fighter(u, frame);
     const look = u.look || {};
+    // without the road art, a traveller who fights is drawn with the stat block's own sprite
+    if (u.kind === "traveller" && look.monster && S.monsters[look.monster]) return Art.monsterGrid(S.monsters[look.monster], frame);
     if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroes[u.ref], frame, A.heroLook(heroes[u.ref]));
     if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name, coat: look.coat }, frame);
     const m = S.monsters[u.ref];
@@ -627,7 +653,7 @@
     const sideList = (s) => el("div", { class: "fside s" + s }, el("div", { class: "fside-name" }, A.cap(label(s))),
       units.filter((u) => u && u.side === s).map((u) => {
         const fill = el("i"), num = el("span", { class: "fhp" }), row = el("div", { class: "fighter", hidden: !!u.summoned },
-          el("span", { class: "fmark s" + s }, marks[u.i]), u.kind === "hero" && heroes[u.ref] ? A.heroLink(u.ref) : el("span", { title: u.name }, u.summoned ? summonName(u.name) : u.name),
+          el("span", { class: "fmark s" + s }, marks[u.i]), u.kind === "hero" && heroes[u.ref] ? A.heroLink(u.ref) : el("span", { title: u.name }, u.summoned ? summonName(u.name) : u.name, u.kind === "traveller" ? el("span", { class: "dim" }, " · traveller") : null),
           el("div", { class: "fbar" }, fill), num);
         rows[u.i] = { row, fill, num, key: "" };
         return row;
@@ -1399,9 +1425,12 @@
       const name = (f.place_name || "").toUpperCase();
       txt(name, cvw / 2, cvh * 0.3, 13, "#ffd65a", "center", B);
       const sides = (s) => units.filter((q) => q && q.side === s && !q.summoned);
-      const count = (s) => { const L = sides(s), hs = L.filter((q) => q.kind === "hero").length, pets = L.filter((q) => q.look && q.look.pet).length, mons = L.length - hs - pets;
-        return [hs ? `${hs} ${hs === 1 ? "hero" : "heroes"}` : "", pets ? `${pets} ${pets === 1 ? "pet" : "pets"}` : "", mons ? label(s) : ""].filter(Boolean).join(" + ") || label(s); };
-      txt(`${f.kind === "pve" ? count(0) : label(0)}  vs  ${f.kind === "pve" ? label(1) : label(1)}`, cvw / 2, cvh * 0.3 + 12 * B, 6.5, "#f6ebd0", "center", B);
+      // a traveller walking with the band is counted as one, not read as a second crew
+      const count = (s) => { const L = sides(s), hs = L.filter((q) => q.kind === "hero").length, pets = L.filter((q) => q.look && q.look.pet).length,
+        trav = L.filter((q) => q.kind === "traveller").length, mons = L.length - hs - pets - trav;
+        return [hs ? `${hs} ${hs === 1 ? "hero" : "heroes"}` : "", pets ? `${pets} ${pets === 1 ? "pet" : "pets"}` : "", trav ? `${trav} ${trav === 1 ? "traveller" : "travellers"}` : "",
+          mons ? label(s) : ""].filter(Boolean).join(" + ") || label(s); };
+      txt(trunc(`${f.kind === "pve" ? count(0) : label(0)}  vs  ${label(1)}`, 56), cvw / 2, cvh * 0.3 + 12 * B, 6.5, "#f6ebd0", "center", B);
       ctx.globalAlpha = 1;
     }
     function banner(msg, u, B, len) {

@@ -61,8 +61,7 @@
       el("div", { class: "sub" }, el("span", null, `Season ${d.season} · Week ${d.week}`), el("span", null, inProgress ? `So far: through day ${d.day_to}` : `Days ${d.day_from}–${d.day_to}`), el("span", null, `${d.events_total} things happened`))));
     const top = d.top.map((id) => events[id]).filter(Boolean);
     if (top[0]) {
-      const sc = Scenes.vignette(top[0], 240, 72);
-      sc.className = "scene";
+      const sc = A.vignette(top[0], 240, 72, "scene");
       main.appendChild(el("div", { class: "lead" }, el("h1", null, A.richText(headline(top[0]), top[0].heroes, top[0].parties)), sc, el("p", null, A.storyLine(top[0]))));
     }
     if (d.column) main.appendChild(el("div", { style: { borderTop: "1px solid #b0915e", borderBottom: "1px solid #b0915e", padding: "8px 0", margin: "8px 0 12px" } },

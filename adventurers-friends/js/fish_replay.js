@@ -2,7 +2,7 @@
 /*
   INPUT: one catch record (league/fishing.py; world["catches"][id], exported as data/catch/<id>.js under key "catch/<id>"):
     { id, day, season, hero: hero id, name: hero name, crew: [{ id, name }] watching from the bank (may be empty),
-      where: "camp" | "town" | "hunt" | "contest", water: content.fish WATERS id or null (a roadside stream),
+      where: "camp" | "town" | "hunt" | "road" | "contest", water: content.fish WATERS id or null (a roadside stream),
       kind: "river" | "lake" | "sea" | "ice" | "swamp" | "cave", perch, place, at: where as words, sky: weather key, night: bool,
       rod: { set, name, tier } | null (a hand line), lure: lure id | null,
       outcome: "catch" | "nothing" | "away" | "junk" | "stolen" | "strange" | "legend_away" | "legend_caught",

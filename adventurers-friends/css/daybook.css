@@ -47,6 +47,7 @@
 .db-lbl { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-family: var(--px, monospace); font-size: 13px; font-weight: 600;
   line-height: 1.15; color: var(--db-ink); overflow-wrap: anywhere; }
 .db-hrs { font-size: 14px; font-weight: 600; line-height: 1.1; color: var(--db-rubric); white-space: nowrap; }
+.db-hrs-s { display: none; font-family: var(--db-num); font-size: 13px; font-weight: 600; line-height: 1.1; color: var(--db-rubric); white-space: nowrap; }
 .db-line { display: none; margin: 0; }
 /* one rule by width: wide = icon, label, time, line; middling = icon, label, time; narrow = icon, time (the label lives in the note) */
 @container (max-width: 66px) {
@@ -54,11 +55,19 @@
   .db-lbl { display: none; }
   .db-hrs { font-size: 13px; white-space: normal; text-align: center; }
 }
+/* a half-hour stop is too narrow for a range: it shows when it began, the note and the list give the rest */
+@container (max-width: 58px) {
+  .db-btn { padding: 7px 1px 6px; }
+  .db-btn canvas { width: 28px; }
+  .db-hrs { display: none; }
+  .db-hrs-s { display: block; }
+}
 @container (min-width: 210px) {
   .db-btn { flex-direction: row; align-items: center; justify-content: flex-start; height: auto; padding: 8px 10px 4px; gap: 10px; text-align: left; }
   .db-txt { align-items: flex-start; }
   .db-b > .db-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0 10px 8px 52px; font-size: 14px; line-height: 1.25; color: #4a3826; }
-  .db-b[data-act="road"] > .db-line { -webkit-line-clamp: 3; }
+  /* a road stretch's line is the day's best sentence: it is shown whole, and the row grows to fit it */
+  .db-b[data-cat="road"] > .db-line { display: block; -webkit-line-clamp: unset; }
 }
 
 .db-tip { display: none; position: absolute; top: calc(100% + 7px); left: -2px; z-index: 30; width: max-content; max-width: min(300px, 78vw);
