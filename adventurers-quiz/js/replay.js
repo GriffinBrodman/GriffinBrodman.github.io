@@ -38,10 +38,15 @@
       el("span", { class: "spds", role: "group", "aria-label": "Speed" }, speeds), snd,
       o.share ? btn("⤴", "Share", "Copy this with a link", () => A.copy(o.share(), o.shared || "Copied with a link.")) : null);
     const plate = o.title ? el("div", { class: "replay-title", "aria-hidden": "true" }, el("small", null, o.title[0]), el("b", null, o.title[1]), o.title[2] ? el("small", null, o.title[2]) : null) : null;
+    // a replay starts on its own before the page has had a gesture, and browsers keep sound locked till one comes: the tap is it,
+    // and each player brings its sound in where the scene has got to (a song in time, the fire's bed for what is left of it)
+    const tap = el("button", { class: "snd-tap", type: "button", title: "Sound is waiting for a tap", hidden: true }, "♪ Tap for sound");
+    tap.onclick = (e) => { e.stopPropagation(); tap.hidden = true; };
     function sync() {
       const on = ctl.playing;
       set(play, on ? "❚❚" : "▶", on ? "Pause" : "Play");
       set(snd, window.Sound && Sound.on ? "🔊" : "🔇", "Sound");
+      tap.hidden = !(window.Sound && Sound.locked);
       if (plate) plate.classList.toggle("gone", ctl.t > (o.titleUntil || 0));
     }
     sync();
@@ -53,6 +58,7 @@
       if (!document.hidden) sync();
     }, 250);
     box.plate = plate;
+    box.tap = tap;
     return box;
   }
   // a whole stage stays on a desktop screen below the header, however wide the page
@@ -64,13 +70,14 @@
     if (!fig.replay) return;
     const bar = controls(fig.replay, o), shot = fig.firstChild;
     fig.insertBefore(bar, shot.nextSibling);
-    if (bar.plate) {
-      const wrap = el("div", { class: "replay-shot" });
-      fig.insertBefore(wrap, shot);
-      wrap.append(shot, bar.plate);
-    }
+    const wrap = el("div", { class: "replay-shot" });
+    fig.insertBefore(wrap, shot);
+    wrap.append(shot, bar.tap);
+    if (bar.plate) wrap.append(bar.plate);
   }
   const lineup = (xs) => xs.reduce((acc, x, i) => acc.concat(i ? [i === xs.length - 1 ? " and " : ", ", x] : [x]), []);
+  // the rest of the crew at the fire or the table, who didn't play
+  const looked = (g, verb) => ((g.onlookers || []).length ? [" ", ...lineup(g.onlookers.map((x) => A.heroLink(x.id))), ` ${verb}.`] : []);
   const fadedPage = (v, title, why) => v.appendChild(el("section", { class: "panel faded" }, el("h2", null, title), el("p", null, why),
     el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
 
@@ -90,7 +97,7 @@
       const mates = (g.joiners || []).map((x) => A.heroLink(x.id));
       const head = g.anthem ? `${A.poss(g.anthem.crew, g.anthem.party)} anthem: “${g.song.title}”` : `“${g.song.title}” at ${g.place || (g.where === "tavern" ? "the tavern" : "camp")}`;
       const p = el("section", { class: "panel" }, el("h2", null, head),
-        el("p", { class: "small muted" }, A.heroLink(g.lead.id), " led", ...(mates.length ? [" with ", ...lineup(mates)] : []), `, ${A.when(g.day, "on")}.`));
+        el("p", { class: "small muted" }, A.heroLink(g.lead.id), " led", ...(mates.length ? [" with ", ...lineup(mates)] : []), `, ${A.when(g.day, "on")}.`, ...looked(g, "listened")));
       if (window.MusicReplay) {
         try { stage(p, MusicReplay.player(g, { bar: true }), { share: () => `${head}\n${A.shareUrl("#/night/" + g.id)}`, shared: "The song and a link copied." }); } catch (e) { if (window.console) console.error(e); }
       }
@@ -102,7 +109,7 @@
     const won = (g.players || [])[g.winner];
     const title = `${g.game.charAt(0).toUpperCase() + g.game.slice(1)} at ${g.place || (g.where === "tavern" ? "the tavern" : "camp")}`;
     const p = el("section", { class: "panel" }, el("h2", null, title),
-      el("p", { class: "small muted" }, ...lineup(names), `, ${A.when(g.day, "on")}. `, won ? `${won.name} won.` : "A draw."));
+      el("p", { class: "small muted" }, ...lineup(names), `, ${A.when(g.day, "on")}. `, won ? `${won.name} won.` : "A draw.", ...looked(g, "looked on")));
     const R = g.game === "chess" ? window.ChessReplay : window.NightReplay;
     if (R) {
       try { stage(p, R.player(g), { share: () => `${title}: ${won ? `${won.name} won` : "a draw"}\n${A.shareUrl("#/night/" + g.id)}`, shared: "The game and a link copied." }); } catch (e) { /* the words below still tell it */ }
@@ -598,7 +605,8 @@
       el("b", { class: "gold" }, outcomeText(f)), " · ", heroIds.filter((h) => heroes[h]).map((h, i) => [i ? ", " : "", A.heroLink(h)])));
     const PX = Math.max(3, R(1200 / cam.vw));
     const cv = el("canvas", { class: "stage", width: cam.vw * PX, height: cam.vh * PX });
-    fitScreen(cv, cv);
+    const box = el("div", { class: "replay-shot" }, cv);
+    fitScreen(box, cv);
     const logBox = el("div", { class: "rlog" });
     const lines = f.log.map((e, i) => el("div", { "data-i": i }, describe(e, units, f.labels)));
     lines.forEach((l) => logBox.appendChild(l));
@@ -627,7 +635,8 @@
     const roster = el("div", { class: "fighters" }, sideList(0), sideList(1));
     const hlBox = el("section", { class: "panel highlights" }, el("h3", null, "Highlights"),
       el("dl", { class: "kv hl" }, hl.map(([k, x]) => [el("dt", null, k), el("dd", null, x)])));
-    v.appendChild(el("div", { class: "fight-stage" }, cv, ctrls, roster));
+    box.append(ctrls.tap);
+    v.appendChild(el("div", { class: "fight-stage" }, box, ctrls, roster));
     v.appendChild(hlBox);
     v.appendChild(el("details", { class: "panel blow" }, el("summary", null, el("h3", null, "Blow by blow")), logBox));
 

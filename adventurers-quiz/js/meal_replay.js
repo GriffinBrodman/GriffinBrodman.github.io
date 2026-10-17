@@ -243,7 +243,7 @@
       nameCard(img, words.slice(cut).join(" "), t, Object.assign({}, o, { line2: true, legendary: false }));
       return nameCard(img, words.slice(0, cut).join(" "), t, Object.assign({}, o, { line2: true, y: (o.y || (o.sub ? H - 22 : H - 12)) - 15, sub: null }));
     }
-    const u = ease3(clamp(t / 0.45, 0, 1)), k = textWidth(name, { k: 2, bold: true }) > W - 24 ? 1 : 2;
+    const u = ease3(clamp(t / 0.45, 0, 1)), k = o.k || (textWidth(name, { k: 2, bold: true }) > W - 24 ? 1 : 2);
     // it drops into place rather than sliding in from past the left edge, so no frame shows the name cut off
     const tw = textWidth(name, { k, bold: true }), x = 10, y = (o.y || (o.sub ? H - 22 : H - 12)) - Math.round((1 - u) * 8);
     const gold = o.legendary ? ["#fff6c8", "#ffe08a", "#f0b840", "#c8841c"] : ["#fff8e8", "#f8e2b0", "#e8c07a", "#c89048"];
@@ -1132,7 +1132,7 @@
       if (r.disaster) { for (let i = 0; i < 3; i++) steam(img, 80 + i * 40, 90, 70, t * 1.1 + i * 2, 0.45, 6, 6, "#6aa848"); }
       else twinkles(img, p.sparkles || [[96, 50, 3], [150, 44, 2], [60, 70, 2]], t, 1.3);
       if (r.legendary) godrays(img, t);
-      nameCard(img, r.name || p.name || "", t - 0.5, { legendary: r.legendary, sub: r.disaster ? "(more or less)" : null });
+      nameCard(img, r.name || p.name || "", t - 0.5, { legendary: r.legendary, k: p.look.cardK, sub: r.disaster ? "(more or less)" : r.catch && textWidth(r.catch) <= W - 16 ? r.catch : null });
     }, sfx: [[0.05, r.disaster ? "sad" : r.legendary ? "fanfare" : "reveal", 1], [0.55, "swish", 1]] });
     const dig = r.disaster ? pokeBeat(r, ctx) : eatBeat(r, ctx, { n: Math.min(3, ctx.cast.length) });
     if (dig) beats.push(dig);
@@ -1465,7 +1465,13 @@
   // ---------- sound: its own WebAudio context, following audio.js's "al.sound" settings and first-click unlock ----------
   const Snd = (() => {
     let ctx = null, out = null, noiseBuf = null, unlocked = false;
-    const prefs = () => { try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; } };
+    // the site keeps the sound switch and levels in Settings (audio.js passes them on); review pages that load this file alone fall back to the old store
+    const prefs = () => {
+      if (root.Sound && root.Sound.fxPrefs) return root.Sound.fxPrefs();
+      try { return Object.assign({ on: true, master: 0.7, sfx: 0.6 }, JSON.parse(root.localStorage.getItem("al.sound") || "{}")); } catch (e) { return { on: true, master: 0.7, sfx: 0.6 }; }
+    };
+    // a player fetched on first use loads after the click that opened its page, so the page's own unlock counts too
+    const open = () => unlocked || !!(root.Sound && root.Sound.unlocked);
     function init() {
       if (ctx) return ctx;
       const AC = root.AudioContext || root.webkitAudioContext;
@@ -1481,7 +1487,7 @@
     }
     function ok() {
       const pr = prefs();
-      if (!unlocked || !pr.on || !init()) return null;
+      if (!open() || !pr.on || !init()) return null;
       if (ctx.state === "suspended") ctx.resume();
       out.gain.value = pr.master * pr.sfx * 0.9;
       return ctx;
@@ -1559,7 +1565,7 @@
       root.document.addEventListener("pointerdown", () => { unlocked = true; }, { capture: true });
       root.document.addEventListener("visibilitychange", () => { if (ctx && root.document.hidden) ctx.suspend(); });
     }
-    return { play, render, FX };
+    return { play, render, FX, get ready() { return open() && prefs().on; } };
   })();
 
   // ---------- the player ----------
@@ -1575,7 +1581,7 @@
     const g = cv.getContext("2d"), img = g.createImageData(W, H);
     const p = planFor(rec, opts), still = p.beats.find((b) => b.id === "reveal" || b.id === "macro2") || p.beats[p.beats.length - 1];
     const pre = preOf(rec, opts);
-    let t = reduced() ? still.t0 + Math.min(1.6, still.dur - 0.01) : -pre, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false;
+    let t = reduced() ? still.t0 + Math.min(1.6, still.dur - 0.01) : -pre, raf = 0, last = 0, onscreen = false, fired = 0, lastDraw = -1, rate = 1, held = false, forced = false, heard = Snd.ready;
     const paint = () => { const f = render(rec, t, opts); img.data.set(f.data); g.putImageData(img, 0, 0); };
     const live = () => !held && fig.isConnected && onscreen && !doc.hidden;
     const LONG = { fire: 1, sizzle: 1, simmer: 1, room: 1 };
@@ -1585,6 +1591,10 @@
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
       t += dt * rate;
+      // sound unlocked mid-replay (the first tap on the page): the beds that should be running come in for what is left of them
+      const ready = Snd.ready;
+      if (ready && !heard) for (let i = 0; i < fired; i++) { const e = p.ev[i], left = e[2] - (t - e[0]); if (LONG[e[1]] && left > 1) Snd.play(e[1], left); }
+      heard = ready;
       while (fired < p.ev.length && p.ev[fired][0] <= t) {
         const e = p.ev[fired], late = t - e[0];
         if (late < 0.25 || (LONG[e[1]] && late < 1)) Snd.play(e[1], e[2]);

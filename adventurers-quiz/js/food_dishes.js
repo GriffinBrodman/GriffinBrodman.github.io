@@ -161,6 +161,14 @@
     juniper: (x, y, r, look, sd) => blob(x, y, r, r, r, (xx, yy, i) => (i.spec > 0.4 ? "#c8d4e0" : ramp(R(["#06080e", "#0e1420", "#1a2434", "#2e3a4e", "#4a5a70"]), 0.15 + i.diff * 0.8, xx, yy)), { k: 30 }),
     barley: (x, y, r, look, sd) => blob(x, y, r * 1.2, r * 0.7, r * 0.6, shade(RP.rice, { base: 0.3 }), { k: 20 }),
     shrimp: (x, y, r, look, sd) => blob(x, y, r, r * 0.6, r * 0.6, (xx, yy, i) => ramp(RP.salmon, 0.2 + i.diff * 0.7 + ((xx + yy) % 3 === 0 ? 0.15 : 0), xx, yy), { wob: [[1, 0.3, sd]], k: 20 }),
+    // a coil of pale eel, the size of a thumb: a short curled tube, a darker line down its back
+    eelcoil: (x, y, r, look, sd) => {
+      const a0 = (sd % 7) * 0.9, pts = [];
+      for (let k = 0; k <= 10; k++) { const a = a0 + k * 0.42, rr = r * (0.95 - k * 0.04); pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.62]); }
+      const rp = look.coil || R(["#8a9a96", "#b4c4c0", "#d4e2dc", "#ecf6f0", "#fcfffc"]);
+      return tube(pts, (t) => r * (0.46 - t * 0.14), (xx, yy, i, q) => (i.spec > 0.5 ? "#ffffff" : Math.abs(q.side) < 0.2 ? ramp(rp, 0.15, xx, yy) : ramp(rp, 0.3 + i.diff * 0.6, xx, yy)), { k: 40, flat: 2.2 });
+    },
+    eelpiece: (x, y, r, look, sd) => blob(x, y, r * 1.2, r * 0.75, r * 0.6, (xx, yy, i) => { const d = Math.hypot((xx - x) / (r * 1.2), (yy - y) / (r * 0.75)); if (d < 0.22) return "#4a6a72"; if (d > 0.82) return ramp(R(["#4a6a74", "#7a9aa2", "#a8c4c8", "#d4ecec"]), 0.2 + i.diff * 0.7, xx, yy); return i.spec > 0.45 ? "#ffffff" : ramp(R(["#9ac4c8", "#bcdcdc", "#d8f0ee", "#f0fffc"]), 0.2 + i.diff * 0.6 + (Math.abs(d - 0.5) < 0.08 ? -0.2 : 0), xx, yy); }, { k: 40, pow: 0.4 }),
     fishflake: (x, y, r, look, sd) => blob(x, y, r, r * 0.7, r * 0.5, shade(RP.white, { base: 0.15, noise: 0.3, seed: sd }), { wob: [[3, 0.2, sd]], seed: sd }),
   };
   // scatter n bits of the given kinds inside an ellipse, deterministic per seed, larger ones first so the small ones sit on top
@@ -287,7 +295,7 @@
     const eat = K.eating(), dz = eat ? eat.zones.length : 0, pot = dz ? img.copy() : null;
     fill(img, f, o.burnt);
     if (dz) {
-      const L = ell(f.cx, f.cy + dz * 2.2, f.rx * (1 - dz * 0.04), f.ry * (1 - dz * 0.04)), O = ell(f.cx, f.cy - 4, f.rx + 6, f.ry + 6);
+      const dk = look.drop || 1, L = ell(f.cx, f.cy + dz * 2.2 * dk, f.rx * (1 - dz * 0.04 * dk), f.ry * (1 - dz * 0.04 * dk)), O = ell(f.cx, f.cy - 4, f.rx + 6, f.ry + 6);
       for (let y = Math.floor(f.cy - f.ry - 10); y <= f.cy + f.ry; y++) for (let x = Math.floor(f.cx - f.rx - 6); x <= f.cx + f.rx + 6; x++) {
         if (O(x + 0.5, y + 0.5) > 1 || L(x + 0.5, y + 0.5) <= 1) continue;
         const q = pot.get(x, y);
@@ -462,12 +470,15 @@
   function soupContents(img, f, spec, stage, seed) {
     if (spec.look.liar && stage !== "raw") return liarSoup(img, f, stage === "burnt", seed);
     const look = spec.look, burnt = stage === "burnt", raw = stage === "raw";
-    const rp = burnt ? R(["#0a0c06", "#141a0c", "#22301a", "#34482a", "#4a6238"]) : look.broth || R(["#5a3a14", "#7a5220", "#9a6c30", "#b88a44", "#d4a85e", "#ecc882"]);
+    const rp = burnt && look.clear ? R(["#2a2c28", "#40443e", "#585e56", "#727a70", "#8e968a"]) : burnt ? R(["#0a0c06", "#141a0c", "#22301a", "#34482a", "#4a6238"]) : look.broth || R(["#5a3a14", "#7a5220", "#9a6c30", "#b88a44", "#d4a85e", "#ecc882"]);
     const objs = [liquid(f.cx, f.cy, f.rx, f.ry, 1, rp, { seed, oil: look.oil === undefined ? 0.3 : look.oil, ripple: 0.25, hi: look.hi, dot: look.dot })];
     const bits = look.bits || [["potato", 6, 5], ["fishflake", 6, 5], ["leafy", 3, 3]];
     const sz = f.rx / 90;
-    if (!raw || look.rawBits) objs.push(...scatter(f.cx, f.cy, f.rx * 0.9, f.ry * 0.9, bits.map(([k, n, s]) => [k, n, s * sz]), burnt ? Object.assign({}, look, { chunk: BURNT }) : look, seed + 1, 0.5));
+    if (!raw || look.rawBits) objs.push(...scatter(f.cx, f.cy, f.rx * 0.9, f.ry * 0.9, bits.map(([k, n, s]) => [k, n, s * sz]), burnt ? Object.assign({}, look, { chunk: BURNT, coil: R(["#1a1612", "#2e2822", "#4a423a", "#6a6258"]) }) : look, seed + 1, 0.5));
     scene(img, objs);
+    if (look.clear && !burnt) { glow(img, f.cx, f.cy, f.rx * 0.85, look.glowC, 0.2, f.ry * 0.85); const r = rng(seed + 5); for (let i = 0; i < 7; i++) star(img, f.cx + (r() - 0.5) * f.rx * 1.4, f.cy + (r() - 0.5) * f.ry * 1.2, "#eaffff", 1, 0.8); }
+    // boiled dry at the edge: a scorched brown-black ring where the broth met the bowl, black flecks, smoke
+    if (look.clear && burnt) { const E = ell(f.cx, f.cy, f.rx, f.ry), r = rng(seed + 7); img.fill((x, y) => { const d = E(x + 0.5, y + 0.5); if (d > 1.04 || d < 0.8) return null; return d > 0.9 ? (h2(x, y, 3) > 0.85 ? "#ff7a2a" : ramp(BURNT, 0.15 + (fbm(x / 3, y / 2, 2) - 0.5) * 0.5, x, y)) : mix(img.get(x, y) || [0, 0, 0], "#2a1a0e", (0.9 - d) < 0.05 ? 0.6 : 0.3); }, f.cx - f.rx - 2, f.cy - f.ry - 2, f.cx + f.rx + 2, f.cy + f.ry + 2); for (let i = 0; i < 40; i++) img.px(f.cx + (r() - 0.5) * f.rx * 1.5, f.cy + (r() - 0.5) * f.ry * 1.4, "#0a0806"); smokeOver(img, [[f.cx - 40, f.cy - 16], [f.cx, f.cy - 22, 70], [f.cx + 40, f.cy - 14]]); }
     if (!burnt) garnishes(img, f, Object.assign({ herbN: 40 }, look), seed);
     if (look.topper) look.topper(img, f, burnt, seed, stage);
   }
@@ -1088,13 +1099,14 @@
       else t += (fbm(xx / 1.6, yy / 1.6, k) - 0.5) * 0.45;
       return ramp(rp, t, xx, yy, 0.5);
     };
-    const N = { legs: 8, wings: 4, fillets: 7, balls: 15, frogs: 4, cod: 1 }[fr.kind] || 8;
+    const N = { legs: 8, wings: 4, fillets: 7, balls: 15, frogs: 4, cod: 1, minnows: 5 }[fr.kind] || 8;
+    objs.glows = [];
     for (let i = 0; i < N; i++) {
-      const a = r() * TAU, d = Math.sqrt(r()) * 0.7, x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d, ang = r() * Math.PI, base = i * 0.9;
+      const a = fr.kind === "minnows" ? (i / N) * TAU + 0.4 + r() * 0.3 : r() * TAU, d = fr.kind === "minnows" ? 0.5 + r() * 0.12 : Math.sqrt(r()) * 0.7, x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d, ang = r() * Math.PI, base = i * 0.9;
       if (fr.kind === "frogs") { const fx = cx - rx * 0.66 + i * (rx * 1.32 / 3), fy = cy - 6 + (i % 2) * 6; item("c" + i, fx, fy, 14, "frogs", { z: base, box: [fx - 20, fy - 20, fx + 20, fy + 24] }); if (taken("c" + i)) continue; }
       else if (fr.kind === "wings") { const wx = cx + (i % 2 ? 42 : -42), wy = cy - 13 + (i > 1 ? 26 : 0); item("c" + i, wx, wy + 8, 16, "wings", { z: base, box: [wx - 40, wy - 10, wx + 40, wy + 28] }); if (taken("c" + i)) continue; }
       else if (fr.kind === "legs") { const L0 = spiderLeg(cx, cy, i); item("c" + i, L0.mid[0], L0.mid[1], 14, "legs", { z: base, box: L0.box }); if (taken("c" + i)) continue; }
-      else if (fr.kind !== "cod") { const bw = { legs: 52, fillets: 25, balls: 14 }[fr.kind] || 20; item("c" + i, x, y, 14, fr.kind, { z: base, ang, box: [x - bw, y - bw * 0.6 - 4, x + bw, y + bw * 0.6 + 4] }); if (taken("c" + i)) continue; }
+      else if (fr.kind !== "cod") { const bw = { legs: 52, fillets: 25, balls: 14, minnows: 20 }[fr.kind] || 20; item("c" + i, x, y, 14, fr.kind, { z: base, ang, box: [x - bw, y - bw * 0.6 - 4, x + bw, y + bw * 0.6 + 4] }); if (taken("c" + i)) { if (fr.kind === "minnows") { for (let k = 0; k < 4; k++) objs.push(blob(x + (h2(i, k, 3) - 0.5) * 18, y + (h2(k, i, 4) - 0.5) * 9, 1.6, 1.3, 1.4, (xx, yy, ii) => ramp(rp, 0.3 + ii.diff * 0.6, xx, yy), { k: 16, base })); if (i % 2 === 0) { const tx = x - Math.cos(ang * 0.6 - 0.3) * (i % 4 ? -1 : 1) * 14, ty = y - Math.sin(ang * 0.6 - 0.3) * 14; objs.push(blob(tx, ty, 4, 3.4, 1, (xx, yy, ii) => (((xx + yy) % 3) < 1 ? "#7a4a0e" : ramp(R(["#4a2a06", "#7a4a0e", "#b07a1c", "#d8a436", "#f4cc66"]), 0.3 + ii.diff * 0.5, xx, yy)), { wob: [[2, 0.3, i]], k: 16, base })); } } continue; } }
       if (fr.kind === "legs") {
         const L0 = spiderLeg(cx, cy, i), leg = crabLeg(L0.x, L0.y, L0.ang, 56, 1.35, rp, raw ? "cook" : stage, i, { bends: L0.bends, rad: [3.6, 3, 2.2], base: base + 2 });
         const cf0 = leg.cf; leg.cf = (xx, yy, ii) => { const c0 = cf0(xx, yy, ii); if (!c0) return null; const c1 = C(c0); if (c1[0] + c1[1] + c1[2] < 120) return c0; return h2(xx, yy, i + 5) > 0.9 ? "#140804" : crisp(xx, yy, ii, i); };
@@ -1149,6 +1161,25 @@
         if (i > 0) continue;
         geo("mound", { cx, cy, rx: rx * 0.8, ry: ry * 0.7, h: 12, cut: true });
         objs.push(blob(cx, cy, rx * 0.8, ry * 0.7, 12, (xx, yy, ii) => (!raw && !burnt && h2(Math.floor(xx / 2), Math.floor(yy / 2), 5) > 0.975 ? "#2e5a1c" : crisp(xx, yy, ii, i)), { wob: [[1, 0.12, 0.5], [2, 0.08, 1], [6, 0.04, 2]], k: 14, rough: 7, scale: 4, seed: 3, base: 2 }));
+      } else if (fr.kind === "minnows") {
+        // a battered minnow: a plump little body, a tail fanned behind, an eye, the batter thin enough that its light comes through
+        const ca = Math.cos(ang * 0.6 - 0.3), sa = Math.sin(ang * 0.6 - 0.3), dir = i % 2 ? 1 : -1, lit = !raw && !burnt && fr.glow;
+        if (!raw) objs.glows.push([x, y, burnt]);
+        // the batter: a lumpy, crinkled jacket, crisp ridges catching the light, thin enough that the minnow's light comes through
+        const loc2 = (xx, yy) => [((xx - x) * ca + (yy - y) * sa) * dir / 16, (-(xx - x) * sa + (yy - y) * ca) / 1.35];
+        const jacket = (u, v) => { const h = 5.6 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.12) / 0.9, 2))) * (1 + (vn(u * 9, v * 0.9, i) - 0.5) * 0.5); return Math.abs(v) <= h ? h : 0; };
+        objs.push({ x0: x - 22, y0: y - 16, x1: x + 22, y1: y + 16, k: 20, base, hf: (xx, yy) => {
+          const [u, v] = loc2(xx, yy), h = u > -0.8 && u < 1.05 ? jacket(u, v) : 0;
+          if (h) return Math.sqrt(Math.max(0, 1 - (v / h) * (v / h))) * 4.5 + 1 + (vn(xx / 1.6, yy / 1.6, i) - 0.5) * 2.2;
+          // the tail, unbattered, poking out behind
+          if (u <= -0.6 && u > -1.25) { const sp = 0.6 + (-0.6 - u) * 7; return Math.abs(v) > sp || (u < -1.08 && Math.abs(v) < 1.2) ? null : 0.8; }
+          return null;
+        }, cf: (xx, yy, ii) => {
+          const [u, v] = loc2(xx + 0.5, yy + 0.5), h = u > -0.8 && u < 1.05 ? jacket(u, v) : 0;
+          if (!h) return raw || burnt ? ramp(burnt ? BURNT : rp, 0.4, xx, yy) : ramp(R(["#4a2a06", "#7a4a0e", "#b07a1c", "#d8a436", "#f4cc66"]), 0.25 + ii.diff * 0.5 + (((v + 9) % 1.6) < 0.5 ? -0.2 : 0), xx, yy);
+          if (lit && ii.diff < 0.45 && Math.abs(v) < h * 0.55 && u > -0.4 && u < 0.7 && h2(xx, yy, i) > 0.35) return mix(crisp(xx, yy, ii, i), fr.glow, 0.5);
+          return crisp(xx, yy, ii, i);
+        } });
       } else if (fr.kind === "balls") {
         objs.push(blob(x, y, 13, 11.5, 12, (xx, yy, ii) => crisp(xx, yy, ii, i), { wob: [[5, 0.05, ang]], k: 18, rough: 1.4, scale: 1.2, seed: i, base, pow: 0.6 }));
       }
@@ -1188,7 +1219,11 @@
     else if (fr.vessel === "paper") { const lay = new Img(W, H); lay.fill((x, y) => { const u = (x - 120) * 0.95 + (y - 90) * 0.3, v = (y - 90) - (x - 120) * 0.12; return Math.abs(u) < 100 && Math.abs(v) < 44 ? ramp(P.paper, 0.6 + (h2(Math.floor(x / 3), y, 2) > 0.8 && Math.floor(y) % 4 === 0 ? -0.3 : 0), x, y) : null; }); outline(lay, "#1a0e06"); img.paste(lay, 0, 0); f = { cx: 120, cy: 88, rx: 92, ry: 36 }; }
     else if (fr.vessel === "plate") { platter(img, 120, 92, 112, 48, "clay", { rim: true }); f = { cx: 120, cy: 86, rx: 86, ry: 32 }; }
     else f = basket(img, 120, 80, 104, 42, 26, look.cloth || ["#8a7a64", "#b4a488", "#d8cbb0", "#efe4cc", "#a0281e"]);
-    scene(img, crispBits(f.cx, f.cy - 6, f.rx, f.ry, fr, o.burnt ? "burnt" : "cook", 4, look));
+    const cb = crispBits(f.cx, f.cy - 6, f.rx, f.ry, fr, o.burnt ? "burnt" : "cook", 4, look);
+    scene(img, cb);
+    // still lit from inside, a little; burnt, a sickly green glimmer from the charred lumps and smoke
+    for (const [x, y, b] of cb.glows || []) { glow(img, x, y, b ? 10 : 15, b ? "#6aff3a" : fr.glow, b ? 0.18 : 0.24, b ? 8 : 11); if (!b) img.px(x, y, "#f8ffd0"); }
+    if (o.burnt && cb.glows && cb.glows.length) smokeOver(img, [[f.cx - 30, f.cy - 20], [f.cx + 10, f.cy - 24, 66], [f.cx + 44, f.cy - 18]]);
     if (!o.burnt) {
       if (fr.vessel !== "plate") { const g = bowl(img, 210, 120, 18, 8, 10, "pewter"); geo("dip", [g.cx, g.cy]); scene(img, [liquid(g.cx, g.cy, g.rx, g.ry, 0, R(["#a89a7a", "#c8bc9a", "#e2d8bc", "#f4eedc"]), { seed: 2, oil: 0, ripple: 0.3 })]); for (let i = 0; i < 12; i++) img.px(g.cx - 6 + (i * 5) % 13, g.cy - 2 + (i % 3), "#4a7a2a"); }
       lemon(img, 32, 122, 1.4);
@@ -1275,6 +1310,7 @@
     eel: { kind: "round", filling: R(["#3a3a2a", "#5a5a42", "#7a7a5a", "#9a9a76", "#bcbc96"]), eels: 4 },
     crab: { kind: "chest", filling: R(["#8a4a3a", "#b06a54", "#d08a70", "#e8ae94", "#f8d0bc"]) },
     stargazy: { kind: "round", filling: R(["#6a4a3a", "#9a7258", "#c49a7a", "#e2bea0", "#f4dcc4"]), stargazy: 7 },
+    gazer: { kind: "round", filling: R(["#3a3a2a", "#5a5a42", "#7a7a5a", "#9a9a76", "#bcbc96"]), eels: 0, gazers: true, vent: false, parsley: true },
   };
   function pieServe(spec, o) {
     const look = spec.look, pi = Object.assign({}, PIES[spec.pal] || PIES.pie, look.pie || {}), burnt = o.burnt, img = tableBack(o.seed || 10);
@@ -1286,7 +1322,7 @@
   }
   function pieTop(img, pi, stage, cx, cy, s, look) {
     const burnt = stage === "burnt", raw = stage === "raw", objs = [];
-    const crust = burnt ? BURNT : raw ? R(["#9a8a6a", "#c4b48e", "#e2d4b0", "#f6ecd2", "#fffaf0"]) : look.pastry || PASTRY;
+    const sunk = burnt && pi.gazers, crust = sunk ? R(["#060302", "#140a04", "#261408", "#3a200c", "#522e12", "#6c3e18"]) : burnt ? BURNT : raw ? R(["#9a8a6a", "#c4b48e", "#e2d4b0", "#f6ecd2", "#fffaf0"]) : look.pastry || PASTRY;
     const sh = (k) => (x, y, i) => {
       if (i.spec > 0.6 && !burnt && !raw) return i.spec > 0.85 ? "#fff6e0" : ramp(crust, 1, x, y);
       return ramp(crust, 0.12 + i.diff * 0.8 - i.ao * 0.4 + (fbm(x / 2.5, y / 2.5, k) - 0.5) * 0.25, x, y);
@@ -1297,8 +1333,9 @@
       const wedge = () => false;
       const tower = (x, y) => { const u = x - cx, v = cy + 4 * s - y; if (Math.abs(u) > 9 * s || v < 0 || v > 22 * s) return 0; if (v > 18 * s && Math.floor((u + 9 * s) / (3.6 * s)) % 2) return 0; return Math.abs(u) < 2.5 * s && v < 6 * s ? 2 : 1; };
       const gaze = pi.stargazy && !raw ? stargazyCrust(cx, cy, s) : null;
-      objs.push({ x0: cx - rx, y0: cy - ry, x1: cx + rx, y1: cy + ry, k: 16, hf: (x, y) => { const d = E(x, y); if (d > 1) return null; if (wedge(x, y)) return 3; const crimp = d > 0.86 ? Math.abs(Math.sin(Math.atan2(y - cy, x - cx) * 22)) * 2.5 + 2 : 0; const crest = pi.crest && !raw ? [0, 2.5, 0.5][tower(x, y)] : 0; return Math.pow(1 - d * d, 0.35) * 10 * s + crimp + crest + (gaze && d <= 0.86 ? gaze.h(x, y) : 0); }, cf: (x, y, i) => {
+      objs.push({ x0: cx - rx, y0: cy - ry, x1: cx + rx, y1: cy + ry, k: 16, hf: (x, y) => { const d = E(x, y); if (d > 1) return null; if (wedge(x, y)) return 3; const crimp = d > 0.86 ? Math.abs(Math.sin(Math.atan2(y - cy, x - cx) * 22)) * 2.5 + 2 : 0; const crest = pi.crest && !raw ? [0, 2.5, 0.5][tower(x, y)] : 0; return (sunk ? (d > 0.84 ? 8 * s : (d * 0.5 + (fbm(x / 6, y / 4, 3) - 0.5) * 0.4) * 9 * s) : Math.pow(1 - d * d, 0.35) * 10 * s) + crimp + crest + (gaze && d <= 0.86 ? gaze.h(x, y) : 0); }, cf: (x, y, i) => {
         const d = E(x, y);
+        if (sunk && d <= 0.84 && Math.abs(vn((x - cx) / 9, (y - cy) / 5, 4) - 0.5) < 0.03) return h2(x, y, 2) > 0.7 ? "#ff6a1a" : "#020101";
         if (wedge(x, y)) return ramp(pi.filling, 0.25 + i.diff * 0.4 + (fbm(x / 3, y / 3, 6) - 0.5) * 0.7, x, y);
         if (gaze && d <= 0.86) { const c = gaze.c(x, y, i, crust, burnt); if (c) return c; }
         if (pi.crest && !raw && tower(x, y)) return tower(x, y) === 2 ? "#3a1806" : ramp(crust, 0.45 + i.diff * 0.5, x, y);
@@ -1335,6 +1372,7 @@
     }
     scene(img, objs);
     if (burnt && pi.stargazy) stargazyTop(img, pi.stargazy, cx, cy, s, true);
+    if (burnt && pi.gazers) { gazers(img, cx, cy, s, true); smokeOver(img, [[cx - 40 * s, cy - 10 * s], [cx + 10 * s, cy - 14 * s, 66], [cx + 50 * s, cy - 8 * s]]); }
     if (raw || burnt) return;
     if (pi.kind === "round") {
       const lay = new Img(W, H);
@@ -1343,6 +1381,8 @@
       for (let k = 0; k < (pi.eels || 0); k++) { const a = (k / pi.eels) * TAU + 0.4, x = cx + Math.cos(a) * 40 * s, y = cy + Math.sin(a) * 16 * s; eelHead(img, x, y - 6, a, s); }
       for (let k = 0; k < (pi.tails || 0); k++) { const a = (k / pi.tails) * TAU + 0.2, x = cx + Math.cos(a) * 44 * s, y = cy + Math.sin(a) * 17 * s; serpentTail(img, x, y - 4, s, k); }
       if (pi.stargazy) stargazyTop(img, pi.stargazy, cx, cy, s);
+      if (pi.parsley) { const r = rng(12); for (let i = 0; i < 40; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 0.8; img.px(cx + Math.cos(a) * 82 * s * d, cy + Math.sin(a) * 36 * s * d, r() < 0.5 ? "#4a7a2a" : "#7aa848"); } }
+      if (pi.gazers) gazers(img, cx, cy, s, false);
     }
   }
   // Stargazy: an egg-washed crust laid in fish-scale rows, three star-shaped vents, serpent heads round the rim gazing up and a tail-tip curling out of the middle
@@ -1695,6 +1735,7 @@
       for (let k = 0; k < 6; k++) { const x = k % 2 ? 160 : 82, y = 66 + Math.floor(k / 2) * 20, dir = k % 2 ? -1 : 1; item("d" + k, x, y, 12, "sardine", { z: k, box: [x - 34, y - 10, x + 34, y + 10], m: { cx: x, cy: y, rx: 28, ry: 6.5, h: 5 } }); if (taken("d" + k)) continue; sardine(img, x, y, burnt ? "burnt" : "cook", k, dir); }
       return img;
     }
+    if (spec.pal === "moonfish") return moonServe(spec, o);
     if (spec.pal === "salmon") {
       slate(img, 120, 86, 200, 64);
       for (let k = 0; k < 7; k++) { const x = 46 + k * 24, y = 86 + Math.sin(k) * 4; item("m" + k, x, y, 16, "slice", { z: k }); if (taken("m" + k)) continue; scene(img, [blob(x, y, 20, 13, 3, (xx, yy, i) => { if (burnt) return ramp(BURNT, i.diff, xx, yy); const band = Math.sin((xx - yy * 0.6) * 0.7) > 0.7; return band ? "#fbd8c0" : i.spec > 0.5 ? "#fff0e8" : ramp(RP.salmon, 0.25 + i.diff * 0.7, xx, yy); }, { wob: [[2, 0.2, k], [3, 0.1, k]], pow: 0.3, k: 30, base: k * 1.5 })]); }
@@ -2026,15 +2067,419 @@
   function rotJoint(img, spec, cx, cy, rx, rr, rot, stage, seed, done) { jointAt(img, roastLook(spec), cx, cy + rr * 0.15, rx * 1.9, rr * 1.1, stage, seed, rot, done); }
   const vn = (x, y, s) => K.vnoise(x, y, s);
 
+  // ---------- the fish specials: a whole fish on its side, a side of fish pinned to a plank, steaks, the legend ----------
+  // a whole fish lies on its side, seen a little from above: u runs tail (-1) to snout (1), v across it in px (negative is its back).
+  // The fork takes the top fillet off a section at a time, nearest the head first, and what's under it shows: white flesh, the backbone
+  // and the ribs; the head and tail stay
+  const FISHES = {
+    pike: { depth: 0.15, fat: 0.05, nose: 0.85, eye: 0.87, gill: 0.66, dorsal: [-0.66, -0.46, 0.85, "fan"], tail: 0.85, spots: true, snout: true },
+    grayling: { depth: 0.2, fat: 0.22, nose: 0.6, eye: 0.84, gill: 0.68, dorsal: [-0.34, 0.44, 1.55, "sail"], tail: 1, scales: true, speck: true },
+    goldcarp: { depth: 0.34, fat: 0.12, nose: 0.5, eye: 0.8, gill: 0.6, dorsal: [-0.46, 0.34, 0.42, "long"], tail: 1.05, scales: true, score: true },
+    trout: { depth: 0.21, fat: 0.18, nose: 0.6, eye: 0.84, gill: 0.66, dorsal: [-0.04, 0.24, 0.7, "fan"], tail: 0.95, speck: true },
+    mackerel: { depth: 0.17, fat: 0.15, nose: 0.7, eye: 0.85, gill: 0.67, dorsal: [0.04, 0.3, 0.6, "fan"], tail: 1.15, bars: true },
+    legend: { depth: 0.3, fat: 0.16, nose: 0.55, eye: 0.8, gill: 0.6, dorsal: [-0.56, 0.46, 0.85, "spiny"], tail: 1.25, scales: true, teeth: true, segs: 6 },
+    char: { depth: 0.2, fat: 0.15, nose: 0.62, eye: 0.85, gill: 0.67, dorsal: [-0.08, 0.2, 0.7, "fan"], tail: 1, spots: true },
+  };
+  // cooked fish flesh is cream, not white: the flakes catch the light, the far fillet between the ribs sits in shadow
+  const FISHFLESH = R(["#5e4a36", "#8a7056", "#b49676", "#d6bc98", "#ecdab8", "#faf0d8"]), FISHBONE = R(["#8a8070", "#b4aa96", "#d8d0bc", "#f0eadc", "#fffcf2"]);
+  // a burnt dish smokes: two dark drifting columns per spot, grey over black
+  function smokeOver(img, pts, ph) { for (const [x, y, h] of pts) { steam(img, x, y, h || 56, (ph || 0) + x * 0.05, 0.5, 6, 5, "#2a2622"); steam(img, x + 3, y - 6, (h || 56) - 10, (ph || 0) + 1.3 + x * 0.05, 0.4, 5, 4, "#6a645c"); } }
+  // a cooked eye gone to an X
+  const xEye = (du, dv, R0) => Math.abs(du - dv) < R0 * 0.32 || Math.abs(du + dv) < R0 * 0.32;
+  function fishLook(spec) { return Object.assign({}, FISHES[spec.pal] || FISHES.grayling, (FA.LOOKS[spec.pal] || FA.LOOKS.grayling).fish || {}, spec.look.fish || {}); }
+  // q: cx, cy, L (half its length), dir (1: head to the right), tilt, cook (0 raw .. 1 done), burnt, f (fishLook), items (report its sections)
+  function fishDraw(img, q) {
+    const f = q.f, L = q.L, D = f.depth * L, dir = q.dir || 1, ca = Math.cos(q.tilt || 0), sa = Math.sin(q.tilt || 0), cook = q.cook === undefined ? 1 : q.cook, burnt = q.burnt;
+    const S = f.segs || 5, uA = -0.62, uB = f.gill - 0.07, seed = q.seed || 3;
+    // a burnt fish curls its tail up off the plate as it shrinks
+    const curl = (ux) => (burnt && ux < -0.35 * L ? Math.pow((-0.35 * L - ux) / L, 2) * L * 0.75 : 0);
+    const loc = (x, y) => { const dx = x - q.cx, dy = y - q.cy, ux = dir * (dx * ca + dy * sa); return [ux, -dx * sa + dy * ca + curl(ux)]; };
+    const at = (ux, vy) => { const A = ux * dir; vy -= curl(ux); return [q.cx + A * ca - vy * sa, q.cy + A * sa + vy * ca]; };
+    const prof = (u) => {
+      if (u > 1.04 || u < -0.84) return 0;
+      if (u >= f.fat) return Math.pow(Math.max(0, 1 - Math.pow((u - f.fat) / (1.04 - f.fat), 2)), f.nose);
+      const t = (u + 0.84) / (f.fat + 0.84);
+      return 0.17 + 0.83 * Math.pow(Math.sin(Math.min(1, t) * Math.PI / 2), 1.3);
+    };
+    const eaten = [];
+    for (let k = 0; k < S; k++) {
+      const uc = uA + (k + 0.5) * (uB - uA) / S, [x, y] = at(uc * L, -D * 0.05), r = (uB - uA) / S * L / 2;
+      if (q.items) item("f" + k, x, y, r, "flake", { z: k, box: [x - r - 4, y - D - 4, x + r + 4, y + D + 4] });
+      eaten.push(q.items && !burnt && taken("f" + k));
+    }
+    // the edge of a section the fork took is ragged, flake by flake
+    const rag = Math.max(9, D * 0.55), jag = Math.max(3, D * 0.16);
+    const segOf = (u, v) => { const uu = u + ((vn(v * 0.25 + 3, 1, seed) - 0.5) * rag + (h2(Math.floor(v / 1.6), 5, seed) - 0.5) * jag) / L, k = Math.floor((uu - uA) / (uB - uA) * S); return k >= 0 && k < S && eaten[k] ? k : -1; };
+    const [fa, fb, fh, fk] = f.dorsal;
+    const finH = (u) => {
+      const t = (u - fa) / (fb - fa);
+      if (t < 0 || t > 1) return 0;
+      const s = fk === "sail" ? Math.pow(t, 0.35) * (1 - Math.pow(t, 7)) : fk === "long" ? Math.pow(Math.sin(Math.PI * t), 0.35) * (1 - t * 0.55) : Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1)), 0.7) * (1 - t * 0.35);
+      return D * fh * s * (fk === "spiny" ? 0.7 + 0.3 * Math.abs(Math.sin(t * Math.PI * 8)) : 1);
+    };
+    const pg = f.gill - 0.05, eyeU = f.eye, R0 = Math.max(1.8, D * 0.17);
+    // what a point is: body, a fin, the tail, the pectoral fin over the body
+    const what = (u, v) => {
+      const p = prof(u), top = D * p, bot = D * p * 1.06, ux = u * L;
+      const pd = (pg - u) * L, pv = v - bot * 0.32;
+      if (pd > 0 && pd < D * 0.75 && Math.abs(pv + pd * 0.15) < 1.2 + pd * 0.32 && u > -0.84 && segOf(u, v) < 0) return { k: "pec", top, bot, t: pd / (D * 0.75) };
+      if (p > 0 && v >= -top && v <= bot) return { k: "body", top, bot };
+      if (burnt && fbm(ux / 3, v / 3, seed + 9) > 0.6) return null;
+      if (u < -0.76 && u >= -1.02) {
+        const s = Math.min(1, (-0.76 - u) / 0.24), spread = D * (0.17 + s * 0.78 * f.tail), notch = s > 0.5 ? D * 0.62 * f.tail * Math.pow((s - 0.5) / 0.5, 1.2) : 0;
+        if (Math.abs(v) <= spread && Math.abs(v) >= notch) return { k: "tail", s, spread };
+      }
+      const h = finH(u);
+      if (h > 0 && v < -top + 1 && v >= -top - h) return { k: "fin", t: (-top - v) / h, h };
+      if (v > bot - 1 && ((u > -0.64 && u < -0.5) || (u > -0.2 && u < -0.06))) { const c = u > -0.4 ? -0.13 : -0.57, w = 0.07, t = 1 - Math.abs(u - c) / w; if (t > 0 && v < bot + D * 0.32 * t) return { k: "fin", t: (v - bot) / (D * 0.32), h: D * 0.3, low: true }; }
+      return null;
+    };
+    const lay = new Img(W, H), ext = L * 1.1, fy = D * (1 + fh) + 4;
+    hrender(lay, [q.cx - ext, q.cy - ext * Math.abs(sa) - fy - 2, q.cx + ext, q.cy + ext * Math.abs(sa) + D * 1.6], (x, y) => {
+      const [ux, v] = loc(x, y), u = ux / L, w = what(u, v);
+      if (!w) return null;
+      if (w.k === "body") { const hh = v < 0 ? w.top : w.bot, b = Math.sqrt(Math.max(0, 1 - (v / hh) * (v / hh))) * D * 0.55; return segOf(u, v) >= 0 && Math.abs(v) < hh * 0.9 && u < f.gill ? b * 0.4 + 0.6 : b + 0.5; }
+      if (w.k === "pec") return D * 0.5;
+      return 1;
+    }, (x, y, i) => {
+      const [ux, v] = loc(x + 0.5, y + 0.5), u = ux / L, w = what(u, v);
+      if (!w) return null;
+      if (burnt) {
+        const n = fbm(x / 3, y / 3, seed), rp = f.ash || BURNT;
+        if (w.k === "body") {
+          const du = (u - eyeU) * L, dv = v + w.top * 0.28;
+          if (Math.hypot(du, dv) < R0 * 1.15) { if (f.eyeC === "gold") return Math.hypot(du, dv) < R0 * 0.5 ? "#0a0604" : ramp(P.gold, 0.5 + i.diff * 0.4, x, y); return xEye(du, dv, R0) ? "#e8e0d0" : "#0a0806"; }
+          // the skin cracked into plates, a few cracks still glowing
+          if (Math.abs(vn(ux / 8, v / 6, seed + 3) - 0.5) < 0.03) return h2(Math.floor(x / 2), Math.floor(y / 2), seed) > 0.8 ? "#ff6a1a" : "#020101";
+        }
+        if (f.ash) return n > 0.68 ? "#c8c2b8" : ramp(rp, 0.15 + i.diff * 0.7 + (n - 0.5) * 0.5, x, y);
+        return n > 0.72 ? mix("#4a4440", "#7a7268", (n - 0.72) * 3) : ramp(rp, 0.05 + i.diff * 0.7 + (n - 0.5) * 0.5, x, y);
+      }
+      const done = cook >= 1 || fbm(x / 5, y / 4, seed + 2) < cook;
+      if (w.k === "fin" || w.k === "tail" || w.k === "pec") {
+        const fin = w.k === "fin" && !w.low ? f.fin : f.fin2 || f.fin, ray = w.k === "tail" ? ((v / Math.max(1, w.spread)) * 7 + 20) % 1 < 0.3 : w.k === "pec" ? (v * 0.8 + 20) % 2 < 0.7 : (ux / 2.5 + 40) % 1 < 0.35;
+        if (f.finSpot && w.k === "fin" && !w.low && h2(Math.floor(ux / 3), Math.floor(v / 3), seed) > 0.8 && w.t > 0.15 && w.t < 0.85) return f.finSpot;
+        if (done && f.finEdge && w.k === "fin" && !w.low && w.t > 0.82) return ramp(f.finEdge, 0.3 + i.diff * 0.6, x, y);
+        let t = 0.3 + i.diff * 0.5 + (ray ? -0.2 : 0) - (w.k === "tail" ? w.s * 0.15 : 0);
+        if (done && f.char && fbm(x / 2.5, y / 2.5, seed + 4) > 0.55) t -= 0.35;
+        if (done && w.k !== "pec" && (w.t > 0.85 || (w.k === "tail" && w.s > 0.9))) t -= 0.25;
+        return ramp(fin, t, x, y);
+      }
+      const hh = v < 0 ? w.top : w.bot, vv = v / hh;
+      // under the top fillet: white flakes, the backbone along the middle and the ribs fanning back from it
+      if (u < f.gill && Math.abs(v) < hh * 0.9 && segOf(u, v) >= 0) {
+        const sv = v + D * 0.04, sw = Math.max(1.6, D * 0.1), as = Math.abs(sv), vper = sw * 2.4;
+        // the backbone: a string of vertebrae, lit on top, a shadow under it
+        if (as < sw) return ((ux % vper) + vper) % vper < 1 ? "#7a6a54" : ramp(FISHBONE, 0.75 - (sv / sw) * 0.3 + i.diff * 0.2, x, y);
+        if (sv > 0 && as < sw + 1.4) return "#4a3a2a";
+        // the ribs sweep back from it toward the belly, the pin bones shorter above; each with its shadow
+        const per = Math.max(4.2, D * 0.34), along = ux + Math.pow(as / hh, 1.25) * hh * 0.85, rb = ((along % per) + per) % per, ribs = as < hh * (sv > 0 ? 0.84 : 0.55);
+        if (ribs && rb < 1.2) return ramp(FISHBONE, 0.5 + i.diff * 0.4, x, y);
+        if (ribs && rb < 2.2) return "#5a4634";
+        // between them, flakes of the far fillet: each flake lighter at its leading edge, a few clinging pieces catching the light
+        const cling = fbm(ux / 3.5, v / 2.2, seed + 11) > 0.6;
+        return ramp(f.flesh || FISHFLESH, 0.12 + (rb / per) * 0.3 + i.diff * 0.25 + (cling ? 0.32 : 0) - (as / hh) * 0.1, x, y);
+      }
+      // the cut face of the fillet beside a section the fork took: cream flake ends, not skin
+      if (u < f.gill && Math.abs(v) < hh * 0.9 && (segOf(u + 2.2 / L, v) >= 0 || segOf(u - 2.2 / L, v) >= 0)) return ramp(f.flesh || FISHFLESH, 0.55 + i.diff * 0.35 + (h2(x, Math.floor(y / 2), seed) > 0.6 ? 0.12 : -0.08), x, y);
+      const eye = Math.hypot((u - eyeU) * L, v + w.top * 0.28);
+      if (eye < R0) {
+        if (f.eyeC === "gold") return eye < R0 * 0.42 ? "#0a0604" : eye < R0 * 0.6 && (x + y) % 2 ? "#fff6c0" : ramp(P.gold, 0.55 + (R0 - eye) / R0 * 0.4 - (v + w.top * 0.28 > 0 ? 0.2 : 0), x, y);
+        if (eye < R0 * 0.45) return "#0c0a08";
+        if (eye < R0 * 0.7 && (u - eyeU) * L < -R0 * 0.1 && (v + w.top * 0.28) < -R0 * 0.15) return "#ffffff";
+        return done ? (eye > R0 * 0.85 ? "#6a6458" : "#ece6d6") : (eye > R0 * 0.85 ? "#3a3020" : "#d8b048");
+      }
+      const ug = f.gill + 0.07 * (1 - vv * vv);
+      if (Math.abs(u - ug) * L < 0.8 && Math.abs(vv) < 0.85) return ramp(done ? f.back : f.rawBack, 0.05, x, y);
+      if (u > 0.965 && Math.abs(v - w.bot * 0.12) < 0.75) return "#140806";
+      if (f.teeth && u > 0.84 && v > w.bot * 0.12 - 2.2 && v < w.bot * 0.12 - 0.6 && (ux + 40) % 3 < 1.4) return "#f0e8d4";
+      const belly = vv + (fbm(x / 6, y / 3, seed + 1) - 0.5) * 0.3 > 0.28;
+      const rp = belly ? (done ? f.belly : f.rawBelly) : done ? f.back : f.rawBack;
+      let t = 0.14 + i.diff * 0.72 + (belly ? 0.12 : 0) - (u > ug ? 0.05 : 0) + (vv < -0.6 ? -0.08 : 0);
+      if (f.scales && u < ug && u > -0.8) { const row = Math.floor((v + 80) / 3), lx = ((ux + (row % 2) * 2) % 4 + 4) % 4; if (lx < 0.9) t -= 0.16; else if (lx < 2) t += 0.05; }
+      if (f.grill && done && u > -0.7 && u < ug - 0.02) { const gb = ((ux * 0.8 + v * 0.55) % 13 + 13) % 13; if (gb < 2.4) return ramp(BURNT, 0.1 + i.diff * 0.35 + (gb < 1.2 ? 0 : 0.15), x, y); if (gb < 3.4) t -= 0.3; }
+      if (f.bars && vv < 0.1 && u < ug && Math.sin(ux * 0.42 + Math.sin(v * 0.45 + ux * 0.05) * 2.4) > 0.4) return f.bar || ramp(rp, 0.02, x, y);
+      if (f.spots && vv < 0.55 && u < ug + 0.05) {
+        const cy0 = Math.floor((v + 80) / 4.6), cx0 = Math.floor((ux + cy0 * 3.1) / 7), jx = (cx0 + 0.5 + (h2(cx0, cy0, seed) - 0.5) * 0.7) * 7 - cy0 * 3.1, jy = (cy0 + 0.5 + (h2(cx0, cy0, seed + 1) - 0.5) * 0.5) * 4.6 - 80;
+        if (h2(cx0, cy0, seed + 2) > 0.3 && Math.hypot((ux - jx) / (1.4 + h2(cx0, cy0, 9)), (v - jy) / 1.05) < 1) return ramp(f.spot, 0.15 + i.diff * 0.7, x, y);
+      }
+      if (f.speck && vv < 0.35) { const hv = h2(Math.floor(ux / 2.2), Math.floor((v + 80) / 2.2), seed + 7); if (f.red && hv > 0.965) return f.red; if (hv > (f.speckN || 0.9)) return f.speck || "#1a1410"; }
+      if (f.score && done && u < ug - 0.04 && u > -0.62 && Math.abs(vv) < 0.75) { const sc = ((ux * 0.9 - v * 0.7) % 11 + 11) % 11; if (sc < 1.1) return "#3a1404"; if (sc < 2.1) return ramp(R(["#c8a070", "#e8c898", "#fff0d0"]), i.diff, x, y); }
+      if (Math.abs(vv + 0.1) < 0.06 && u < ug && u > -0.75 && (ux + 40) % 3 < 2) t -= 0.1;
+      if (done && f.char && fbm(x / 3, y / 2.5, seed + 4) > 1 - f.char * 0.62) t -= 0.42;
+      else if (done && fbm(x / 2.5, y / 2.5, seed + 5) > 0.8) t -= 0.12;
+      if (f.sheen && done && vv < 0.2 && h2(Math.floor(ux / 3), Math.floor(v / 2), seed) > 0.988 && i.diff > 0.45) return f.sheen;
+      if (done && f.glaze && i.spec > 0.35 && !i.edge) return i.spec > 0.6 ? "#fff8d8" : "#ffd870";
+      if (i.spec > 0.62 && !i.edge && done) return i.spec > 0.8 ? "#fff4e0" : ramp(rp, 1, x, y);
+      return ramp(rp, t, x, y);
+    }, { k: f.glaze ? 30 : 20 });
+    outline(lay, burnt ? "#020101" : "#0a0604");
+    img.paste(lay, 0, 0);
+    if (!burnt && f.eyeC === "gold" && cook >= 1) { const [ex, ey] = at(eyeU * L, -D * prof(eyeU) * 0.28); glow(img, ex, ey, 10, "#ffd040", 0.3); star(img, ex - 1, ey - 1, "#fffbe8", 3, 0.9); }
+    return { at, D, L, prof };
+  }
+  function thymeSprig(img, x, y, ang, s) {
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const lay = new Img(W, H);
+    for (let k = 0; k < 18 * s; k++) { lay.px(x + ca * k, y + sa * k, "#5a4426"); if (k % 2 === 1) for (const sd of [-1, 1]) { const lx = x + ca * k - sa * sd * 1.6, ly = y + sa * k + ca * sd * 1.6; lay.px(lx, ly, "#4e6e30"); lay.px(lx - sa * sd, ly + ca * sd, "#8ab05a"); } }
+    img.paste(lay, 0, 0);
+  }
+  function wholeServe(spec, o) {
+    const f = fishLook(spec), burnt = o.burnt, img = tableBack(o.seed || 15), pal = spec.pal, pan = pal === "goldcarp" || pal === "trout";
+    geo("inside", f.flesh || FISHFLESH);
+    if (pan) {
+      B.skilletWide(img, 118, 86, 104, 42, 0);
+      // the butter or honey under it: golden, or gone to black tar that bubbled and set
+      scene(img, [liquid(118, 86, 92, 36, 0, burnt ? R(["#020101", "#0a0604", "#140a06", "#1e1008", "#2a160a"]) : pal === "trout" ? R(["#3a1c06", "#5e300c", "#8a4c16", "#b47024", "#d89a40", "#f4c470"]) : R(["#5a2a04", "#8a4806", "#b8700c", "#e09a1c", "#f8c038", "#ffe48a"]), { seed: 4, oil: burnt ? 0.1 : 0.5, ripple: 0.3, hi: burnt ? "#6a5a4a" : "#fff8e0" })]);
+      if (burnt) { const r = rng(17); for (let i = 0; i < 26; i++) { const a = r() * TAU, d = 0.5 + r() * 0.45, x = 118 + Math.cos(a) * 92 * d, y = 86 + Math.sin(a) * 36 * d, rr = 1 + r() * 2.2; for (let k = 0; k < 14; k++) img.px(x + Math.cos(k * 0.45) * rr * 1.5, y + Math.sin(k * 0.45) * rr, "#3a2a1a"); } }
+    } else B.board(img, 120, 98, 116, 46, 6, pal === "mackerel" ? R(["#1a0e06", "#2e1a0c", "#462a16", "#5e3c22", "#7a5030", "#966a44"]) : null);
+    if (pal === "trout" && !burnt) { const r = rng(7); for (let i = 0; i < 70; i++) { const a = r() * TAU, d = 0.55 + r() * 0.42, x = 118 + Math.cos(a) * 92 * d, y = 86 + Math.sin(a) * 36 * d; img.px(x, y, "#fff2c8"); if (r() < 0.5) img.px(x + 1, y, "#f8dca0"); img.px(x, y + 1, "#6a3a10", 0.6); } }
+    const L = pal === "goldcarp" ? 82 : 92;
+    fishDraw(img, { cx: 116, cy: pal === "goldcarp" ? 88 : 86, L, dir: 1, tilt: -0.05, cook: 1, burnt, f, items: true, seed: 3 });
+    if (burnt) { if (pal === "mackerel") { const r = rng(5); for (let i = 0; i < 70; i++) img.px(40 + r() * 160, 104 + r() * 26, r() < 0.6 ? "#a8a29a" : "#d8d4cc"); } smokeOver(img, pal === "mackerel" ? [[100, 70, 70], [124, 66, 76], [148, 72, 66]] : [[88, 74], [140, 70]]); return img; }
+    if (pal === "grayling") { for (const [x, y, a] of [[40, 122, -0.6], [180, 124, -2.4], [196, 60, 2.6], [60, 58, 0.3]]) thymeSprig(img, x, y, a, 1.4); const r = rng(9); for (let i = 0; i < 24; i++) img.px(60 + r() * 120, 76 + r() * 18, r() < 0.5 ? "#6a8a3a" : "#9ab860"); }
+    if (pal === "goldcarp") { const r = rng(5); for (let i = 0; i < 14; i++) { const x = 50 + r() * 140, y = 100 + r() * 10; for (let j = 0; j < 2 + r() * 4; j++) img.px(x, y + j, j ? "#e8a020" : "#fff0a0"); } }
+    if (pal === "trout") { herb(img, 196, 112, 1.2, 4); lemon(img, 40, 120, 1.3); }
+    if (pal === "mackerel") { const r = rng(3); for (let i = 0; i < 50; i++) { const x = 30 + r() * 180, y = 104 + r() * 30; img.px(x, y, r() < 0.5 ? "#f4f0e8" : "#2a2420"); } lemon(img, 206, 118, 1.3); }
+    return img;
+  }
+
+  // the pike in its clay: the lower half of the shell like a cracked boat under it, the lid broken off behind with the skin stuck inside
+  const RIVERCLAY = R(["#1e140c", "#34241a", "#4e3828", "#6a4e38", "#86684c", "#a28462", "#bca07e"]);
+  WARE.riverclay = RIVERCLAY;
+  const CHARCLAY = R(["#060403", "#0e0906", "#18110c", "#241a12", "#32251a", "#423224", "#54412e"]);
+  WARE.charclay = CHARCLAY;
+  function clayServe(spec, o) {
+    const f = fishLook(spec), burnt = o.burnt, img = tableBack(o.seed || 16);
+    geo("inside", FISHFLESH);
+    shadow(img, 122, 120, 112, 14, 0.5, "#000000");
+    const CL = burnt ? CHARCLAY : RIVERCLAY, lid = new Img(W, H), E = ell(120, 46, 96, 16, [[7, 0.05, 1], [13, 0.03, 2]], 3);
+    lid.fill((x, y) => { const d = E(x + 0.5, y + 0.5); if (d > 1) return null; if (d > 0.82) return ramp(CL, 0.55 - (x - 120) / 96 * 0.2 + (h2(x, y, 4) - 0.5) * 0.3, x, y); const sk = !burnt && fbm(x / 7, y / 3, 6) > 0.56; return sk ? ramp(f.back, 0.2 + fbm(x / 2, y / 2, 2) * 0.5, x, y) : ramp(CL, 0.18 + (1 - d) * 0.25 + (fbm(x / 3, y / 3, 5) - 0.5) * 0.3, x, y); });
+    outline(lid, "#0a0604");
+    img.paste(lid, 0, 0);
+    const fb = bowl(img, 120, 84, 114, 32, 18, burnt ? "charclay" : "riverclay");
+    const r = rng(11), crackC = burnt ? "#ff6a1a" : "#140c06";
+    for (let k = 0; k < 26; k++) { const a = r() * TAU, x = 120 + Math.cos(a) * 113, y = 84 + Math.sin(a) * 31; img.rect(x - 1, y - 1, 2 + Math.floor(r() * 3), 2, "#140c06"); }
+    // cracks down the shell's side; when it burnt they glow, and the shell has split clean through in one place
+    for (let k = 0; k < (burnt ? 8 : 5); k++) { let x = 24 + k * (burnt ? 26 : 42) + r() * 10, y = 100 + r() * 8; for (let j = 0; j < 13; j++) { x += (r() - 0.5) * 3; y += 1; img.px(x, y, j % 4 === 3 && burnt ? "#ffc060" : crackC); if (burnt) img.px(x + 1, y, "#020101"); } }
+    if (burnt) for (let y = 102; y < 126; y++) { const x = 150 + (y - 102) * 0.4 + Math.sin(y * 0.9) * 1.5; img.rect(x, y, 3, 1, "#020101"); img.px(x + 1, y, "#ff7a2a"); }
+    scene(img, [blob(fb.cx, fb.cy + 4, fb.rx * 0.92, fb.ry * 0.72, 2, (x, y, i) => ramp(burnt ? CHARCLAY : R(["#2a1c10", "#3e2c1c", "#544028", "#6a5236"]), 0.3 + i.diff * 0.4 + (fbm(x / 4, y / 3, 2) - 0.5) * 0.3, x, y), { k: 8 })]);
+    fishDraw(img, { cx: 120, cy: 82, L: 94, dir: 1, tilt: -0.03, cook: 1, burnt, f, items: true, seed: 5 });
+    for (const [x, y, s] of [[22, 132, 1], [214, 130, 0.8], [200, 40, 0.7]]) scene(img, [blob(x, y, 12 * s, 6 * s, 5 * s, (xx, yy, i) => ramp(CL, 0.2 + i.diff * 0.7, xx, yy), { wob: [[3, 0.25, x], [5, 0.12, y]], k: 10 })]);
+    if (!burnt) for (let i = 0; i < 30; i++) img.px(40 + r() * 160, 112 + r() * 26, r() < 0.5 ? "#4e3828" : "#86684c");
+    else smokeOver(img, [[70, 70], [120, 64, 70], [170, 72]]);
+    return img;
+  }
+
+  // a side of fish pinned skin down to a split plank with green twigs (or juniper), its edges caught by the fire
+  function splitPlank(img, cx, cy, hl, hw, ang, seed) {
+    const lay = new Img(W, H), ca = Math.cos(ang), sa = Math.sin(ang), rp = R(["#2a1a0c", "#4a3018", "#6e4c28", "#94683a", "#b88a52", "#d4aa72", "#ead0a0"]);
+    const edge = (u, s) => hw + (vn(u / 6, s, seed) - 0.5) * 5;
+    for (let y = Math.floor(cy - hl * Math.abs(sa) - hw - 4); y < cy + hl * Math.abs(sa) + hw + 8; y++) for (let x = Math.floor(cx - hl - 2); x < cx + hl + 2; x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, u = dx * ca + dy * sa, v = -dx * sa + dy * ca, endN = hl - Math.abs(u) + (vn(v / 3, 4, seed) - 0.5) * 4;
+      if (endN < 0) continue;
+      const top = v >= -edge(u, 1) && v <= edge(u, 2), side = !top && v > edge(u, 2) && v <= edge(u, 2) + 5;
+      if (!top && !side) continue;
+      const char = Math.max(0, 1 - endN / 22) * 0.6 + (Math.abs(v) > hw - 4 ? 0.25 : 0) + (fbm(x / 5, y / 4, seed) > 0.68 ? 0.2 : 0);
+      const g = Math.sin(v * 1.3 + fbm(u / 18, v / 3, seed) * 5) * 0.12 + (h2(Math.floor(u / 30), Math.floor(v), seed) > 0.85 ? -0.12 : 0);
+      lay.px(x, y, side ? ramp(rp, 0.15 - char * 0.2, x, y) : char > 0.55 && h2(x, y, seed) > 0.4 ? ramp(BURNT, 0.3 + g, x, y) : ramp(rp, 0.55 + g - char * 0.45 - (u / hl) * 0.06, x, y));
+    }
+    outline(lay, "#0a0604");
+    img.paste(lay, 0, 0);
+  }
+  function plankLook(spec) { return Object.assign({ flesh: RP.salmon, fat: "#ffe2c8", pins: "twig" }, (FA.LOOKS[spec.pal] || {}).plank || {}, spec.look.plank || {}); }
+  // q: cx, cy, L, wd (its half width at the thick end), ang, cook, burnt, f, items
+  function fishSide(img, q) {
+    const f = q.f, L = q.L, Wd = q.wd, ca = Math.cos(q.ang), sa = Math.sin(q.ang), cook = q.cook === undefined ? 1 : q.cook, burnt = q.burnt, S = 6, uA = -0.94, uB = 1.03, seed = q.seed || 2;
+    const at = (ux, v) => [q.cx + ux * ca - v * sa, q.cy + ux * sa + v * ca];
+    const half = (u) => { if (u < -1 || u > 1) return 0; let h = Wd * (0.28 + 0.72 * Math.pow((u + 1) / 2, 0.42)); if (u > 0.9) h *= Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.9) / 0.1, 2))) * 0.3 + 0.7; if (u > 0.985) h *= 0.5; return h; };
+    const eaten = [];
+    for (let k = 0; k < S; k++) {
+      const uc = uA + (k + 0.5) * (uB - uA) / S, [x, y] = at(uc * L, 0), r = (uB - uA) / S * L / 2;
+      if (q.items) item("f" + k, x, y, r, "flake", { z: -Math.abs(k - (S - 1) / 2) + (k > S / 2 ? 0.1 : 0), box: [x - r - 4, y - Wd - 4, x + r + 4, y + Wd + 4] });
+      eaten.push(q.items && !burnt && taken("f" + k));
+      if (eaten[k]) { const st = new Img(W, H); st.fill((xx, yy) => { const dx = xx - x, dy = yy - y, u = dx * ca + dy * sa, v = -dx * sa + dy * ca; return Math.abs(u) < r && Math.abs(v) < half(uc) * 0.9 && h2(xx, yy, k) > 0.35 ? "#4a2208" : null; }, x - r - Wd, y - Wd - r, x + r + Wd, y + Wd + r); img.paste(st, 0, 0, 0.35); for (let i = 0; i < 4; i++) { const rr = rng(k * 9 + i); img.rect(x + (rr() - 0.5) * r * 1.6, y + (rr() - 0.5) * Wd, 2, 1, ramp(f.flesh, 0.7, 0, 0)); } }
+    }
+    const segOf = (u, v) => { const uu = u + (vn(v * 0.5 + 2, 3, seed) - 0.5) * 0.08, k = Math.floor((uu - uA) / (uB - uA) * S); return k >= 0 && k < S && eaten[k]; };
+    const loc = (x, y) => { const dx = x - q.cx, dy = y - q.cy; return [dx * ca + dy * sa, -dx * sa + dy * ca]; };
+    const lay = new Img(W, H), ext = L + Wd + 4;
+    hrender(lay, [q.cx - ext, q.cy - ext * Math.abs(sa) - Wd - 2, q.cx + ext, q.cy + ext * Math.abs(sa) + Wd + 2], (x, y) => {
+      const [ux, v] = loc(x, y), u = ux / L, h = half(u);
+      if (!h || Math.abs(v) > h || segOf(u, v)) return null;
+      return Math.sqrt(1 - (v / h) * (v / h)) * Wd * 0.35;
+    }, (x, y, i) => {
+      const [ux, v] = loc(x + 0.5, y + 0.5), u = ux / L, h = half(u);
+      if (!h) return null;
+      if (burnt) { const n = fbm(x / 3, y / 3, seed), saved = u - (h - Math.abs(v)) / L * 0.8 + (n - 0.5) * 0.25 > 0.62; if (saved && h - Math.abs(v) > 2.5) return ramp(f.flesh, 0.12 + i.diff * 0.6, x, y); return n < 0.2 && h2(x, y, 3) > 0.8 ? "#ff6a1a" : ramp(BURNT, 0.08 + i.diff * 0.7 + (n - 0.5) * 0.5, x, y); }
+      const edge = h - Math.abs(v), done = cook >= 1 || fbm(x / 5, y / 4, seed + 1) < cook;
+      if (f.skin && v < -h + 3.2) return h2(Math.floor(ux / 2), Math.floor(v), seed) > 0.82 ? f.skinSpot : ramp(f.skin, 0.2 + i.diff * 0.6, x, y);
+      if (done && (edge < 2 + (fbm(ux / 4, v, seed) - 0.3) * 3 || (u < -0.86 && fbm(x / 3, y / 3, seed) > 0.4))) return ramp(BURNT, 0.25 + i.diff * 0.6 + fbm(x / 2, y / 2, seed) * 0.4, x, y);
+      if (((ux + Math.abs(v) * 1.5 + fbm(ux / 5, v / 4, seed) * 4) % 8.5 + 8.5) % 8.5 < 1.1 && edge > 2) return mix(f.fat, ramp(f.flesh, 0.8, x, y), 0.3);
+      if (i.spec > 0.55 && done) return i.spec > 0.78 ? "#fff4e8" : ramp(f.flesh, 1, x, y);
+      const rp = done ? f.flesh : R(["#8a3a2a", "#b0584a", "#d07a68", "#e89c88", "#f8bca8"]);
+      return ramp(rp, 0.15 + i.diff * 0.7 + (done && fbm(x / 3, y / 3, seed + 6) > 0.7 ? -0.2 : 0), x, y);
+    }, { k: 26 });
+    outline(lay, burnt ? "#020101" : "#1a0804");
+    img.paste(lay, 0, 0);
+    for (const pu of [-0.55, 0, 0.55]) {
+      const h = half(pu) + 9, [x0, y0] = at(pu * L, -h), [x1, y1] = at(pu * L + 4, h);
+      if (f.pins === "juniper") juniperSprig(img, x0, y0, x1, y1, burnt);
+      else twig(img, x0, y0, x1, y1, burnt);
+    }
+  }
+  function twig(img, x0, y0, x1, y1, burnt) {
+    const lay = new Img(W, H), n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)), bark = burnt ? BURNT : R(["#1a2a0c", "#2e4614", "#46641e", "#62862c", "#86aa44"]);
+    for (let i = 0; i <= n; i++) { const t = i / n, x = lerp(x0, x1, t), y = lerp(y0, y1, t); lay.px(x, y, ramp(bark, 0.75, 0, 0)); lay.px(x + 1, y, ramp(bark, 0.45, 0, 0)); lay.px(x + 1, y + 1, ramp(bark, 0.2, 0, 0)); }
+    if (!burnt) { lay.rect(x0, y0 - 1, 2, 2, "#e0e8b0"); for (let k = 0; k < 6; k++) { lay.px(x1 + 2 + k, y1 - 2 - k * 0.5, k < 3 ? "#4a7a2a" : "#7aa848"); lay.px(x1 + 2 + k, y1 - 1 - k * 0.5, "#2e5018"); } }
+    outline(lay, "#0a0e04");
+    img.paste(lay, 0, 0);
+  }
+  function juniperSprig(img, x0, y0, x1, y1, burnt) {
+    const lay = new Img(W, H), n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)), dx = (x1 - x0) / n, dy = (y1 - y0) / n;
+    for (let i = 0; i <= n; i++) { const x = x0 + dx * i, y = y0 + dy * i; lay.px(x, y, burnt ? "#1a1412" : "#4a3420"); if (i % 2 === 0) for (const sd of [-1, 1]) for (let k = 1; k < 5; k++) lay.px(x + sd * k * 0.9 - dx * k * 0.4, y - k * 0.4 + dy * 0.2, burnt ? "#22201c" : k < 3 ? "#2e4a2a" : "#4e7444"); }
+    outline(lay, "#050a06");
+    img.paste(lay, 0, 0);
+    if (!burnt) for (const [bx, by] of [[x1 + 5, y1 - 3], [x1 + 8, y1], [x1 + 4, y1 + 2]]) { scene(img, [blob(bx, by, 2.4, 2.2, 2.4, (x, y, i) => (i.spec > 0.4 ? "#c8d8f0" : ramp(R(["#0c1428", "#1a2848", "#2e4470", "#4a6898", "#7a98c4"]), 0.2 + i.diff * 0.8, x, y)), { k: 30 })]); }
+  }
+  function juniperBed(img, cx, cy, rx, ry, burnt) {
+    const r = rng(23), lay = new Img(W, H);
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * Math.PI + (r() - 0.5) * 0.3, x0 = cx + Math.cos(a) * rx * 0.15, y0 = cy + (r() - 0.5) * ry * 0.5, len = rx * (0.75 + r() * 0.3), dirx = k % 2 ? 1 : -1;
+      for (let j = 0; j < len; j++) { const x = x0 + dirx * j, y = y0 + Math.sin(j * 0.05 + k) * 4 + (j / len) * (k % 3 - 1) * ry * 0.4; lay.px(x, y, burnt ? "#1a1412" : "#4a3420"); if (j % 2 === 0) for (const sd of [-1, 1]) for (let q = 1; q < 6; q++) lay.px(x - dirx * q * 0.5, y + sd * q * 0.8, burnt ? (q > 3 ? null : "#24201c") : q < 3 ? "#26402a" : q < 5 ? "#3e6040" : "#6a8a5a"); }
+    }
+    outline(lay, burnt ? "#020101" : "#081008");
+    img.paste(lay, 0, 0);
+    if (burnt) return;
+    for (let k = 0; k < 16; k++) { const x = cx + (r() - 0.5) * rx * 1.9, y = cy + (r() - 0.5) * ry * 1.6; scene(img, [blob(x, y, 2.6, 2.4, 2.6, (xx, yy, ii) => (ii.spec > 0.4 ? "#d0dcf0" : ramp(R(["#0c1428", "#1a2848", "#2e4470", "#4a6898", "#7a98c4"]), 0.2 + ii.diff * 0.8, xx, yy)), { k: 30 })]); }
+  }
+  function charServe(spec, o) {
+    const f = fishLook(spec), burnt = o.burnt, img = tableBack(o.seed || 19);
+    geo("inside", FISHFLESH);
+    shadow(img, 122, 118, 110, 14, 0.5, "#000000");
+    juniperBed(img, 120, 92, 112, 30, burnt);
+    fishDraw(img, { cx: 118, cy: 84, L: 90, dir: 1, tilt: -0.04, cook: 1, burnt, f, items: true, seed: 6 });
+    if (burnt) smokeOver(img, [[84, 72], [130, 68, 70], [170, 74]]);
+    else for (let i = 0; i < 4; i++) steam(img, 70 + i * 34, 70, 34, i * 1.4, 0.3, 4, 3, "#e8ecf0");
+    return img;
+  }
+  function plankServe(spec, o) {
+    if ((FA.LOOKS[spec.pal] || {}).fish) return charServe(spec, o);
+    const f = plankLook(spec), burnt = o.burnt, img = tableBack(o.seed || 17);
+    geo("inside", f.flesh);
+    shadow(img, 124, 118, 112, 12, 0.5, "#000000");
+    splitPlank(img, 120, 86, 114, 32, -0.06, 5);
+    fishSide(img, { cx: 118, cy: 84, L: 96, wd: 24, ang: -0.06, cook: 1, burnt, f, items: true });
+    if (burnt) smokeOver(img, [[70, 72], [110, 68, 66], [150, 74]]);
+    if (!burnt) { for (let i = 0; i < 5; i++) steam(img, 60 + i * 30, 70, 30, i * 1.3, 0.3, 3, 2.5); if (f.pins === "juniper") { const r = rng(4); for (let i = 0; i < 8; i++) scene(img, [blob(30 + r() * 180, 124 + r() * 14, 2.2, 2, 2.2, (x, y, ii) => (ii.spec > 0.4 ? "#c8d8f0" : ramp(R(["#0c1428", "#1a2848", "#2e4470", "#4a6898"]), 0.2 + ii.diff * 0.8, x, y)), { k: 30 })]); } else lemon(img, 214, 124, 1.2); }
+    return img;
+  }
+
+  // moonfish steaks: rounds cut across the fish, a thin silver rim of skin, the backbone's knuckle in the middle, the face seared gold
+  // a steak cut across the fish: an oval with a notch at the bottom where the belly was, a dark skin rim all round, the backbone's round
+  // knuckle a little above the middle with its spines up and down, the flesh in rings round it; seared, grill bars across. Burnt, the face
+  // goes to cracked black, the skin rim curls up grey and the bone still shows white
+  function steakObj(cx, cy, rx, ry, st, k, burnt, cook) {
+    const E0 = ell(cx, cy, rx, ry, [[3, 0.04, k * 2], [5, 0.03, k]], k), th = burnt ? 3 : 5;
+    const notch = (x, y) => y > cy + ry * 0.35 && Math.abs(x - cx) < (y - cy - ry * 0.35) * 0.55;
+    const E = (x, y) => (notch(x, y) ? 9 : E0(x, y));
+    const bx = cx, by = cy - ry * 0.1;
+    return { x0: cx - rx - 2, y0: cy - ry - 4, x1: cx + rx + 2, y1: cy + ry + th + 2, k: 24, base: k * 0.5,
+      hf: (x, y) => { const d = E(x, y); if (d <= 1) return th + (1 - d * d) * 2 + (burnt && d > 0.84 ? 2 : 0); const d2 = E(x, y - th); return d2 <= 1 ? th - 0.1 * (y - cy) : null; },
+      cf: (x, y, i) => {
+        const d = E(x + 0.5, y + 0.5);
+        if (d > 1) return burnt ? ramp(BURNT, 0.25, x, y) : ramp(st.skin, 0.2 + (1 - Math.abs(x - cx) / rx) * 0.35 + (h2(x, y, k) > 0.8 ? 0.25 : 0), x, y);
+        const bd = Math.hypot((x - bx) / 4.2, (y - by) / 3.2), spine = Math.abs(x - bx) < 0.8 && Math.abs(y - by) < ry * 0.72 && bd >= 1;
+        if (bd < 0.4) return "#3a2e26";
+        if (bd < 1) return ramp(FISHBONE, 0.55 + i.diff * 0.4, x, y);
+        if (bd < 1.25) return "#4a3a2a";
+        if (spine) return ramp(FISHBONE, 0.4 + i.diff * 0.3, x, y);
+        if (d > 0.84) return burnt ? (h2(x, y, k) > 0.5 ? "#8a847a" : "#5a544c") : ramp(st.skin, 0.25 + i.diff * 0.55 + (h2(x, y, k) > 0.85 ? 0.25 : 0), x, y);
+        if (d > 0.78) return burnt ? "#141010" : "#3a3a44";
+        if (burnt) { const c = Math.abs(vn((x - cx) / 4, (y - cy) / 3, k + 9) - 0.5) < 0.04; return c ? (h2(x, y, k) > 0.5 ? "#ff6a1a" : "#020101") : ramp(BURNT, 0.1 + i.diff * 0.6 + (fbm(x / 3, y / 3, k) - 0.5) * 0.4, x, y); }
+        const rp = cook >= 1 ? st.flesh : st.raw, ang = Math.atan2(y - by, x - bx), rr = Math.hypot((x - bx) / rx, (y - by) / ry);
+        let t = 0.38 + i.diff * 0.45 + (Math.sin(rr * 14 + Math.abs(Math.sin(ang)) * 2.2) > 0.84 ? -0.18 : 0);
+        if (cook >= 1) { const gb = ((x - cx) * 0.9 + (y - cy) * 1.6 + 60) % 12; if (gb < 1.6) return ramp(st.sear, 0.12 + i.diff * 0.3, x, y); if (gb < 2.6) return ramp(st.sear, 0.55 + i.diff * 0.3, x, y); }
+        if (i.spec > 0.62) return "#ffffff";
+        return ramp(rp, t, x, y);
+      } };
+  }
+  const STEAKS = [[60, 70, 30, 16], [114, 66, 30, 16], [168, 72, 30, 16], [86, 100, 30, 16], [142, 102, 30, 16]];
+  function moonSteaks(img, cx, cy, s, stage, look, items) {
+    const st = look.steak || FA.LOOKS.moonfish.steak, burnt = stage === "burnt", objs = [];
+    const sh = burnt ? 0.82 : 1;
+    STEAKS.forEach(([x, y, rx, ry], k) => {
+      const X = cx + (x - 114) * s, Y = cy + (y - 88) * s, m = { cx: X, cy: Y, rx: rx * s * 0.8, ry: ry * s * 0.8, h: 6 };
+      if (items) item("s" + k, X, Y, rx * s * 0.6, "steak", { z: Y, m });
+      objs.push(steakObj(X, Y, rx * s * sh, ry * s * sh, st, k, burnt, stage === "raw" ? 0 : 1));
+    });
+    scene(img, objs);
+  }
+  function moonServe(spec, o) {
+    const look = spec.look, burnt = o.burnt, img = tableBack(o.seed || 14), st = look.steak || FA.LOOKS.moonfish.steak;
+    slate(img, 120, 90, 214, 76);
+    if (!burnt) glow(img, 114, 88, 100, st.glow, 0.16, 46);
+    geo("inside", st.flesh);
+    moonSteaks(img, 114, 88, 1, burnt ? "burnt" : "cook", look, true);
+    if (burnt) smokeOver(img, [[60, 62], [114, 56, 66], [168, 64], [100, 92, 50]]);
+    if (!burnt) { const r = rng(3); for (let i = 0; i < 40; i++) { const x = 30 + r() * 180, y = 60 + r() * 60; img.px(x, y, "#5a8a3a"); if (r() < 0.5) img.px(x + 1, y - 1, "#8ab858"); } lemon(img, 206, 122, 1.2); for (const [x, y] of [[60, 56], [170, 52], [120, 60]]) star(img, x, y, "#e8f0ff", 1, 0.8); }
+    return img;
+  }
+
+  // the legend on its board: filling the frame, scorched near black, the eye still gleaming; a crew carves it a portion at a time
+  function bigServe(spec, o) {
+    const f = fishLook(spec), burnt = o.burnt, img = tableBack(o.seed || 18);
+    geo("inside", FISHFLESH);
+    shadow(img, 120, 128, 118, 14, 0.6, "#000000");
+    B.board(img, 120, 100, 118, 46, 4, R(["#140a04", "#24140a", "#3a2412", "#52361c", "#6c4a28", "#886036"]));
+    fishDraw(img, { cx: 116, cy: 84, L: 106, dir: -1, tilt: 0.04, cook: 1, burnt, f, items: true, seed: 8 });
+    if (burnt) { star(img, 30, 70, "#fffbe8", 3, 0.9); smokeOver(img, [[80, 56, 60], [120, 50, 70], [160, 56, 60], [196, 64]]); return img; }
+    for (const [x, y, a] of [[26, 124, -0.7], [210, 126, -2.5], [214, 50, 2.4]]) thymeSprig(img, x, y, a, 1.5);
+    const r = rng(6);
+    for (let i = 0; i < 30; i++) { const x = 20 + r() * 200, y = 118 + r() * 18; img.px(x, y, "#f4f0e8"); img.px(x, y + 1, "#3a2a1a", 0.5); }
+    return img;
+  }
+
+  // the stargazing eel pie: three or four eel heads up through slits in the crust, eyes on the sky
+  function eelGazer(img, x, y, s, lean, burnt) {
+    const skin = burnt ? BURNT : R(["#0e0e08", "#1e1e12", "#32321e", "#4a4a2c", "#66663e", "#868656"]), objs = [];
+    scene(img, [blob(x, y + 1, 6 * s, 2.4 * s, 1, () => "#1a0a04", { k: 4, base: 0 })]);
+    const throat = burnt ? BURNT : R(["#5a4a1a", "#8a7430", "#b49a48", "#d8c070"]);
+    const top = [x + lean * 7 * s, y - 13 * s], mid = [x + lean * 2 * s, y - 7 * s], tip = [top[0] + lean * 6 * s, top[1] - 6 * s];
+    objs.push(tube([[x, y], mid, top], (t) => (3.4 - t * 0.6) * s, (xx, yy, i, q) => (i.spec > 0.6 && !burnt ? "#d0d0a8" : q.side * (lean >= 0 ? 1 : -1) > 0.35 ? ramp(throat, 0.3 + i.diff * 0.6, xx, yy) : ramp(skin, 0.25 + i.diff * 0.6, xx, yy)), { k: 30, base: 4 }));
+    objs.push(tube([top, tip], (t) => (3.3 - t * 1.6) * s, (xx, yy, i, q) => (i.spec > 0.55 && !burnt ? "#e0e0b8" : q.side * (lean >= 0 ? 1 : -1) > 0.45 ? ramp(throat, 0.35 + i.diff * 0.5, xx, yy) : ramp(skin, 0.3 + i.diff * 0.6, xx, yy)), { k: 30, base: 10 }));
+    scene(img, objs);
+    const ux = (tip[0] - top[0]) / (6.7 * s), uy = (tip[1] - top[1]) / (6.7 * s), px = -uy, py = ux;
+    if (burnt) { for (const sd of [-1, 1]) { const ex = Math.round(top[0] + ux * 2.6 * s + px * sd * 1.8 * s), ey = Math.round(top[1] + uy * 2.6 * s + py * sd * 1.8 * s); for (let k = -1; k <= 1; k++) { img.px(ex + k, ey + k, "#e8e0d0"); img.px(ex + k, ey - k, "#e8e0d0"); } } return; }
+    for (let k = 1; k < 5 * s; k++) img.px(tip[0] - ux * k + px * 1.2 * (lean >= 0 ? 1 : -1), tip[1] - uy * k + py * 1.2 * (lean >= 0 ? 1 : -1), "#1a0a04");
+    for (const sd of [-1, 1]) { const ex = Math.round(top[0] + ux * 2.6 * s + px * sd * 1.6 * s), ey = Math.round(top[1] + uy * 2.6 * s + py * sd * 1.6 * s); img.rect(ex - 1, ey - 1, 3, 3, "#1a1a0c"); img.rect(ex - 1, ey - 1, 2, 2, "#fffbe0"); img.px(ex - 1 + (ux > 0 ? 1 : 0), ey - 1, "#0a0a04"); }
+  }
+  function gazers(img, cx, cy, s, burnt) {
+    const pts = [-0.32, -1.05, -2.05, -2.8].map((a) => [cx + Math.cos(a) * 60 * s, cy + Math.sin(a) * 22 * s, Math.cos(a)]).sort((p, q) => p[1] - q[1]);
+    for (const [x, y, c] of pts) eelGazer(img, x, y, s * 1.7, c * 0.75, burnt);
+    if (!burnt) for (const [x, y, c] of pts) star(img, x + c * 14 * s, y - 40 * s, "#fffbe8", 1, 0.7);
+  }
+
   Object.assign(FA.PLATES, {
     pie: { piece: (spec) => ({ draw(img, o) { const pi = Object.assign({}, PIES[spec.pal] || PIES.pie, spec.look.pie || {}); pieTop(img, pi, o.stage, o.cx, o.cy, o.s * 0.7, spec.look); } }), serve: pieServe },
     sweet: { piece: (spec) => ({ draw(img, o) { const kind = spec.look.sweet || { trifle: "trifle", berry: "tart", honey: "cake", toffee: "toffee" }[spec.pal] || "tart"; SWEETS[kind](img, spec, o.stage, o.cx, o.cy, o.s * 0.7); } }), serve: sweetServe },
     jelly: { piece: (spec) => ({ draw(img, o) { if (spec.pal === "cathedral") cathedral(img, o.cx, o.cy + 30 * o.s, o.stage === "burnt", o.wob || 0); else jellyDome(img, o.cx, o.cy + 20 * o.s, 40 * o.s, 28 * o.s, o.stage === "burnt", o.wob || 0, spec.look); } }), serve: jellyServe },
     ice: { piece: (spec) => ({ draw(img, o) { const im = iceServe(spec, { burnt: o.stage === "burnt" }); img.paste(im, 0, 0); } }), serve: iceServe },
-    fillet: { piece: (spec) => ({ draw(img, o) { if (spec.pal === "sardine") { for (let k = 0; k < 4; k++) sardine(img, o.cx - 34 + (k % 2) * 68, o.cy - 12 + Math.floor(k / 2) * 22, o.stage, k, k % 2 ? -1 : 1); } else serpentFillet(img, o.cx, o.cy, o.stage, 1); } }), serve: filletServe },
+    fillet: { piece: (spec) => ({ draw(img, o) { if (spec.pal === "sardine") { for (let k = 0; k < 4; k++) sardine(img, o.cx - 34 + (k % 2) * 68, o.cy - 12 + Math.floor(k / 2) * 22, o.stage, k, k % 2 ? -1 : 1); } else if (spec.pal === "moonfish") moonSteaks(img, o.cx, o.cy, o.s * 0.62, o.stage, spec.look, false); else serpentFillet(img, o.cx, o.cy, o.stage, 1); } }), serve: filletServe },
     claws: { piece: (spec) => ({ draw(img, o) { const cl = Object.assign({}, CLAWS[spec.pal] || CLAWS.crab, spec.look.claws || {}); if (cl.legend) { scene(img, [crabLeg(o.cx - 110 * o.s, o.cy + 14 * o.s, -0.2, 220 * o.s, 2.4 * o.s, cl.shell, o.stage, 1, { bend: 0.2 })]); return; } scene(img, clawHeap(o.cx, o.cy, 54 * o.s, 20 * o.s, cl, o.stage, 3, o.s * 0.75)); } }), serve: clawsServe },
     salad: { piece: (spec) => ({ draw(img, o) { const sd = Object.assign({}, SALADS[spec.pal] || SALADS.forest, spec.look.salad || {}); saladBits(img, { cx: o.cx, cy: o.cy, rx: 70 * o.s, ry: 26 * o.s }, sd, o.stage, 3); } }), serve: saladServe },
   });
+
+  const COOK = { raw: 0, sear: 0.45, cook: 1 };
+  Object.assign(FA.PLATES, {
+    wholefish: { piece: (spec) => ({ flip: true, draw(img, o) { fishDraw(img, { cx: o.cx, cy: o.cy, L: 60 * o.s, dir: 1, tilt: -0.04, cook: COOK[o.stage] === undefined ? 1 : COOK[o.stage], burnt: o.stage === "burnt", f: fishLook(spec), seed: 3 }); } }), serve: wholeServe },
+    clayfish: { piece: (spec) => ({ draw(img, o) { fishDraw(img, { cx: o.cx, cy: o.cy, L: 68 * o.s, dir: 1, tilt: -0.03, cook: COOK[o.stage] === undefined ? 1 : COOK[o.stage], burnt: o.stage === "burnt", f: fishLook(spec), seed: 5 }); } }), serve: clayServe },
+    plankfish: { piece: (spec) => ({ draw(img, o) { if ((FA.LOOKS[spec.pal] || {}).fish) return fishDraw(img, { cx: o.cx, cy: o.cy, L: 60 * o.s, dir: 1, tilt: -0.04, cook: COOK[o.stage] === undefined ? 1 : COOK[o.stage], burnt: o.stage === "burnt", f: fishLook(spec), seed: 6 }); splitPlank(img, o.cx, o.cy + 2 * o.s, 84 * o.s, 24 * o.s, -0.06, 5); fishSide(img, { cx: o.cx - 2, cy: o.cy, L: 72 * o.s, wd: 18 * o.s, ang: -0.06, cook: COOK[o.stage] === undefined ? 1 : COOK[o.stage], burnt: o.stage === "burnt", f: plankLook(spec) }); } }), serve: plankServe },
+    bigfish: { piece: (spec) => ({ draw(img, o) { fishDraw(img, { cx: o.cx, cy: o.cy, L: 75 * o.s, dir: -1, tilt: 0, cook: COOK[o.stage] === undefined ? 1 : COOK[o.stage], burnt: o.stage === "burnt", f: fishLook(spec), seed: 8 }); } }), serve: bigServe },
+    eelpie: { piece: (spec) => ({ draw(img, o) { pieTop(img, Object.assign({}, PIES.gazer, spec.look.pie || {}), o.stage, o.cx, o.cy, o.s * 0.7, spec.look); } }),
+      serve: (spec, o) => pieServe(Object.assign({}, spec, { look: Object.assign({}, spec.look, { pie: Object.assign({}, PIES.gazer, spec.look.pie || {}) }) }), o) },
+  });
+  // how the fish specials go into the embers: the pike in river clay, the salmon's plank in a bed of leaves
+  Object.assign(FA.DISH, { pike_clay: Object.assign({}, FA.DISH.pike_clay, { parcel: "clay" }), salmon_plank: Object.assign({}, FA.DISH.salmon_plank, { parcel: "leaves" }) });
 
   Object.assign(FA.PLATES, {
     roast: { piece: (spec) => ({ draw(img, o) { const rl = Object.assign({}, ROASTS[spec.pal] || ROASTS.pork, spec.look.roast || {}); if (rl.roots) return scene(img, [jointObj(o.cx, o.cy, 40 * o.s, 18 * o.s, ROASTS.pork, o.stage, o.seed)]); jointAt(img, rl, o.cx, o.cy, 92 * o.s, 24 * o.s, o.stage, o.seed); } }), serve: roastServe },

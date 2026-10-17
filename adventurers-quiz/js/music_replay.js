@@ -125,6 +125,14 @@
   }
   const heroOf = (id, name) => (App.heroes && App.heroes[id]) || { id, name: name || "A hero", look: { skin: "#e0b088", hair: "#5a3a20", style: 1, face: 1, fav: "#8a6a3a", scars: [] }, cls: "warrior", weapon: "none", weapon_tier: 1, armor_tier: 1 };
   const voiceColor = (h) => lift(((h || {}).look || {}).fav, 0.5);
+  // everyone at the night: the lead, the joiners in join order, then the crew who only listened ("listen"); old records list no
+  // onlookers, and an anthem's members fill in for them
+  function castOf(rec) {
+    const out = [{ id: rec.lead.id, name: rec.lead.name, inst: rec.lead.inst || null, how: "lead" }]
+      .concat((rec.joiners || []).map((j) => ({ id: j.id, name: j.name, inst: j.inst || null, how: j.how })));
+    for (const m of (rec.onlookers || []).concat((rec.anthem || {}).members || [])) if (!out.some((p) => p.id === m.id)) out.push({ id: m.id, name: m.name, inst: null, how: "listen" });
+    return out;
+  }
 
   // ---------- D: the tavern stage ----------
   function tavernScene(rec, P, words) {
@@ -135,10 +143,10 @@
     for (const c of P.cues) if (c.kind === "join") joinT[c.who] = c.t;
     const startT = P.lines.length ? P.lines[0].t0 : 0, endT = (P.cues.find((c) => c.kind === "end") || { t: P.len }).t;
     const chorusT = (P.cues.find((c) => c.kind === "chorus") || { t: endT }).t;
-    const players = [{ id: rec.lead.id, name: rec.lead.name, inst: rec.lead.inst, how: "lead" }].concat((rec.joiners || []).map((j) => ({ id: j.id, name: j.name, inst: j.inst, how: j.how })));
+    const players = castOf(rec);
     const onStage = players.filter((p) => p.how === "lead" || p.how === "inst" || p.how === "sing" || p.how === "over").slice(0, 4);
-    const front = players.filter((p) => !onStage.includes(p)).slice(0, 2);
-    const STAGE = [[2.2, 2.2], [3.6, 0.9], [0.9, 3.6], [3.5, 2.7]], FLOOR = [[4.9, 2.7], [2.7, 4.9]];
+    const front = players.filter((p) => !onStage.includes(p)).slice(0, 4);
+    const STAGE = [[2.2, 2.2], [3.6, 0.9], [0.9, 3.6], [3.5, 2.7]], FLOOR = [[4.9, 2.7], [2.7, 4.9], [5.4, 1.4], [1.4, 5.4]];
     const cast = [], anchors = {};
     const place = (p, u, v, raised) => {
       const h = heroOf(p.id, p.name), [x, y0] = iso(u, v), y = y0 - (raised ? 4 : 0), face = p.how === "lead" ? 1 : x < OX ? 1 : -1;
@@ -343,9 +351,7 @@
     const startT = P.lines.length ? P.lines[0].t0 : 0, endT = (P.cues.find((c) => c.kind === "end") || { t: P.len }).t;
     const chorusT = (P.cues.find((c) => c.kind === "chorus") || { t: endT }).t;
     // the whole crew at the fire is on the ridge, joined or not: the lead, the joiners, and anyone who only listened
-    const players = [{ id: rec.lead.id, name: rec.lead.name, inst: rec.lead.inst, how: "lead" }].concat((rec.joiners || []).map((j) => ({ id: j.id, name: j.name, inst: j.inst, how: j.how })));
-    for (const m of (rec.anthem || {}).members || []) if (!players.some((p) => p.id === m.id)) players.push({ id: m.id, name: m.name, inst: null, how: "listen" });
-    players.splice(6);
+    const players = castOf(rec).slice(0, 6);
     // the lead in the middle, the crew either side
     const order = players.slice(1).reduce((a, p, i) => (i % 2 ? [p].concat(a) : a.concat([p])), [players[0]]);
     const gap = Math.min(44, (W - 60) / Math.max(1, order.length - 1 + (rec.pets && rec.pets.length ? 1 : 0)));
@@ -545,11 +551,19 @@
       }
     }
     function stopSound() { if (handle) { handle.stop(); handle = null; } }
+    // the song autoplays before the page has had a gesture; the music comes in, in time with the scene, the moment sound unlocks
+    function hearIn() {
+      if (t > P.len - 0.5 || isStill()) return;
+      const E = window.Sound && Sound.engine ? Sound.engine() : null;
+      if (E && E.live) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), now: Math.max(0, t) });
+    }
     function frame(ms) {
       raf = 0;
-      if (!live()) { last = 0; stopSound(); return; }
+      if (!live()) { last = 0; stopSound(); if (talk) talk.hold(true); return; }
+      if (talk) talk.hold(false);
       const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
       last = ms;
+      if (!handle && !ended) hearIn();
       t = handle ? handle.t : t + dt;
       lyricsAt(t);
       if (t > P.len + 1.5 && !ended) {
@@ -607,10 +621,10 @@
           if (ended || !playing) { start(P === full ? full : short, true); return; }
           paused = false; last = 0;
           const E = window.Sound && Sound.engine ? Sound.engine() : null;
-          if (E && E.live && !isStill()) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), from: t });
+          if (E && E.live && !isStill()) handle = Music.perform(P, { voices: Music.voices(P === full ? specFull : specShort), now: t });
           if (!raf && live() && !isStill()) raf = requestAnimationFrame(frame);
         },
-        pause() { paused = true; stopSound(); },
+        pause() { paused = true; stopSound(); if (talk) talk.hold(true); },
         restart() { start(P === full ? full : short, true); },
         skip() {
           stopSound(); paused = false; playing = true; ended = false; shown = P.lines.length - 1; t = P.len + 1.6;
@@ -647,5 +661,5 @@
 
   // pure: a plan's length and cues, for the night gallery and tests
   function timeline(rec, part) { const P = Music.plan(Music.specFor(rec, Music.words(rec.song), part || "short")); return { len: P.len, cues: P.cues, lines: P.lines.length }; }
-  window.MusicReplay = { player, register, kindOf, timeline, strikes, SCENES, drawInst, GLYPH };
+  window.MusicReplay = { player, register, kindOf, timeline, strikes, castOf, SCENES, drawInst, GLYPH };
 })();

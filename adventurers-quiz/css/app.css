@@ -223,8 +223,15 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .skill.trigger { border-left-color: var(--crimson); }
 .journey { display: flex; gap: 6px; align-items: flex-end; overflow-x: auto; padding-bottom: 4px; }
 .journey .step { text-align: center; min-width: 84px; }
+.journey .step .when { white-space: nowrap; }
 .journey .step canvas { width: 56px; height: 68px; }
-.journey .arrow { color: var(--brass0); font-size: 26px; padding-bottom: 30px; }
+.journey .arrow { color: var(--brass0); font-size: 26px; padding-bottom: 22px; }
+/* one reading, one caption: who read the spread and how long it lasts, under its cards */
+.omen-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.omen-row .omen-card { width: 120px; }
+.omen-by { margin: 4px 0 8px; }
+@media (max-width: 480px) { .omen-row { flex-wrap: nowrap; } .omen-row .omen-card { flex: 1 1 0; min-width: 0; width: auto; } }
+.heading-line { margin-top: 6px; }
 .inv { display: flex; flex-wrap: wrap; gap: 6px; }
 .inv .it { display: flex; align-items: center; gap: 4px; background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 2px 6px 2px 2px; font-size: 15px; }
 .inv .it canvas { width: 20px; height: 20px; }
@@ -265,6 +272,14 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .replay-bar .spds .btn:last-child { border-radius: 0 3px 3px 0; }
 .replay-bar .btn[disabled] { opacity: 0.45; cursor: default; }
 .replay-shot { position: relative; }
+.snd-tap { position: absolute; right: 8px; bottom: 8px; z-index: 3; font-family: var(--px); font-size: 13px; line-height: 1; padding: 6px 10px 7px; cursor: pointer;
+  background: linear-gradient(#ecdcb4, #d8c28e); color: #3a1e08; border: 2px solid #8a6a34; border-radius: 3px; box-shadow: 0 0 0 2px #1a1008, 0 3px 0 #0008;
+  animation: snd-tap 1.6s ease-in-out infinite; }
+.snd-tap[hidden] { display: none; }
+.fight-stage .snd-tap { top: 12px; bottom: auto; }
+.snd-tap:hover { background: linear-gradient(#f6ead0, #e4d0a0); }
+@keyframes snd-tap { 50% { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .snd-tap { animation: none; } }
 @media (min-width: 601px) { .fit-screen { max-width: calc((100vh - 260px) * var(--ar)); margin-left: auto; margin-right: auto; } }
 .replay-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: max-content; max-width: 86%; text-align: center; font-family: var(--px);
   background: linear-gradient(#ecdcb4, #d8c28e); color: #2a1a0c; border: 3px solid #8a6a34; box-shadow: 0 0 0 2px #1a1008, 0 4px 0 #0008; padding: 6px 16px 7px;
@@ -775,16 +790,7 @@ table.boxscore { margin-bottom: 8px; }
 @media (max-width: 500px) { .tables-replay { margin: 8px -14px; } .tables-replay figcaption { padding: 0 14px; } }
 .night-replay, .chess-replay { margin: 8px 0; }
 @media (max-width: 500px) { .night-replay, .chess-replay { margin: 8px -14px; } }
-.yeti-corner .chess-replay, .yeti-corner .chess-replay canvas { margin: 0; max-width: 100%; height: auto !important; }
 .chess-replay .chess-replay-mode { margin-top: 6px; }
-.yeti-corner { float: right; max-width: 45%; margin: 0 0 6px 10px; color: inherit; text-decoration: none; }
-.yeti-corner .yeti-note { text-align: center; }
-/* on a phone the box would squeeze the lead headline into a sliver beside it (QA3 P2-2): a slim strip above the lead instead */
-@media (max-width: 500px) {
-  .yeti-corner { float: none; max-width: none; display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
-  .yeti-corner .chess-replay { flex: 0 0 96px; width: 96px; }
-  .yeti-corner .yeti-note { text-align: left; }
-}
 .chess-replay .chess-real { margin-top: 4px; font-style: italic; }
 /* a sung line is a lyric, not the singer talking about themselves */
 .say.sung .say-who:not(:empty)::before { content: "\266A "; }
@@ -840,7 +846,30 @@ table.boxscore { margin-bottom: 8px; }
 
 /* fishing: the hobby equipment tabs, the trophy wall of fish plaques, and the Creel Book */
 .hobby-tabs { margin-top: 2px; }
+.hobby-tabs button.empty:not(.on) { opacity: 0.6; }
+.hobby-empty { padding: 6px 2px; }
+.hobby-empty p { margin: 0 0 4px; }
 .hobby-info { margin-top: 8px; }
+/* pastimes: the pixel pentagon at the head of the hobby panel (views.js pastimeChart) */
+/* it sits in the Character tab's left column: the chart and the tabs side by side when there's room, stacked when not */
+.hobby-wrap { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-start; }
+.hobby-wrap > .pt-wrap { flex: 0 0 332px; max-width: 100%; box-sizing: border-box; }
+.hobby-kit { flex: 1 1 240px; min-width: 0; }
+.pt-wrap { background: var(--parch) var(--dither); border: 2px solid var(--wood3); box-shadow: inset 0 0 0 2px var(--parch3), 0 0 0 1px var(--brass0), 3px 3px 0 rgba(46, 33, 22, 0.25); padding: 8px 4px; }
+.pt-wrap > h4 { text-align: center; margin: 2px 0 4px; }
+.pt-line { font-size: 16px; text-align: center; margin: 0 8px 2px; min-height: 2.6em; }
+.pt-chart { position: relative; height: 304px; margin: 0 auto; }
+.pt-canvas { position: absolute; image-rendering: pixelated; }
+.pt-label { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: 0; padding: 2px 4px;
+  font-family: var(--px); font-size: 13px; color: var(--ink); cursor: pointer; border-radius: 2px; }
+.pt-label:hover, .pt-label:focus-visible { background: var(--parch3); outline: 1px solid var(--edge); }
+.pt-icon { image-rendering: pixelated; display: block; }
+.pt-detail { text-align: center; margin: 0 6px 4px; min-height: 1.4em; }
+.pt-key { display: flex; justify-content: center; align-items: center; gap: 6px; }
+.pt-sw { display: inline-block; width: 14px; height: 10px; margin-left: 8px; }
+.pt-sw.pt-keen { background: #c8963e; border: 2px solid #8e2a22; }
+.pt-sw.pt-good { height: 3px; background: repeating-linear-gradient(90deg, #2f5a7a 0 4px, transparent 4px 8px); }
+@media (max-width: 480px) { .hobby-wrap > .pt-wrap { flex-basis: 100%; } }
 .fish-wall { display: flex; flex-wrap: wrap; gap: 8px; }
 .fish-plaque { display: flex; align-items: center; gap: 6px; min-width: 150px; background: var(--parch); border: 1px solid var(--edge); border-radius: 2px; padding: 4px 8px 4px 4px; }
 .fish-plaque.rare { border-color: var(--brass2); }
@@ -851,3 +880,18 @@ table.boxscore { margin-bottom: 8px; }
 .creel-card.rare { border-color: var(--brass2); }
 .creel-fish { flex: 0 0 auto; min-width: 48px; }
 .creel-water { display: flex; gap: 8px; align-items: center; border-top: 1px dashed var(--edge); padding: 6px 0; }
+.recipe-list { margin: 4px 0 8px 18px; padding: 0; }
+
+/* the purse chart on the hero Record tab (views.js purseChart) */
+.purse-wrap { position: relative; max-width: 640px; }
+.purse-svg { width: 100%; height: auto; display: block; }
+.purse-grid { stroke: var(--parch3); stroke-width: 1; }
+.purse-ax { font: 11px var(--ui, sans-serif); fill: var(--ink2, #6e5a44); }
+.purse-area { fill: rgba(169, 119, 31, 0.18); }
+.purse-line { fill: none; stroke: var(--brass0, #a9771f); stroke-width: 2.5; stroke-linejoin: round; }
+.purse-dot { fill: var(--parch, #f7ecd5); stroke: var(--wood3, #4a2f1c); stroke-width: 2; }
+.purse-hit { fill: transparent; cursor: pointer; }
+.purse-pt { fill: var(--wood3); }
+.purse-pt.bare { fill: var(--parch3); stroke: var(--wood3); stroke-width: 1; }
+.purse-tip { position: absolute; top: 4px; min-width: 150px; max-width: 30%; background: var(--parch, #f7ecd5); border: 2px solid var(--wood3, #4a2f1c); padding: 6px 8px; font-size: 13px; pointer-events: none; box-shadow: 3px 3px 0 rgba(46, 33, 22, 0.25); }
+@media (max-width: 480px) { .purse-tip { max-width: 60%; } }
