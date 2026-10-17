@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["daybook/h1/90"]={"day":30,"label":"Day 30","title":"Season 3, day 30, hour by hour","blocks":[{"act":"delve","label":"Underground","from":6.0,"to":18.0,"line":"Spent the day in Emberdeep.","fights":["f279"]}],"evening":{"kind":"dungeon","line":"Camped in Emberdeep"}};
