@@ -720,7 +720,7 @@
     const pack = (p) => (p ? `packed ${A.plural(p.torches || 0, "torch", "torches")} and ${A.plural(p.rations || 0, "ration")}` : "");
     const lair = (id) => el("a", { href: `#/dungeon/${id}` }, A.nodeName(id, true));
     if (dv.now) {
-      return el("p", { class: "small muted dg-delve-line" }, "Underground in ", lair(dv.now.dest), `, floor ${dv.now.floor}, day ${Math.max(1, dv.now.days)}`,
+      return el("p", { class: "small muted dg-delve-line" }, "Underground in ", lair(dv.now.dest), `, on ${A.floorWords(dv.now.floor, dv.now.dest)}, day ${Math.max(1, dv.now.days)}`,
         dv.now.packed ? `; ${pack(dv.now.packed)} for the trip.` : ".");
     }
     const L = dv.last;
@@ -1227,7 +1227,7 @@
       el("b", null, h.gear.armor.name), el("span", { class: "dim small" }, ` (tier ${h.gear.armor.tier})`)));
     const inv = el("div", { class: "inv" });
     inv.appendChild(el("span", { class: "it" }, A.itemSprite("gold", 2), A.money(h.gold * 10 + (h.copper || 0))));
-    const one = { "Fangs & Claws": "fang", "Remains": "set of remains", "Stolen Goods": "bag of stolen goods" };
+    const one = { "Fangs & Claws": "fang", "Torches": "torch", "Remains": "set of remains", "Stolen Goods": "bag of stolen goods" };
     const goodName = (g, q) => { const n = S.goods[g].name; return (q === 1 ? one[n] || n.replace(/s$/, "") : n).toLowerCase(); };
     for (const [g, q] of Object.entries(h.inv)) inv.appendChild(el("span", { class: "it" }, A.itemSprite(g, 2), `${q} ${goodName(g, q)}`));
     if (!h.kit) for (const r of h.relics) inv.appendChild(el("span", { class: "it" }, A.itemSprite("relic", 2), r.identified === false ? "an unidentified relic" : r.name));
@@ -1495,7 +1495,7 @@
       // the road strip walks the hero and whoever of the crew was on the road with them
       const party = h.party && A.parties[h.party];
       const walkers = [h.id, ...((party && party.members) || []).filter((id) => id !== h.id)].map((id) => A.heroes[id]).filter(Boolean);
-      try { out = db ? Daybook.render(db, { heroes: walkers }) : null; } catch (e) { out = null; }
+      try { out = db ? Daybook.render(db, { heroes: walkers, hero: h.id }) : null; } catch (e) { out = null; }
       // an open "Read the day" stays open while paging, so a reader comparing days isn't made to reopen it every time
       const fold = out && out.querySelector("details.db-more");
       if (fold) {
@@ -1506,6 +1506,8 @@
       shown = d;
       // the road art loads with the first road day it draws (it keeps the first page light), then the day redraws with its strips
       if (db && !window.RoadScenes && (db.blocks || []).some((b) => b && b.stretch)) A.roadArt().then(() => { if (shown === d && window.RoadScenes) draw(d, db); }, () => {});
+      // and the town art with the first town day, the same way
+      if (db && !window.TownDay && (db.blocks || []).some((b) => b && b.scene)) A.need(A.TOWN_ART).then(() => { if (shown === d && window.TownDay) draw(d, db); }, () => {});
       const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
       nav.replaceChildren(
         prev != null ? el("button", { class: "btn small", onclick: () => go(prev) }, `‹ Day ${prev}`) : el("span"),

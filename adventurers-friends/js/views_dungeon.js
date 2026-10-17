@@ -222,11 +222,11 @@
     if (bossArt && B.alive === false) bossArt.classList.add("dg-slain-art");
     let bossLine;
     if (B.alive === false && kill) bossLine = [el("span", { class: "dg-stamp" }, "SLAIN"), " by ", crewLink(kill.crew, kill.by), ` ${A.when(kill.day, "on")}.`];
-    else if (lairWalked) bossLine = [el("span", { class: "red" }, "Alive"), `, in its lair on floor ${lairFloor}.`];
+    else if (lairWalked) bossLine = [el("span", { class: "red" }, "Alive"), `, in its lair on ${A.floorWords(lairFloor, D.id)}.`];
     else if (B.rumoured) {
       const R = B.rumour_why || {};
       const why = R.by ? ` (${R.by} ${R.how} ${A.when(R.day, "on")})` : R.how ? ` (${R.how})` : "";
-      bossLine = [el("span", { class: "dg-pencil" }, "Rumoured"), ` to wait somewhere below${lairFloor ? `, floor ${lairFloor} by the talk` : ""}${why}.`];
+      bossLine = [el("span", { class: "dg-pencil" }, "Rumoured"), ` to wait somewhere below${lairFloor ? `, on ${A.floorWords(lairFloor, D.id)} by the talk` : ""}${why}.`];
     }
     else bossLine = [el("span", { class: "dg-pencil" }, "Unseen"), ". Nobody has heard where it waits."];
     const older = (B.kills || []).filter((k) => k !== kill || B.alive !== false);
@@ -243,7 +243,7 @@
     const gen = (D.tenant || {}).gen || 1, spoils = (D.spoils || []).slice().reverse();
     const row = (s, isOld) => el("li", { class: [s.tier || "", isOld ? "old" : ""].join(" ").trim(), title: s.what ? cap(s.what) : "" }, lootSprite(s),
       el("span", { class: `dg-spoils-name${s.tier === "unique" ? " dg-unique" : ""}` }, s.name),
-      el("span", { class: "dg-spoils-who" }, heroes[s.hero] ? el("a", { href: `#/hero/${s.hero}` }, s.who) : s.who, `, floor ${s.floor}`, STATE_SAY(s)),
+      el("span", { class: "dg-spoils-who" }, heroes[s.hero] ? el("a", { href: `#/hero/${s.hero}` }, s.who) : s.who, `, on ${A.floorWords(s.floor, D.id)}`, STATE_SAY(s)),
       el("span", { class: "dg-spoils-day" }, A.when(s.day)));
     // where it is today: worn says nothing, a carried unique is kept for later, anything else carried is for sale
     function STATE_SAY(s) { return s.state === "carried" ? (s.tier === "unique" ? ", kept, not yet worn" : ", stashed to sell") : s.state === "gone" && s.tier !== "unique" ? ", since sold" : ""; }
@@ -261,7 +261,7 @@
         old.shown.length ? [el("b", null, "From earlier tenants:"), el("ul", { class: "dg-spoils-list" }, old.shown.map((s) => row(s, true))), more(old.more)] : null));
     }
     const ins = D.inside || [];
-    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", ins.map((x, i) => [i ? ", " : "", el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label), ` on floor ${x.floor}`]), "."]
+    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", ins.map((x, i) => [i ? ", " : "", el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label), ` on ${A.floorWords(x.floor, D.id)}`]), "."]
       : "Nobody is below tonight."));
     void ui;
     return p;
@@ -454,7 +454,7 @@
     };
     const row = (d) => {
       const floors = [...new Set(d.rooms.map((r) => r.floor))];
-      return el("li", null, el("b", null, A.when(d.day)), ": ", crewLink(d.crew, d.label), `, ${A.plural(d.rooms.length, "room")}`, floors.length > 1 ? ` on floors ${floors.join(" and ")}` : ` on floor ${floors[0] || d.floor}`, `, ${PACE_SAY[d.pace] || d.pace} `,
+      return el("li", null, el("b", null, A.when(d.day)), ": ", crewLink(d.crew, d.label), `, ${A.plural(d.rooms.length, "room")}`, floors.length > 1 ? ` on the ${floors.sort((a, b) => a - b).map(A.floorOrd).join(" and ")} floors` : ` on ${A.floorWords(floors[0] || d.floor, D.id)}`, `, ${PACE_SAY[d.pace] || d.pace} `,
         el("button", { type: "button", class: "watch dg-watch", onclick: () => watch(D, ui, d) }, "▸ watch"), best(d));
     };
     list.slice(0, 8).forEach((d) => ul.appendChild(row(d)));

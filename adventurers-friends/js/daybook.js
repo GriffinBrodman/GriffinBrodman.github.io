@@ -116,6 +116,13 @@
     // a squared milestone with a cap stone and its mileage cut in, never a rounded headstone
     milestone: [".aaaaaaaaaaa..", ".aSSSSSSSSSa..", ".aaaaaaaaaaa..", "..aSssssssAa..", "..aSqqqsssAa..", "..aSssqsssAa..", "..aSsqssssAa..",
       "..aSsqssssAa..", "..aSssssssAa..", "..aSqqqqqsAa..", "..aSsssqssAa..", "..aSssssssAa..", ".EeEeeEeEeEe.."],
+    // a town day's own stretches (league/town_day.py): the sun up over the bed, a steaming bowl, a mug by candlelight
+    wake: ["..........gg..", ".........gyyg.", "..........gg..", "W.............", "W.............", "Whhh..........", "Whhhrrrrrrrrrr", "WrrrrrrrrrrrrR",
+      "WRRRRRRRRRRRRR", "WWWWWWWWWWWWWW", "W............W"],
+    breakfast: ["...1...1......", "....1...1.....", "...1...1......", "..........s...", ".........s....", "..PPPPPPPPP...", ".PoooooooooP..", "PPPPPPPPPPPPP.",
+      ".PWWWWWWWWWP..", "..PWWWWWWWP...", "...PPPPPPP...."],
+    evening: ["..........y...", ".........yoy..", "..........o...", "..hh.hh...h...", ".hhhhhhh.hhh..", ".dWggggd.hhh..", ".dWggggdddhh..", ".dWggggd.dhh..",
+      ".dWggggdd.hh..", ".dWggggd..hh..", ".dGGGGGd.WWWW.", "..ddddd......."],
     traveller: [".....nnn....W.", "....nnfnn...W.", "....nfffn...W.", ".....fff....W.", "....nnnnn..fW.", "...nnnnnnnn.W.", "...nnnnnn...W.",
       "....nnnn....W.", "....nnnn....W.", "....n..n....W.", "....n..n....W.", "...dd..dd...w."],
   };
@@ -248,12 +255,14 @@
     infirmary: "Infirmary", bath: "Bathhouse", fishing: "Fishing", dice: "Dice", bakery: "Bakery", pet: "With the pet", mount: "With the mount",
     crew: "With the crew", meet: "A meeting", spar: "Sparring", odd_request: "Odd request", fair: "The fair", yeti: "Yeti!", auction: "Auction",
     event: "Town event", song: "Music", wander: "Wandering", carousing: "Carousing", hunt: "Hunting", delve: "Delving", camp: "Camp",
+    wake: "Waking up", breakfast: "Breakfast", evening: "The evening",
     halt: "Midday halt", road_event: "On the road", inn: "The inn", shrine: "A shrine", toll: "The toll", ferry: "The crossing", ford: "The ford", milestone: "A landmark", traveller: "A traveller",
   };
   const KINDS = { inn: "At the inn", camp: "At camp", stable: "In the stables", room: "A rented room", dungeon: "Below ground", cell: "In the cells", road: "By the roadside" };
   const CAT = {
     road: "road", arrive: "road", depart: "road", wander: "road", camp: "road",
     halt: "road", road_event: "road", inn: "road", shrine: "road", toll: "road", ferry: "road", ford: "road", milestone: "road", traveller: "road",
+    wake: "town", breakfast: "town", evening: "town",
     errands: "town", bakery: "town", bath: "town", dice: "town", fair: "town", auction: "town", event: "town", carousing: "town", meet: "town", odd_request: "town", busk: "town", song: "town",
     work: "craft", labour: "craft", forge: "craft", brew: "craft", study: "craft", forage: "craft", fishing: "craft", rest: "craft",
     train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms",
@@ -335,11 +344,17 @@
   // names in a line link to their pages when the site is around it (a gallery page draws the daybook alone)
   const txt = (s) => (window.App && App.storyText ? App.storyText(s) : s);
   // the fights of a stretch of the day, each linked to its replay while it is kept
+  // a town stretch plays as its scene on its own page (#/day/hero/day/block) while its day's file is kept
+  function townLink(b) {
+    if (!b.scene || b.wday == null || !b.hero || !window.App) return null;
+    return [" ", h("a", { class: "watch", href: `#/day/${b.hero}/${b.wday}/${b.i}` }, "▶ watch")];
+  }
   function fightLinks(b) {
     const own = b.ref && window.App ? App.storyLink(b.ref) : null;
     const room = roomLink(b);
     if (own) return [" ", own, room];
     if (b.rec && kept("road", b.rec)) return [" ", h("a", { class: "watch", href: `#/road/${b.rec}` }, "▶ watch")];
+    if (b.scene) return townLink(b) || [];
     if (room) return [room, ...fightIds(b)];
     return fightIds(b);
   }
@@ -358,7 +373,8 @@
     opts = opts || {};
     if (!db) return null;
     const ev = db.evening && (db.evening.kind || db.evening.line) ? db.evening : null;
-    const list = (db.blocks || []).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
+    // each block knows its place in the day's file and its hero, so a town stretch can link its scene
+    const list = (db.blocks || []).map((b, i) => (b && b.scene ? Object.assign({}, b, { i, wday: db.wday, hero: opts.hero }) : b)).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
     if (!list.length && !ev) return null;
     const id = "db" + ++uid;
     const start = Math.floor(Math.min(6, ...list.map((b) => b.from))), end = Math.ceil(Math.max(18, ...list.map((b) => b.to)));
@@ -397,7 +413,7 @@
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
       // a road stretch gets its still road strip behind the line when the road art is loaded (road_scenes.js)
       // and the town errands after a road day get the street at the town's edge, so the day's last tile isn't a bare box
-      const roadDay = roadOf || null, street = !b.stretch && roadDay && CAT[act] === "town" && from >= roadDay.to;
+      const roadDay = roadOf || null, street = !b.stretch && !b.scene && roadDay && CAT[act] === "town" && from >= roadDay.to;
       if ((b.stretch || street) && window.RoadScenes && RoadScenes.strip) {
         const base = b.stretch ? b : { stretch: "town", biome: roadDay.biome, weather: roadDay.weather, line: b.line };
         const dressed = RoadScenes.dress ? RoadScenes.dress(Object.assign({}, base, { seed: db.day })) : {};
@@ -405,6 +421,13 @@
           // the canvas grows with the stretch, so a long tile shows more road at the same pixel size rather than a bigger band
           { heroes: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 });
         if (strip) { strip.classList.add("road-strip"); li.append(strip); }
+      }
+      // a town stretch gets its scene along the tile's foot, the act looping on its set (town_day_replay.js, loaded with the first town day)
+      if (b.scene && window.TownDay && TownDay.strip) {
+        let strip = null;
+        // a scene that can't be drawn leaves the tile as it was, never the day
+        try { strip = TownDay.strip(b, { hero: (window.App && App.heroes || {})[opts.hero] || (opts.heroes || [])[0], heroes: window.App && App.heroes, w: Math.round(Math.max(160, Math.min(320, (to - from) * 110))), h: 64, phase: i * 0.7 }); } catch (e) { if (window.console) console.error(e); }
+        if (strip) { strip.classList.add("town-strip"); li.append(strip); }
       }
       rows.push(li);
     });

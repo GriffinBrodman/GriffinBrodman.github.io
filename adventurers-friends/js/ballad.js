@@ -310,7 +310,7 @@
     });
     const ghost = !o.cast && song.dirge && H[song.dirge] ? add(Tv.actor(H[song.dirge], 0, 0, {}), OX + 30, OY + 22, { role: "ghost", face: -1, ph: 0.6 }) : null;
     if (ghost) ghost.key = 4.5;
-    const LOCALS = [[OX - 82, OY + 44, 1], [OX + 62, OY + 52, -1], [OX - 104, OY + 62, 1], [OX + 84, OY + 76, -1]].filter(([x]) => x > 8 && x < W - 8);
+    const LOCALS = (o.locals ? o.locals(OX, OY) : [[OX - 82, OY + 44, 1], [OX + 62, OY + 52, -1], [OX - 104, OY + 62, 1], [OX + 84, OY + 76, -1]]).filter(([x]) => x > 8 && x < W - 8);
     for (const [x, y, face] of LOCALS.slice(0, o.cast ? 4 : Math.max(3, 5 - about.length))) {
       const a = Tv.local(r, 0, 0);
       add(a, x, y, { role: "local", face, ph: r() });
@@ -370,7 +370,7 @@
       for (const [x, y] of candles) lights.push({ x, y: y - 5, r: 24, k: 0.45 + flick * 0.12 });
       for (const [lu, lv, drop] of [[6.2, 6.2, 70], [11.5, 6.5, 66]]) { Tv.lantern(ctx, st, lu, lv, flick, drop, true); const [x, y] = st.iso(lu, lv); lights.push({ x, y: y - drop + 10, r: 60, k: 0.5 + flick * 0.1 }); }
       { const [x, y] = st.rwall(5.5, 28); lights.push({ x, y: y + 10, r: 30, k: 0.5, cool: true }); }
-      shine(ctx, t, lights, 0.42);
+      shine(ctx, t, lights, o.ambient != null ? o.ambient : 0.42);
       if (o.over) o.over(ctx, t);
       // the tune rising off the lute, a little faster while the song is on
       const per = playing ? 0.42 : 0.95, life = 2.6;
@@ -426,5 +426,5 @@
     return scene(song, { W, H, event: e, fps: 12, sound: false });
   }
 
-  window.Ballad = { scene, vignette, reaction, LOOKS, build, FULL };
+  window.Ballad = { scene, vignette, reaction, LOOKS, build, FULL, figure, drawFig };
 })();

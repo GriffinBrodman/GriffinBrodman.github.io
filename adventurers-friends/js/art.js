@@ -717,7 +717,7 @@
     chitin: ["#3a3440", "shard"], bones: ["#e8e0d0", "bone"], remains: ["#7a6a5a", "sack"], grave_dust: ["#9a9aa0", "pile"], ectoplasm: ["#7af08a", "flask"],
     wisp_light: ["#c8f0ff", "flask"], troll_hide: ["#6a7a6a", "hide"], ore: ["#8a7a6a", "rock"], gem: ["#5ad0f0", "gem"], trinket: ["#e8b84a", "ring"],
     stolen_goods: ["#7a5a8a", "sack"], drake_scale: ["#c84a3a", "shard"], frost_crystal: ["#9ae8ff", "gem"], ember_core: ["#ff8a2a", "gem"],
-    relic: ["#5ab8a8", "gem"], dragon_scale: ["#e8b84a", "shard"], gold: ["#ffd84a", "coin"],
+    relic: ["#5ab8a8", "gem"], dragon_scale: ["#e8b84a", "shard"], gold: ["#ffd84a", "coin"], torch: ["#8a5a32", "torch"],
   };
   // painted with the shared shader so items share the heroes' top-left light, ramps and outline
   function drawItem(id) {
@@ -733,6 +733,7 @@
       case "fang": P.poly([[3, 1], [9, 1], [8, 5], [6, 11], [4.5, 5]], "c", (x) => 0.4 - (x - 3) * 0.12); P.rect(3, 1, 6, 1, "dk", 0); P.px(5, 3, W); break;
       case "bone": P.line(3, 9, 9, 3, "c", 0.1, 1.1); for (const [x, y] of [[2.5, 8.5], [3.5, 9.5], [8.5, 2.5], [9.5, 3.5]]) P.ell(x, y, 1.4, 1.4, "c", { s: 0.15 }); P.px(7, 3, W); break;
       case "sack": P.ell(6, 8, 4.5, 3.6, "c", { s: 0.05 }); P.poly([[4.5, 4.5], [7.5, 4.5], [8.5, 2], [3.5, 2]], "c", 0.2); P.rect(4, 4, 4, 1, "rope", 0.2); P.px(4, 7, W); break;
+      case "torch": P.line(3.5, 11, 7.5, 4.5, "c", 0.1, 1.2); P.rect(6, 4, 3, 2, "rope", 0.1); P.ell(8.6, 2.6, 2.1, 2.4, "gold", { s: 0.45 }); P.px(9, 1, W); P.px(8, 2, "#ff7a2a"); break;
       case "rock": P.ell(6, 7.5, 4.8, 3.8, "c", { s: 0.05, fn: (x, y, s) => (x + y * 2) % 9 === 0 ? s - 0.5 : s }); P.px(5, 7, "gold", 0.5); P.px(8, 8, "gold", 0.3); P.px(4, 5, W); break;
       case "gem": P.poly([[6, 1], [11, 5], [6, 11], [1, 5]], "c", (x, y) => (y < 5 ? 0.7 : 0) + (x < 6 ? 0.25 : -0.35)); P.line(1.5, 5, 10.5, 5, "c", 0.9); P.px(4, 3, W); P.px(5, 2, W); break;
       case "ring": P.ell(6, 7.5, 4, 3.6, "c", { s: 0.1, fn: (x, y, s) => (((x + 0.5 - 6) / 2) ** 2 + ((y + 0.5 - 7.5) / 1.8) ** 2 <= 1 ? false : s) }); P.ell(6, 3, 1.7, 1.5, "gem", { s: 0.3 }); P.px(5, 2, W); break;

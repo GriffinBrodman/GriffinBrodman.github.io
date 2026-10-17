@@ -38,6 +38,13 @@
   const IRREGULAR = { hero: "heroes", party: "parties" };
   function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
   function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+  // as league/content/world_map.py floor_words: n counts from 1, and the last of several floors reads "the bottom floor" (of two) or "the deepest floor"
+  const FLOOR_ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  function floorOrd(n) { return FLOOR_ORD[n - 1] || `${n}th`; }
+  function floorWords(n, did, capital, deep = true) {
+    const t = ((S.dungeons || {})[did] || {}).floors || 0;
+    return `${capital ? "The" : "the"} ${deep && t > 1 && n >= t ? (t === 2 ? "bottom" : "deepest") : floorOrd(n)} floor`;
+  }
   // a crew's own exported possessive when there is one (party.poss), else as league/heroes.py poss: "The Mossy Cats'", "Brix's"
   function poss(s, pid) {
     const p = pid && parties[pid];
@@ -358,6 +365,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   }
   // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
   const ROAD_ART = ["road_scenes", "road_art"];
+  // a town day's scenes: the sets, the acts and the player (and what they draw with), loaded with the first town day a page draws
+  const TOWN_ART = STAGE.concat(["road_scenes", "road_art", "scene_kits", "stage", "town_day_sets", "town_day_sets_b", "town_day_sets_c", "town_day_sets_e", "town_day_flat", "town_day_flat_sets", "town_day_flat_sets_b", "town_day_acts", "town_day_replay"]);
   // the art and the road cast (data/road_cast.js: travellers' looks and the places) arrive together
   function roadArt(names) {
     return Promise.all([need(names || ROAD_ART), S.road ? null : load("road_cast").then((c) => { S.road = c; })]);
@@ -429,7 +438,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
     [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
     // the replay pages (replay.js) and everything their players stand on
-    [/^\/(fight|night|meal|catch|road|reading|table)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
+    [/^\/(fight|night|meal|catch|road|reading|table|day)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
       "js/music.js", "js/replay.js"], []]];
   const lazyLoaded = new Set();
   function lazy(hash) {
@@ -502,7 +511,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss, placeHref,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd,
   };
 })();

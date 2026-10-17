@@ -617,7 +617,7 @@
   function room(st, r, opts) {
     const { iso, lwall, rwall, quad } = st;
     const cv = st.canvas(), ctx = cv.getContext("2d");
-    ctx.fillStyle = "#1a120c"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#1a120c"; ctx.fillRect(0, 0, st.W, st.H);
     // boarded walls: upright wainscot below a rail, wide horizontal boards above, a timber post every few tiles
     const wall = (side) => (x, y) => {
       const [a, h] = side === "l" ? st.onL(x, y) : st.onR(x, y), lt = side === "r";
@@ -715,27 +715,15 @@
     return cv;
   }
 
-  // cfg: { seed, keeper: {name, lines}, cast: [{h, lines, focus, pet}], board, onVisible }
-  function inn(cfg) {
-    const r = Art.rng(Art.hash(cfg.seed || "tavern"));
-    const st = stage(W, H, OX, OY);
-    const wrap = document.createElement("div");
-    wrap.className = "tavern";
-    const cv = document.createElement("canvas");
-    cv.width = W; cv.height = H;
-    wrap.appendChild(cv);
-    const ctx = cv.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-    // the town outside the windows: given, or wherever the page's hero is tonight
-    const lookOut = { board: cfg.board, town: cfg.town || ((cfg.cast.find((c) => c.focus) || {}).h || {}).loc };
-    const bg = room(st, r, lookOut);
-    const keepLines = (cfg.keeper && cfg.keeper.lines) || ["Another one?"];
-
+  // the room's furniture, each piece its own canvas with a depth key: the bar in panelled sections, the tables with their stools and
+  // candles, and either tonight's pallets (an inn) or a pair of barrels (the preseason tavern)
+  function furnish(st, r, board) {
+    const cfg = { board };
     const piece = (paint) => { const c = st.canvas(); paint(c.getContext("2d")); return c; };
     const furniture = [], candles = [], sleepers = [];
     // the bar front is panelled in half-tile frames
     const panels = (x, y) => {
-      const u = (x + 0.5 - OX) / 8 + BAR_V, h = OY + (u + BAR_V) * 4 - y - 0.5, f = u * 2 - Math.floor(u * 2);
+      const u = (x + 0.5 - st.OX) / 8 + BAR_V, h = st.OY + (u + BAR_V) * 4 - y - 0.5, f = u * 2 - Math.floor(u * 2);
       if (f < 0.1 || h < 2.5 || h > 10.5) return "#6a4222";
       return f < 0.2 || h > 9.5 ? "#3a2212" : "#56361c";
     };
@@ -764,6 +752,26 @@
       for (const [u, bl, hair] of sleeps) furniture.push({ key: u + 1.3, cv: piece((c) => sleepers.push(pallet(c, st, u, 0.25, 1.8, 1.0, bl, hair))) });
       furniture.push({ key: 7.7 + 0.6, cv: piece((c) => { const [x, y] = st.iso(7.75, 0.55); barrel(c, Math.round(x), Math.round(y)); }) });
     } else for (const [u, v] of [[11.7, 0.5], [12.4, 1.3]]) furniture.push({ key: u + v, cv: piece((c) => { const [x, y] = st.iso(u, v); barrel(c, Math.round(x), Math.round(y)); }) });
+    return { furniture, candles, sleepers };
+  }
+
+  // cfg: { seed, keeper: {name, lines}, cast: [{h, lines, focus, pet}], board, onVisible }
+  function inn(cfg) {
+    const r = Art.rng(Art.hash(cfg.seed || "tavern"));
+    const st = stage(W, H, OX, OY);
+    const wrap = document.createElement("div");
+    wrap.className = "tavern";
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    wrap.appendChild(cv);
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    // the town outside the windows: given, or wherever the page's hero is tonight
+    const lookOut = { board: cfg.board, town: cfg.town || ((cfg.cast.find((c) => c.focus) || {}).h || {}).loc };
+    const bg = room(st, r, lookOut);
+    const keepLines = (cfg.keeper && cfg.keeper.lines) || ["Another one?"];
+
+    const { furniture, candles, sleepers } = furnish(st, r, cfg.board);
     const inside = inRoom(st, NU, NV, WH), shine = lighting(W, H, (x, y) => inside(x, y) && !lookOut.views.some((v) => v.glass(x, y))), fireAt = st.lwall((FIRE.v0 + FIRE.v1) / 2, 8);
 
     const actors = [];
@@ -943,6 +951,6 @@
       cast: pending.map((h) => ({ h, lines: h.chatter || [] })) });
   }
 
-  window.Tavern = { scene, inn, stage, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, petHit, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
+  window.Tavern = { scene, inn, stage, room, furnish, ROOM: { NU, NV, WH, BAR_V, TABLES, FIRE, W, H }, reduced, fillPoly, actor, keeper, local, step, drawActor, drawMarker, drawPet, petHit, pick, talk, loop, windowR, moonbeam, hearth, flames, lantern, barrel,
     shade, line, slab, legs, table, stool, pallet, zzz, mugAt, candle, lighting, inRoom, weatherAt };
 })();
