@@ -157,6 +157,7 @@
       const st = L.dungeons[id] || {};
       p.appendChild(el("p", { class: "small muted" }, `Level ${d.level} dungeon · ${d.floors} floors · ${dangerWord(st.danger)}`));
       p.appendChild(el("p", null, d.desc));
+      p.appendChild(el("p", null, el("a", { class: "dg-open", href: `#/dungeon/${id}` }, "Open the map of its floors ▸")));
       const pct = Math.round(st.explored || 0);
       p.appendChild(el("div", { class: "small" }, `Explored: ${st.explored_word || "untouched (0%)"}`,
         el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));

@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r605"]={"id":"r605","day":89,"kind":"toll","place":"gants_bridge","road":"ironhaven~veldrock","biome":"plains","weather":"storm","tod":"afternoon","hour":15,"heroes":["h19","h20"],"lead":"h20","line":"Gant takes Wren's 2 copper toll, bites each coin, and lifts the bar.","fare":2,"place_kind":"toll","tally":9,"outcome":"place"};

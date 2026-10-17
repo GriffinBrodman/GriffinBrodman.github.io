@@ -180,9 +180,11 @@
   function places() {
     if (placeNames) return placeNames;
     placeNames = [];
-    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), `#/map/${id}`]);
+    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), placeHref(id)]);
     return placeNames;
   }
+  // a dungeon has its own page with its floors; every other place opens on the map
+  function placeHref(id) { return S.dungeons && S.dungeons[id] ? `#/dungeon/${id}` : `#/map/${id}`; }
   // turns plain story text into nodes with hero & party names linked, and the first mention of each town and dungeon
   function richText(text, heroIds, partyIds) {
     const names = [];
@@ -271,7 +273,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     for (const id of hs) who.appendChild(heroPortrait(heroes[id], 1, { noGray: true }));
     const meta = [];
     if (!opts.noDay) meta.push(dayLabel(e));
-    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: `#/map/${e.loc}` }, nodeName(e.loc)) : nodeName(e.loc));
+    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: placeHref(e.loc) }, nodeName(e.loc)) : nodeName(e.loc));
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
     const fightLink = storyLink(e) || (e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, "♪ hear it") : null);
@@ -401,6 +403,27 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // ---------- router ----------
   const routes = [];
   function route(re, fn) { routes.push([re, fn]); }
+  // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
+  const LAZY = [[/^\/dungeon\//, ["js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/dungeon_map_iso.js", "js/views_dungeon.js"], ["css/dungeon.css"]]];
+  const lazyLoaded = new Set();
+  function lazy(hash) {
+    const hit = LAZY.find(([re]) => re.test(hash));
+    if (!hit || lazyLoaded.has(hit)) return false;
+    lazyLoaded.add(hit);
+    const v = window.AL_V ? `?v=${window.AL_V}` : "";
+    for (const href of hit[2]) document.head.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: href + v }));
+    let left = hit[1].length;
+    for (const src of hit[1]) {
+      const s = document.createElement("script");
+      s.src = src + v;
+      // in order: later page files build on the earlier ones
+      s.async = false;
+      s.onload = () => { if (--left === 0) render(); };
+      s.onerror = () => { console.error("could not load " + src); };
+      document.body.appendChild(s);
+    }
+    return true;
+  }
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
@@ -426,6 +449,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
         return;
       }
     }
+    if (lazy(hash)) return;
     view.innerHTML = "";
     view.appendChild(el("div", { class: "panel" }, el("h2", null, "Lost in the woods"), el("p", null, "That page doesn't exist. ", el("a", { href: "#/" }, "Back to the Crier."))));
   }
@@ -460,6 +484,6 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
     nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, ROAD_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss,
+    animated, money, coins, tableLink, poss, placeHref,
   };
 })();

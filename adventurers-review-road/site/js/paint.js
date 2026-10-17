@@ -294,8 +294,13 @@
     return { legacy: false, outfit: a.outfit || cl.outfit || "leather", mat: a.material || OUTFIT_MAT[a.outfit] || "leather", at: Math.max(1, Math.min(5, a.tier || at0)), aglow: a.glow || null,
       w: { family: w.family || h.weapon, tier: Math.max(1, Math.min(5, w.tier || 1)), two: w.two !== false && !!(w.two || w.family === "daggers"), glow: w.glow || null },
       head: k.head && k.head.art ? k.head : null, mark: k.mark || null, off: w.two ? null : k.offhand || null, back: k.back || null,
-      neck: k.neck || null, rings: (k.rings || []).slice(0, 2), pocket: k.pocket || null };
+      neck: k.neck || null, rings: (k.rings || []).slice(0, 2), pocket: k.pocket || null, belt: k.belt || null, boots: k.boots || null, gloves: k.gloves || null };
   }
+  // belt, boots and gloves found underground: leather darkening with the piece's tier, and the grade as a small glow
+  const DELVE_COL = { belt: ["#a08058", "#6e4a30", "#4e3626", "#3e2a22"], boots: ["#74523a", "#5a3a26", "#463830", "#2e2a30"], gloves: ["#c8a878", "#8e5c3a", "#5a3c28", "#3c3238"] };
+  const GRADE_GLOW = { great: "#ffd060", unique: "#6ee0c8" };
+  const delveCol = (it, slot) => DELVE_COL[slot][Math.max(0, Math.min(3, it.tier || 0))];
+  const gradeGlow = (it) => (it && GRADE_GLOW[it.grade]) || null;
 
   const HEAD_COL = {
     hood: (t, f) => ["#7a6a58", mix(f, "#3a3440", 0.55), mix(f, "#2e3a2a", 0.5), "#34303e"][t],
@@ -343,6 +348,7 @@
       mana: ramp("#3ab8b8"), illus: ramp("#e07aa8"), mint: ramp("#8ad8c4"), brass: ramp("#c8963a"), cloud: ramp("#a4aebc"), warp: ramp("#b4302a"),
       rosec: ramp("#c82a44"), rope: ramp("#c4a26a"),
       glass: ramp("#b8d0e0"), night: ramp("#2a3470"), crim: ramp("#8e2a2a"), straw: ramp("#d8b45a"), moon: ramp("#e4e2dc"), peacock: ramp("#2a8a8a"),
+      blt: ramp(k.belt || "#6e4a30"), bts: ramp(k.boots || "#5a3a26"), glv: ramp(k.gloves || "#7e5436"),
       ngem: ramp(k.neckGem || "#c83a3a"), strap: ramp("#b48a56"), pearl: ramp("#ece6da"), pk: ramp(k.tint || "#6a4a3a"), wolf: ramp("#8e8e96"), rust: ramp("#8a5a3a"),
     };
   }
@@ -356,7 +362,8 @@
     const pale = scars.includes("pale"), skinHex = pale ? mix(look.skin, "#c8ccd8", 0.35) : look.skin;
     if (head === "hood" || head === "skull_hood" || head === "beast_hood") look.hair = mix(look.hair, "#241c1a", 0.45);
     const mats = makeMats(Object.assign({}, look, { skinHex }), { at: K.at, mat: K.mat, dark, wt: K.w.tier, ht: tierOf(K.head, 1), ot: tierOf(K.off, 1), bt: tierOf(K.back, 1),
-      head, back: K.back && K.back.art, neckGem: K.neck && soften(K.neck.gem || (K.neck.art === "scarf" ? look.fav : null)), tint: K.pocket && soften(K.pocket.tint) });
+      head, back: K.back && K.back.art, neckGem: K.neck && soften(K.neck.gem || (K.neck.art === "scarf" ? look.fav : null)), tint: K.pocket && soften(K.pocket.tint),
+      belt: K.belt && delveCol(K.belt, "belt"), boots: K.boots && delveCol(K.boots, "boots"), gloves: K.gloves && delveCol(K.gloves, "gloves") });
     const c = { h, look, r, cx, scars, head, outfit, pale, mats, st: look.style, k: K, ht: tierOf(K.head, 1), mark: K.mark };
     c.faceW = 6.5 + r() * 1.1; c.jawW = c.faceW - 0.9 - r() * 0.7; c.chin = 24.6 + r() * 0.8;
     c.pointy = r() < 0.28; c.freckles = r() < 0.2 && toHsv(look.skin)[2] > 0.8; c.eye = EYES[Math.floor(r() * EYES.length)];
@@ -1479,7 +1486,8 @@
     const tpx = track(P, () => torso(P, c.outfit, cx, c.r, c));
     armorPortrait(P, c);
     if (K.aglow) glows.push([tpx, K.aglow]);
-    if (K.pocket && K.pocket.art === "belt") glows.push([track(P, () => { P.rect(cx - 15, 35.5, 30, 2, "pk", (x, y) => (y < 36 ? 0.35 : -0.1) - (x - cx) * 0.03); P.rect(cx - 2, 35, 4, 3, "gold", (x) => 0.45 - (x - cx) * 0.2); P.rect(cx - 1, 36, 2, 1, "pk", -0.4); }), K.pocket.glow]);
+    if (K.belt) glows.push([track(P, () => { P.rect(cx - 15, 35.5, 30, 2, "blt", (x, y) => (y < 36 ? 0.35 : -0.1) - (x - cx) * 0.03); P.rect(cx - 2, 35, 4, 3, K.belt.tier >= 2 ? "gold" : "omet", (x) => 0.45 - (x - cx) * 0.2); P.rect(cx - 1, 36, 2, 1, "blt", -0.4); }), gradeGlow(K.belt)]);
+    else if (K.pocket && K.pocket.art === "belt") glows.push([track(P, () => { P.rect(cx - 15, 35.5, 30, 2, "pk", (x, y) => (y < 36 ? 0.35 : -0.1) - (x - cx) * 0.03); P.rect(cx - 2, 35, 4, 3, "gold", (x) => 0.45 - (x - cx) * 0.2); P.rect(cx - 1, 36, 2, 1, "pk", -0.4); }), K.pocket.glow]);
     P.layer = 3;
     if (back) glows.push([track(P, () => backPortrait(P, c, back, bt, true)), K.back.glow]);
     headFront(P, c, true);
@@ -1633,8 +1641,8 @@
     }
     if (back) glows.push([track(P, () => backSprite(P, c, back, bt, false)), K.back.glow]);
     P.layer = 2;
-    const peg = c.scars.includes("peg"), boots = K.pocket && K.pocket.art === "boots";
-    const bootM = boots ? "pk" : "boot", bootTop = boots ? 28 : 30;
+    const peg = c.scars.includes("peg"), boots = !!K.boots || !!(K.pocket && K.pocket.art === "boots");
+    const bootM = K.boots ? "bts" : boots ? "pk" : "boot", bootTop = boots ? 28 : 30;
     if (q) P.post = lower;
     const bootPx = track(P, () => {
       if (q && kn) kneelLegs(P, outfit, base, bootM, peg, kn);
@@ -1653,7 +1661,10 @@
       }
     }).filter((i) => P.mat[i] === bootM);
     if (q) P.post = upper;
-    if (boots) glows.push([bootPx, K.pocket.glow]);
+    if (K.boots) {
+      if (!q && !o.seated && !ROBES.has(outfit) && K.boots.tier >= 2) { P.px(10, 29, "gold", 0.3); if (!peg) P.px(16, 29, "gold", 0); }
+      glows.push([bootPx, gradeGlow(K.boots)]);
+    } else if (boots) glows.push([bootPx, K.pocket.glow]);
     torsoPx.push(...track(P, () => P.poly([[8.5, 17], [19.5, 17], [19, 25.5], [9, 25.5]], base, (x, y) => 0.25 - (x - 13) * 0.08 - (y - 17) * 0.025 + (outfit === "chain" && (x + y * 2) % 3 === 0 ? -0.45 : 0))));
     switch (outfit) {
       case "robe": case "robe_dark": P.poly([[12, 17], [16, 17], [14, 20]], "skin", -0.5); P.rect(9, 22, 10, 1, K.at >= 4 ? "gold" : K.at === 1 ? "dleather" : "gold", 0.2); break;
@@ -1673,7 +1684,10 @@
         break;
     }
     armorSprite(P, c);
-    if (K.pocket && K.pocket.art === "belt") glows.push([track(P, () => { P.rect(9, 24, 10, 2, "pk", (x, y) => (y === 24 ? 0.3 : -0.2) - (x - 9) * 0.04); P.rect(13, 24, 2, 2, "gold", (x) => (x === 13 ? 0.5 : 0)); P.px(18, 26, "pk", -0.3); }), K.pocket.glow]);
+    if (K.belt) {
+      const by = ROBES.has(outfit) ? 22 : 24;
+      glows.push([track(P, () => { P.rect(9, by, 10, 2, "blt", (x, y) => (y === by ? 0.3 : -0.2) - (x - 9) * 0.04); P.rect(13, by, 2, 2, K.belt.tier >= 2 ? "gold" : "silver", (x) => (x === 13 ? 0.5 : 0)); P.px(K.belt.tier ? 18 : 15, by + 2, "blt", -0.3); }), gradeGlow(K.belt)]);
+    } else if (K.pocket && K.pocket.art === "belt") glows.push([track(P, () => { P.rect(9, 24, 10, 2, "pk", (x, y) => (y === 24 ? 0.3 : -0.2) - (x - 9) * 0.04); P.rect(13, 24, 2, 2, "gold", (x) => (x === 13 ? 0.5 : 0)); P.px(18, 26, "pk", -0.3); }), K.pocket.glow]);
     else if (K.pocket && !["boots", "gauntlet", "belt"].includes(K.pocket.art)) P.rect(17, 24, 2, 2, "leather", (x) => 0.2 - (x - 17) * 0.3);
     P.layer = 3;
     const sleeve = outfit === "plate" || outfit === "chain" ? "metal" : outfit === "fur" ? "skin" : outfit === "vestments" ? "shirt" : outfit === "robe_dark" ? "robed" : outfit === "leather" ? "hide" : outfit === "cloak" ? "cloth" : base;
@@ -1685,11 +1699,14 @@
       armorShape(P, c, sleeve);
       if (outfit === "motley" && !both) for (let y = 17; y < 24; y++) for (const x of [20, 21, 22]) if (P.matAt(x, y) === sleeve) P.px(x, y, "shirt", -0.1 - (x - 20) * 0.2);
     }));
-    const gaunt = K.pocket && K.pocket.art === "gauntlet";
-    if (gaunt) glows.push([track(P, () => { P.rect(6, 22, 2, 4, "pk", (x, y) => 0.4 - (x - 6) * 0.3 - (y - 22) * 0.1); P.rect(5, 21, 4, 2, "pk", (x, y) => (y === 21 ? 0.6 : 0) - (x - 5) * 0.15); }), K.pocket.glow]);
+    const gaunt = K.pocket && K.pocket.art === "gauntlet", gl = K.gloves, hand = gl ? "glv" : "skin", glovePx = [];
+    const cuff = (x0, s0) => track(P, () => { P.rect(x0, 22, 2, 4, "glv", (x, y) => (y === 22 ? 0.55 : 0.15) + s0 - (x - x0) * 0.3); if (gl.tier >= 2) P.rect(x0, 22, 2, 1, "gold", 0.2 + s0); });
+    if (gl) glovePx.push(...cuff(6, 0));
+    else if (gaunt) glows.push([track(P, () => { P.rect(6, 22, 2, 4, "pk", (x, y) => 0.4 - (x - 6) * 0.3 - (y - 22) * 0.1); P.rect(5, 21, 4, 2, "pk", (x, y) => (y === 21 ? 0.6 : 0) - (x - 5) * 0.15); }), K.pocket.glow]);
     else P.rect(6, 24, 2, 2, "skin", (x) => 0.2 - (x - 6) * 0.3);
     if (both) P.layer = 3;
     else if (c.scars.includes("hook")) { P.px(21, 24, "#a8a8b0"); P.px(21, 25, "#c8c8d0"); P.px(20, 26, "#a8a8b0"); }
+    else if (gl) glovePx.push(...cuff(20, -0.25));
     else P.rect(20, 24, 2, 2, "skin", (x) => -0.2 - (x - 20) * 0.3);
     if (back) glows.push([track(P, () => backSprite(P, c, back, bt, true)), K.back.glow]);
     const hpx = track(P, () => { P.tf = HT; headFront(P, c, false); P.tf = null; });
@@ -1721,7 +1738,7 @@
       c.ofg = K.off.glow;
       const art = K.off.art;
       glows.push([track(P, () => offhand(P, art, tierOf(K.off, 1), c)), K.off.glow]);
-      if (art !== "shield" && art !== "tower_shield" && art !== "lute") P.rect(art === "shovel" ? 21 : 20, 24, 2, 2, "skin", (x) => 0.2 - (x - 20) * 0.3);
+      if (art !== "shield" && art !== "tower_shield" && art !== "lute") glovePx.push(...track(P, () => P.rect(art === "shovel" ? 21 : 20, 24, 2, 2, hand, (x) => 0.2 - (x - 20) * 0.3)));
     }
     if (BODY_MARKS.has(c.mark)) { P.layer = 8; bodyMark(P, c, true); }
     P.layer = 9;
@@ -1736,8 +1753,7 @@
       P.layer = 3;
       P.line(17.5, 19.5, fx + 1.6, fy + 0.2, sleeve, -0.15, 1);
       P.layer = 10;
-      P.rect(Math.round(fx - 1), Math.round(fy - 1), 2, 2, "skin", (x) => 0.3 - (x - fx) * 0.3);
-      P.rect(6, 24, 2, 2, gaunt ? "pk" : "skin", (x) => 0.2 - (x - 6) * 0.3);
+      glovePx.push(...track(P, () => { P.rect(Math.round(fx - 1), Math.round(fy - 1), 2, 2, hand, (x) => 0.3 - (x - fx) * 0.3); P.rect(6, 24, 2, 2, gl ? "glv" : gaunt ? "pk" : "skin", (x) => 0.2 - (x - 6) * 0.3); }));
     }
     if (o.seated) { P.layer = 10; saddleTop(P); }
     P.layer = 11;
@@ -1752,7 +1768,8 @@
     const outline = o.legend ? "#5a3a08" : "#16121a";
     if (K.w.glow) glowUp(g, P, wpx, K.w.glow, o.frame, { outline });
     if (K.aglow) glowUp(g, P, torsoPx, K.aglow, o.frame, { outline, amt: 0.6 });
-    for (const [px, gl] of glows) glowUp(g, P, px, gl, o.frame, { outline });
+    for (const [px, gw] of glows) glowUp(g, P, px, gw, o.frame, { outline });
+    if (gl && gradeGlow(gl)) glowUp(g, P, glovePx.filter((i) => P.mat[i] === "glv"), gradeGlow(gl), o.frame, { outline });
     // jewellery is too small for a rim: a stone in the glow colour, with a highlight that blinks
     for (const [[x, y], gl, half] of jewels) {
       for (let j = 0; j < 2; j++) for (let i = 0; i < (half ? 1 : 2); i++) g.set(x + i, y + j, j ? mix(gl, "#16121a", 0.3) : gl);
@@ -2374,6 +2391,6 @@
   }
 
   // shared with Art.gearIcon: the same pieces, drawn alone
-  const Gear = { soften, makeMats, headgear, offhand, OFF_C, axis, weapon, backSprite, neckSprite, track, glowUp, TMETAL, METAL, CROWN_Y };
+  const Gear = { soften, makeMats, headgear, offhand, OFF_C, axis, weapon, backSprite, neckSprite, track, glowUp, TMETAL, METAL, CROWN_Y, DELVE_COL, GRADE_GLOW };
   window.Paint = { Paint, ramp, hsv, toHsv, portraitGrid, fullBody, sleeper, setAside, MARKS, PW, PH, Gear };
 })();

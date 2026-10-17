@@ -337,9 +337,20 @@
   // the fights of a stretch of the day, each linked to its replay while it is kept
   function fightLinks(b) {
     const own = b.ref && window.App ? App.storyLink(b.ref) : null;
-    if (own) return [" ", own];
+    const room = roomLink(b);
+    if (own) return [" ", own, room];
     if (b.rec && kept("road", b.rec)) return [" ", h("a", { class: "watch", href: `#/road/${b.rec}` }, "▶ watch")];
-    const ids = (b.fights || []).filter((id) => kept("fight", id));
+    if (room) return [room, ...fightIds(b)];
+    return fightIds(b);
+  }
+  // a room underground opens that floor of the dungeon's map with the room picked out
+  function roomLink(b) {
+    const r = b.room;
+    if (!r || !r.dungeon || !window.App) return null;
+    return [" ", h("a", { class: "watch db-room", href: `#/dungeon/${r.dungeon}/${r.floor}/${r.room}` }, "▸ on the map")];
+  }
+  function fightIds(b) {
+    const ids = [...new Set([...(b.fights || []), ...(b.room && b.room.fight ? [b.room.fight] : [])])].filter((id) => kept("fight", id));
     return ids.flatMap((id, i) => [" ", h("a", { class: "watch", href: `#/fight/${id}` }, ids.length > 1 ? `▶ fight ${i + 1}` : "▶ watch")]);
   }
   let uid = 0;
@@ -381,7 +392,7 @@
         class: "db-btn", type: "button", "aria-describedby": tipId, "aria-label": `${when}: ${label}${b.line ? ". " + b.line : ""}`,
         onclick: (e) => { const open = !li.classList.contains("open"); for (const o of li.parentNode.querySelectorAll(".db-b.open")) o.classList.remove("open"); li.classList.toggle("open", open); e.stopPropagation(); },
       }, icon(act, 2), h("span", { class: "db-txt" }, h("span", { class: "db-lbl" }, label), h("span", { class: "db-hrs" }, parts[0] + "–", h("wbr"), parts[1]), h("span", { class: "db-hrs-s" }, clock(from).replace(/(am|pm)$/, "")))),
-      b.line ? h("p", { class: "db-line" }, txt(b.line), fightLinks(b)) : null,
+      b.line ? h("p", { class: "db-line" }, txt(b.line), fightLinks(b)) : b.room ? h("p", { class: "db-line" }, roomLink(b)) : null,
       b.table ? h("p", { class: "db-line db-table" }, tableLink(b)) : null,
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
       // a road stretch gets its still road strip behind the line when the road art is loaded (road_scenes.js)

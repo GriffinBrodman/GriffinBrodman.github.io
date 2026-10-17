@@ -622,7 +622,14 @@
         if (!MEMBER_FIG[m] && typeof member === "number") m = CREWS[sp.key].members[member % CREWS[sp.key].members.length];
       }
       if (MEMBER_FIG[m]) return MEMBER_FIG[m](f);
-      const lk = fallbackLook(sp.id + "|" + (m || "lead"), sp.what + " " + sp.role, sp.palette);
+      // the same looks the crew's portrait gives them: the face (or the first member) in the leader's look and the league's own
+      // look for it, the rest in their own with the leader's colour
+      const names = (sp.members || []).map((x) => (typeof x === "string" ? x : x.id || x.name));
+      const lead = Object.assign(fallbackLook(sp.id + "|lead", sp.what + " " + sp.role, sp.palette), sp.look || {});
+      const i = names.indexOf(m);
+      if (i <= 0) return heroLike(sp.id + ":lead", lead, f);
+      const mm = (sp.members || [])[i];
+      const lk = Object.assign(fallbackLook(sp.id + "|" + m, ((mm && mm.role) || "") + " " + sp.what, sp.palette), { fav: lead.fav });
       return heroLike(sp.id + ":" + m, lk, f);
     }
     if (sp.key === "aldous") return aldousFig(f);
