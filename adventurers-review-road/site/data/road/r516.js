@@ -1,1 +1,0 @@
-window.LD=window.LD||{};window.LD["road/r516"]={"id":"r516","day":80,"kind":"meet","place":null,"road":"carrbridge~saltmarrow","biome":"coast","weather":"clear","tod":"afternoon","hour":15,"heroes":["h18","h2","h4"],"lead":"h2","line":"Mags Halloran falls in beside Sela for the first time without a word and stays a mile.","traveller":"mags","met":1,"outcome":"meet"};

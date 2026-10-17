@@ -1,1 +1,0 @@
-window.LD=window.LD||{};window.LD["daybook/h18/90"]={"day":30,"label":"Day 30","title":"Season 3, day 30, hour by hour","blocks":[{"act":"delve","label":"Walking","from":6.0,"to":18.0,"line":"Back through 21 cleared rooms on floor 1."}],"evening":{"kind":"dungeon","line":"Camped in the Ashveil Crypts"}};

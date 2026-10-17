@@ -20,20 +20,45 @@
       return [((ev.clientX - r.left) / r.width) * cv.width, ((ev.clientY - r.top) / r.height) * cv.height, ev.clientX - r.left, ev.clientY - r.top];
     };
     const hit = (mx, my) => placed.find((p) => Math.abs(p.x - mx) < p.r && Math.abs(p.y - my) < p.r * 1.3);
+    // a found roadside place: its pin stands above its point on the road; a tap anywhere near it says what it is
+    const pins = window.Isle && Isle.pinsOn ? Isle.pinsOn(cv) : [];
+    const pinAt = (mx, my) => {
+      const k = cv._k || 2;
+      // a finger is wider than a pin: the target reaches 12 screen pixels round it, 22 on a phone
+      const box = cv.getBoundingClientRect().width, ph = ((window.RoadArt && RoadArt.PIN) || { h: 14 }).h;
+      const reach = (box < 520 ? 22 : 12) * (cv.width / box);
+      let best = null, bd = reach ** 2;
+      for (const q of pins) { const d = (q.x - mx) ** 2 + (q.y - (ph / 2) * k - my) ** 2; if (d < bd) { bd = d; best = q.p; } }
+      return best;
+    };
+    const pinText = (p) => {
+      const by = (A.heroes || {})[p.by];
+      return `${p.name} · found ${A.when(p.found, "on")}${by ? " by " + by.name : ""}${p.tally ? " · " + p.tally : ""}`;
+    };
+    // the tip stays inside the map: it flips to the left of the pointer near the right edge, and wraps on a phone
+    const showTip = (txt, cx, cy) => {
+      tip.hidden = !txt;
+      tip.textContent = txt;
+      const box = cv.getBoundingClientRect().width;
+      tip.style.maxWidth = Math.max(140, box - 24) + "px";
+      tip.style.whiteSpace = "normal";
+      const w = tip.offsetWidth;
+      tip.style.left = Math.max(4, cx + 12 + w > box ? cx - 12 - w : cx + 12) + "px"; tip.style.top = cy + 12 + "px";
+    };
     cv.addEventListener("mousemove", (ev) => {
       const [mx, my, cx, cy] = toMap(ev);
       const ph = hit(mx, my);
+      const pin = ph ? null : pinAt(mx, my);
       const nd = Scenes.nearestNode(mx, my, cv);
-      const txt = ph ? `${ph.h.name} · ${ph.h.doing || ""}` : nd ? A.nodeName(nd) : "";
-      tip.hidden = !txt;
-      tip.textContent = txt;
-      tip.style.left = cx + 12 + "px"; tip.style.top = cy + 12 + "px";
+      showTip(ph ? `${ph.h.name} · ${ph.h.doing || ""}` : pin ? pinText(pin) : nd ? A.nodeName(nd) : "", cx, cy);
     });
     cv.addEventListener("mouseleave", () => (tip.hidden = true));
     cv.addEventListener("click", (ev) => {
-      const [mx, my] = toMap(ev);
+      const [mx, my, cx, cy] = toMap(ev);
       const ph = hit(mx, my);
       if (ph) { location.hash = `#/hero/${ph.h.id}`; return; }
+      const pin = pinAt(mx, my);
+      if (pin) { showTip(pinText(pin), cx, cy); return; }
       const nd = Scenes.nearestNode(mx, my, cv);
       if (nd) showNode(side, nd);
     });
@@ -132,6 +157,7 @@
       const st = L.dungeons[id] || {};
       p.appendChild(el("p", { class: "small muted" }, `Level ${d.level} dungeon · ${d.floors} floors · ${dangerWord(st.danger)}`));
       p.appendChild(el("p", null, d.desc));
+      p.appendChild(el("p", null, el("a", { class: "dg-open", href: `#/dungeon/${id}` }, "Open the map of its floors ▸")));
       const pct = Math.round(st.explored || 0);
       p.appendChild(el("div", { class: "small" }, `Explored: ${st.explored_word || "untouched (0%)"}`,
         el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));

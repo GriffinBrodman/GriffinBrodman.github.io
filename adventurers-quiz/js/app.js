@@ -151,9 +151,9 @@
   }
   // ---------- links to what a story line tells ----------
   // an event, diary line or snippet carries the ids of the records it is about (league/export.py LINKS); the link shows only while that record is kept
-  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"]];
+  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"], ["road_rec", "road"]];
   function kept(route, id) {
-    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds }[route];
+    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds, road: roadIds }[route];
     return !!id && !!ids && ids.has(id);
   }
   function storyHref(x) {
@@ -180,9 +180,11 @@
   function places() {
     if (placeNames) return placeNames;
     placeNames = [];
-    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), `#/map/${id}`]);
+    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), placeHref(id)]);
     return placeNames;
   }
+  // a dungeon has its own page with its floors; every other place opens on the map
+  function placeHref(id) { return S.dungeons && S.dungeons[id] ? `#/dungeon/${id}` : `#/map/${id}`; }
   // turns plain story text into nodes with hero & party names linked, and the first mention of each town and dungeon
   function richText(text, heroIds, partyIds) {
     const names = [];
@@ -271,7 +273,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     for (const id of hs) who.appendChild(heroPortrait(heroes[id], 1, { noGray: true }));
     const meta = [];
     if (!opts.noDay) meta.push(dayLabel(e));
-    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: `#/map/${e.loc}` }, nodeName(e.loc)) : nodeName(e.loc));
+    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: placeHref(e.loc) }, nodeName(e.loc)) : nodeName(e.loc));
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
     const fightLink = storyLink(e) || (e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, "♪ hear it") : null);
@@ -290,6 +292,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   const fightIds = new Set((L && L.fights_index) || []), nightIds = new Set((L && L.nights_index) || []), mealIds = new Set((L && L.meals_index) || []), readingIds = new Set((L && L.readings_index) || []);
+  const roadIds = new Set((L && L.roads_index) || []);
   const catchIds = new Set((L && L.catches_index) || []), gameIds = new Set((L && L.games_index) || []), songIds = new Set(((L && L.songs) || []).map((s) => s.id));
   const heroSongBy = {};
   for (const s of (L && L.hero_songs) || []) heroSongBy[s.id] = s.author;
@@ -333,6 +336,12 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
       s.onerror = () => { delete scripts[n]; reject(new Error("could not load " + n)); };
       document.head.appendChild(s);
     }))), Promise.resolve());
+  }
+  // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
+  const ROAD_ART = ["road_scenes", "road_art"];
+  // the art and the road cast (data/road_cast.js: travellers' looks and the places) arrive together
+  function roadArt(names) {
+    return Promise.all([need(names || ROAD_ART), S.road ? null : load("road_cast").then((c) => { S.road = c; })]);
   }
 
   // ---------- follow ("my heroes") ----------
@@ -394,6 +403,27 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // ---------- router ----------
   const routes = [];
   function route(re, fn) { routes.push([re, fn]); }
+  // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
+  const LAZY = [[/^\/dungeon\//, ["js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/dungeon_map_iso.js", "js/views_dungeon.js"], ["css/dungeon.css"]]];
+  const lazyLoaded = new Set();
+  function lazy(hash) {
+    const hit = LAZY.find(([re]) => re.test(hash));
+    if (!hit || lazyLoaded.has(hit)) return false;
+    lazyLoaded.add(hit);
+    const v = window.AL_V ? `?v=${window.AL_V}` : "";
+    for (const href of hit[2]) document.head.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: href + v }));
+    let left = hit[1].length;
+    for (const src of hit[1]) {
+      const s = document.createElement("script");
+      s.src = src + v;
+      // in order: later page files build on the earlier ones
+      s.async = false;
+      s.onload = () => { if (--left === 0) render(); };
+      s.onerror = () => { console.error("could not load " + src); };
+      document.body.appendChild(s);
+    }
+    return true;
+  }
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
@@ -419,6 +449,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
         return;
       }
     }
+    if (lazy(hash)) return;
     view.innerHTML = "";
     view.appendChild(el("div", { class: "panel" }, el("h2", null, "Lost in the woods"), el("p", null, "That page doesn't exist. ", el("a", { href: "#/" }, "Back to the Crier."))));
   }
@@ -452,7 +483,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, ROAD_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink, poss, placeHref,
   };
 })();

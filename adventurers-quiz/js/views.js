@@ -30,9 +30,9 @@
     return { warrior: "warrior", ranger: "ranger", mage: "mage" }[k] || "warrior";
   }
   const PATH = {
-    warrior: { word: "steel", stat: "might" },
-    ranger: { word: "the bow", stat: "agility" },
-    mage: { word: "spellwork", stat: "mind" },
+    warrior: { word: "steel", plain: "a blade or a big stick", stat: "might" },
+    ranger: { word: "the bow", plain: "a bow, from a distance", stat: "agility" },
+    mage: { word: "spellwork", plain: "magic", stat: "mind" },
   };
   // class emblems come from the art engine (Art.classEmblem); until it has them, the slot stays empty
   function classIcon(path, px) {
@@ -71,9 +71,9 @@
     const first = ((h.class_history || [])[0] || [])[1];
     const path = PATH[first] ? first : basePath(h.cls), sig = signature(h), row = rowOf(h);
     return el("div", { class: "class-strip" }, classIcon(path, 2),
-      tip(el("span", { class: "pill" }, row === "front" ? "Front row" : "Back row"), ROW_TIP[row]),
-      el("span", { class: "pill" }, `Fights with ${PATH[path].word}`),
-      sig ? tip(el("span", { class: "pill gold" }, `Signature: ${sig.name}, used ${plural(sig.uses, "time")}`),
+      tip(el("span", { class: "pill" }, row === "front" ? "stands in front in a fight" : "stays at the back in a fight"), ROW_TIP[row]),
+      el("span", { class: "pill" }, `fights with ${PATH[path].plain}`),
+      sig ? tip(el("span", { class: "pill gold" }, `best move: ${sig.name} (used ${plural(sig.uses, "time")})`),
         `${h.name}'s signature move: the fighting skill used most. ${sig.desc || ""}`, sig.name) : null,
       h.alive ? el("span", { class: "pill" }, nextStep(h)) : null);
   }
@@ -164,17 +164,20 @@
   const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind);
   // what one day's front page shows, from that day's events and the two days before it
   function crierDay(today, E) {
-    const allToday = E.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id));
+    // the owner's rule: a death or a boss kill is the big moment of its day, ahead of anything else at the same importance
+    const BIG = { death: 3, boss: 2, boss_kill: 2 }, big = (e) => BIG[e.kind] || 0;
+    const allToday = E.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || big(b) - big(a) || idNum(a.id) - idNum(b.id));
     const todays = allToday.filter(heroic);
     const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
     const seasonEnd = todays.find((e) => e.kind === "season_end");
     // deaths are rare by design; when one happens it is the story of the day
     const death = todays.find((e) => e.kind === "death");
     // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
-    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || idNum(a.id) - idNum(b.id))[0];
+    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || big(b) - big(a) || idNum(a.id) - idNum(b.id))[0];
     const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
     const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
-    let lead = seasonEnd || death || fresh || todays[0];
+    const bossKill = todays.find((e) => big(e) === 2 && todays[0] && e.imp >= todays[0].imp);
+    let lead = seasonEnd || death || bossKill || fresh || todays[0];
     if (!lead || lead.imp < 3) {
       const recent = E.filter((e) => heroic(e) && e.day >= today - 1 && e.day <= today && e.imp >= 3).sort((a, b) => b.imp - a.imp || b.day - a.day);
       lead = recent[0] || lead || E.filter((e) => heroic(e) && e.day <= today).sort(byDayDesc)[0];
@@ -623,6 +626,7 @@
         el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
           h.progress ? el("span", { class: "dim" }, ` · ${h.progress}`) : null),
         h.why ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${h.why}.`) : null,
+        delveLine(h.delve),
         todayBox(h.daybook && window.Daybook ? null : h.route, h.today, null, h.tables_today, h.fights_today),
         goalLine(h.goal, h.party),
         ...(h.vows || []).map((v) => vowLine(v, h.party)),
@@ -680,7 +684,7 @@
     const icons = el("a", { class: "wearing", href: `#/hero/${h.id}/character`, title: "See the kit" },
       items.map((x) => { const cv = kitIcon(x, h, 2); cv.title = x.name; if (x.magic) cv.className = "magic"; return cv; }));
     return el("div", { class: "wearing-strip" }, icons,
-      fresh.length ? el("div", { class: "tiny" }, el("b", null, `New since ${A.when(fresh[fresh.length - 1].day, true)}: `), fresh.map((x) => x.name + (x.plus ? ` (${x.plus})` : "")).join(", ")) : null);
+      fresh.length ? el("div", { class: "tiny" }, el("b", null, `New since ${A.when(fresh[fresh.length - 1].day, true)}: `), fresh.map((x) => x.name + (x.plus ? `, ${x.plus}` : "")).join("; ")) : null);
   }
   const NOT_THEIR_STORY = new Set(["weather", "sale", "map_sale", "levelups", "delve", "meet", "edict", "world", "hyper", "omen", "gossip", "town", "drift", "watch", "raid"]);
   function bestStory(h) {
@@ -701,6 +705,19 @@
 
   const GOAL_TIP = "Every party, and every hero on their own, picks one goal a season: a boss to bring down, a purse to fill, places to see. The season's ceremony counts who got there.";
   const VOW_TIP = "A promise sworn after a big moment: to repay a rescue, to get even for a robbery, never to pay a toll. Kept or broken, the Crier remembers.";
+  function delveLine(dv) {
+    if (!dv) return null;
+    const pack = (p) => (p ? `packed ${A.plural(p.torches || 0, "torch", "torches")} and ${A.plural(p.rations || 0, "ration")}` : "");
+    const lair = (id) => el("a", { href: `#/dungeon/${id}` }, A.nodeName(id, true));
+    if (dv.now) {
+      return el("p", { class: "small muted dg-delve-line" }, "Underground in ", lair(dv.now.dest), `, floor ${dv.now.floor}, day ${Math.max(1, dv.now.days)}`,
+        dv.now.packed ? `; ${pack(dv.now.packed)} for the trip.` : ".");
+    }
+    const L = dv.last;
+    return el("p", { class: "small muted dg-delve-line" }, "Last trip: ", lair(L.dest), ` ${A.when(L.day, "on")}, ${A.plural(L.days, "day")} below`,
+      L.packed ? `, ${pack(L.packed)}` : "", L.turn ? `; came up because ${L.turn}.` : ".");
+  }
+
   function goalLine(g, inParty) {
     if (!g) return null;
     return el("div", { class: "goal-line" + (g.done ? " met" : g.missed ? " missed" : "") },
@@ -863,9 +880,11 @@
     return tip(row, moved.map((g) => `Was ${g.from}, now ${g.to}.${g.day ? " Day " + g.day + ":" : ""} ${g.why || ""}.`).join(" "), `${who} grew ${moved[moved.length - 1].mood}`);
   }
   // the paper doll: what the hero wears, slot by slot, with the story of each piece
-  const KIT_SLOTS = { head: "Head", neck: "Neck", armor: "Armor", ring1: "Ring", back: "Back", offhand: "Off-hand", pocket: "Pocket", ring2: "Ring", weapon: "Weapon" };
+  const KIT_SLOTS = { head: "Head", neck: "Neck", armor: "Armor", ring1: "Ring", back: "Back", offhand: "Off-hand", pocket: "Pocket", ring2: "Ring", weapon: "Weapon", belt: "Belt", gloves: "Gloves", boots: "Boots" };
+  const GRADE_WORD = { plain: "plain", common: "sound", great: "fine, with a knack", unique: "one of a kind" };
   const QUALITY = ["plain", "decent", "fine", "masterwork"], QUALITY5 = ["", "battered", "plain", "good", "fine", "masterwork"];
   function qualityWord(it) {
+    if (it.grade) return GRADE_WORD[it.grade];
     if (it.tier == null || it.slot === "pocket" || /^ring|neck/.test(it.slot)) return null;
     return it.slot === "weapon" || it.slot === "armor" ? QUALITY5[it.tier] : QUALITY[it.tier];
   }
@@ -875,7 +894,8 @@
   }
   function kitPanel(h) {
     const items = h.kit_items || [], rings = items.filter((x) => /^ring/.test(x.slot));
-    const bySlot = (k) => (k === "ring1" ? rings[0] : k === "ring2" ? rings[1] : items.find((x) => x.slot === k)) || null;
+    const graded = (x) => (x && h.kit && h.kit[x.slot] && h.kit[x.slot].grade ? Object.assign({}, x, { grade: h.kit[x.slot].grade }) : x);
+    const bySlot = (k) => graded((k === "ring1" ? rings[0] : k === "ring2" ? rings[1] : items.find((x) => x.slot === k)) || null);
     const info = el("div", { class: "kit-info" });
     const tiles = [];
     const show = (it, k, tile) => {
@@ -889,15 +909,16 @@
       const sub = [KIT_SLOTS[k] || cap(it.slot || ""), it.magic ? (it.enchant ? `enchanted: ${it.enchant}` : "magic") : qualityWord(it)].filter(Boolean).join(" · ");
       info.append(...[el("div", { class: "nm" + (it.magic ? " magic" : ""), style: it.glow ? "--glow:" + it.glow : null }, it.name),
         el("div", { class: "tiny dim" }, sub),
-        it.plus ? el("div", { class: "small plus" }, it.plus, el("span", { class: "dim" }, it.slot === "weapon" ? " to every blow" : " against every blow")) : null,
+        it.plus ? el("div", { class: "small plus" }, it.plus) : null,
         it.fx ? el("div", { class: "small fx" }, it.fx) : null,
         it.desc ? el("p", { class: "small" }, it.desc.replace(/\{n\}/g, h.name)) : null,
         (it.history || []).length ? historyList(it.history) : it.story ? el("p", { class: "tiny muted story" }, cap(it.story) + (/[.!?]$/.test(it.story) ? "" : ".")) : null].filter(Boolean));
     };
     const tile = (k) => {
       const it = bySlot(k), cv = it ? kitIcon(it, h, 3) : null;
-      const t = el("button", { class: "kit-slot" + (it ? "" : " empty") + (it && it.magic ? " magic" : ""), type: "button", title: it ? it.name + (it.plus ? ` (${it.plus})` : "") : KIT_SLOTS[k],
-        style: it && it.glow ? "--glow:" + it.glow : null }, cv || el("span", { class: "ph" }), el("span", { class: "lbl" }, KIT_SLOTS[k]));
+      const glow = it && (it.glow || { great: "#e8b84a", unique: "#4ec8b0" }[it.grade]);
+      const t = el("button", { class: "kit-slot" + (it ? "" : " empty") + (it && (it.magic || glow) ? " magic" : ""), type: "button", title: it ? it.name + (it.plus ? `: ${it.plus}` : "") : KIT_SLOTS[k],
+        style: glow ? "--glow:" + glow : null, "data-slot": k }, cv || el("span", { class: "ph" }), el("span", { class: "lbl" }, KIT_SLOTS[k]));
       const go = () => show(it, k, t);
       t.addEventListener("mouseenter", go); t.addEventListener("focus", go); t.addEventListener("click", go);
       tiles.push(t);
@@ -906,11 +927,12 @@
     const doll = el("div", { class: "kit-doll" },
       el("div", { class: "kit-col" }, ["head", "neck", "armor", "ring1"].map(tile)),
       el("div", { class: "kit-mid" }, A.heroSprite(h, 4, { cls: "kit-hero" }), tile("weapon")),
-      el("div", { class: "kit-col" }, ["back", "offhand", "pocket", "ring2"].map(tile)));
+      el("div", { class: "kit-col" }, ["back", "offhand", "pocket", "ring2"].map(tile)),
+      el("div", { class: "kit-row" }, ["belt", "gloves", "boots"].map(tile)));
     const p = panel("Kit", el("div", { class: "kit" }, doll, info));
     const first = items.find((x) => x.magic) || bySlot("weapon");
     const firstK = first ? Object.keys(KIT_SLOTS).find((k) => bySlot(k) === first) : "weapon";
-    show(first, firstK, tiles[["head", "neck", "armor", "ring1", "weapon", "back", "offhand", "pocket", "ring2"].indexOf(firstK)]);
+    show(first, firstK, tiles.find((t) => t.dataset.slot === firstK));
     const extra = (h.curios || []).map((c) => ({ it: Object.assign({ slot: "curio" }, c), k: "curio" }))
       .concat((h.relics || []).map((r) => ({ relic: r })));
     if (extra.length) {
@@ -1203,7 +1225,7 @@
     p.appendChild(inv);
     if ((h.maps || []).length) {
       p.appendChild(el("p", { class: "small muted", style: { marginTop: "8px" } }, "Maps in the pack"));
-      p.appendChild(el("div", { class: "small" }, h.maps.map((m, i) => [i ? " · " : "", el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name),
+      p.appendChild(el("div", { class: "small" }, h.maps.map((m, i) => [i ? " · " : "", el("a", { href: `#/dungeon/${m.dungeon}` }, S.dungeons[m.dungeon].name),
         ` (${m.pct}% mapped${m.worked ? `, ${m.worked}% opened up by ${h.name}` : ""})`])));
     }
     return p;
@@ -1457,10 +1479,13 @@
     const kept = h.daybook_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).daybook_days || [];
     const days = kept.filter((d) => d !== today).concat([today]).sort((a, b) => a - b);
     const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginBottom: "6px" } });
-    let readOpen = false;
+    let readOpen = false, shown = null;
     const draw = (d, db) => {
       let out = null;
-      try { out = db ? Daybook.render(db) : null; } catch (e) { out = null; }
+      // the road strip walks the hero and whoever of the crew was on the road with them
+      const party = h.party && A.parties[h.party];
+      const walkers = [h.id, ...((party && party.members) || []).filter((id) => id !== h.id)].map((id) => A.heroes[id]).filter(Boolean);
+      try { out = db ? Daybook.render(db, { heroes: walkers }) : null; } catch (e) { out = null; }
       // an open "Read the day" stays open while paging, so a reader comparing days isn't made to reopen it every time
       const fold = out && out.querySelector("details.db-more");
       if (fold) {
@@ -1468,6 +1493,9 @@
         fold.addEventListener("toggle", () => { readOpen = fold.open; });
       }
       body.replaceChildren(out || el("p", { class: "small muted" }, `Nothing was written down for day ${d}.`));
+      shown = d;
+      // the road art loads with the first road day it draws (it keeps the first page light), then the day redraws with its strips
+      if (db && !window.RoadScenes && (db.blocks || []).some((b) => b && b.stretch)) A.roadArt().then(() => { if (shown === d && window.RoadScenes) draw(d, db); }, () => {});
       const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
       nav.replaceChildren(
         prev != null ? el("button", { class: "btn small", onclick: () => go(prev) }, `‹ Day ${prev}`) : el("span"),

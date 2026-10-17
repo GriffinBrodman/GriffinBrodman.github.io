@@ -276,7 +276,8 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
   background: linear-gradient(#ecdcb4, #d8c28e); color: #3a1e08; border: 2px solid #8a6a34; border-radius: 3px; box-shadow: 0 0 0 2px #1a1008, 0 3px 0 #0008;
   animation: snd-tap 1.6s ease-in-out infinite; }
 .snd-tap[hidden] { display: none; }
-.fight-stage .snd-tap { top: 12px; bottom: auto; }
+/* in a fight the team plates hold the top corners and the HUD the bottom, so the tap waits at mid-height on the right */
+.fight-stage .snd-tap { top: 42%; bottom: auto; }
 .snd-tap:hover { background: linear-gradient(#f6ead0, #e4d0a0); }
 @keyframes snd-tap { 50% { transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .snd-tap { animation: none; } }
@@ -895,3 +896,7 @@ table.boxscore { margin-bottom: 8px; }
 .purse-pt.bare { fill: var(--parch3); stroke: var(--wood3); stroke-width: 1; }
 .purse-tip { position: absolute; top: 4px; min-width: 150px; max-width: 30%; background: var(--parch, #f7ecd5); border: 2px solid var(--wood3, #4a2f1c); padding: 6px 8px; font-size: 13px; pointer-events: none; box-shadow: 3px 3px 0 rgba(46, 33, 22, 0.25); }
 @media (max-width: 480px) { .purse-tip { max-width: 60%; } }
+
+/* the Kit's belt, gloves and boots row, and the map panel's link to a dungeon's own page */
+.kit-row { grid-column: 1 / -1; display: flex; justify-content: center; gap: 6px; padding-top: 4px; border-top: 1px dashed var(--edge); }
+.dg-open { font-family: var(--px); font-size: 14px; }

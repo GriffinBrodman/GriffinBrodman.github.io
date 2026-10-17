@@ -654,6 +654,29 @@
     return project(m[0], m[1]);
   }
 
+  // a roadside place a hero has found (league road_places: {road: [a, b], at}): a tiny pin on the road where it bends, as the road was drawn
+  const PIN = { inn: "#c8963e", waystation: "#c8963e", shrine: "#f6ead0", toll: "#c0402c", ferry: "#4a7ab8", ford: "#4a7ab8" };
+  function placeXY(p) {
+    const S = App.S, nodeById = Object.fromEntries(T.N.map((d) => [d.id, d]));
+    const r = S.roads.find(([a, b]) => (a === p.road[0] && b === p.road[1]) || (a === p.road[1] && b === p.road[0]));
+    if (!r || !nodeById[r[0]] || !nodeById[r[1]]) return null;
+    const A = nodeById[r[0]].xy, B = nodeById[r[1]].xy, t = r[0] === p.road[0] ? p.at : 1 - p.at;
+    const len = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, wob = (T.n2(A[0] / 9, B[1] / 9) - 0.5) * 14, bend = Math.sin(t * Math.PI) * wob;
+    return project(A[0] + (B[0] - A[0]) * t - ((B[1] - A[1]) / len) * bend, A[1] + (B[1] - A[1]) * t + ((B[0] - A[0]) / len) * bend);
+  }
+  function roadPins(ctx, k) {
+    // the plain pins stand in until the road art has loaded, then it draws its own over them
+    if (!window.RoadArt && (App.L.road_places || []).length) App.roadArt().then(() => { if (window.RoadArt) roadPins(ctx, k); }, () => {});
+    for (const p of App.L.road_places || []) {
+      const xy = placeXY(p);
+      if (!xy) continue;
+      const x = Math.round(xy[0] * k), y = Math.round(xy[1] * k), s = k;
+      if (window.RoadArt && RoadArt.drawPin) { RoadArt.drawPin(ctx, p.kind, x, y, k); continue; }
+      ctx.fillStyle = "#2a1b11"; ctx.fillRect(x - 2 * s, y - 5 * s, 4 * s, 4 * s); ctx.fillRect(x - s / 2, y - 2 * s, s, 2 * s);
+      ctx.fillStyle = PIN[p.kind] || "#b4bcc4"; ctx.fillRect(x - s, y - 4 * s, 2 * s, 2 * s);
+    }
+  }
+
   function drawMap(cv, opts) {
     opts = opts || {};
     const k = opts.small ? 1 : 2;
@@ -670,6 +693,7 @@
     const ctx = over.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     const S = App.S, placed = [], groups = {}, extra = {};
+    if (!opts.small) roadPins(ctx, k);
     for (const h of App.L.heroes) {
       if (!h.alive) continue;
       const [x, y] = heroPos(h), key = Math.round(x) + "," + Math.round(y);
@@ -776,5 +800,10 @@
     return bd < 26 * 26 ? best : null;
   }
 
-  window.Isle = { drawMap, nearestNode, project, TW, TH, tree, pine, rock, house, SURF };
+  // the found places' pins on a drawn map, in its canvas pixels: { p (league road_places row), x, y (the pin's point) }
+  function pinsOn(cv) {
+    const k = cv._k || 2;
+    return (App.L.road_places || []).map((p) => { const xy = placeXY(p); return xy && { p, x: xy[0] * k, y: xy[1] * k }; }).filter(Boolean);
+  }
+  window.Isle = { drawMap, nearestNode, project, pinsOn, TW, TH, tree, pine, rock, house, SURF };
 })();
