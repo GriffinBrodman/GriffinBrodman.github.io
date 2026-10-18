@@ -78,6 +78,7 @@
   function namedThings(line, petKind) {
     if (!root.Stage || !Stage.NOUNS || !root.SceneKits) return [];
     const ok = new Set(SceneKits.ANIMALS.concat([...MOVERS])), out = [];
+    line = Stage.undish ? Stage.undish(line) : line;
     for (const [re, id] of Stage.NOUNS) if (ok.has(id) && id !== petKind && re.test(line || "") && !out.includes(id)) out.push(id);
     return out.slice(0, 2);
   }
@@ -180,6 +181,10 @@
     goods: ["kkkkk", "kpppk", "kpkpk", "kpppk", "kkkkk"],
   };
   const TPAL = { k: "#2a1a12", b: "#8a5a2a", o: "#c8803a", y: "#e8c050", w: "#f4ecd8", p: "#e2d0a8", c: "#9ac8e8", m: "#8a8a92", r: "#d84a3a", g: "#5e8a3a" };
+  // a tag's food prop that only says "something to eat", which the dish the line names replaces
+  const PLATE_PROPS = new Set(["bowl", "bun", "loaf", "pasty", "pie", "cake", "fish", "pot", "apple", "cheese", "egg", "honey", "basket", "goods"]);
+  // and the acts with no prop of their own where a hand holds or passes what the line names (not a throw, a ladder, a tool)
+  const DISH_ACTS = new Set(["eat", "give", "get", "haggle", "look", "chase", "feed"]);
   const PROPS = new Map();
   function propImg(name) {
     if (PROPS.has(name)) return PROPS.get(name);
@@ -412,14 +417,25 @@
     P.mark("after", t + 4.0);
     return 5.8;
   };
+  // a bite: the food hangs from the corner of the mouth down past the chin, so however big it is the eyes stay clear
+  const MOUTH = 11;
+  function bite(ctx, S, h, food) {
+    const c = propImg(food), [hx, hy] = S.head(h), f = S.p(h).face;
+    if (!c) return;
+    const mx = hx + (f > 0 ? 3 : -3), x = f > 0 ? mx - 1 : mx - c.width + 2;
+    drawProp(ctx, food, x, hy + MOUTH - 1 + c.height, f < 0);
+    return [mx, hy + MOUTH];
+  }
   function onTheMove(P, h, t, food) {
     const a = P.posOf(h), b = near(a, -3.6, 2.2);
     P.mark("act", t);
     P.walk(h, a, b, t, t + 4.4, { faceEnd: -1 });
     P.effect(t, t + 5.6, (ctx, lt, S) => {
       const [x, y] = S.hand(h), up = frac(lt / 1.1) < 0.35, f = S.p(h).face;
-      if (lt < 4.6) drawProp(ctx, food, x - 3 - (up ? f * 3 : 0), y + 2 - (up ? 7 : 0), f < 0);
-      if (up && lt < 4.6) { ctx.fillStyle = "#e8c890"; ctx.fillRect(R(x - f * 4), R(y + 4), 1, 1); }
+      if (lt >= 4.6) return;
+      if (!up) { drawProp(ctx, food, x - 3, y + 2, f < 0); return; }
+      const m = bite(ctx, S, h, food);
+      if (m) { ctx.fillStyle = "#e8c890"; ctx.fillRect(R(m[0] + f * 2), R(m[1] + 5), 1, 1); }
     }, 1);
     P.mark("peak", t + 2.0);
     P.hold(h, b, t + 4.4, t + 5.8, { face: -1, pose: (lt, p) => { p.dip = lt > 0.3 && lt < 1.0 ? 1 : 0; } });
@@ -446,8 +462,8 @@
       P.mark("peak", start + 1.2);
       P.effect(start, start + 4.6, (ctx, lt, S) => {
         const [x, y] = S.hand(h), up = frac(lt / 1.2) < 0.35, f = S.p(h).face;
-        drawProp(ctx, food, x - 3 - (up ? f * 3 : 0), y + (sitting ? 6 : 2) - (up ? 7 : 0), f < 0);
-        if (kind === "eat" && up) { ctx.fillStyle = "#e8c890"; ctx.fillRect(R(x - f * 4), R(y + 2 + (lt * 6) % 4), 1, 1); }
+        const m = up ? bite(ctx, S, h, food) : (drawProp(ctx, food, x - 3, y + (sitting ? 6 : 2), f < 0), null);
+        if (kind === "eat" && m) { ctx.fillStyle = "#e8c890"; ctx.fillRect(R(m[0] + f * 2), R(m[1] + 4 + (lt * 6) % 4), 1, 1); }
         if (kind === "eat" && lt > 1.2 && lt < 2.4) glyph(ctx, "heart", S.head(h)[0] - 2, S.head(h)[1] - 6 - R((lt - 1.2) * 6), "#e8566a", 1 - (lt - 1.2) / 1.2);
         if (/bowl|tea|pot|cup/.test(food) && !up) steam(ctx, x, y - 2, lt, 3);
       }, 1);
@@ -992,6 +1008,8 @@
     P.sc = Object.assign({}, sc, { spots: sp });
     const seed = (block.from || 0) + (block.line || "").length;
     P.prop = tag.prop || null;
+    const dish = root.Stage && Stage.dishProp ? Stage.dishProp(block.line) : null;
+    if (dish && (P.prop ? PLATE_PROPS.has(P.prop) : DISH_ACTS.has(tag.act))) P.prop = dish;
     P.quilt = sc.lie ? sc.lie.quilt : ["#3a5a7a", "#a8b8c8"];
     P.len = sc.lie ? sc.lie.len : 1.3;
     const hero = figure(cast.hero), h = P.actor("hero", "hero", hero, sp.act ? sp.in || sp.act : [6, 6]);
@@ -1195,7 +1213,7 @@
       // the page's hero gets a small bobbing gold marker while the scene opens, so the eye finds them
       if (tt < 3.2 && !still) { const [x, y] = S.head(h); marker(ctx, x, y - 8 - (Math.floor(tt * 2.5) % 2), Math.min(1, (3.2 - tt) / 0.6)); }
     };
-    return { dur, loop, caps, draw, marks: P.marks };
+    return { dur, loop, caps, draw, marks: P.marks, prop: P.prop, head: (t) => headOf(P.at(P.hero, t), P.sc) };
   }
 
   root.TownActs = { plan, figure, folk, ACTS: Object.keys(ACT), drawProp, glyph };

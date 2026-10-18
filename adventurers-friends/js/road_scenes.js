@@ -13,7 +13,7 @@
   RoadScenes.dress(block)        -> the spec additions for a daybook stretch { stretch, biome, place_kind?, traveller?, line? }: each stretch
                                     kind its own roadside thing and band placing, the line's cart, signpost or milestone when it names one.
   RoadScenes.walker(grid, k)     -> the grid in walk-cycle step k (0-3): legs scissored, body bobbed.
-  RoadScenes.kit                 -> { Buf, blit, grade, C, mix, rng, hash, clamp, lerp, bay, hourOf, piece } for road_replay.js.
+  RoadScenes.kit                 -> { Buf, blit, grade, C, mix, rng, hash, clamp, lerp, bay, hourOf, piece, punch... } for road_replay.js and hunt_scenes.js.
   Everything is deterministic in (spec, t); nothing touches the DOM except strip().
 */
 (function (root) {
@@ -1154,6 +1154,6 @@
 
   root.RoadScenes = {
     W: W0, H: H0, scene, frame, compose, strip, walker, piece, hourOf, isNight, dress, BIOMES: Object.keys(BIOME).concat(["dungeon"]), THEMES: Object.keys(THEME_BIOME),
-    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc },
+    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc, punch },
   };
 })(typeof window !== "undefined" ? window : globalThis);

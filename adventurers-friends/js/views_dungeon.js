@@ -193,8 +193,12 @@
       drawSheet(sheet, D, ui);
     }
     ui.pick = pick;
-    drawSheet(sheet, D, ui);
-    if (rn) requestAnimationFrame(() => { const m = sheet.querySelector(".dg-card:not([hidden])") || sheet.querySelector(".dg-mapbox"); if (m) m.scrollIntoView({ block: "center" }); });
+    const go = () => {
+      drawSheet(sheet, D, ui);
+      if (rn) requestAnimationFrame(() => { const m = sheet.querySelector(".dg-card:not([hidden])") || sheet.querySelector(".dg-mapbox"); if (m) m.scrollIntoView({ block: "center" }); });
+    };
+    // a font must be in before the sheet measures and writes its notes
+    if (Pen.handMode === "font") Pen.fontsReady().then(go); else go();
   }
   function lastFloorWalked(D) {
     let best = null;
@@ -277,9 +281,10 @@
     const st = replay ? replay.state : Pen.known(D, floor);
     st.rumour = !!(D.boss && D.boss.rumoured);
     if (!replay) st.crews = (D.inside || []).filter((x) => x.floor === floor.floor).map((x) => ({ crew: x.crew, n: crewRoom(D, x.crew, floor) })).filter((x) => x.n != null);
+    const depth = (n) => { const w = Ink.depthWord(n, D.floors.length); return w ? ` · ${w}` : ""; };
     const tabs = el("div", { class: "dg-tabs", role: "tablist" }, D.floors.map((f) => { const [w, t] = walkedOf(f); return el("button", { type: "button", role: "tab", "aria-selected": String(f.floor === floor.floor), class: "dg-tab" + (f.floor === floor.floor ? " on" : ""), onclick: () => ui.pick(f.floor) },
-      el("b", null, `Floor ${f.floor}`), el("span", { class: "dg-tab-n" }, `${w} of ${t} walked`)); }));
-    sheet.append(el("h2", null, `${D.name}, floor ${floor.floor}`), tabs,
+      el("b", null, `Floor ${f.floor}`, el("span", { class: "dg-tab-d" }, depth(f.floor))), el("span", { class: "dg-tab-n" }, `${w} of ${t} walked`)); }));
+    sheet.append(el("h2", null, `${D.name}, floor ${floor.floor}${depth(floor.floor)}`), el("div", { class: "dg-floorbar" }, tabs, depthStack(D, floor.floor, ui)),
       el("p", { class: "tiny dim dg-sub" }, walkedOf(floor)[0] ? `${walkedOf(floor)[0]} of ${walkedOf(floor)[1]} rooms walked. Inked as the crews come home; pencil marks the rooms a door away that nobody has opened.` : D.tenant && D.tenant.day ? `Nobody has walked this floor since the new tenants moved in ${A.when(D.tenant.day, "on")}. The old maps went with the old tenants.` : floor.floor > 1 && !(D.floors.find((f) => f.floor === floor.floor - 1) || { rooms: [] }).rooms.some((r) => r.stair && r.state) ? "Nobody has found the way down to this floor yet." : "Nobody has walked this floor yet. The way in and the doors off it are pencilled in."));
     const seen = new Set(), notes = (D.notes || []).filter((n) => n.floor === floor.floor && (!replay || n.day < replay.before) && G.byN[key(n.room)] && !seen.has(n.hero + n.room + n.text) && seen.add(n.hero + n.room + n.text)).sort((a, b) => a.day - b.day);
     // the sheet carries the newest notes whose rooms are inked; the rest wait in the list below
@@ -340,6 +345,27 @@
     if (ui.sel && G.byN[ui.sel] && G.shown.has(ui.sel)) select(G.byN[ui.sel], false);
     return self;
   }
+  // the floors side-on, stacked going down from the daylight: which floor this sheet is, where each crew is tonight, where the boss waits
+  function depthStack(D, on, ui) {
+    if (D.floors.length < 2) return null;
+    const B = D.boss || {}, lairFloor = (D.floors.find((f) => f.rooms.some((r) => r.lair)) || {}).floor;
+    const lairWalked = D.floors.some((f) => f.rooms.some((r) => r.lair && r.state));
+    const bossName = String(B.name || "the boss").replace(/^the\s+/i, "");
+    const boss = B.alive === false ? el("span", { class: "dg-depth-boss slain" }, `${bossName}, slain`)
+      : lairWalked ? el("span", { class: "dg-depth-boss" }, `${bossName}'s lair`)
+      : B.rumoured ? el("span", { class: "dg-depth-boss rumour" }, `${bossName}? (rumoured)`) : null;
+    const rows = D.floors.map((f, i) => {
+      const here = (D.inside || []).filter((x) => x.floor === f.floor);
+      return el("button", { type: "button", class: "dg-depth-row" + (f.floor === on ? " on" : ""), style: { "--d": i / Math.max(1, D.floors.length - 1) }, onclick: () => ui.pick(f.floor),
+        "aria-label": `Floor ${f.floor}, ${Ink.depthWord(f.floor, D.floors.length)}` },
+        el("span", { class: "dg-depth-n" }, `${f.floor}`),
+        el("span", { class: "dg-depth-w" }, Ink.depthWord(f.floor, D.floors.length)),
+        el("span", { class: "dg-depth-who" }, here.map((x) => el("span", { class: "dg-depth-crew" }, el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), Ink.clean(Pen.crewShort(x.crew)))),
+          f.floor === lairFloor ? boss : null));
+    });
+    return el("div", { class: "dg-depth", role: "group", "aria-label": "The floors, top to bottom" },
+      el("div", { class: "dg-depth-sky" }, el("span", null, "daylight"), el("span", { class: "dg-depth-arrow" }, "floors count down ↓")), ...rows);
+  }
   // where a crew below tonight stands: the last room it walked on that floor
   function crewRoom(D, crew, floor) {
     for (let i = (D.days || []).length - 1; i >= 0; i--) {
@@ -350,12 +376,10 @@
     const mine = floor.rooms.filter((r) => r.state && r.state.crew === crew).sort((a, b) => b.state.d - a.state.d)[0];
     return mine ? mine.n : floor.rooms[0].n;
   }
-  // a note card: the writer's bust, who they are and how they write, then the note itself in their pixel hand
+  // a note card: the writer's bust, who they are and how they write, then the note itself in their hand
   function noteSlip(n, num, i) {
     const who = heroes[n.hero], H = Pen.HANDS[n.hand] || Pen.HANDS.neat;
     const slip = Ink.slip(n, 150);
-    slip.className = "dg-hand";
-    slip.style.width = slip.width * 2 + "px";
     let face = null;
     if (who) { try { face = Ink.bustCanvas(who, 16); face.className = "dg-bust"; face.style.width = face.width * 2 + "px"; } catch (e) { /* a face is optional */ } }
     return el("div", { class: "dg-note", "data-i": String(i), style: { "--tilt": ((hashStr(n.text) % 5) - 2) * 0.4 + "deg" } },

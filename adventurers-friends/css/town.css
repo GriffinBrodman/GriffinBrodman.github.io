@@ -17,3 +17,5 @@
 @keyframes town-cap-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .town-cap.in span { animation: none; } }
 @media (max-width: 520px) { .town-cap { font-size: 14px; padding: 6px 9px; } }
+/* a phone has the whole line in full right under the player, so the beat-by-beat bar would only say half of it twice */
+@media (max-width: 520px) { .town-replay > .town-cap { display: none; } }

@@ -7,7 +7,9 @@
       else the line is read clause by clause: the first name in a clause does it, the next one has it done to them, the verb
       picks the act, the first thing named is the prop, an animal or cart named is put on stage with what it is doing (beh).
   Stage.split(line) -> the line cut into captions of up to three short lines each, never inside a quote.
-  Stage.prop(name) -> a small pixel grid { w, h, px } of a held or handed thing. Stage.propIn(text) -> the first prop a text names.
+  Stage.prop(name) -> a small pixel grid { w, h, px } of a held or handed thing. Stage.propIn(text) -> the first prop a text names
+      (a dish of the food module first). Stage.dishIn(text) -> { id, prop } of the first dish a text names; Stage.dishProp(text) -> its prop.
+      Stage.undish(text) -> the text with every dish name blanked (same length), for finding the animals a line names.
   Stage.NOUNS -> [pattern, kit id] for the animals and things SceneKits draws (scene_kits.js).
   Actors: h0.. the heroes (h0 the lead), t the traveller (a crew's face), m1.. a crew's members, x:<role> anyone or anything
   else the line names (x:farmer, x:dog, x:cart), crowd a row of onlookers.
@@ -88,6 +90,10 @@
     knot: [".kk.", "ktkt", "tkkt", ".tt."],
     button: [".kk.", "kOOk", "kOOk", ".kk."],
     trunk: ["kkkkkk", "kbybbk", "kbbbbk", "kkkkkk"],
+    pie: ["..kkkk..", ".kyoyok.", "koooooOk", "kOOOOOOk", ".kkkkkk."],
+    cake: ["...r..", ".kkkk.", "kwfwfk", "kppppk", "kooOOk", ".kkkk."],
+    haunch: [".kkkk....", "kooOOk...", "kOoOOOk..", "kOOOOOk..", ".kOOOkwk.", "..kkk.kwkk", "......kwwk", ".......kk."],
+    skewer: [".kkk.kkk.kkk..", "kooOkrRrkoOOk.", "bOOOkRRRkOOOkb", ".kkk.kkk.kkk.."],
   };
   const cache = new Map();
   function prop(name) {
@@ -100,26 +106,68 @@
     return g;
   }
   // a word in a line, to the prop that shows it
+  const FISH = /\b(fish|trout|pike|eels?|perch|carp|roach|herring|mackerel|cod|salmon|minnows?|sardines?|grayling|char)\b/;
   const PROP_WORDS = [
     [/\bletters?\b|\benvelope|\bintroduction\b/, "letter"], [/\bmaps?\b|\bchart\b/, "map"], [/\brecipe\b|\bscroll\b|\bnews\b|\bverse\b/, "scroll"], [/\bnote\b|\blist\b|\bslate\b|\bposter\b/, "note"],
-    [/\blure\b/, "lure"], [/\b(fish|trout|pike|eel|perch|carp|roach|herring|mackerel)\b/, "fish"], [/\b(loaf|bread)\b/, "loaf"], [/\b(buns?|cake|biscuits?|scones?)\b/, "bun"],
-    [/\bbasket\b/, "basket"], [/\bapples?\b|\bpears?\b|\bplums?\b/, "apple"], [/\b(pasty|pie|pasties)\b/, "pasty"], [/\b(stew|soup|porridge|bowl)\b/, "bowl"],
+    [/\blure\b/, "lure"], [FISH, "fish"], [/\b(loaf|bread)\b/, "loaf"], [/\b(buns?|biscuits?|scones?)\b/, "bun"], [/\b(cakes?|tarts?|puddings?)\b/, "cake"],
+    [/\bbasket\b/, "basket"], [/\bapples?\b|\bpears?\b|\bplums?\b/, "apple"], [/\b(pasty|pasties)\b/, "pasty"], [/\bpies?\b/, "pie"], [/\b(stew|soup|porridge|bowl)\b/, "bowl"],
     [/\b(tea|tonic|cup)\b/, "tea"], [/\b(ale|beer|mug|tankard|cider)\b/, "mug"], [/\bpurse\b/, "purse"], [/\b(coins?|copper|silver|gold|penny|pennies)\b/, "coin"],
     [/\brings?\b/, "ring"], [/\bhats?\b|\bbonnet\b|\bcap\b/, "hat"], [/\bcards?\b|\bdeck\b/, "card"], [/\bflowers?\b|\bposy\b|\bdaisy|\bdaisies\b|\bbloom/, "flower"],
     [/\bpebbles?\b/, "pebble"], [/\bstones?\b|\brock\b/, "stone"], [/\blanterns?\b|\blamps?\b/, "lamp"], [/\bcandles?\b/, "candle"], [/\brod\b/, "rod"],
     [/\bboots?\b|\bshoes?\b/, "boots"], [/\bstrap\b|\bbelt\b/, "strap"], [/\bledger\b/, "ledger"], [/\bbook\b|\bjournal\b/, "book"], [/\b(firewood|kindling|sticks?|log)\b/, "wood"],
-    [/\beggs?\b/, "egg"], [/\bcheese\b/, "cheese"], [/\bhoney\b/, "honey"], [/\bjar\b/, "jar"], [/\bkey\b/, "key"], [/\bfeathers?\b/, "feather"], [/\bhorseshoe\b/, "horseshoe"],
+    [/\beggs?\b/, "egg"], [/\bcheese\b/, "cheese"], [/\bhoney\b(?! ?cakes?)/, "honey"], [/\bjar\b/, "jar"], [/\bkey\b/, "key"], [/\bfeathers?\b/, "feather"], [/\bhorseshoe\b/, "horseshoe"],
     [/\brope\b/, "rope"], [/\bknots?\b/, "knot"], [/\bspoon\b/, "spoon"], [/\bpot\b|\bkettle\b/, "pot"], [/\bbells?\b/, "bell"], [/\bbottle\b|\bflask\b/, "bottle"],
     [/\bshells?\b/, "shell"], [/\bmedal\b/, "medal"], [/\bribbon\b/, "ribbon"], [/\bscarf\b/, "scarf"], [/\bblanket\b|\bcloak\b/, "blanket"], [/\bsacks?\b|\bpail\b|\bbucket\b/, "sack"],
     [/\blute\b|\bfiddle\b|\bharp\b/, "lute"], [/\bwhistle\b|\bpipe\b/, "whistle"], [/\bdrum\b/, "drum"], [/\bswords?\b|\blance\b/, "sword"], [/\bdice\b/, "dice"], [/\bbuttons?\b/, "button"],
     [/\bform\b/, "form"], [/\btabard\b/, "tabard"], [/\btrunk\b/, "trunk"],
   ];
   function propIn(text) {
+    const d = dishProp(text);
+    if (d) return d;
     const s = String(text || "").toLowerCase();
     let best = null, at = 1e9;
     for (const [re, name] of PROP_WORDS) { const m = s.match(re); if (m && m.index < at) { at = m.index; best = name; } }
     return best;
   }
+
+  // a dish of the food module named in a line (data/static.js food.dishes), to the prop that shows it on its plate
+  const PLATE = { stew: "bowl", soup: "bowl", porridge: "bowl", pilaf: "bowl", salad: "bowl", ice: "bowl", roast: "haunch", slab: "haunch", sweet: "cake", jelly: "cake",
+    crisps: "basket", pie: "pie", eelpie: "pie", bun: "bun", skewer: "skewer", sausage: "skewer", claws: "pot",
+    fillet: "fish", wholefish: "fish", plankfish: "fish", clayfish: "fish", bigfish: "fish" };
+  const PLATE_NAME = { bun: [[/\bbread\b/, "loaf"]], pie: [[/\bpast(y|ies)\b/, "pasty"]], crisps: [[FISH, "fish"]] };
+  // how the town's own lines name its dish (league/content/town_life.py DISHES) where that is not the dish's name
+  const DISH_SAID = { "fried river fish": "river_cone", "chowder on the harbour wall": "harbour_chowder" };
+  const said = (x) => String(x || "").toLowerCase().replace(/[‘’]/g, "'").replace(/[-\s]/g, " ");
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let dishSrc, dishList = [];
+  function dishes() {
+    const S = (root.LD && root.LD.static) || (root.App && root.App.S) || {}, src = (S.food || {}).dishes || null;
+    if (src === dishSrc) return dishList;
+    dishSrc = src;
+    const out = [];
+    for (const [id, d] of Object.entries(src || {})) {
+      const nm = said(d.name).replace(/^the /, ""), own = (PLATE_NAME[d.plate] || []).find(([re]) => re.test(nm));
+      out.push([nm, id, own ? own[1] : PLATE[d.plate] || "bowl"]);
+    }
+    for (const [ph, id] of Object.entries(DISH_SAID)) { const hit = out.find((x) => x[1] === id); if (hit) out.push([ph, id, hit[2]]); }
+    dishList = out.sort((a, b) => b[0].length - a[0].length).map(([nm, id, prop]) => [new RegExp("(?<![a-z])" + esc(nm) + "(?![a-z])", "g"), id, prop]);
+    return dishList;
+  }
+  // -> { id, prop } of the first dish a text names (the longest name where two start together), or null
+  function dishIn(text) {
+    const s = said(text);
+    let best = null, at = 1e9;
+    for (const [re, id, prop] of dishes()) { re.lastIndex = 0; const m = re.exec(s); if (m && m.index < at) { at = m.index; best = { id, prop }; } }
+    return best;
+  }
+  // -> [[start, end]] of every dish a text names, so an "eel pie" puts no eel on the stage
+  function dishSpans(text) {
+    const s = said(text), out = [];
+    for (const [re] of dishes()) { re.lastIndex = 0; let m; while ((m = re.exec(s))) if (!out.some(([a, b]) => m.index < b && m.index + m[0].length > a)) out.push([m.index, m.index + m[0].length]); }
+    return out;
+  }
+  function undish(text) { let s = String(text || ""); for (const [a, b] of dishSpans(s)) s = s.slice(0, a) + " ".repeat(b - a) + s.slice(b); return s; }
+  function dishProp(text) { const d = dishIn(text); return d ? d.prop : null; }
 
   // ---------- cutting a line into captions ----------
   const MAXC = 84;
@@ -203,10 +251,11 @@
     }
     // the animals, carts and things the line puts on the road (up to two per caption), each drawn by scene_kits.js
     let n = 0;
+    const dished = dishSpans(s);
     for (const [re, id] of NOUNS) {
       if (n >= 2) break;
       const m = s.match(re);
-      if (!m || out.some((o) => o.id === "x:" + id || (m.index >= o.at && m.index < o.at + o.len))) continue;
+      if (!m || dished.some(([a, b]) => m.index >= a && m.index < b) || out.some((o) => o.id === "x:" + id || (m.index >= o.at && m.index < o.at + o.len))) continue;
       out.push({ id: "x:" + id, at: m.index, len: m[0].length });
       n++;
     }
@@ -706,5 +755,5 @@
     return { steps: merged, set: (merged.find((s) => s.set) || {}).set || null };
   }
 
-  root.Stage = { script, hint, parse, split, prop, propIn, PROPS: Object.keys(P), FINALE, ARC, NOUNS, verbOf, names };
+  root.Stage = { script, hint, parse, split, prop, propIn, dishIn, dishProp, undish, PROPS: Object.keys(P), FINALE, ARC, NOUNS, verbOf, names };
 })(typeof window !== "undefined" ? window : globalThis);

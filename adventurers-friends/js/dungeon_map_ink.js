@@ -1,4 +1,4 @@
-/* The floor sheet: one tacked parchment per floor, its burrows inked as crews come home (ticks and days in the crew's colour, trap Xs with tier dots, the rooms a passage away pencilled with "?", the S of a found secret door, the lair named in pencil when rumoured or ringed when slain, crew pennants), with the heroes' margin notes written in their own pixel hands. */
+/* The floor sheet: one tacked parchment per floor, its burrows inked as crews come home (ticks and days in the crew's colour, trap Xs with tier dots, the rooms a passage away pencilled with "?", the S of a found secret door, the lair named in pencil when rumoured or ringed when slain, crew pennants), with the heroes' margin notes written in their own handwriting fonts (or pixel hands under ?hand=pixel or ?hand=clear), and the floor's depth in its title. */
 (function () {
   "use strict";
   const P = window.DungeonPen, { mix, h2, vnoise, hashStr, key } = P;
@@ -7,6 +7,9 @@
     cloth0: "#150d08", cloth1: "#1f140d", cloth2: "#2a1b11", parch: "#eedfba", parch3: "#dbc394", edge: "#b0915e", edge2: "#8a6a42",
     ink: "#2e2116", hatch: "#7a5a3a", paper: "#f3e6c6", lite: "#ece0bc", pencil: "#6e665e", red: "#a3301f", brass: "#c8963e", brass2: "#ecc56a", outline: "#16121a",
   };
+  // floors count down from the way in: floor 1 is nearest the daylight and the last is the bottom
+  const depthWord = (n, total) => (total < 2 ? "" : n === 1 ? "the way in" : n >= total ? "the bottom" : "deeper");
+  const sheetTitle = (D, n) => { const w = depthWord(n, D.floors.length); return clean(`${D.name} - floor ${n}${w ? " - " + w : ""}`); };
   const clean = (s) => String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[—–]/g, "-").replace(/…/g, "...").replace(/→/g, "->");
 
   // where everything sits on the sheet, before anything is drawn: the room boxes in sheet pixels and the passages the token walks
@@ -15,11 +18,11 @@
     const plan = P.carve(D.id, floor), wide = !!o.wide;
     // margins grow with the notes the sheet may carry; the right one always keeps room for the crews' pennants
     const said = new Set((D.notes || []).filter((n) => n.floor === floor.floor && n.text.length <= 90).map((n) => n.text)).size;
-    const side = said >= 4 ? 96 : said >= 2 ? 72 : said ? 52 : 20;
+    const side = P.handMode === "font" ? (said >= 4 ? 120 : said >= 2 ? 92 : said ? 64 : 20) : said >= 4 ? 96 : said >= 2 ? 72 : said ? 52 : 20;
     // the sheet is cut to what it shows, so the paper isn't mostly empty; a floor nobody has walked keeps room for its admission
     const fr = frame(D, floor, plan);
     const LM = wide ? side : 12, RM = wide ? Math.max(side, 70) : 12, TM = wide ? 30 : 28, BM = (wide ? (said >= 3 ? 40 : 24) : 12) + (fr.blank && !fr.none ? 40 : 0);
-    const title = P.width("neat", clean(`${D.name} - floor ${floor.floor}`));
+    const title = P.width("neat", sheetTitle(D, floor.floor));
     const minW = Math.max(title + (wide ? 70 : 50), wide ? 330 : 170), minH = wide ? 190 : 110;
     let cw = (fr.x1 - fr.x0 + 1) * CELL, ch = (fr.y1 - fr.y0 + 1) * CELL;
     const W = Math.max(LM + cw + RM, minW), H = Math.max(TM + ch + BM, minH);
@@ -333,7 +336,7 @@
       haloed((p) => P.write(p, "map", "S", x, y - 1, { bold: true, col: C.red }), C.red);
     }
     // the title, the compass and the crews who inked this floor
-    const title = clean(`${D.name} - floor ${G.floor.floor}`);
+    const title = sheetTitle(D, G.floor.floor);
     P.write(S.px, "neat", title, 14, 12, {});
     P.line(S.px, 12, 22, 16 + P.width("neat", title), 21, P.HANDS.neat.col);
     block(10, 8, P.width("neat", title) + 10, 18);
@@ -359,13 +362,23 @@
       }
     }
     const onPaper = (notes || []).filter((n) => roomCls.get(key(n.room)) === 1);
-    const placed = G.wide && onPaper.length ? margins(S, G, onPaper, occ, block) : [];
+    const texts = [];
+    const placed = G.wide && onPaper.length ? margins(S, G, onPaper, occ, block, texts) : [];
     for (const pin of st.crews || []) {
       const b = G.byN[key(pin.n)];
       if (b) crewPin(S, Math.round(b.x0 + b.w - 5), Math.round(b.y0 + 4), pin.crew);
     }
     for (const [x, y] of [[SX + 2, SY + 2], [SX + SW - 5, SY + 2], [SX + 2, SY + SH - 5], [SX + SW - 5, SY + SH - 5]]) tack(S, x, y);
     S.canvas(cv);
+    if (texts.length) {
+      // the pixel sheet scaled up whole, so the fonts' notes can be written over it at the screen's own resolution
+      const K = Math.min(4, 2 * Math.max(1, Math.round(window.devicePixelRatio || 1))), base = S.canvas();
+      cv.width = W * K; cv.height = H * K;
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(base, 0, 0, W * K, H * K);
+      for (const t of texts) P.fontLine(ctx, K, t.h, t.s, t.x, t.y, t.o);
+    }
     return placed;
   }
 
@@ -406,9 +419,9 @@
   const ARROW = /\s*(?:->|=>|-->)\s*$|^\s*(?:<-|<=|<--)\s*/;
   function noteLines(n, w) {
     const sig = " -" + String(n.name || "?").trim()[0].toUpperCase();
-    return P.wrap(n.hand, clean(n.text).replace(ARROW, " ").trim() + sig, w);
+    return P.noteWrap(n.hand, clean(n.text).replace(ARROW, " ").trim() + sig, w);
   }
-  function margins(S, G, notes, occ, block) {
+  function margins(S, G, notes, occ, block, texts) {
     const { W, H } = G;
     // summed-area table of what is taken, rebuilt after each note goes down
     let sat = null;
@@ -426,13 +439,13 @@
       const b = G.byN[key(n.room)];
       if (!b) continue;
       const pointed = ARROW.test(clean(n.text));
-      const Hh = P.hand(n.hand), lh = P.lineH(Hh) + (Hh.font === "3" ? 0 : 0);
-      const widths = Hh.font === "3" && Hh.k === 2 ? [118, 150, 90] : [92, 118, 72, 140];
+      const Hh = P.hand(n.hand), lh = P.noteLineH(n.hand), font = P.handMode === "font";
+      const widths = font ? [112, 140, 90, 170] : Hh.font === "3" && Hh.k === 2 ? [118, 150, 90] : [92, 118, 72, 140];
       build();
       let best = null;
       for (const mw of widths) {
         const ls = noteLines(n, mw);
-        const w = Math.max(...ls.map((l) => P.width(n.hand, l))) + 2, h = ls.length * lh + 1;
+        const w = Math.max(...ls.map((l) => P.noteWidth(n.hand, l))) + 2, h = ls.length * lh + 1;
         for (let y = 2; y + h < H - 2; y += 2) for (let x = 2; x + w < W - 2; x += 2) {
           const nx = Math.max(x, Math.min(b.cx, x + w)), ny = Math.max(y, Math.min(b.cy, y + h));
           const d = Math.hypot(nx - b.cx, ny - b.cy);
@@ -444,8 +457,12 @@
         }
       }
       if (!best || best.d > 70) continue;
-      const col = n.kind === "boss" ? C.red : Hh.col;
-      best.ls.forEach((l, i) => P.write(S.px, n.hand, l, best.x, best.y + i * lh, { col, seed: (hashStr(n.text) % 997) + i * 17, flourish: Hh.flourish && i === 0 }));
+      const col = n.kind === "boss" ? C.red : font ? P.fontSpec(n.hand).col : Hh.col;
+      best.ls.forEach((l, i) => {
+        const o = { col, seed: (hashStr(n.text) % 997) + i * 17, flourish: Hh.flourish && i === 0 };
+        if (font) texts.push({ h: n.hand, s: l, x: best.x, y: best.y + i * lh, o });
+        else P.write(S.px, n.hand, l, best.x, best.y + i * lh, o);
+      });
       block(best.x - 3, best.y - 3, best.w + 6, best.h + 6);
       const far = Math.hypot(Math.max(b.x0 - 2, Math.min(best.nx, b.x0 + b.w + 2)) - best.nx, Math.max(b.y0 - 2, Math.min(best.ny, b.y0 + b.h + 2)) - best.ny);
       if ((best.d > 9 && far > 5) || (pointed && far > 1)) {
@@ -464,15 +481,26 @@
     return placed;
   }
 
-  // a note on its own slip, in its writer's hand, for the cards under the sheet and the phone's pins
+  // a note on its own slip, in its writer's hand, for the cards under the sheet and the phone's pins: in a font it is plain text, so it
+  // wraps to the card; in pixels it is a canvas at twice the sheet's scale (the clear hand wrapped to fit a card unscaled)
   function slip(n, maxW) {
-    const Hh = P.hand(n.hand), ls = P.wrap(n.hand, clean(n.text), maxW || 150), lh = P.lineH(Hh) + 1;
+    if (P.handMode === "font") {
+      const F = P.fontSpec(n.hand), p = document.createElement("p");
+      p.className = "dg-hand dg-hand-font";
+      Object.assign(p.style, { font: P.fontCss(n.hand, F.size * 2), lineHeight: F.lh, color: n.kind === "boss" ? C.red : F.col, textTransform: F.caps ? "uppercase" : "none" });
+      p.textContent = clean(n.text);
+      return p;
+    }
+    const Hh = P.hand(n.hand), ls = P.wrap(n.hand, clean(n.text), P.handMode === "clear" ? 114 : maxW || 150), lh = P.lineH(Hh) + 1;
     const w = Math.max(20, ...ls.map((l) => P.width(n.hand, l))) + 4, h = ls.length * lh + 3;
     const S = P.surface(w, h);
     ls.forEach((l, i) => P.write(S.px, n.hand, l, 1, 2 + i * lh, { col: n.kind === "boss" ? C.red : Hh.col, seed: (hashStr(n.text) % 997) + i * 17, flourish: Hh.flourish && i === 0 }));
-    return S.canvas();
+    const cv = S.canvas();
+    cv.className = "dg-hand";
+    cv.style.width = w * 2 + "px";
+    return cv;
   }
   function bustCanvas(h, rows) { const g = P.bust(h, rows || 16), S = P.surface(g.w, g.h); S.grid(g, 0, 0); return S.canvas(); }
 
-  window.DungeonInk = { layout, draw, slip, bustCanvas, clean, CELL };
+  window.DungeonInk = { layout, draw, slip, bustCanvas, clean, depthWord, CELL };
 })();

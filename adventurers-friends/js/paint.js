@@ -253,21 +253,24 @@
   const AURA = Art.AURA;
   // marks of a calling (league/content/gear.py CLASS_MARKS): crowns ride the head and scale with it; face and floating marks are
   // drawn natively at each size (FINE); body marks are carried at the hip or the off hand
-  const CROWNS = new Set(["flame_crown", "ice_crown", "leaf_crown", "elemental_crown"]);
-  const FINE = new Set(["rune_crown", "star_orbit", "spectacles", "domino", "veil", "triad", "raincloud", "goggles", "warpaint", "rose"]);
-  const BODY_MARKS = new Set(["ward_sigil", "pendulum", "trap_belt", "rope_coil", "spellhand", "whip"]);
+  const CROWNS = new Set(["flame_crown", "ice_crown", "leaf_crown", "elemental_crown", "storm_crown"]);
+  const FINE = new Set(["rune_crown", "star_orbit", "spectacles", "domino", "veil", "triad", "raincloud", "goggles", "warpaint", "rose", "claw_scars", "eyepatch", "thundercloud", "spirits"]);
+  const BODY_MARKS = new Set(["ward_sigil", "pendulum", "trap_belt", "rope_coil", "spellhand", "whip", "trophy_cord", "hunting_horn", "wanted_poster", "satchel", "mortar", "poison_vial", "ladle",
+    "tabard", "pauldrons", "spare_blades", "slung_lute", "wolf_mantle", "bedroll", "stag_trophy"]);
+  // body marks carried on the back are drawn behind the figure first (part "back"); a tabard goes over the armour, under the arms
+  const BEHIND = new Set(["spare_blades", "slung_lute", "bedroll", "stag_trophy"]);
   const MARKS = new Set(["halo", "antlers", ...CROWNS, ...FINE, ...BODY_MARKS]);
   const OUTFIT_MAT = { robe: "cloth", robe_dark: "cloth", vestments: "cloth", fancy: "cloth", vest: "cloth", motley: "cloth", leather: "leather", fur: "leather", cloak: "leather", chain: "chain", plate: "plate", plate_dark: "plate" };
   const BASE = { robe: "robe", robe_dark: "robed", vestments: "shirt", fancy: "robe", vest: "shirt", motley: "robe", leather: "hide", fur: "hide", cloak: "cloth", chain: "metal", plate: "metal" };
-  const COVERS = new Set(["great_helm", "skull_helm", "hood", "skull_hood", "beast_hood", "helm", "top_hat", "mitre", "tricorn", "bandana", "feather_cap", "leather_cap"]);
-  const HAIRY = new Set(["helm", "bandana", "feather_cap", "leather_cap"]);
+  const COVERS = new Set(["great_helm", "skull_helm", "hood", "skull_hood", "beast_hood", "helm", "top_hat", "mitre", "tricorn", "bandana", "feather_cap", "leather_cap", "fur_cap"]);
+  const HAIRY = new Set(["helm", "bandana", "feather_cap", "leather_cap", "fur_cap"]);
   const FULL = new Set(["great_helm", "skull_helm"]);
   const HOODS = new Set(["hood", "skull_hood", "beast_hood"]);
   const FRINGE = ["thin", "full", "thin", "mohawk", null, "full", "full", "thin", "full", "full", "thin", "sweep", "thin", "full", "thin", "full", "full", "full", "thin", "sweep", "full", "thin"];
   const FRINGE_LOCKS = new Set([1, 5, 6, 8, 9, 16, 17, 20]);
   // where a crown sits on top of each kind of headgear (portrait space)
   const CROWN_Y = { none: 10, hood: 7.2, skull_hood: 7.2, beast_hood: 7.2, leather_cap: 8.2, helm: 7.2, horns: 8.6, great_helm: 6.6, skull_helm: 6.6, wizard_hat: 9.4,
-    mitre: 10.4, wide_hat: 7.6, top_hat: 6.8, tricorn: 8.2, bandana: 8.6, feather_cap: 8.2, circlet: 10.6, crown: 10.6, mask: 10 };
+    mitre: 10.4, wide_hat: 7.6, top_hat: 6.8, tricorn: 8.2, bandana: 8.6, feather_cap: 8.2, circlet: 10.6, crown: 10.6, mask: 10, fur_cap: 7.4, herb_wreath: 10 };
   // players picked these colours in the quiz, so the hue stays; only the loudest saturation is reined in toward the earthy palette
   const softCache = {};
   function soften(hex) {
@@ -278,7 +281,7 @@
   // faces and hair are drawn in flat ramps; dither is for cloth and backdrops
   const FLAT = new Set(["skin", "hair", "lip", "stub", "hd"]);
   const HEAD_TOP = { none: 5.5, hood: 5.5, skull_hood: 5.5, beast_hood: 3, leather_cap: 5.5, helm: 4.5, great_helm: 4.5, skull_helm: 4.5, horns: 4.5, wizard_hat: -1,
-    mitre: -1, wide_hat: 2.5, top_hat: 0, tricorn: 4, bandana: 6, feather_cap: 6, circlet: 5, crown: 5, mask: 5.5 };
+    mitre: -1, wide_hat: 2.5, top_hat: 0, tricorn: 4, bandana: 6, feather_cap: 6, circlet: 5, crown: 5, mask: 5.5, fur_cap: 5, herb_wreath: 5 };
   const tierOf = (x, d) => Math.max(0, Math.min(3, x && x.tier != null ? x.tier : x && x.glow ? 3 : d));
 
   function kitView(h, cl) {
@@ -307,6 +310,8 @@
     skull_hood: (t) => ["#7a7680", "#4a4656", "#3a3646", "#26222e"][t],
     beast_hood: (t) => ["#a88a64", "#a88a64", "#76727a", "#dcd6c8"][t],
     leather_cap: (t) => ["#8e6c4c", "#7a5638", "#5a3c28", "#6a4630"][t],
+    fur_cap: (t) => ["#9a8a74", "#6a4a30", "#a85c34", "#66646e"][t],
+    herb_wreath: (t) => ["#6a9a4a", "#5a8a3a", "#4e7448", "#4a7a3a"][t],
     horns: (t) => ["#7a5638", "#7a828c", "#7a828c", "#949eaa"][t],
     wizard_hat: (t, f) => ["#7a6044", f, f, mix(f, "#1a1630", 0.3)][t],
     wide_hat: (t) => ["#d8b45a", "#7a5034", "#6a4a30", "#3a3444"][t],
@@ -347,6 +352,8 @@
       hd: ramp(["circlet", "crown", "mask"].includes(k.head) ? head : soften(head)), pale: ramp("#b4844e"), hmet: ramp(TMETAL[ht]), omet: ramp(TMETAL[ot]), bk: ramp(back), silver: ramp("#c4cad4"), copper: ramp("#b87440"),
       mana: ramp("#3ab8b8"), illus: ramp("#e07aa8"), mint: ramp("#8ad8c4"), brass: ramp("#c8963a"), cloud: ramp("#a4aebc"), warp: ramp("#b4302a"),
       rosec: ramp("#c82a44"), rope: ramp("#c4a26a"),
+      parch: ramp("#e0cea0"), stone: ramp("#8e887c"), tox: ramp("#86cc4a"), herb: ramp("#58784a"), sage: ramp("#8e9e6a"), lav: ramp("#8e7ab8"), berry: ramp("#a8303a"),
+      scarp: ramp("#e4a8a0"), fox: ramp("#b0643a"), storm: ramp("#5c6478"), ghost: ramp("#bfe8cc"), blanket: ramp("#8e4a3a"),
       glass: ramp("#b8d0e0"), night: ramp("#2a3470"), crim: ramp("#8e2a2a"), straw: ramp("#d8b45a"), moon: ramp("#e4e2dc"), peacock: ramp("#2a8a8a"),
       blt: ramp(k.belt || "#6e4a30"), bts: ramp(k.boots || "#5a3a26"), glv: ramp(k.gloves || "#7e5436"),
       ngem: ramp(k.neckGem || "#c83a3a"), strap: ramp("#b48a56"), pearl: ramp("#ece6da"), pk: ramp(k.tint || "#6a4a3a"), wolf: ramp("#8e8e96"), rust: ramp("#8a5a3a"),
@@ -410,7 +417,7 @@
     P.layer = 1;
     if (c.mark === "star_orbit") fineMark(P, c, "back");
     if (c.mark === "halo") {
-      const hy = (HEAD_TOP[c.head] == null ? 6 : HEAD_TOP[c.head]) - (c.head === "none" && HAIR_LIFT[st] ? HAIR_LIFT[st] : 2);
+      const hy = (HEAD_TOP[c.head] == null ? 6 : HEAD_TOP[c.head]) - (c.head === "none" && HAIR_LIFT[st] ? HAIR_LIFT[st] : c.head === "circlet" ? 4.5 : 2);
       for (let a = 0; a < 48; a++) { const t = (a / 48) * Math.PI * 2; P.px(cx + Math.cos(t) * 7, hy + Math.sin(t) * 2, "#ffe88a", 0); }
     }
     if (!covered && (st === 1 || st === 6)) P.poly([[cx - 8, 10], [cx + 8, 10], [cx + 10, st === 1 ? 33 : 26], [cx - 10, st === 1 ? 33 : 26]], "hair", (x, y) => -0.3 + hairTex(x, y) - (y - 10) * 0.02);
@@ -493,6 +500,7 @@
         if (mark === "elemental_crown") P.poly([[x - 0.9, by + 0.5], [x + 0.2, by - hgt - (i % 3 === 0 ? 0.6 : 0)], [x + 1, by + 0.5]], ELEM[i % 3], 0.45 - (i % 2) * 0.25);
         if (mark === "ice_crown") P.poly([[x - 0.7, by + 0.5], [x, by - hgt], [x + 0.7, by + 0.5]], "ice", i % 2 ? 0.1 : 0.5);
         if (mark === "leaf_crown") P.ell(x, by, 1.3, 0.9, "leaf", { s: i % 2 ? 0.3 : -0.1, k: 0.6 });
+        if (mark === "storm_crown") P.poly([[x - 0.8, by + 0.5], [x + 0.4, by - hgt * 0.55], [x - 0.3, by - hgt * 0.5], [x + 0.6, by - hgt - 0.4], [x + 0.9, by - hgt * 0.4], [x + 0.2, by - hgt * 0.45], [x + 0.9, by + 0.5]], i % 2 ? "#a8dcff" : "#e8f6ff", 0.3);
       }
       return;
     }
@@ -519,6 +527,13 @@
         P.rect(cx - wide, y0, wide * 2, 1, "gold", 0.2);
         for (const [x, hgt, i] of [[-5.5, 4, 1], [-2.7, 6.5, 0], [0, 8.5, 2], [2.7, 6.5, 0], [5.5, 4, 1]]) P.poly([[cx + x - 1.1, y0], [cx + x + 0.2, y0 - hgt], [cx + x + 1.3, y0]], ELEM[i], x < 0 ? 0.45 : 0.1);
         P.px(cx - 0.5, y0, "#fff8d0");
+        break;
+      case "storm_crown":
+        // a band of dark iron with lightning forking up from it, the tallest bolt at the brow
+        P.rect(cx - wide, y0, wide * 2, 1, "storm", 0.3);
+        for (const [x, hgt, m] of [[-5.2, 4.5, "#a8dcff"], [-2.4, 6.5, "#fff35a"], [0.5, 8.5, "#e8f6ff"], [3.4, 6.5, "#fff35a"], [6, 4.5, "#a8dcff"]])
+          P.poly([[cx + x - 1.4, y0], [cx + x + 0.8, y0 - hgt * 0.58], [cx + x - 0.5, y0 - hgt * 0.5], [cx + x + 1.1, y0 - hgt], [cx + x + 1.7, y0 - hgt * 0.4], [cx + x + 0.4, y0 - hgt * 0.46], [cx + x + 1.4, y0]], m, 0.35);
+        P.px(cx + 0.5, y0, "#a0d8ff");
         break;
       case "flame_crown":
         P.rect(cx - wide, y0, wide * 2, 1, "gold", 0.2);
@@ -605,6 +620,40 @@
         drops.forEach(([x, y], i) => { const yy = y + ((f + i) % 2) * (sp ? 1 : 2); P.px(x, yy, "#9ad0f4"); P.px(x, yy + 1, "#5a98d8"); });
         break;
       }
+      case "thundercloud": {
+        // a squall that follows the hero about: a dark cloud beside the head with a bolt forking out of it
+        const [x0, y0, k] = sp ? [20.5, 1.2, 0.6] : [8, 2.5, 1];
+        for (const [dx, dy, r] of [[-3.6, 0.8, 2.4], [0, -0.6, 3.2], [3.8, 0.6, 2.6]]) P.ell(x0 + dx * k * 1.15, y0 + dy * k, r * k + 0.3, r * k * 0.8 + 0.3, "storm", { s: 0.15 });
+        if (sp) { for (const [x, y] of f ? [[20, 4], [21, 5], [20, 6], [21, 7]] : [[21, 4], [20, 5], [21, 6], [20, 7]]) P.px(x, y, y % 2 ? "#fff8c0" : "#f8e050"); P.px(19, 1, "cloud", 0.4); }
+        else {
+          P.poly(f ? [[9, 5], [11, 5], [9.5, 8], [11.5, 8], [7, 14], [8, 9.4], [6.2, 9.4]] : [[7.5, 5], [9.5, 5], [8, 8], [10, 8], [5.5, 14], [6.5, 9.4], [4.8, 9.4]], "#f8e050", 0.4);
+          P.px(f ? 9 : 7.5, 8, "#fff8c0"); P.ell(6, 0.8, 1.6, 1, "cloud", { s: 0.4 });
+        }
+        break;
+      }
+      case "eyepatch": {
+        // a black patch over the eye that isn't needed: the strap shows only on skin and hair, never over a hat
+        const bare = (x, y) => { const [X, Y] = P.tf ? P.T(x + 0.5, y + 0.5) : [x + 0.5, y + 0.5], m = P.matAt(Math.floor(X), Math.floor(Y)); return m === "skin" || m === "hair"; };
+        if (sp) { for (let x = 9; x <= 18; x++) { const y = Math.round(7.6 + (x - 9) * 0.25); if (bare(x, y) && x !== 15) P.px(x, y, "#2a2224"); } P.px(15, 10, "#1e1a1c"); P.px(16, 10, "#2a2224"); P.px(15, 9, "#2a2224"); }
+        else {
+          for (let x = 11; x <= 29; x++) { const y = 12.6 + (x - 11) * 0.16; if (bare(x, y)) P.px(x, y, "#2a2224", 0); }
+          P.ell(22.8, 17.2, 2.4, 2.1, "#1e1a1c"); P.px(22, 16, "#4a4048");
+        }
+        break;
+      }
+      case "spirits": {
+        // the dead who answer: two pale wisps hanging about the head, a dark eye each, their tails trailing off
+        const wisp = (x, y, r, tail) => {
+          P.ell(x, y, r, r * 1.1, "ghost", { s: 0.35 });
+          P.poly([[x - r, y + r * 0.3], [x + r, y + r * 0.3], [x + tail, y + r * 3]], "ghost", (xx, yy) => -0.1 - (yy - y) * 0.06);
+          P.px(x - r * 0.45, y - r * 0.1, "#2a4a3a"); P.px(x + r * 0.35, y - r * 0.1, "#2a4a3a");
+        };
+        if (sp) {
+          for (const [x, y, t] of [[22, 3 + f, 1], [5, 8 - f, -1]]) { P.px(x, y, "ghost", 0.5); P.px(x + 1, y, "ghost", 0.2); P.px(x, y + 1, "ghost", 0.1); P.px(x + 1, y + 1, "ghost", -0.1); P.px(x + (t > 0 ? 1 : 0), y + 2, "ghost", -0.3); P.px(x + (t > 0 ? 2 : -1), y + 3, "ghost", -0.5); }
+          P.px(22, 4 + f, "#2a4a3a");
+        } else { wisp(5.5, 6 + f, 2.6, -2); wisp(34.5, 3.5 - f, 2, 2.2); }
+        break;
+      }
       case "goggles":
         if (sp) { for (const x of [9, 10, 13, 14, 17, 18]) P.px(x, 7, "dleather", -0.2); for (const x0 of [11, 15]) { P.px(x0, 6, "#e8fbff"); P.px(x0 + 1, 6, "#78c0d8"); P.px(x0, 7, "#5aa8c8"); P.px(x0 + 1, 7, "#3a7aa0"); } }
         else {
@@ -620,12 +669,30 @@
         if (sp) { P.px(11, 13, "leaf", 0); P.px(12, 13, "leaf", -0.2); for (const [x, y, s] of [[15, 12, 0.5], [16, 12, 0.1], [15, 13, 0], [16, 13, -0.4]]) P.px(x, y, "rosec", s); P.px(15, 14, "leaf", 0.2); }
         else { P.line(14.5, 23.5, 22, 22.6, "leaf", 0.1); P.ell(15.6, 24.4, 1.3, 0.8, "leaf", { s: 0.3 }); P.ell(24, 22.2, 2.1, 2, "rosec", { s: 0.25 }); P.px(23.5, 21.5, "rosec", -0.6); P.px(24, 22, "#ffd0d8"); }
         break;
+      case "claw_scars": {
+        // three healed rakes from brow to cheek, only on bare skin (a cap's brim hides their tops) and skipping the eye
+        const onSkin = (x, y) => { const [X, Y] = P.tf ? P.T(x + 0.5, y + 0.5) : [x + 0.5, y + 0.5]; return P.matAt(Math.floor(X), Math.floor(Y)) === "skin"; };
+        if (sp) { for (const [x, y] of [[13, 6], [14, 7], [15, 6], [16, 7], [16, 9], [16, 10], [16, 11], [17, 12], [17, 6], [18, 7], [18, 8], [18, 9], [18, 10], [18, 11]]) if (onSkin(x, y)) P.px(x, y, "scarp", 0.25 - (y - 7) * 0.04); }
+        else for (const [x0, x1] of [[21, 23.6], [23.2, 25.8], [25.4, 27.4]]) for (let y = 10; y <= 23; y++) {
+          const x = x0 + ((x1 - x0) * (y - 10)) / 13;
+          if (y >= 15.5 && y <= 18 && x > 21 && x < 24.5) continue;
+          if (!onSkin(x, y)) continue;
+          P.px(x, y, "scarp", 0.35 - Math.abs(y - 16) * 0.03);
+          if (onSkin(x + 1, y)) P.px(x + 1, y, "skin", -0.55);
+        }
+        break;
+      }
     }
     P.tf = tf;
   }
   // body marks: sprite in its own pixels (off hand at 20-21, 24-25; belt at y 24), portrait in head space below the chin
-  function bodyMark(P, c, sp) {
-    const f = c.frame || 0;
+  // the bust ends just under the chest, so what hangs at the hip is raised into frame there
+  const HIP_LIFT = { wanted_poster: 1.5, satchel: 2.5, mortar: 3, poison_vial: 3.2, ladle: 3 };
+  function bodyMark(P, c, sp, part) {
+    const f = c.frame || 0, tf0 = P.tf;
+    if (part === "back" && !BEHIND.has(c.mark)) return;
+    if ((part === "torso") !== (c.mark === "tabard")) return;
+    if (!sp && tf0 && HIP_LIFT[c.mark]) P.tf = Object.assign({}, tf0, { oy: tf0.oy - HIP_LIFT[c.mark] });
     switch (c.mark) {
       case "ward_sigil": {
         const [x0, y0, r] = sp ? [24, 19, 3.4] : [34, 25, 5.2];
@@ -680,7 +747,241 @@
         else { P.line(12, 31.5, 9.5, 28.5, "dwood", 0.3, 0.7); P.px(9, 28, "gold", 0.4); P.line(6, 38, 4, 41, "rope", -0.3); }
         break;
       }
+      case "trophy_cord":
+        // a thong strung with fangs and dark claws, worn shoulder to hip
+        if (sp) {
+          P.line(19, 17.5, 9.5, 24.5, "strap", -0.1);
+          for (const [x, y, m] of [[17, 20, "bone"], [15, 21, "antler"], [13, 23, "bone"], [11, 24, "antler"]]) P.px(x, y, m, 0.5);
+          P.px(14, 23, "bone", 0.2); P.px(14, 24, "bone", -0.2);
+        } else {
+          P.line(31.5, 26, 11, 37.5, "strap", -0.15, 0.6);
+          [0.1, 0.24, 0.38, 0.52, 0.66, 0.8].forEach((q, i) => {
+            const x = 31.5 - q * 20.5, y = 26 + q * 11.5 + 0.8, big = i === 2;
+            if (i % 2 === 0) P.poly([[x - 1.1, y], [x + 1.1, y], [x + 0.2, y + (big ? 4.2 : 3)]], "bone", (xx) => 0.45 - (xx - x) * 0.25);
+            else P.poly([[x - 0.9, y], [x + 0.9, y], [x - 0.6, y + 2.6]], "antler", -0.15);
+          });
+        }
+        break;
+      case "hunting_horn": {
+        // a curled horn slung on a strap from the far shoulder, its brass bell at the hip
+        if (sp) {
+          P.line(9, 17.5, 18.5, 25, "strap", -0.05);
+          const map = ["b.....", "hh...B", ".hh.hB", "..hhhB"];
+          map.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== ".") P.px(19 + i, 26 + j, ch === "h" ? "horn" : "brass", ch === "h" ? 0.45 - j * 0.25 : 0.3 - j * 0.2); }));
+        } else {
+          P.line(9, 27, 27, 35.4, "strap", -0.05, 0.7);
+          const pts = [];
+          for (let i = 0; i <= 12; i++) { const q = i / 12; pts.push([26.5 + q * 9.5, 31.6 + Math.sin(q * Math.PI * 0.95) * 3.6 - q * 1.8]); }
+          for (let i = 0; i < pts.length; i++) { const r = 0.7 + (i / 12) * 1.4; P.ell(pts[i][0], pts[i][1], r, r, "horn", { s: 0.2, k: 0.8 }); }
+          for (const q of [0.3, 0.62]) { const p = pts[Math.round(q * 12)], r = 0.9 + q * 1.5; P.rect(p[0] - 0.5, p[1] - r, 1, r * 2, "brass", 0.35); }
+          const e = pts[12];
+          P.ell(e[0] + 0.6, e[1], 1.3, 2.6, "brass", { s: 0.3 }); P.ell(e[0] + 0.9, e[1], 0.6, 1.6, "dwood", { s: -0.4 });
+          P.ell(pts[0][0] - 0.4, pts[0][1], 0.7, 0.7, "brass", { s: 0.4 });
+        }
+        break;
+      }
+      case "wanted_poster":
+        // a bounty notice folded into the belt: parchment, a scrawled face and a red wax seal
+        if (sp) {
+          for (const [y, x0, x1] of [[21, 18, 19], [22, 18, 20], [23, 18, 20], [24, 18, 20], [25, 18, 20]]) for (let x = x0; x <= x1; x++) P.px(x, y, "parch", 0.4 - (x - 18) * 0.2 - (y - 21) * 0.06);
+          P.px(19, 22, "dwood", 0.1); P.px(19, 25, "crim", 0.4); P.px(20, 21, "parch", -0.5);
+        } else {
+          P.poly([[27.4, 28.6], [35.6, 29.6], [34.8, 39.6], [26.4, 38.8]], "parch", (x, y) => 0.4 - (x - 27) * 0.05 - (y - 29) * 0.03 + ((x * 3 + y * 2) % 11 === 0 ? -0.25 : 0));
+          P.poly([[34, 29.4], [35.6, 29.6], [35.4, 31.4]], "parch", -0.6);
+          P.line(28.6, 30.4, 33.6, 31, "dwood", 0.1, 0.45);
+          ringAt(P, 31, 34, 1.9, 2, "dwood", () => 0.1, (a) => Math.floor(a * 3) % 3 !== 2);
+          P.px(30, 33.5, "dwood", 0); P.px(31.6, 33.5, "dwood", 0);
+          P.line(28.4, 37, 31.6, 37.3, "dwood", 0.2, 0.4);
+          P.ell(33.4, 37.6, 1.3, 1.2, "crim", { s: 0.35 });
+        }
+        break;
+      case "satchel":
+        // an herb satchel on a strap from the far shoulder, sprigs and a flower poking out under the flap
+        if (sp) {
+          P.line(9, 17.5, 19, 25.5, "strap", -0.05);
+          for (const [x, y, m, s] of [[19, 24, "leaf", 0.4], [20, 23, "leaf", 0.2], [21, 24, "herb", 0.3], [22, 24, "leaf", -0.1], [20, 22, "feather", 0.3]]) P.px(x, y, m, s);
+          P.rect(19, 25, 4, 4, "leather", (x, y) => 0.3 - (x - 19) * 0.15 - (y - 25) * 0.08);
+          P.rect(19, 25, 4, 2, "dleather", (x, y) => (y === 25 ? 0.35 : 0) - (x - 19) * 0.1);
+          P.px(20, 26, "gold", 0.3);
+        } else {
+          P.line(9, 28, 29, 37, "strap", -0.05, 0.7);
+          for (const [x0, y0, x1, y1, m] of [[30, 32, 29, 27.6, "leaf"], [32, 32, 32.6, 27, "herb"], [34, 32, 36, 28, "leaf"], [35.5, 32.5, 38, 30, "sage"]]) {
+            P.line(x0, y0, x1, y1, m, 0.2, 0.45);
+            P.ell(x1, y1, 1.2, 0.8, m, { s: 0.35, k: 0.6 });
+          }
+          for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) P.px(32.6 + a, 26.2 + b, "feather", 0.3 - a * 0.15);
+          P.px(32.6, 26.2, "gold", 0.4);
+          P.poly([[28, 32.5], [37.5, 32.5], [38, 40], [27.5, 40]], "leather", (x, y) => 0.3 - (x - 28) * 0.05 - (y - 32) * 0.04);
+          P.poly([[27.6, 31.6], [37.8, 31.6], [37.2, 35.6], [32.6, 36.6], [28.2, 35.6]], "dleather", (x, y) => (y < 32.6 ? 0.35 : 0.05) - (x - 28) * 0.04);
+          P.rect(32, 35.4, 1.4, 1.6, "gold", 0.35);
+        }
+        break;
+      case "mortar":
+        // a small stone mortar on a cord at the hip, its wooden pestle standing in it
+        if (sp) {
+          P.px(20, 25, "rope", 0.2); P.px(21, 26, "rope", 0);
+          P.line(21, 27, 23.5, 23.5, "wood", 0.3);
+          P.rect(19, 27, 5, 1, "stone", (x) => 0.5 - (x - 19) * 0.12); P.px(21, 27, "stone", -0.7);
+          P.rect(19, 28, 5, 1, "stone", (x) => 0.1 - (x - 19) * 0.12);
+          P.rect(20, 29, 3, 1, "stone", (x) => -0.2 - (x - 20) * 0.15);
+          P.px(23.5, 23, "wood", 0.5);
+        } else {
+          P.line(29, 31.4, 31, 34, "rope", 0.2, 0.45); P.line(36.5, 31.4, 35, 34, "rope", -0.1, 0.45);
+          P.line(32.4, 34.4, 36.8, 27.2, "wood", 0.25, 0.75);
+          P.ell(37, 26.8, 1.2, 1.2, "wood", { s: 0.3 });
+          P.ell(33, 36.2, 4.2, 3.2, "stone", { s: 0.15, fn: (x, y, s) => (y < 35 ? false : s + ((x * 5 + y * 3) % 9 === 0 ? -0.35 : 0)) });
+          P.ell(33, 35.2, 4.2, 1.2, "stone", { s: 0.45 }); P.ell(33, 35.3, 3, 0.7, "stone", { s: -0.6 });
+          P.rect(31, 39, 4, 1, "stone", -0.3);
+        }
+        break;
+      case "poison_vial": {
+        // a green glass vial corked and hung on the belt; the brew catches the light, a bubble rising between the frames
+        if (sp) {
+          P.px(19, 22, "wood", 0.3);
+          P.px(19, 23, "glass", 0.4);
+          P.rect(18, 24, 3, 2, "tox", (x, y) => 0.55 - (x - 18) * 0.2 - (y - 24) * 0.15);
+          P.px(18, 24, "#eaffd0"); P.px(19 + f, 26, "tox", -0.35);
+        } else {
+          P.line(29, 31.6, 31, 33, "dleather", 0, 0.45);
+          P.rect(31.4, 30.6, 2, 1.6, "wood", 0.3);
+          P.rect(31.6, 32, 1.6, 2, "glass", (x) => 0.4 - (x - 31.6) * 0.3);
+          P.ell(32.4, 36.4, 3, 3, "glass", { s: 0.3 });
+          P.ell(32.4, 36.8, 2.6, 2.4, "tox", { s: 0.45, fn: (x, y, s) => (y < 35.6 ? false : s) });
+          P.px(31.2, 34.8, "#f4fff0"); P.px(30.6, 35.8, "#eaffd0");
+          P.px(33 + f * 0.6, 37.2 - f * 1.4, "#dcffb8");
+        }
+        break;
+      }
+      case "tabard": {
+        // a cream surcoat over the armour with a cross in the hero's colour and a gold hem
+        if (sp) {
+          P.rect(11, 18, 6, 9, "moon", (x, y) => 0.35 - (x - 11) * 0.08 - (y - 18) * 0.02);
+          P.rect(11, 18, 6, 1, "gold", (x) => 0.35 - (x - 11) * 0.1);
+          P.rect(13, 19, 2, 5, "fav", 0.25); P.rect(12, 20, 4, 1, "fav", 0.25);
+          P.rect(10, 24, 8, 1, "dleather", -0.1); P.px(13, 24, "gold", 0.3);
+          P.rect(11, 26, 6, 1, "gold", (x) => 0.3 - (x - 11) * 0.1);
+        } else {
+          const free = (x, y) => { const [X, Y] = P.tf ? P.T(x + 0.5, y + 0.5) : [x + 0.5, y + 0.5]; return P.lay[Math.floor(Y) * P.w + Math.floor(X)] !== 3; };
+          P.poly([[c.cx - 5.5, 30], [c.cx + 5.5, 30], [c.cx + 7, 41], [c.cx - 7, 41]], "moon", (x, y) => (free(x, y) ? 0.35 - (x - c.cx) * 0.04 : false));
+          P.rect(c.cx - 1, 31.5, 2, 7, "fav", (x) => 0.25 - (x - c.cx) * 0.1); P.rect(c.cx - 3.5, 33.5, 7, 2, "fav", (x) => 0.25 - (x - c.cx) * 0.05);
+          P.line(c.cx - 5.5, 30, c.cx + 5.5, 30, "gold", 0.2);
+        }
+        break;
+      }
+      case "pauldrons":
+        // a fortress's shoulders: great rounded spaulders, two lames under each, a gold rivet and a short spike
+        for (const side of [-1, 1]) {
+          if (sp) {
+            const x0 = side < 0 ? 7 : 21;
+            P.poly([[x0 - 1, 15], [x0 + 1, 15], [x0 - side * 0.2, 12.6]], "metal", 0.6);
+            P.ell(x0, 16.8, 3.7, 2.6, "metal", { s: side < 0 ? 0.35 : -0.05 });
+            P.ell(x0, 19, 3.3, 1.3, "metal", { s: side < 0 ? -0.15 : -0.45 });
+            for (let dx = -2; dx <= 2; dx++) P.px(x0 + dx, 18, "gold", 0.25 - dx * side * 0.08);
+            P.px(x0 - side, 16, "#f4f6fa");
+          } else {
+            const x0 = c.cx + side * 12.5;
+            P.poly([[x0 - 1.6, 26], [x0 + 1.6, 26], [x0 + side * 0.8, 21]], "metal", 0.55);
+            P.ell(x0, 30.5, 8, 5.6, "metal", { s: side < 0 ? 0.3 : -0.05 });
+            for (let dx = -7; dx <= 7; dx++) { const t = (dx / 7.5) ** 2; P.px(x0 + dx, 33.6 + t * 1.4, "metal", -0.8); P.px(x0 + dx, 35.8 + t * 1.2, "metal", -0.8); }
+            for (let dx = -7; dx <= 7; dx++) P.px(x0 + dx, 33 + (dx / 7.5) ** 2 * 1.4, "gold", 0.25 - dx * side * 0.02);
+            P.ell(x0 - side * 4, 29.4, 1, 1, "gold", { s: 0.4 });
+          }
+        }
+        break;
+      case "wolf_mantle":
+        // a whole grey wolfskin over the shoulders, its forepaws hanging on the chest
+        if (sp) {
+          for (let x = 5; x <= 22; x++) P.ell(x + 0.5, 16.6 + ((x + 0.5 - 14) / 8) ** 2 * 1.6 + (x % 2) * 0.4, 1.4, 1.2, "wolf", { s: 0.35 - (x - 13) * 0.05 + (x % 3 === 0 ? 0.3 : 0), k: 0.6 });
+          for (const x of [10, 16]) { P.rect(x, 18, 2, 3, "wolf", (xx, y) => 0.2 - (xx - x) * 0.3 - (y - 18) * 0.1); P.px(x, 21, "bone", 0.3); P.px(x + 1, 21, "bone", 0); }
+        } else {
+          for (let a = 0; a < 26; a++) {
+            const q = (a / 25) * Math.PI, x = c.cx - Math.cos(q) * 16.5, y = 31 - Math.sin(q) * 3.6 + (a % 2) * 0.8;
+            P.ell(x, y, 2.9, 2.6, "wolf", { s: (a % 3 === 0 ? 0.35 : 0) - (x - c.cx) * 0.03, k: 0.7 });
+          }
+          for (const s of [-1, 1]) { const x = c.cx + s * 6.5; P.rect(x - 1.5, 32, 3, 5, "wolf", (xx, y) => 0.25 - (xx - x) * 0.12 - (y - 32) * 0.05); for (const dx of [-1, 0, 1]) P.px(x + dx - 0.5, 37, "bone", 0.3 - dx * 0.1); }
+        }
+        break;
+      case "spare_blades":
+        // two more swords sheathed crossways on the back, hilts over each shoulder
+        if (part !== "back") break;
+        for (const side of [-1, 1]) {
+          if (sp) {
+            const hx = side < 0 ? 6 : 22, tx = side < 0 ? 21 : 7;
+            P.line(hx, 12, tx, 29, "silver", 0.2);
+            P.line(hx, 12, hx + side * 1.5, 9.5, "dleather", 0.1);
+            P.px(hx + side * 2, 9, "gold", 0.4);
+            P.line(hx - 1.2, 12.6 + side * 0.9, hx + 1.2, 11.4 - side * 0.9, "gold", 0.3);
+          } else {
+            const hx = side < 0 ? 5 : 35, tx = side < 0 ? 30 : 10;
+            P.line(hx, 24, tx, 44, "silver", 0.25, 0.7);
+            P.line(hx, 24, hx + side * 2.5, 19.5, "dleather", 0.1, 0.7);
+            P.ell(hx + side * 2.8, 19, 1.1, 1.1, "gold", { s: 0.4 });
+            P.line(hx - 2.4, 25.6 + side * 1.6, hx + 2.4, 22.4 - side * 1.6, "gold", 0.3, 0.6);
+          }
+        }
+        break;
+      case "slung_lute":
+        // the bard's own lute slung on the back belly up, its round body over the far shoulder, unless it's in the hand
+        if (c.k.w.family === "lute") break;
+        if (part === "back") {
+          if (sp) {
+            P.line(20, 13, 9, 27, "dwood", 0.1);
+            P.ell(21.6, 9.6, 3.2, 3.8, "wood", { s: 0.3 }); P.ell(21.4, 9.4, 1, 1, "dwood", { s: -0.6 }); P.rect(20, 12, 3, 1, "dwood", 0.2); P.px(20, 7, "wood", 0.8);
+          } else {
+            P.line(31, 26, 14, 42, "dwood", 0.1, 1.1);
+            P.ell(33, 20.5, 5.6, 6.8, "wood", { s: 0.25 }); P.ell(32.6, 20, 1.7, 1.7, "dwood", { s: -0.6 });
+            ringAt(P, 32.6, 20, 2.6, 2.6, "gold", (t) => 0.3 - Math.cos(t + 0.8) * 0.3, (t) => Math.floor(t * 4) % 2 === 0);
+            P.rect(30, 24.5, 6, 1.2, "dwood", 0.2); for (const x of [31.4, 32.6, 33.8]) P.line(x, 14, x, 24.5, "#e8e0c8", 0.1);
+          }
+        } else if (sp) P.line(19.5, 16.6, 9, 25, "strap", -0.05);
+        else P.line(c.cx + 12, 28.5, c.cx - 8, 40, "strap", -0.05, 0.6);
+        break;
+      case "bedroll":
+        // a blanket rolled and strapped across the top of the back, an end showing past each shoulder
+        if (part !== "back") break;
+        if (sp) {
+          P.rect(5, 13, 18, 3, "blanket", (x, y) => (y === 13 ? 0.35 : y === 15 ? -0.35 : 0.05) - (x - 5) * 0.02);
+          P.px(5, 14, "blanket", -0.7); P.px(22, 14, "cream", 0.1);
+          P.rect(7, 13, 1, 3, "strap", 0.1); P.rect(20, 13, 1, 3, "strap", -0.1);
+        } else {
+          P.ell(20, 26.6, 13.5, 3.4, "blanket", { s: 0.05, fn: (x, y, s) => s + ((x + y) % 7 === 0 ? -0.25 : 0) });
+          P.ell(7, 26.6, 1.3, 3.2, "blanket", { s: -0.5 }); P.ell(7.2, 26.6, 0.6, 1.4, "cream", { s: -0.2 });
+          for (const x of [11, 29]) P.rect(x - 0.7, 22.8, 1.6, 7.6, "strap", (xx) => 0.2 - (xx - x) * 0.2);
+        }
+        break;
+      case "stag_trophy": {
+        // the skull of a great stag strapped on the back, its antlers rising over the far shoulder; on the bust it rides the near
+        // shoulder in front, where the quiver and the hat can't hide it
+        if ((part === "back") !== sp) break;
+        const beam = (x0, y0, x1, y1, w) => (sp ? P.line(x0, y0, x1, y1, "antler", 0.15) : P.line(x0, y0, x1, y1, "horn", -0.1, w * 1.35));
+        if (sp) {
+          beam(22, 11, 18, 1); beam(24.5, 11, 27.4, 0.6); beam(20.6, 7, 17.4, 6.2); beam(19.4, 4.6, 21.2, 0.6); beam(25.8, 7.4, 27.6, 7); beam(26.4, 4.4, 24.6, 0.4);
+          for (const [x, y] of [[18, 1], [27, 1], [21, 1], [25, 1], [17, 6]]) P.px(x, y, "bone", 0.4);
+          P.ell(23.3, 12.6, 1.8, 2.2, "bone", { s: 0.3 }); P.px(22, 12, "#2a2224"); P.px(24, 12, "#2a2224"); P.px(23, 14, "bone", -0.3);
+        } else {
+          beam(4.6, 22, 1.2, 4, 0.8); beam(8, 22, 11.5, 4.5, 0.8); beam(2.6, 12, 0.2, 10.5, 0.6); beam(2, 8, 4.4, 2.5, 0.6); beam(10, 13, 12.8, 11.8, 0.6); beam(10.8, 9, 8.6, 3, 0.6);
+          for (const [x, y] of [[1, 4], [11.5, 4.5], [4.4, 2.5], [8.6, 3]]) P.ell(x, y, 0.7, 0.7, "bone", { s: 0.4 });
+          P.ell(6.3, 25.5, 2.8, 3.6, "bone", { s: 0.3 }); P.ell(6.3, 29.5, 1.6, 1.8, "bone", { s: 0 }); P.ell(5.1, 25, 0.8, 0.9, "#2a2224"); P.ell(7.5, 25, 0.8, 0.9, "#2a2224");
+        }
+        break;
+      }
+      case "ladle":
+        // a long ladle stood in a small dented pot that hangs at the hip
+        if (sp) {
+          P.line(21.5, 26.5, 24.5, 19.5, "silver", 0.35); P.px(24, 19, "silver", 0.6);
+          P.rect(19, 26, 4, 3, "dmetal", (x, y) => (y === 26 ? 0.55 : 0.05) - (x - 19) * 0.12);
+          P.px(23, 27, "dmetal", -0.2); P.px(21, 28, "dmetal", -0.55);
+        } else {
+          P.line(32.6, 34, 38.4, 24.6, "silver", 0.4, 0.6);
+          P.line(38.4, 24.6, 37.4, 23.6, "silver", 0.3, 0.6);
+          P.ell(32.4, 36.6, 4.4, 3.2, "dmetal", { s: 0.1, fn: (x, y, s) => (y < 34.6 ? false : s + ((x - 34) ** 2 + (y - 37.5) ** 2 < 1.6 ? -0.45 : 0)) });
+          P.rect(27.8, 34, 9.2, 1.4, "dmetal", (x) => 0.55 - (x - 28) * 0.06);
+          P.rect(26.8, 34.6, 1.2, 1, "dmetal", -0.2); P.rect(36.8, 34.6, 1.2, 1, "dmetal", -0.4);
+          P.line(28, 32.4, 30, 34, "dleather", 0, 0.4);
+        }
+        break;
     }
+    P.tf = tf0;
   }
 
   // ---------- off-hands, drawn in sprite space around the left hand (20-21, 24-25); the portrait reuses them scaled ----------
@@ -1448,6 +1749,58 @@
         if (t === 3) for (const x of [cx - 5, cx - 2, cx + 1, cx + 4]) P.px(x, 12, "gold", 0.5);
         if (t === 0) P.rect(cx - 4, 8, 3, 2, "patch", 0);
         break;
+      case "fur_cap": {
+        // a trapper's cap: a shaggy dome over a turned-up brim and ear flaps of paler pelt; the fox's (or wolf's) tail hangs behind a flap
+        const brim = ["cream", "fur", "cream", "cream"][t], shag = (x, y) => ((x * 3 + y * 5) % 7 === 0 ? -0.4 : (x * 5 + y) % 6 === 0 ? 0.3 : 0);
+        if (t >= 2) {
+          const pts = [];
+          for (let i = 0; i <= 8; i++) { const q = i / 8; pts.push([cx + fw + 2 + Math.sin(q * 2.6) * 2, 12 + q * 13]); }
+          P.tube(pts, 1.6, 2.4, t === 3 ? "wolf" : "fox", -0.05);
+          P.ell(pts[8][0] - 0.2, pts[8][1] + 1.6, 2.1, 1.9, t === 3 ? "dmetal" : "cream", { s: 0.25 });
+        }
+        if (t === 3) for (const s of [-1, 1]) {
+          P.poly([[cx + s * 1.6, 8], [cx + s * 5, 0.8], [cx + s * 6.6, 9]], "hd", s < 0 ? 0.35 : -0.15);
+          P.poly([[cx + s * 3.2, 7.6], [cx + s * 4.9, 3.4], [cx + s * 5.6, 8]], "scarp", s < 0 ? -0.2 : -0.45);
+        }
+        dome("hd", 7.4, (x, y, s) => s + shag(x, y));
+        for (const dx of [-5, -2, 1, 4]) { const x = cx + dx, y = Math.floor(13 - 7.4 * Math.sqrt(Math.max(0, 1 - ((x + 0.5 - cx) / (fw + 1.4)) ** 2))); P.px(x, y - 1, "hd", 0.35); }
+        const fl = [18.5, 20.5, 21.5, 21.5][t];
+        for (const s of [-1, 1]) P.poly([[cx + s * (fw + 2.1), 13], [cx + s * (fw - 0.8), 13], [cx + s * (fw - 0.5), fl - 1.4], [cx + s * (fw + 0.7), fl], [cx + s * (fw + 2.2), fl - 1.6]], brim,
+          (x, y) => (s < 0 ? 0.25 : -0.2) + shag(x, y) * 0.6 - (y - 13) * 0.03);
+        P.rect(cx - fw - 2, 10.5, fw * 2 + 4, 3.2, brim, (x, y) => (y <= 10 ? 0.5 : y >= 13 ? -0.3 : 0.12) - (x - cx) * 0.05 + shag(x, y) * 0.7);
+        if (t === 0) for (const [x, y] of [[cx - 3, 8], [cx - 2, 9], [cx + 3, 7]]) P.px(x, y, "hd", -0.55);
+        if (t === 1) for (const s of [-1, 1]) P.line(cx + s * (fw + 0.8), fl, cx + s * (fw + 0.2), fl + 3, "dleather", -0.1, 0.5);
+        break;
+      }
+      case "herb_wreath": {
+        // herbs twisted into a ring that sits on the hair like a circlet: the front dips, the sides run down to the temples
+        const w = fw + 1.2, arc = (x) => 10.4 + ((x + 0.5 - cx) / w) ** 2 * 1.8, n = t === 0 ? 8 : 12;
+        const greens = [["leaf", "leaf"], ["leaf", "herb"], ["herb", "sage"], ["leaf", "herb", "sage"]][t];
+        if (t === 0) for (let x = cx - w; x <= cx + w; x += 0.5) P.px(x, arc(x), "leaf", -0.15);
+        for (let i = 0; i <= n; i++) {
+          const x = cx - w + (i * 2 * w) / n, up = i % 2 ? -0.45 : 0.45;
+          P.ell(x, arc(x) + up, t === 0 ? 1.1 : 1.6, t === 0 ? 0.7 : 1, greens[i % greens.length], { s: up < 0 ? 0.35 : -0.05, k: 0.6 });
+        }
+        const bloom = (dx, petal, eye) => { const x = cx + dx, y = arc(x) - 0.4; for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) P.px(x + a, y + b, petal, 0.35 - a * 0.15); P.px(x, y, eye, 0.4); };
+        if (t === 0) for (const dx of [-5.5, -2, 1.5, 5]) bloom(dx, "feather", "gold");
+        if (t === 1) for (const dx of [-3.5, 3]) { const x = cx + dx; P.ell(x, arc(x) - 0.5, 1, 1, "gold", { s: 0.45 }); }
+        if (t === 2) {
+          for (let x = cx - w + 1; x <= cx + w - 1; x += 2) P.line(x, arc(x) - 0.4, x + (x < cx ? -0.8 : 0.8), arc(x) - (Math.abs(x - cx) > 4 ? 4.2 : 3), "herb", 0.35, 0.45);
+          for (const dx of [-5, -1, 3, 6]) { const x = cx + dx; P.px(x, arc(x) - 2.6, "lav", 0.45); P.px(x + 1, arc(x) - 1.8, "lav", 0); }
+        }
+        if (t === 3) {
+          for (const [dx, h] of [[-6, 3], [-1.5, 4.8], [4, 3.2]]) P.line(cx + dx, arc(cx + dx) - 0.4, cx + dx - 0.8, arc(cx + dx) - h, "herb", 0.35, 0.5);
+          const ex = cx + w - 0.5, ey = arc(ex);
+          P.line(ex, ey, ex + 1.6, ey + 6, "leaf", 0.1, 0.5);
+          for (const [dx, dy] of [[0.6, 2.4], [1.4, 4.6]]) P.ell(ex + dx + 0.8, ey + dy, 1, 0.7, "leaf", { s: 0.25, k: 0.6 });
+          P.px(ex + 1.4, ey + 6.4, "berry", 0.4); P.px(ex + 2.2, ey + 6, "berry", 0);
+          bloom(-4, "feather", "gold");
+          bloom(2, "gold", "rust");
+          for (const dx of [-1, 6]) { const x = cx + dx; P.px(x, arc(x) - 1.6, "lav", 0.45); P.px(x, arc(x) - 2.4, "lav", 0.1); }
+          for (const [dx, dy] of [[-6.5, 0.6], [-5.6, 1.3], [4.6, 0.6], [5.5, 1.3]]) { const x = cx + dx; P.px(x, arc(x) + dy, "berry", 0.35); }
+        }
+        break;
+      }
       case "feather_cap":
         P.ell(cx, 12, fw + 1, 5.6, "hd", { s: 0.1, fn: (x, y, s) => (y > 12 ? false : s) });
         if (t === 3) P.rect(cx - fw - 0.5, 11, fw * 2 + 1, 1, "gold", 0.2);
@@ -1458,7 +1811,7 @@
     }
     if (c.hglow) {
       const spot = { helm: [cx, 13], great_helm: [cx, 14], skull_helm: [cx, 9], hood: [cx, 30], skull_hood: [cx, 9], beast_hood: [cx - 3, 8], wizard_hat: [cx, 8], mitre: [cx, 4], wide_hat: [cx, 8],
-        top_hat: [cx, 7], tricorn: [cx + 3, 8], circlet: [cx, 12], crown: [cx, 6], mask: [cx, 14], bandana: [cx, 10], feather_cap: [cx, 10], leather_cap: [cx, 13], horns: [cx, 13] }[head];
+        top_hat: [cx, 7], tricorn: [cx + 3, 8], circlet: [cx, 12], crown: [cx, 6], mask: [cx, 14], bandana: [cx, 10], feather_cap: [cx, 10], leather_cap: [cx, 13], horns: [cx, 13], fur_cap: [cx, 12], herb_wreath: [cx, 11] }[head];
       if (spot) { P.px(spot[0], spot[1], c.hglow); P.px(spot[0] - 1, spot[1], mix(c.hglow, "#ffffff", 0.5)); }
     }
   }
@@ -1474,6 +1827,7 @@
     const glows = [];
     const back = K.back && K.back.art, bt = tierOf(K.back, 1);
     if (back) glows.push([track(P, () => backPortrait(P, c, back, bt, false)), K.back.glow]);
+    if (BEHIND.has(c.mark)) bodyMark(P, c, false, "back");
     const wpx = track(P, () => portraitWeapon(P, K.w));
     if (K.off) {
       const [ax, ay] = OFF_C[K.off.art] || [21.5, 22.5], tf0 = P.tf;
@@ -1485,6 +1839,7 @@
     P.layer = 2;
     const tpx = track(P, () => torso(P, c.outfit, cx, c.r, c));
     armorPortrait(P, c);
+    if (c.mark === "tabard") bodyMark(P, c, false, "torso");
     if (K.aglow) glows.push([tpx, K.aglow]);
     if (K.belt) glows.push([track(P, () => { P.rect(cx - 15, 35.5, 30, 2, "blt", (x, y) => (y < 36 ? 0.35 : -0.1) - (x - cx) * 0.03); P.rect(cx - 2, 35, 4, 3, K.belt.tier >= 2 ? "gold" : "omet", (x) => 0.45 - (x - cx) * 0.2); P.rect(cx - 1, 36, 2, 1, "blt", -0.4); }), gradeGlow(K.belt)]);
     else if (K.pocket && K.pocket.art === "belt") glows.push([track(P, () => { P.rect(cx - 15, 35.5, 30, 2, "pk", (x, y) => (y < 36 ? 0.35 : -0.1) - (x - cx) * 0.03); P.rect(cx - 2, 35, 4, 3, "gold", (x) => 0.45 - (x - cx) * 0.2); P.rect(cx - 1, 36, 2, 1, "pk", -0.4); }), K.pocket.glow]);
@@ -1640,6 +1995,7 @@
       else P.poly([[8, 17], [20, 17], [22.5, 32], [5.5, 32]], "favd", (x) => -0.2 - (x - 14) * 0.05);
     }
     if (back) glows.push([track(P, () => backSprite(P, c, back, bt, false)), K.back.glow]);
+    if (BEHIND.has(c.mark)) bodyMark(P, c, true, "back");
     P.layer = 2;
     const peg = c.scars.includes("peg"), boots = !!K.boots || !!(K.pocket && K.pocket.art === "boots");
     const bootM = K.boots ? "bts" : boots ? "pk" : "boot", bootTop = boots ? 28 : 30;
@@ -1684,6 +2040,7 @@
         break;
     }
     armorSprite(P, c);
+    if (c.mark === "tabard") bodyMark(P, c, true, "torso");
     if (K.belt) {
       const by = ROBES.has(outfit) ? 22 : 24;
       glows.push([track(P, () => { P.rect(9, by, 10, 2, "blt", (x, y) => (y === by ? 0.3 : -0.2) - (x - 9) * 0.04); P.rect(13, by, 2, 2, K.belt.tier >= 2 ? "gold" : "silver", (x) => (x === 13 ? 0.5 : 0)); P.px(K.belt.tier ? 18 : 15, by + 2, "blt", -0.3); }), gradeGlow(K.belt)]);
@@ -1991,11 +2348,11 @@
       const shut = c.pale ? "#8a98b0" : mix(look.skinHex || look.skin, "#140c0c", dim ? 0.8 : 0.66), ec = c.pale ? "#b8c8e8" : mix(c.eye, "#100c10", 0.45);
       [[-2.7, 0.7], [0.7, 0.7]].forEach(([ex, ey], i) => {
         const [x, y] = at(ex, ey);
-        if (scars.includes("eyepatch") && i === 1) { for (const [a, b] of [[-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [0, -1], [-1, -1]]) P.px(x + a, y + b, "#16121a"); P.px(x, y, "#3a3036"); return; }
+        if ((scars.includes("eyepatch") || c.mark === "eyepatch") && i === 1) { for (const [a, b] of [[-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [0, -1], [-1, -1]]) P.px(x + a, y + b, "#16121a"); P.px(x, y, "#3a3036"); return; }
         if (awake) { P.px(x - 1, y, c.gaze > 0 ? "#ece6da" : ec); P.px(x, y, c.gaze > 0 ? ec : "#ece6da"); }
         else { P.px(x - 1, y, shut); P.px(x, y, shut); if (dim) { P.px(x - 1, y - 1, "skin", 0.6); P.px(x, y - 1, "skin", 0.6); } }
       });
-      if (scars.includes("eyepatch")) draw(() => P.line(-4.6, -1.8, 4.4, -1.0, "#16121a"));
+      if (scars.includes("eyepatch") || c.mark === "eyepatch") draw(() => P.line(-4.6, -1.8, 4.4, -1.0, "#16121a"));
       dot(-1.0, 2.6, "skin", -0.7);
       if (look.face !== 2) { dot(-1.6, 3.9, "lip", -0.6); dot(-0.6, 3.9, "lip", -0.6); }
       else dot(-1.1, 3.9, "lip", -0.75);
@@ -2011,7 +2368,7 @@
         if (c.mark === "antlers") draw(() => { for (const a of [-2.3, -1.2]) { const [x0, y0] = rim(a, 5), [x1, y1] = rim(a, 10), [x2, y2] = rim(a + (a < -2 ? -0.35 : 0.35), 8.4); P.line(x0, y0, x1, y1, "antler", 0.1); P.line((x0 + x1) / 2, (y0 + y1) / 2, x2, y2, "antler", -0.1); } });
         else draw(() => { for (let i = 0; i < 7; i++) { const a = -2.7 + i * 0.4, [x, y] = rim(a, 5.4), [x1, y1] = rim(a, i % 2 ? 6.8 : 7.8);
           if (c.mark === "leaf_crown") P.ell(x, y, 1.2, 0.9, "leaf", { s: i % 2 ? 0.3 : -0.1, k: 0.6 });
-          else P.poly([[x - Math.sin(a) * 0.9, y + Math.cos(a) * 0.9], [x1, y1], [x + Math.sin(a) * 0.9, y - Math.cos(a) * 0.9]], c.mark === "ice_crown" ? "ice" : c.mark === "elemental_crown" ? ELEM[i % 3] : "flame", i % 2 ? 0.1 : 0.45); } });
+          else P.poly([[x - Math.sin(a) * 0.9, y + Math.cos(a) * 0.9], [x1, y1], [x + Math.sin(a) * 0.9, y - Math.cos(a) * 0.9]], c.mark === "ice_crown" ? "ice" : c.mark === "elemental_crown" ? ELEM[i % 3] : c.mark === "storm_crown" ? "#a8dcff" : "flame", i % 2 ? 0.1 : 0.45); } });
       }
     });
   }

@@ -293,6 +293,10 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
   .replay-bar { gap: 4px; }
   .replay-bar .btn { padding: 2px 9px; min-width: 36px; min-height: 34px; justify-content: center; }
   .replay-bar .btn .lbl { display: none; }
+  /* on a phone the stage is too small to float a button over: the bar's own sound button asks for the tap instead */
+  .replay-shot .snd-tap { display: none; }
+  .replay-bar .btn.snd-wait { animation: snd-tap 1.6s ease-in-out infinite; box-shadow: 0 0 0 2px #e8c46a; }
+  .replay-bar .btn.snd-wait .lbl { display: inline; }
 }
 
 /* quiz */
@@ -900,3 +904,10 @@ table.boxscore { margin-bottom: 8px; }
 /* the Kit's belt, gloves and boots row, and the map panel's link to a dungeon's own page */
 .kit-row { grid-column: 1 / -1; display: flex; justify-content: center; gap: 6px; padding-top: 4px; border-top: 1px dashed var(--edge); }
 .dg-open { font-family: var(--px); font-size: 14px; }
+
+.daybook-fold > .daybook-sum { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; margin-bottom: 6px; }
+.daybook-fold > .daybook-sum::-webkit-details-marker { display: none; }
+.daybook-fold > .daybook-sum > h2 { flex: 1 1 auto; margin: 0; }
+.daybook-fold > .daybook-sum::after { content: "▾  hide"; font-size: 12px; color: var(--dim, #8a7a60); white-space: pre; }
+.daybook-fold:not([open]) > .daybook-sum::after { content: "▸  show"; }
+.daybook-fold:not([open]) > .daybook-sum { margin-bottom: 0; }

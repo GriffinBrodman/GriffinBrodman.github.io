@@ -1,4 +1,4 @@
-/* Shared by the dungeon maps: a fast pixel surface, the 3x5 and Pixelify pixel letters, each hero's pixel hand, crew inks, and the floor plan carved into cells from the exported room layout. */
+/* Shared by the dungeon maps: a fast pixel surface, the 3x5 and Pixelify pixel letters, each hero's hand (a handwriting font each; ?hand=pixel or ?hand=clear for the pixel hand), crew inks, and the floor plan carved into cells from the exported room layout. */
 (function () {
   "use strict";
 
@@ -110,8 +110,16 @@
     flourish: { font: "P", col: "#2a4a2a", flourish: true, word: "a flourishing hand" },
     map: { font: "P", col: "#2e2116" },
   };
+  // each hand is written in its handwriting font; ?hand=pixel shows the old pixel hand, ?hand=clear the pixel hand straightened and spaced
+  const HAND_MODE = (() => { try { const m = new URLSearchParams(location.search).get("hand"); return m === "pixel" || m === "clear" ? m : "font"; } catch (e) { return "font"; } })();
+  if (HAND_MODE === "clear") for (const [k, H] of Object.entries(HANDS)) {
+    if (k === "map") continue;
+    Object.assign(H, { caps: false, jit: 0, tilt: 0, slant: 0, sp: 1, grain: H.grain ? 0.06 : 0, lead: 3 });
+    if (H.font === "3") Object.assign(H, { font: "P", k: 1, bold: true, col: "#2a2320" });
+    if (k === "cramped") H.col = "#55504a";
+  }
   const hand = (h) => (typeof h === "string" ? HANDS[h] || HANDS.neat : h);
-  const lineH = (H) => (H.font === "3" ? 6 * (H.k || 1) + 1 : 10);
+  const lineH = (H) => (H.font === "3" ? 6 * (H.k || 1) + 1 : 10) + (H.lead || 0);
   const capH = (H) => (H.font === "3" ? 5 * (H.k || 1) : 7);
   const prep = (H, s) => (H.caps ? String(s).toUpperCase() : String(s));
   function charW(H, ch, first) {
@@ -148,15 +156,70 @@
     }
     return cx - x;
   }
-  function wrap(h, text, maxW) {
+  function wrap(h, text, maxW, wf) {
     const words = String(text).split(/\s+/).filter(Boolean), out = [];
     let cur = "";
     for (const wd of words) {
       const t = cur ? cur + " " + wd : wd;
-      if (cur && width(h, t) > maxW) { out.push(cur); cur = wd; } else cur = t;
+      if (cur && (wf || width)(h, t) > maxW) { out.push(cur); cur = wd; } else cur = t;
     }
     if (cur) out.push(cur);
     return out;
+  }
+
+  // ---------- the handwriting fonts: one font and ink per hand; size in sheet pixels, set per font so the small-bodied ones read as large as the rest ----------
+  const FONTS = {
+    big: { fam: "Permanent Marker", size: 8.5, lh: 1.3, base: 0.9, caps: true, col: "#2a2320" },
+    jagged: { fam: "Covered By Your Grace", size: 10.5, lh: 1.15, base: 0.85, caps: true, col: "#7a2e16" },
+    neat: { fam: "Indie Flower", size: 9.5, lh: 1.25, base: 0.9, col: "#4a2a16" },
+    upright: { fam: "Patrick Hand", size: 10, lh: 1.1, base: 0.85, col: "#1e1a16" },
+    scrawl: { fam: "Kalam", size: 9.5, lh: 1.3, base: 0.95, col: "#5e2430" },
+    looping: { fam: "Caveat", wt: 500, size: 12, lh: 1.05, base: 0.8, col: "#22324e" },
+    block: { fam: "Gochi Hand", size: 9.5, lh: 1.15, base: 0.85, caps: true, col: "#2a2a2e" },
+    cramped: { fam: "Just Another Hand", size: 13.5, lh: 0.9, base: 0.8, col: "#4f4a44" },
+    flourish: { fam: "Dancing Script", wt: 500, size: 11, lh: 1.2, base: 0.85, col: "#2a4a2a" },
+  };
+  const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Covered+By+Your+Grace&family=Indie+Flower&family=Patrick+Hand&family=Kalam"
+    + "&family=Caveat:wght@500&family=Gochi+Hand&family=Just+Another+Hand&family=Dancing+Script:wght@500&display=swap";
+  const FALLBACK = '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive';
+  const fontSpec = (h) => FONTS[h] || FONTS.neat;
+  const fontCss = (h, px) => { const F = fontSpec(h); return `${F.wt || 400} ${px}px "${F.fam}", ${FALLBACK}`; };
+  let fontsP = null;
+  // resolves once the fonts are in, or failed (offline, file:// with no network), or after a few seconds; the fallback is a system cursive
+  function fontsReady() {
+    if (HAND_MODE !== "font") return Promise.resolve();
+    if (fontsP) return fontsP;
+    const sheet = new Promise((res) => {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = FONTS_CSS;
+      l.onload = res; l.onerror = res;
+      document.head.appendChild(l);
+    });
+    const faces = () => (document.fonts && document.fonts.load ? Promise.all(Object.keys(FONTS).map((h) => document.fonts.load(fontCss(h, 20), "Ag").catch(() => null))) : null);
+    fontsP = Promise.race([sheet.then(faces), new Promise((res) => setTimeout(res, 2500))]).then(() => undefined);
+    return fontsP;
+  }
+  let mctx = null;
+  const noteText = (h, s) => (HAND_MODE === "font" ? (fontSpec(h).caps ? String(s).toUpperCase() : String(s)) : String(s));
+  function noteWidth(h, s) {
+    if (HAND_MODE !== "font") return width(h, s);
+    mctx = mctx || document.createElement("canvas").getContext("2d");
+    mctx.font = fontCss(h, fontSpec(h).size * 4);
+    return Math.ceil(mctx.measureText(noteText(h, s)).width / 4);
+  }
+  const noteLineH = (h) => (HAND_MODE === "font" ? Math.round(fontSpec(h).size * fontSpec(h).lh) : lineH(hand(h)));
+  const noteWrap = (h, text, maxW) => wrap(h, text, maxW, noteWidth);
+  // one line in a font on a canvas drawn K times the sheet's scale; y is the line's top, and each line leans a hair its own way
+  function fontLine(ctx, K, h, s, x, y, o) {
+    const F = fontSpec(h);
+    ctx.save();
+    ctx.font = fontCss(h, F.size * K);
+    ctx.fillStyle = (o && o.col) || F.col;
+    ctx.textBaseline = "alphabetic";
+    ctx.translate(x * K, (y + F.size * F.base) * K);
+    ctx.rotate((h2((o && o.seed) || 0, 5, 17) - 0.5) * 0.025);
+    ctx.fillText(noteText(h, s), 0, 0);
+    ctx.restore();
   }
   function line(px, x0, y0, x1, y1, col, dash) {
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
@@ -343,5 +406,6 @@
   }
 
   window.DungeonPen = { rgb, hex, mix, lum, h2, vnoise, hashStr, ramp, surface, Font3, FontP, HANDS, hand, width, write, wrap, lineH, capH, line, arrow, tick, ring,
+    handMode: HAND_MODE, FONTS, fontSpec, fontCss, fontsReady, noteText, noteWidth, noteLineH, noteWrap, fontLine,
     crewInk, crewBanner, crewShort, bust, carve, visible, known, key };
 })();

@@ -18,6 +18,25 @@
 .dg-tab.on { background: var(--wood2); color: var(--brass2); border-color: var(--brass0); }
 .dg-tab b { font-weight: 700; }
 .dg-tab-n { font-size: 11px; opacity: 0.85; }
+.dg-tab-d { font-weight: 400; }
+.dg-floorbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; margin: 0 0 6px; }
+.dg-floorbar .dg-tabs { margin: 0; }
+/* the floors side-on: daylight and grass on top, each floor a band of earth darker the deeper it lies */
+.dg-depth { flex: 1 1 260px; max-width: 460px; border: 2px solid var(--wood2); font-family: var(--px); font-size: 13px; box-shadow: 1px 2px 0 rgba(40, 25, 10, 0.25); }
+.dg-depth-sky { display: flex; justify-content: space-between; gap: 8px; padding: 2px 8px; background: linear-gradient(#a9cde3, #dfe6d6); color: #2e4256; font-size: 11px; border-bottom: 3px solid #5a7a3a; }
+.dg-depth-arrow { color: #2e2116; }
+.dg-depth-row { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; min-height: 26px; padding: 3px 8px; border: 0; border-top: 1px dashed rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, #3a2414 calc(var(--d, 0) * 100%), #8a6640); color: #f4e4c0; font: inherit; text-align: left; cursor: pointer; }
+.dg-depth-row:hover { filter: brightness(1.12); }
+.dg-depth-row.on { box-shadow: inset 4px 0 0 var(--brass2), inset 0 0 0 1px var(--brass2); }
+.dg-depth-row.on .dg-depth-w::after { content: "  (this map)"; color: var(--brass2); }
+.dg-depth-n { font-weight: 700; text-align: center; color: var(--brass2); }
+.dg-depth-who { display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: flex-end; }
+.dg-depth-crew { white-space: nowrap; }
+.dg-depth-crew .dg-swatch { border-color: #f4e4c0; }
+.dg-depth-boss { color: #ffb8a0; white-space: nowrap; }
+.dg-depth-boss.rumour { font-style: italic; color: #e8d8b8; border-bottom: 1px dashed #e8d8b8; }
+.dg-depth-boss.slain { text-decoration: line-through; color: #c8b8a0; }
 .dg-card-stage:not(:empty) { margin: 6px 0 4px; max-width: 420px; }
 .dg-story-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dg-card-notes-h { margin: 8px 0 2px; }
@@ -46,6 +65,7 @@
 .dg-note-head { display: flex; gap: 8px; align-items: center; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px dashed #c8ad7c; font-size: 15px; }
 .dg-bust { display: block; height: auto; image-rendering: pixelated; }
 .dg-hand { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
+.dg-hand-font { margin: 0; image-rendering: auto; overflow-wrap: anywhere; }
 .dg-note.on { outline: 2px solid var(--red); }
 .dg-note .dg-num { position: absolute; left: 5px; top: 7px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); color: #fff4dc; font: 700 10px/16px var(--px); text-align: center; }
 .dg-note p { margin: 0 0 4px; overflow-wrap: anywhere; }

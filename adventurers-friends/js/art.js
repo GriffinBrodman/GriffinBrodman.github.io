@@ -994,7 +994,7 @@
       : iconFit((Q) => G.weapon(Q, art, k.wt, G.axis(Q, 0, 0, Math.PI / 4, 1), { glow: it.glow }), M, art === "wand" ? 1.8 : 1.2);
     else if (slot === "armor") { P = new Paint.Paint(16, 16); armorIcon(P, art, k.at, it.glow); }
     else if (slot === "head") P = iconFit((Q) => {
-      const holl = ["hood", "skull_hood", "beast_hood", "helm", "great_helm", "skull_helm", "leather_cap", "horns"].includes(art);
+      const holl = ["hood", "skull_hood", "beast_hood", "helm", "great_helm", "skull_helm", "leather_cap", "fur_cap", "horns"].includes(art);
       Q.layer = 1;
       if (holl) Q.ell(20, 16, 6.6, 8.4, "#1e1824");
       Q.layer = 7;

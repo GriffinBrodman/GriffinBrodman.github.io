@@ -42,8 +42,11 @@
     cv.style.width = cv.style.height = 16 * (px || 2) + "px";
     return cv;
   }
+  // the move a hero is known for: their own class's move once they have used it, then any move they choose over a song or knack
+  // that fires by itself every fight (a Hunter's Bring It Down, not the Marching Song everyone steps off to)
   function signature(h) {
-    const used = (h.skills || []).filter((s) => s.type !== "world" && s.uses).sort((a, b) => b.uses - a.uses);
+    const rank = (s) => (s.own ? 2 : 0) + (s.type !== "trigger" ? 1 : 0);
+    const used = (h.skills || []).filter((s) => s.type !== "world" && s.uses).sort((a, b) => rank(b) - rank(a) || b.uses - a.uses);
     return used[0] || null;
   }
   function nextStep(h) {
@@ -74,7 +77,7 @@
       tip(el("span", { class: "pill" }, row === "front" ? "stands in front in a fight" : "stays at the back in a fight"), ROW_TIP[row]),
       el("span", { class: "pill" }, `fights with ${PATH[path].plain}`),
       sig ? tip(el("span", { class: "pill gold" }, `best move: ${sig.name} (used ${plural(sig.uses, "time")})`),
-        `${h.name}'s signature move: the fighting skill used most. ${sig.desc || ""}`, sig.name) : null,
+        `${h.name}'s signature move: their own class's move once used, otherwise the fighting move used most. ${sig.desc || ""}`, sig.name) : null,
       h.alive ? el("span", { class: "pill" }, nextStep(h)) : null);
   }
   function fightCard(h) {
@@ -649,7 +652,15 @@
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
     const cal = dayCalendar(h);
-    if (cal) v.appendChild(el("section", { class: "panel daybook-panel" }, cal));
+    if (cal) {
+      // folding the day away is a reader's choice that holds on every hero page until they open it again
+      let shut = false;
+      try { shut = localStorage.getItem("al.daybook") === "closed"; } catch (e) { /* storage unavailable */ }
+      const fold = el("details", { class: "daybook-fold" }, el("summary", { class: "daybook-sum" }, el("h2", null, "Hour by hour")), cal);
+      fold.open = !shut;
+      fold.addEventListener("toggle", () => { try { localStorage.setItem("al.daybook", fold.open ? "open" : "closed"); } catch (e) { /* storage unavailable */ } });
+      v.appendChild(el("section", { class: "panel daybook-panel" }, fold));
+    }
     const tro = trophyShelf(h.trophies, (h.angler || {}).legends);
     if (tro) v.appendChild(tro);
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
@@ -1489,6 +1500,9 @@
     const kept = h.daybook_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).daybook_days || [];
     const days = kept.filter((d) => d !== today).concat([today]).sort((a, b) => a - b);
     const body = el("div"), nav = el("div", { class: "row small", style: { justifyContent: "space-between", marginBottom: "6px" } });
+    // the kept days spent hunting, so a hunt is a tap away however many days ago it was
+    const hunts = (h.hunt_days || ((L.heroes || []).find((x) => x.id === h.id) || {}).hunt_days || []).filter((d) => days.includes(d));
+    const huntRow = hunts.length ? el("div", { class: "small db-hunts", style: { marginBottom: "6px" } }, el("span", { class: "dim" }, "Hunting days: ")) : null;
     let readOpen = false, shown = null;
     const draw = (d, db) => {
       let out = null;
@@ -1508,6 +1522,9 @@
       if (db && !window.RoadScenes && (db.blocks || []).some((b) => b && b.stretch)) A.roadArt().then(() => { if (shown === d && window.RoadScenes) draw(d, db); }, () => {});
       // and the town art with the first town day, the same way
       if (db && !window.TownDay && (db.blocks || []).some((b) => b && b.scene)) A.need(A.TOWN_ART).then(() => { if (shown === d && window.TownDay) draw(d, db); }, () => {});
+      // and the hunt's acts with the first hunt day
+      if (db && !window.HuntScenes && (db.blocks || []).some((b) => b && b.act === "hunt" && b.stretch)) A.need(A.HUNT_ART).then(() => { if (shown === d && window.HuntScenes) draw(d, db); }, () => {});
+      if (huntRow) huntRow.replaceChildren(huntRow.firstChild, ...hunts.map((x, k) => [k ? ", " : "", x === d ? el("b", null, A.when(x)) : el("a", { href: "javascript:void 0", onclick: () => go(x) }, A.when(x))]).flat());
       const i = days.indexOf(d), prev = days[i - 1], next = days[i + 1];
       nav.replaceChildren(
         prev != null ? el("button", { class: "btn small", onclick: () => go(prev) }, `‹ Day ${prev}`) : el("span"),
@@ -1517,7 +1534,7 @@
     const go = (d) => (d === today ? draw(d, h.daybook) : A.load(`daybook/${h.id}/${d}`).then((db) => draw(d, db), () => draw(d, null)));
     draw(today, h.daybook);
     // the buttons sit above the day, so they don't move when a day is taller or shorter than the last
-    return el("div", null, days.length > 1 ? nav : null, body);
+    return el("div", null, days.length > 1 ? nav : null, huntRow, body);
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }

@@ -367,6 +367,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   const ROAD_ART = ["road_scenes", "road_art"];
   // a town day's scenes: the sets, the acts and the player (and what they draw with), loaded with the first town day a page draws
   const TOWN_ART = STAGE.concat(["road_scenes", "road_art", "scene_kits", "stage", "town_day_sets", "town_day_sets_b", "town_day_sets_c", "town_day_sets_e", "town_day_flat", "town_day_flat_sets", "town_day_flat_sets_b", "town_day_acts", "town_day_replay"]);
+  // a hunt day's acts on the wilds' own ground, with the game and the hunt's props
+  const HUNT_ART = ["road_scenes", "road_art", "scene_kits", "stage", "hunt_art", "hunt_scenes"];
   // the art and the road cast (data/road_cast.js: travellers' looks and the places) arrive together
   function roadArt(names) {
     return Promise.all([need(names || ROAD_ART), S.road ? null : load("road_cast").then((c) => { S.road = c; })]);
@@ -511,7 +513,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, HUNT_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
     animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd,
   };
 })();
