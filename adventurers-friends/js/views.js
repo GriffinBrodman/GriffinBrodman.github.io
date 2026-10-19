@@ -1599,11 +1599,10 @@
         w.paid && w.paid.length ? el("div", { class: "tiny dim" }, "Paid for by " + w.paid.map(([n, v]) => `${n} (${v}s)`).join(", ") + ".") : null)),
       who, gap);
   }
-  // with a wagon on the road, the crew's animals travel as one string: every member's mount in one place, ridden, hitched or resting
+  // the crew's animals in one place: every member's mount, ridden, hitched or resting, and whatever pulls the wagon
   function crewMounts(p) {
-    if (!p.wagon) return null;
     const ms = p.members.map((m) => heroes[m]).filter((h) => h && h.alive && h.mount);
-    const pull = p.wagon.puller && !ms.some((h) => h.mount.hitched) ? p.wagon.puller : null;
+    const pull = p.wagon && p.wagon.puller && !ms.some((h) => h.mount.hitched) ? p.wagon.puller : null;
     if (!ms.length && !pull) return null;
     const cart = pull ? el("div", { class: "crew-mount" }, el("div", { class: "mount-art" }, mountArt(pull, 3)),
       el("div", null, el("b", null, pull.name), el("div", { class: "tiny muted" }, cap(`${pull.colour || ""} ${pull.label}`.trim())),
