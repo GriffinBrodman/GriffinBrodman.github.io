@@ -250,7 +250,7 @@
     const [, sd] = A.seasonOf(day), len = L.meta.season_length || 30, wk = Math.ceil(sd / 7);
     const wlen = Math.min(7, len - (wk - 1) * 7), wd = sd - (wk - 1) * 7, prev = wk > 1 ? issueOf(day - wd) : null;
     const tail = wd === wlen && weekHere ? "The Week is below" : prev && prev.week ? ["Last week: ", el("a", { href: issueHref(prev) }, "The Week ›")] : null;
-    return el("div", { class: "week-strip" }, `Week ${wk} · day ${wd} of ${wlen}`, tail ? [el("span", { class: "sep" }, " · "), tail] : null);
+    return el("div", { class: "week-strip" }, `Week ${wk} · day ${wd} of ${wlen}`, tail ? [el("span", { class: "sep" }, " · "), tail] : null, el("span", { class: "sep" }, " · "), el("a", { href: `#/echo/${day}` }, "▶ The Daily Echo"));
   }
   // a headline cut at a word, never mid-word
   const clip = (t, n) => (t.length <= n ? t : t.slice(0, n).replace(/[\s,;:–-]+\S*$/, "") + "…");
