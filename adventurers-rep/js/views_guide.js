@@ -145,7 +145,34 @@
   };
   const fill = (txt) => txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", ")).replace("{theme}", theme());
   // a small "?" beside a label, into the Guide's entry for it; it works on a phone, where a hover title doesn't
-  Views.helpLink = (topic, what) => el("a", { class: "q-help", href: `#/guide/${topic}`, title: `What is ${what || topic.replace(/-/g, " ")}?`, "aria-label": `What is ${what || topic.replace(/-/g, " ")}? (the Guide)` }, "?");
+  Views.helpLink = (topic, what) => el("a", { class: "q-help", href: `#/guide/${topic}`, "data-topic": topic, "aria-label": `What is ${what || topic.replace(/-/g, " ")}? (the Guide)` }, "?");
+  const entry = (topic) => {
+    const want = ALIAS[topic] || topic;
+    for (const [, items] of GUIDE) for (const [k, txt, id] of items) if ((id || slug(k)) === want || slug(k) === want) return [k, fill(txt)];
+    return null;
+  };
+  // on a mouse, hovering the "?" shows the Guide's entry in place; a tap (phones) still opens the Guide
+  let pop = null;
+  const hide = () => { if (pop) { pop.remove(); pop = null; } };
+  const show = (a) => {
+    const e = entry(a.dataset.topic);
+    if (!e) return;
+    hide();
+    pop = el("div", { class: "q-pop", role: "tooltip" }, el("b", null, e[0]), el("p", null, e[1]), el("span", { class: "q-pop-more" }, "Click for the Guide ›"));
+    document.body.appendChild(pop);
+    const r = a.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    const top = r.bottom + 8 + h > window.innerHeight ? r.top - h - 8 : r.bottom + 8;
+    pop.style.left = `${left + window.scrollX}px`;
+    pop.style.top = `${top + window.scrollY}px`;
+  };
+  if (window.matchMedia && window.matchMedia("(hover: hover)").matches) {
+    document.addEventListener("mouseover", (ev) => { const a = ev.target.closest && ev.target.closest(".q-help"); if (a) show(a); });
+    document.addEventListener("mouseout", (ev) => { const a = ev.target.closest && ev.target.closest(".q-help"); if (a && !a.contains(ev.relatedTarget)) hide(); });
+    document.addEventListener("focusin", (ev) => { if (ev.target.classList && ev.target.classList.contains("q-help")) show(ev.target); });
+    document.addEventListener("focusout", hide);
+    window.addEventListener("hashchange", hide);
+  }
   A.route(/^\/guide(?:\/([\w-]+))?$/, (v, focus) => {
     v.appendChild(el("h1", null, "The Guide"));
     v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page.",

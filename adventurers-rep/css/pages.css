@@ -3,6 +3,11 @@
 /* "?" links into the Guide, and the Guide entry they land on */
 .q-help { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; margin-left: 2px; vertical-align: 1px; border-radius: 50%;
   font-family: var(--px); font-size: 11px; font-weight: 700; line-height: 1; color: var(--parch); background: var(--edge2); border: 1px solid var(--wood3); text-transform: none; letter-spacing: 0; }
+.q-pop { position: absolute; z-index: 50; max-width: 320px; padding: 10px 12px; background: var(--parch); color: var(--ink); font-family: var(--body);
+  border: 2px solid var(--edge2); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35); font-size: 15px; line-height: 1.35; pointer-events: none; }
+.q-pop b { display: block; margin-bottom: 3px; font-size: 16px; }
+.q-pop p { margin: 0 0 6px; }
+.q-pop-more { font-size: 13px; color: var(--muted); }
 .q-help:hover { background: var(--crimson); color: var(--brass2); text-decoration: none; }
 .kv.guide dt[id] { scroll-margin-top: 140px; }
 .kv.guide dt.guide-hit { background: var(--brass2); color: var(--ink); padding: 2px 6px; margin-left: -6px; box-shadow: inset 3px 0 0 var(--crimson); }

@@ -37,7 +37,7 @@
     goblin: null, beast: null,
   };
 
-  function interior(kind, W, H, r, info) {
+  function interior(kind, W, H, r, info, place) {
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
@@ -58,30 +58,7 @@
       info.window = [wx, 8, 16, 12];
       return cv;
     }
-    for (let x = 0; x < W; x += 6) { F(x, 0, 6, floor, r() < 0.5 ? "#6e4628" : "#644024"); F(x, 0, 1, floor, "#42281a"); }
-    for (let y = 10; y < floor; y += 14) F(0, y, W, 1, "#4a2e1c");
-    for (let y = floor; y < H; y += 3) { F(0, y, W, 3, (y / 3) % 2 ? "#8e5c34" : "#83542f"); F(0, y, W, 1, "#a06c40"); }
-    for (let x = 0; x < W; x += 17) F(x + ((x / 17) % 2) * 8, floor, 1, H - floor, "#5a3820");
-    const wx = Math.floor(W * 0.08);
-    F(wx, 6, 22, 16, "#3a2414"); F(wx + 2, 8, 18, 12, "#8ac4ec"); F(wx + 2, 16, 18, 4, "#6aa83a"); F(wx + 10, 8, 2, 12, "#3a2414"); F(wx + 2, 13, 18, 1, "#3a2414");
-    const sx = Math.floor(W * 0.55);
-    for (const y of [8, 18]) {
-      F(sx, y + 6, 70, 2, "#3a2414");
-      for (let k = 0; k < 9; k++) { const c = ["#5a8a3a", "#8a3a2a", "#c8a040", "#3a5a8a"][k % 4]; F(sx + 3 + k * 7, y + 1, 3, 5, c); F(sx + 4 + k * 7, y, 1, 1, c); F(sx + 3 + k * 7, y + 1, 1, 2, "#f0e0c0"); }
-    }
-    const by = floor - 12;
-    F(sx - 6, by, W - sx + 6, 13, "#4a2c18"); F(sx - 6, by, W - sx + 6, 3, "#7a4a28"); F(sx - 6, by, W - sx + 6, 1, "#a8703c");
-    for (let x = sx; x < W; x += 12) F(x, by + 4, 1, 9, "#3a2214");
-    for (const [bx, s] of [[W * 0.42, 1], [W * 0.47, 0]]) { F(bx, floor - 10 + s * 2, 9, 10, "#3a2214"); F(bx + 1, floor - 9 + s * 2, 7, 8, "#8a5a30"); F(bx + 1, floor - 7 + s * 2, 7, 1, "#5a5a62"); F(bx + 1, floor - 3 + s * 2, 7, 1, "#5a5a62"); }
-    const lx = Math.floor(W * 0.3);
-    info.lamp = [lx, 9];
-    F(lx, 0, 1, 7, "#2a1a10"); F(lx - 2, 7, 5, 5, "#2a1a10"); F(lx - 1, 8, 3, 3, "#ffd86a");
-    const g = ctx.createRadialGradient(lx, 10, 0, lx, 10, 40);
-    g.addColorStop(0, "rgba(255,200,110,0.35)"); g.addColorStop(1, "rgba(255,200,110,0)");
-    ctx.fillStyle = g; ctx.fillRect(lx - 40, 0, 80, 50);
-    const tx = Math.floor(W * 0.62);
-    F(tx, H - 9, 34, 3, "#3a2214"); F(tx, H - 9, 34, 1, "#a8703c"); F(tx + 3, H - 6, 2, 6, "#3a2214"); F(tx + 29, H - 6, 2, 6, "#3a2214");
-    F(tx + 8, H - 12, 3, 3, "#c8c0b0"); F(tx + 20, H - 12, 3, 3, "#c8a040");
+    if (window.TavernFlat) TavernFlat.paint(cv, Object.assign(info, { town: place && place.town, wx: place && place.wx }), r);
     return cv;
   }
 
@@ -98,7 +75,7 @@
     const r = rng(seed || 7);
     const P = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
     const F = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-    if (kind === "tavern" || kind === "jail") return interior(kind, W, H, r, info);
+    if (kind === "tavern" || kind === "jail") return interior(kind, W, H, r, info, place);
     const cave = CAVE[kind];
     const horizon = Math.round(H * 0.62);
     if (cave) {
@@ -307,15 +284,11 @@
     const d = place && place.d, add = (x) => { if (x) out.push(x); };
     const n = (k) => (vig ? Math.ceil(k / 2) : k);
 
-    if (kind === "tavern" || kind === "jail") {
-      if (info.lamp) {
-        add(A.glow({ x: info.lamp[0], y: info.lamp[1] + 1, r: 34, rgb: "255,200,110", a: 0.1, amp: 0.12, seed: s() }));
-        add(A.torch({ x: info.lamp[0] - 1, y: info.lamp[1] + 2, r: 8, seed: s(), cols: ["#ffb84a", "#ffd86a", "#ffe88a", "#fff8d0"] }));
-      }
-      const wnd = info.window || [Math.floor(W * 0.08) + 2, 8, 18, 12];
+    if (kind === "tavern") return window.TavernFlat ? TavernFlat.actors(info, A, s) : out;
+    if (kind === "jail") {
+      const wnd = info.window;
       add(A.fireflies({ x: wnd[0] + 2, y: wnd[1] + wnd[3], w: wnd[2] + 10, h: 18, n: 5, glow: false, col: "#e8d8a8", seed: s() }));
-      if (kind === "tavern") add(A.cat({ x: W * 0.84, y: H - 3, range: 10, seed: s() }));
-      if (kind === "jail") add(A.quad({ kind: "rat", x0: W * 0.1, x1: W * 0.5, y: H - 3, seed: s() }));
+      add(A.quad({ kind: "rat", x0: W * 0.1, x1: W * 0.5, y: H - 3, seed: s() }));
       return out;
     }
 
@@ -481,7 +454,7 @@
     const ground = Math.round(H * 0.62) + 14;
     // a dungeon is framed from its own map header, cut so its way in stands just behind the heroes
     const TS = window.TownScenes, hdr = !indoors && S.dungeons[e.loc] && TS && TS.frame && TS.DUNGEONS.includes(e.loc) ? TS.frame(e.loc, W, H, { y0: (TS.FOOT[e.loc] || 70) - (ground - 9) }) : null;
-    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, place);
+    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, indoors ? { town: e.loc, wx: e.wx } : place);
     const info = hdr ? { kind, W, H, horizon: ground - 14, bk: S.dungeons[e.loc].biome } : bg.info;
     if (e.wx && !indoors) weatherOverlay(bg.getContext("2d"), W, H, e.wx, seed);
     // heroes, foes and props sit on their own layer so the place's ambient life can pass behind them
