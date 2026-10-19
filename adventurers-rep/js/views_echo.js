@@ -451,15 +451,18 @@
       const gh = el("div", { class: "echo-ghead" }, p ? A.bannerSprite(p.banner, 2) : null, p ? A.partyLink(k) : el("span", null, groups.size > 1 ? "On their own" : "Everyone"));
       const g = el("div", { class: "echo-grid" });
       g.style.setProperty("--n", String(Math.min(5, xs.length)));
+      const gi = tiles.length;
       for (const id of xs) {
-        const h = heroes[id], db = dbs.get(id), t = { h, db, list: sorted(db), info: dayInfo(h, db), key: null, rec: null };
+        const h = heroes[id], db = dbs.get(id), t = { h, db, list: sorted(db), info: dayInfo(h, db), key: null, rec: null, group: gi, cols: Math.min(5, xs.length) };
         t.pic = el("div", { class: "echo-pic" });
         t.what = el("span", { class: "echo-what" });
         t.line = el("div", { class: "echo-line" });
         t.when = el("span", { class: "echo-span" });
-        const face = A.heroPortrait(h, 1, { cls: "echo-face" });
+        t.face = A.heroPortrait(h, 1, { cls: "echo-face" });
+        t.faces = el("span", { class: "echo-faces" }, t.face);
+        t.nameEl = el("b", null, h.name);
         t.a = el("a", { class: "echo-tile" + (mine.includes(id) ? " mine" : ""), href: "#/hero/" + id, onclick: () => setSess({ day, at: STEPS[si], href: t.a.getAttribute("href") }) },
-          t.pic, el("div", { class: "echo-cap" }, face, el("div", { class: "echo-captxt" }, el("b", null, h.name), " · ", t.what)), t.when, t.line);
+          t.pic, el("div", { class: "echo-cap" }, t.faces, el("div", { class: "echo-captxt" }, t.nameEl, " · ", t.what)), t.when, t.line);
         g.appendChild(t.a);
         tiles.push(t);
       }
@@ -513,6 +516,7 @@
         t.a.setAttribute("href", hrefOf(t.h, st, t.db, day));
         t.a.classList.toggle("has-replay", /^#\/(fight|night|meal|catch|road|reading|table|day)\//.test(t.a.getAttribute("href")));
         t.a.title = `${t.h.name}, ${clock(st.b ? st.b.from : time)}: ${t.what.textContent}`;
+        t.sig = [t.when.textContent, t.what.textContent].join("|");
         if (st.b && st.b.room && window.DelveScenes) {
           roomRec(st.b, day, band(t.h)).then((rec) => {
             if (t.key !== st.key) return;
@@ -525,8 +529,29 @@
         }
         queue.push({ t, st, time });
       }
+      merge();
       if (queue.length && !pumping) { pumping = true; requestAnimationFrame(pump); }
       try { history.replaceState(null, "", `#/echo/${day}?at=${time}`); } catch (e) { /* file:// may refuse */ }
+    }
+    // crewmates doing the same thing this hour share one wide tile, and part again when they go separate ways
+    function merge() {
+      const same = new Map();
+      for (const t of tiles) {
+        const k = t.group + "#" + t.sig;
+        if (!same.has(k)) same.set(k, []);
+        same.get(k).push(t);
+      }
+      for (const xs of same.values()) {
+        const [lead, ...rest] = xs;
+        for (const t of rest) t.a.hidden = true;
+        lead.a.hidden = false;
+        lead.a.classList.toggle("wide", xs.length > 1);
+        lead.a.style.gridColumn = xs.length > 1 ? `span ${Math.min(xs.length, lead.cols)}` : "";
+        lead.faces.replaceChildren(...xs.map((t) => t.face));
+        const nm = xs.map((t) => t.h.name);
+        lead.nameEl.textContent = nm.length > 1 ? `${nm.slice(0, -1).join(", ")} and ${nm[nm.length - 1]}` : nm[0];
+        lead.a.classList.toggle("mine", xs.some((t) => mine.includes(t.h.id)));
+      }
     }
     function sync() {
       playBtn.textContent = playing ? "❚❚" : si >= STEPS.length - 1 ? "↺" : "▶";
