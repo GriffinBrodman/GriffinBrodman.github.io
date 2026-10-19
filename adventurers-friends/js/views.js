@@ -21,6 +21,8 @@
     curiosity: "Curiosity", temper: "Temper", loyalty: "Loyalty" };
   function traitWord(t, v) { const w = TRAIT_WORDS[t]; return w[Math.min(4, Math.max(0, Math.floor((v + 1) / 0.4)))]; }
 
+  // a small "?" into the Guide's topic (Views.helpLink, from views_guide.js, loaded after this file)
+  function guideQ(topic, what) { return window.Views && Views.helpLink ? Views.helpLink(topic, what) : null; }
   function panel(title, ...kids) { return el("section", { class: "panel" }, title ? el("h2", null, title) : null, ...kids); }
 
   // ---------- class identity: blade, bow or spell gives a hero's page its own colours, emblem and fighting summary ----------
@@ -210,7 +212,7 @@
       parch.appendChild(el("div", { class: "lead" },
         lead.day < today ? el("div", { class: "small muted" }, "Still the talk of the taverns, from yesterday:") : null,
         el("h1", null, A.richText(hl, lead.heroes, lead.parties)),
-        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => `${x.name} (${x.owner})`))].slice(0, 4);
+        (() => { const owners = [...new Set((lead.heroes || []).map((id) => heroes[id]).filter((x) => x && !x.npc).map((x) => (String(x.owner || "").trim().toLowerCase() === x.name.toLowerCase() ? x.name : `${x.name} (${x.owner})`)))].slice(0, 4);
           return owners.length ? el("div", { class: "small muted" }, "Starring " + owners.join(", ")) : null; })(),
         scene,
         el("p", { class: "muted" }, hl === lead.text ? (lead.loc ? A.nodeName(lead.loc) : "") : A.richText(lead.text, lead.heroes, lead.parties),
@@ -221,12 +223,12 @@
     }
     if (second.length || (roundup || []).length) parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
     if ((roundup || []).length) parch.appendChild(el("div", { class: "ks-roundup" }, el("div", { class: "ks-head" }, "✦ Reaching new heights"),
-      el("p", { class: "tiny muted" }, `${plural(roundup.length, "hero")} reached a turning point today.`), A.feed(roundup, { noDay: true })));
-    if (second.length) parch.appendChild(A.feed(second, { noDay: true }));
+      el("p", { class: "tiny muted" }, `${plural(roundup.length, "hero")} reached a turning point today.`), A.feed(roundup, { noDay: true, mark: true })));
+    if (second.length) parch.appendChild(A.feed(second, { noDay: true, mark: true }));
   }
   function smallerHappenings(p, small) {
     if (!small.length) return;
-    const more = el("div", { hidden: true }, A.feed(small, { noDay: true }));
+    const more = el("div", { hidden: true }, A.feed(small, { noDay: true, mark: true }));
     p.appendChild(el("button", { class: "btn small", onclick: (ev) => { more.hidden = !more.hidden; ev.target.textContent = more.hidden ? `+ ${small.length} smaller happenings` : "hide"; } }, `+ ${small.length} smaller happenings`));
     p.appendChild(more);
   }
@@ -243,17 +245,39 @@
       next ? el("a", { href: issueHref(next) }, `Day ${next.sday} ›`) : el("span"));
   }
 
+  // where a day sits in its season's week (league/digest.py week_of), and the way to the last finished The Week
+  function weekStrip(day, weekHere) {
+    const [, sd] = A.seasonOf(day), len = L.meta.season_length || 30, wk = Math.ceil(sd / 7);
+    const wlen = Math.min(7, len - (wk - 1) * 7), wd = sd - (wk - 1) * 7, prev = wk > 1 ? issueOf(day - wd) : null;
+    const tail = wd === wlen && weekHere ? "The Week is below" : prev && prev.week ? ["Last week: ", el("a", { href: issueHref(prev) }, "The Week ›")] : null;
+    return el("div", { class: "week-strip" }, `Week ${wk} · day ${wd} of ${wlen}`, tail ? [el("span", { class: "sep" }, " · "), tail] : null);
+  }
+  // a headline cut at a word, never mid-word
+  const clip = (t, n) => (t.length <= n ? t : t.slice(0, n).replace(/[\s,;:–-]+\S*$/, "") + "…");
+  const ISSUE_MARKS = [["week", "The Week"], ["finale", "Finale"], ["great", "Great event"]];
+
   // ================= BACK ISSUES =================
   A.route(/^\/days$/, (v) => {
     const is = (L.issues || []).slice().reverse();
     const p = panel("Back issues of the Crier", el("p", { class: "small muted" }, "Every day's front page this age, newest first."));
     let season = null, ul = null;
+    const slots = {};
     for (const x of is) {
-      if (x.season !== season) { season = x.season; p.appendChild(el("h4", null, `Season ${season}`)); ul = el("div", { class: "issues" }); p.appendChild(ul); }
-      ul.appendChild(el("a", { class: "btn small", href: issueHref(x) }, `Day ${x.sday}`));
+      if (x.season !== season) { season = x.season; p.appendChild(el("h4", null, `Season ${season}`)); ul = el("ul", { class: "issue-list" }); p.appendChild(ul); }
+      slots[x.day] = el("span", { class: "issue-hl" });
+      ul.appendChild(el("li", null, el("a", { class: "issue-row", href: issueHref(x) }, el("span", { class: "issue-day" }, `Day ${x.sday}`), slots[x.day],
+        ISSUE_MARKS.filter(([k]) => x[k]).map(([k, w]) => el("span", { class: `issue-mark ${k}` }, w)))));
     }
     if (!is.length) p.appendChild(el("p", { class: "empty" }, "The first issue comes out on day 1."));
     v.appendChild(p);
+    // the lead is picked by the same rule as the day's own paper (crierDay), from each day's stories and the two days before it
+    A.load("headlines").then((H) => {
+      for (const x of is) {
+        const E = [x.day - 2, x.day - 1, x.day].flatMap((d) => H[d] || []);
+        const { lead } = crierDay(x.day, E);
+        if (lead && slots[x.day]) slots[x.day].textContent = clip((L.llm_lead || {})[lead.id] || headline(lead), 84);
+      }
+    }, () => {});
   });
   A.route(/^\/day\/(\d+)$/, (v, d) => {
     const day = +d, x = issueOf(day);
@@ -263,12 +287,13 @@
       parch.appendChild(el("div", { class: "mast" },
         el("div", { class: "title" }, "The Daily Crier"),
         el("div", { class: "sub" }, el("span", null, issueLabel(x)), el("span", null, L.meta.name), el("span", null, "Back issue")),
+        weekStrip(day, !!iss.week),
         issueNav(day)));
       const { elsewhere, lead, second, roundup, main, small } = crierDay(day, iss.events);
       leadAndSecond(parch, lead, second, day, roundup);
       v.appendChild(parch);
       const p = panel(`That day · ${issueLabel(x)}`);
-      p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
+      p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day.", mark: true }));
       smallerHappenings(p, small);
       v.appendChild(p);
       if (iss.week) v.appendChild(Views.theWeek(iss.week, { rankings: true }));
@@ -287,6 +312,7 @@
         el("span", null, meta.phase === "preseason" ? "Preseason edition" : `Season ${meta.season} · Day ${meta.season_day}`),
         el("span", null, meta.name),
         el("span", null, theme ? theme.name : "All the news that's fit to shout")),
+      meta.phase === "season" ? weekStrip(lastDay(), !!(L.week && L.week.season === meta.season && L.week.done && L.week.day_to === meta.season_day)) : null,
       meta.phase === "preseason" ? null : issueNav(lastDay())));
     const mineFirst = A.mine().map((id) => heroes[id]).filter(Boolean);
     if (L.annals) v.appendChild(el("section", { class: "finale-hero age-end" },
@@ -295,11 +321,14 @@
       el("p", null, `${plural(L.annals.seasons, "season")}, ${plural(L.annals.days, "day")}. The legends, the champions, the fallen and the grudges are written down.`),
       el("a", { class: "btn primary", href: "#/annals" }, "📜 Read the Annals of the Age")));
     if (mineFirst.length && meta.phase !== "preseason") v.appendChild(followPanel(mineFirst, lastDay()));
-    const picker = !mineFirst.length && !skippedPick() && L.heroes.length ? pickPanel() : null;
+    if (!mineFirst.length && meta.phase !== "preseason" && L.heroes.length) {
+      if (!skippedPick()) { const row = pickRow(); if (row) parch.appendChild(row); }
+      const since = sinceVisit(lastDay());
+      if (since) v.appendChild(since);
+    }
     v.appendChild(parch);
     if ((L.card || []).length && meta.phase === "season") v.appendChild(panel("On the card", el("p", { class: "small dim" }, "What to watch for next."),
       el("ul", { class: "diary card-list" }, L.card.map((c) => el("li", null, A.storyLine(c))))));
-    if (picker) v.appendChild(picker);
     const wxs = weatherStrip();
     if (wxs) parch.appendChild(wxs);
     const hb = hyperBanner();
@@ -345,7 +374,7 @@
     v.appendChild(grid);
 
     const p = panel(`Since yesterday · Day ${L.meta.season_day}`);
-    p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
+    p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day.", mark: true }));
     const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
     if (main.length < 5 && snips.length) {
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
@@ -354,9 +383,9 @@
     smallerHappenings(p, small);
     left.appendChild(p);
     const week = L.events.filter((e) => e !== lead && heroic(e) && e.day < today && e.day >= today - 6 && e.imp >= 4).sort(byDayDesc).slice(0, 14);
-    if (week.length) left.appendChild(panel("Earlier this week", A.feed(week, { dayHeaders: true })));
+    if (week.length) left.appendChild(panel("Earlier this week", A.feed(week, { dayHeaders: true, mark: true })));
 
-    if (theme) right.appendChild(el("section", { class: "panel theme-banner tight" }, el("div", null, el("h3", { class: "gold" }, theme.name), el("p", { class: "small" }, theme.desc))));
+    if (theme) right.appendChild(el("section", { class: "panel theme-banner tight" }, el("div", null, el("h3", { class: "gold" }, theme.name, guideQ("season-themes", "season themes")), el("p", { class: "small" }, theme.desc))));
     const radar = (L.world_events || []).map((we) => we.kind === "sighting" ? `Monster sighting in ${A.nodeName(we.wild, true)}: double bounties (${plural(we.days, "day")} left)`
       : we.kind === "festival" ? `Festival in ${A.nodeName(we.town, true)} (${plural(we.days, "day")} left)` : we.kind === "games" ? `${cap(we.event)} contest in ${A.nodeName(we.town, true)} in ${plural(we.days - 1, "day")}` : null).filter(Boolean);
     if (radar.length) right.appendChild(panel("On the radar", el("ul", { class: "diary" }, radar.map((r) => el("li", null, A.storyText(r))))));
@@ -518,7 +547,80 @@
         el("button", { class: "btn small", onclick: () => { try { localStorage.setItem("al.nopick", "1"); } catch (e) { /* storage unavailable */ } rerender(); } }, "Just browsing")),
       search, grid, notListed());
   }
+  // the same choice as the big picker, as one line of names under the masthead
+  function pickRow() {
+    const me = quizOwner(), isMe = (h) => !!me && String(h.owner || "").trim().toLowerCase() === me;
+    const pool = L.heroes.filter((h) => h.alive && !h.npc).sort((a, b) => isMe(b) - isMe(a) || String(a.owner).localeCompare(String(b.owner)));
+    if (!pool.length) return null;
+    const chips = pool.map((h) => {
+      const same = String(h.owner || "").trim().toLowerCase() === h.name.toLowerCase();
+      const b = el("button", { type: "button", class: "pick-chip" + (isMe(h) ? " me" : ""), title: same ? `Pin ${h.name}` : `Pin ${h.name} (${h.owner}'s hero)`,
+        onclick: () => { A.toggleMine(h.id); A.toast(`${h.name} is yours. They'll be waiting here every time you check in.`); rerender(); } },
+      A.heroPortrait(h, 1, { cls: "mini" }), h.name);
+      b.dataset.q = `${h.name} ${h.owner || ""}`.toLowerCase();
+      return b;
+    });
+    const search = pool.length > 8 ? el("input", { type: "text", class: "pick-find", placeholder: "Find yours", "aria-label": "Find your hero by your name or theirs" }) : null;
+    if (search) search.addEventListener("input", () => { const q = search.value.trim().toLowerCase(); for (const b of chips) b.hidden = !!q && !b.dataset.q.includes(q); });
+    return el("div", { class: "pick-row" }, el("b", { class: "pick-ask" }, "Which one is yours?"), search, el("div", { class: "pick-chips" }, chips),
+      el("button", { type: "button", class: "pick-skip", onclick: () => { try { localStorage.setItem("al.nopick", "1"); } catch (e) { /* storage unavailable */ } rerender(); } }, "Just browsing"));
+  }
+  // a last-seen mark (al.seen*) moves only once the reader has reached the end of what it covered, so a quick peek doesn't eat a later read
+  function whenRead(node, save) {
+    const write = () => { try { save(); } catch (e) { /* storage unavailable */ } };
+    if (!("IntersectionObserver" in window)) { write(); return; }
+    const io = new IntersectionObserver((xs) => { if (xs.some((x) => x.isIntersecting)) { io.disconnect(); write(); } });
+    io.observe(node);
+  }
+  const seenWord = (from, today) => (today - from <= 1 ? "yesterday" : `day ${A.seasonOf(from)[1]}`);
+  // for a reader with no hero pinned: the biggest stories of the days since this browser last read the paper
+  function sinceVisit(today) {
+    let last = null;
+    try { last = +localStorage.getItem("al.seen") || null; } catch (e) { return null; }
+    if (!last) { try { localStorage.setItem("al.seen", String(today)); } catch (e) { /* storage unavailable */ } return null; }
+    if (last >= today - 1) {
+      if (last >= today) return null;
+      const mark = el("span", { class: "seen-mark" });
+      whenRead(mark, () => localStorage.setItem("al.seen", String(today)));
+      return mark;
+    }
+    const top = L.events.filter((e) => heroic(e) && e.kind !== "big_move" && e.day > last && e.day < today).sort((a, b) => b.imp - a.imp || b.day - a.day).slice(0, 5)
+      .sort((a, b) => a.day - b.day || idNum(a.id) - idNum(b.id));
+    const d1 = A.seasonOf(last + 1)[1], d2 = A.seasonOf(today - 1)[1];
+    const weeks = (L.issues || []).filter((x) => x.week && x.day < today), weekIs = weeks[weeks.length - 1];
+    const end = el("p", { class: "tiny dim caught-up" }, `That's the biggest news since ${seenWord(last, today)}. Today's paper is below.`);
+    const p = el("section", { class: "panel follow tight since-visit" },
+      el("div", { class: "row wrap between" }, el("h3", null, "Since your last visit"),
+        el("span", { class: "small muted" }, d1 === d2 ? `You missed day ${d1}` : `You missed days ${d1}–${d2}`, weekIs ? [" · ", el("a", { href: issueHref(weekIs) }, "The Week ›")] : null)),
+      top.length ? el("ul", { class: "diary since-list" }, top.map((e) => { const w = A.storyLink(e);
+        return el("li", null, el("span", { class: "since-day" }, `Day ${A.seasonOf(e.day)[1]}`), " ", A.richText(clip(headline(e), 120), e.heroes, e.parties), w ? [" ", w] : null); }))
+        : el("p", { class: "small muted" }, "Quiet days, mostly."), end);
+    whenRead(end, () => localStorage.setItem("al.seen", String(today)));
+    return p;
+  }
+  // where a pinned hero stands in the Crier's standings, and how far they have moved since this browser last read their catch-up
+  const standings = () => sortedHeroes(L.heroes.filter((h) => h.joined === L.meta.season || h.alive));
+  function rankOf(h) { const i = standings().findIndex((x) => x.id === h.id); return h.alive === false || i < 0 ? null : i + 1; }
+  function rankLine(h) {
+    const r = rankOf(h);
+    if (!r) return null;
+    let was = null;
+    try { was = +localStorage.getItem("al.rank." + h.id) || null; } catch (e) { /* storage unavailable */ }
+    const mv = was ? was - r : 0;
+    return el("div", { class: "small rank-now" }, `${ordinal(r)} in the standings`, mv ? el("span", { class: mv > 0 ? "green" : "red" }, mv > 0 ? ` ▲${mv}` : ` ▼${-mv}`) : null);
+  }
+  // a story about two or more of the reader's heroes, or about a good part of the league, is told once under the catch-ups, not once per hero
+  const WIDE = 5;
   function followPanel(list, today) {
+    const pinned = new Set(list.map((h) => h.id));
+    const ctx = { seen: [], isShared: (e) => (e.heroes || []).filter((id) => pinned.has(id)).length >= 2 || (e.heroes || []).length >= WIDE, shared: new Map() };
+    const alsoBox = el("div", { class: "also-yours", hidden: true });
+    ctx.also = (evs) => {
+      for (const e of evs) ctx.shared.set(e.id, e);
+      const all = [...ctx.shared.values()].sort((a, b) => a.day - b.day || idNum(a.id) - idNum(b.id));
+      alsoBox.replaceChildren(el("h3", null, list.length > 1 ? "Also involving your heroes" : `Also involving ${list[0].name}`), A.feed(all, { dayHeaders: true }));
+      alsoBox.hidden = !all.length;
+    };
     const p = el("section", { class: "panel follow" }, el("div", { class: "row wrap between" },
       el("h2", null, list.length > 1 ? "Your heroes today" : "Your hero today"),
       el("button", { class: "btn small", onclick: () => { for (const h of list) A.toggleMine(h.id); try { localStorage.removeItem("al.nopick"); } catch (e) { /* storage unavailable */ } rerender(); } }, "Switch hero")));
@@ -526,16 +628,24 @@
       const ep = L.annals && (L.annals.epitaphs || {})[h.id];
       if (ep) p.appendChild(el("p", { class: "epilogue" }, el("b", null, `${h.name}, in the Annals: `), ep));
       const box = el("div", { class: "grid2", style: { marginBottom: "10px" } });
-      box.append(A.heroCard(h), catchUp(h, today));
+      box.append(A.heroCard(h, { extra: rankLine(h) }), catchUp(h, today, ctx));
       p.appendChild(box);
     }
+    p.appendChild(alsoBox);
+    const from = Math.min(...ctx.seen.map((x) => x[1]));
+    const end = el("p", { class: "small dim caught-up" }, `✓ You're caught up. That's everything since ${seenWord(from, today)}.`);
+    p.appendChild(end);
+    whenRead(end, () => {
+      for (const [key] of ctx.seen) localStorage.setItem(key, String(today));
+      for (const h of list) { const r = rankOf(h); if (r) localStorage.setItem("al.rank." + h.id, String(r)); }
+    });
     return p;
   }
 
   function tablePanel() {
     const list = sortedHeroes(L.heroes.filter((h) => h.joined === L.meta.season || h.alive)).slice(0, 10);
     const t = el("table");
-    t.appendChild(el("tr", null, el("th", null, "#"), el("th", null, "Hero"), el("th", { class: "num" }, "Lv"), el("th", { class: "num" }, "Renown")));
+    t.appendChild(el("tr", null, el("th", null, "#"), el("th", null, "Hero"), el("th", { class: "num" }, "Lv"), el("th", { class: "num" }, "Renown", guideQ("renown"))));
     list.forEach((h, i) => t.appendChild(el("tr", null, el("td", { class: "dim" }, i + 1),
       el("td", null, el("div", { class: "row", style: { gap: "4px" } }, A.heroPortrait(h, 1), el("div", null, A.heroLink(h.id), el("div", { class: "tiny dim" }, h.npc ? "" : h.owner)))),
       el("td", { class: "num" }, h.level), el("td", { class: "num gold" }, h.renown))));
@@ -546,7 +656,7 @@
     const box = panel("Party standings");
     if (!ps.length) { box.appendChild(el("p", { class: "empty" }, "No parties yet. Everyone's a lone wolf.")); return box; }
     const t = el("table", { class: "ptable" });
-    t.appendChild(el("tr", null, el("th", null, "#"), el("th", null, "Party"), el("th", { class: "num" }, "Morale"), el("th", { class: "num" }, "Renown")));
+    t.appendChild(el("tr", null, el("th", null, "#"), el("th", null, "Party"), el("th", { class: "num" }, "Morale", guideQ("morale")), el("th", { class: "num" }, "Renown", guideQ("renown"))));
     ps.forEach((p, i) => {
       const grp = el("div", { class: "grp-row" });
       for (const m of p.members) if (heroes[m]) grp.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp" }));
@@ -563,7 +673,7 @@
     if (!bs.length && !feuds.length) return el("span");
     const order = { sweethearts: 0, nemeses: 1, "best friends": 2, rivals: 3, friends: 4 };
     bs.sort((a, b) => order[a.type] - order[b.type]);
-    const box = panel("Bonds & grudges");
+    const box = panel(null, el("h2", null, "Bonds & grudges", guideQ("bonds-and-grudges", "bonds and grudges")));
     const seenF = new Set();
     for (const f of feuds) {
       const key = f.parties.slice().sort().join("|");
@@ -595,15 +705,15 @@
   A.needs(/^\/hero\//, A.SONG);
   A.needs(/^\/party\//, ["mount_art", "music"]);
   A.needs(/^\/songs/, A.SONG);
-  A.route(/^\/hero\/(\w+)(?:\/(\w+))?$/, (v, id, tab) => {
+  A.route(/^\/hero\/(\w+)(?:\/([a-z]+))?(?:\/(\d+))?$/, (v, id, tab, day) => {
     const lost = () => { v.innerHTML = ""; v.appendChild(panel("We can't find that hero", el("p", null, "The link may be from an older league, or it has a typo. Every hero in this league is on the roster."),
       el("p", null, el("a", { class: "btn", href: "#/roster" }, "The Roster"), " ", el("a", { class: "btn", href: "#/" }, "Back to the Crier")))); };
     if (!heroes[id]) { lost(); return; }
     v.appendChild(el("p", { class: "loading" }, "Loading hero…"));
-    return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "diary"); }, lost);
+    return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "diary", day ? +day : null); }, lost);
   });
 
-  function heroPage(page, h, tab) {
+  function heroPage(page, h, tab, day) {
     const v = el("div", { class: `heropage path-${basePath(h.cls)}` });
     page.appendChild(v);
     const head = el("section", { class: "panel hero-panel" });
@@ -625,39 +735,26 @@
         el("div", { class: "small" }, `Level ${h.level} `, el("span", { class: "has-tip", title: (S.classes[h.cls] || {}).desc || "" }, h.title), h.party ? [" of ", A.partyLink(h.party)] : " · solo"),
         el("div", { class: "small muted" }, h.npc ? "A league hero" : `${h.owner}'s hero`)),
       el("div", { class: "hero-details" },
-        (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by the skills and the life " + h.name + " has had)" : ""}`) : null,
-        keystoneBadges(h),
-        wearingStrip(h),
-        classStrip(h),
-        personaStrip(h),
-        h.faction && (S.factions || {})[h.faction] ? el("div", { class: "tiny" }, `${S.factions[h.faction].icon || ""} ${S.factions[h.faction].ranks[h.frank || 0]} of ${S.factions[h.faction].name}`,
-          el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
-        el("div", { class: "small muted" }, `Joined season ${h.joined || "next"}`,
-          h.home ? ` · owns a ${h.home.kind} in ${A.nodeName(h.home.town, true)}` : ""),
-        el("p", { style: { marginTop: "8px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
+        el("p", { style: { marginTop: "4px", marginBottom: "2px" } }, el("span", { class: h.alive ? "green" : "red" }, h.alive ? "● " : "✝ "), status,
           h.progress ? el("span", { class: "dim" }, ` · ${h.progress}`) : null),
-        h.why ? el("p", { class: "small muted", style: { fontStyle: "italic" } }, `Why: ${h.why}.`) : null,
-        delveLine(h.delve),
-        todayBox(h.daybook && window.Daybook ? null : h.route, h.today, null, h.tables_today, h.fights_today),
-        goalLine(h.goal, h.party),
-        ...(h.vows || []).map((v) => vowLine(v, h.party)),
         h.alive ? el("div", { class: "row wrap small", style: { gap: "14px" } },
           el("div", { style: { minWidth: "150px" } }, `HP ${h.hp}/${h.maxhp}`, A.bar(h.hp, h.maxhp)),
-          el("div", { style: { minWidth: "150px" } }, `XP ${h.xp}/${h.xp_next} (to level ${h.level + 1})`, A.bar(h.xp, h.xp_next, "gold")),
-          el("div", { style: { minWidth: "150px" } }, `Stress ${h.stress} (${h.stress >= 70 ? "frayed" : h.stress >= 40 ? "tense" : "calm"})`, A.bar(h.stress, 100, "red"),
+          el("div", { style: { minWidth: "150px" } }, `XP ${h.xp}/${h.xp_next} (to level ${h.level + 1})`, guideQ("xp-and-levels", "XP"), A.bar(h.xp, h.xp_next, "gold")),
+          el("div", { style: { minWidth: "150px" } }, `Stress ${h.stress} (${h.stress >= 70 ? "frayed" : h.stress >= 40 ? "tense" : "calm"})`, guideQ("stress"), A.bar(h.stress, 100, "red"),
             (h.stress_why || []).length ? el("div", { class: "tiny dim" }, "This week: " + h.stress_why.map(([k, v]) => `${k} ${v > 0 ? "+" : "−"}${Math.abs(v)}`).join(", ")) : null),
           el("div", null, el("b", { class: "gold" }, A.money(h.gold * 10 + (h.copper || 0)))),
-          h.joined ? el("div", { style: { minWidth: "150px" } }, el("b", { class: "gold" }, h.renown), " renown",
+          h.joined ? el("div", { style: { minWidth: "150px" } }, el("b", { class: "gold" }, h.renown), " renown", guideQ("renown"),
             el("div", { class: "tiny dim" }, renownCaption(h)),
             (h.renown_parts || []).length ? el("div", { class: "tiny" }, "Renown from: ", h.renown_parts.slice(0, 4).map(([k, v], i) => {
               const part = el("span", k === "a steady hand" ? { class: "has-tip" } : null, `${k} ${v > 0 ? "+" : ""}${v}`);
-              return [i ? " · " : "", k === "a steady hand" ? tip(part, "Renown for careful heroes. Cautious heroes skip the risky fights that pay out the most fame, so instead they earn a little renown for every clean fight they win and every job they finish properly: the more cautious the hero, the more. Bold heroes earn none of it.", "A steady hand") : part];
+              return [i ? " · " : "", k === "a steady hand" ? [tip(part, "Renown for careful heroes. Cautious heroes skip the risky fights that pay out the most fame, so instead they earn a little renown for every clean fight they win and every job they finish properly: the more cautious the hero, the more. Bold heroes earn none of it.", "A steady hand"), guideQ("a-steady-hand", "a steady hand")] : part];
             })) : null) : null,
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
+    // the header is only who and how they are; the day (today, hour by hour, tonight) heads the Diary, the rest of who they are heads Character
     const cal = dayCalendar(h);
-    let hourByHour = null;
+    let hourByHour = null, daySec = null;
     if (cal) {
       // folding the day away is a reader's choice that holds on every hero page until they open it again
       let shut = false, opening = false;
@@ -666,27 +763,47 @@
       fold.open = !shut;
       // a diary link that unfolds the day for one look doesn't overrule the reader's choice to keep it folded
       fold.addEventListener("toggle", () => { if (opening) { opening = false; return; } try { localStorage.setItem("al.daybook", fold.open ? "open" : "closed"); } catch (e) { /* storage unavailable */ } });
-      const sec = el("section", { class: "panel daybook-panel" }, fold);
-      v.appendChild(sec);
-      hourByHour = { days: cal.days, go: (d) => { if (!fold.open) { opening = true; fold.open = true; } cal.go(d); sec.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+      daySec = el("section", { class: "panel daybook-panel" }, fold);
+      hourByHour = { days: cal.days, go: (d) => { if (!fold.open) { opening = true; fold.open = true; } cal.go(d); daySec.scrollIntoView({ behavior: "smooth", block: "start" }); } };
     }
-    const tro = trophyShelf(h.trophies, (h.angler || {}).legends);
-    if (tro) v.appendChild(tro);
+    const today = todayBox(h.daybook && window.Daybook ? null : h.route, h.today, null, h.tables_today, h.fights_today);
+    const goals = [h.why ? el("p", { class: "small muted", style: { fontStyle: "italic", margin: "0 0 4px" } }, `Why: ${h.why}.`) : null, delveLine(h.delve), today,
+      goalLine(h.goal, h.party), ...(h.vows || []).map((x) => vowLine(x, h.party))].filter(Boolean);
+    const nowBox = goals.length ? el("section", { class: "panel tight hero-now" }, goals) : null;
+    const replays = el("p", { class: "small hero-replays" }, el("a", { href: `#/replays/${h.id}` }, `▶ All of ${A.poss(h.name)} replays`));
     const night = h.alive && h.tonight && window.Night ? Night.scene(h, L) : null;
-    if (night) v.appendChild(panel(null, night));
+    const nightBox = night ? panel(null, night) : null;
+    const about = el("section", { class: "panel tight hero-about" },
+      (S.classes[h.cls] || {}).desc ? el("div", { class: "tiny muted", style: { fontStyle: "italic" } }, `${h.title}: ${S.classes[h.cls].desc}${(S.classes[h.cls].tier || 0) > 0 ? " (an evolved class, earned by the skills and the life " + h.name + " has had)" : ""}`) : null,
+      keystoneBadges(h),
+      wearingStrip(h),
+      classStrip(h),
+      personaStrip(h),
+      h.faction && (S.factions || {})[h.faction] ? el("div", { class: "tiny" }, `${S.factions[h.faction].icon || ""} ${S.factions[h.faction].ranks[h.frank || 0]} of ${S.factions[h.faction].name}`,
+        el("span", { class: "dim" }, ` · rank ${(h.frank || 0) + 1} of ${S.factions[h.faction].ranks.length}`)) : null,
+      el("div", { class: "small muted" }, `Joined season ${h.joined || "next"}`, h.home ? ` · owns a ${h.home.kind} in ${A.nodeName(h.home.town, true)}` : ""));
+    const tro = trophyShelf(h.trophies, (h.angler || {}).legends);
 
-    const tabs = el("div", { class: "tabs" });
+    const tabs = el("div", { class: "tabs hero-tabs" });
     const body = el("div");
-    const T = [["diary", "Diary"], ["character", "Character"], ["people", "People"], ["record", "Record"]];
+    // Record folded into Character as "Career" (round 38); an old #/hero/<id>/record link opens Character
+    const T = [["diary", "Diary"], ["character", "Character"], ["people", "People"]];
+    if (tab === "record") { tab = "character"; history.replaceState(null, "", `#/hero/${h.id}/character`); }
     if (!T.some((t) => t[0] === tab)) tab = "diary";
     for (const [k, label] of T) tabs.appendChild(el("button", { class: k === tab ? "on" : "", onclick: () => history.replaceState(null, "", `#/hero/${h.id}/${k}`) || show(k) }, label));
     v.append(tabs, body);
     function show(k) {
       for (const b of tabs.children) b.classList.toggle("on", b.textContent === T.find((t) => t[0] === k)[1]);
       body.innerHTML = "";
-      ({ diary: (b, x) => { if (x.alive === false) b.appendChild(dirgePanel(x)); diaryTab(b, x, hourByHour); }, character: (b, x) => { charTab(b, x); b.appendChild(heroExtras(x)); }, people: (b, x) => { peopleTab(b, x); b.appendChild(repPanel(x)); b.appendChild(factionRows(x)); const tm = travellersMet(x); if (tm) b.appendChild(tm); }, record: recordTab })[k](body, h);
+      ({
+        diary: (b, x) => { b.append(...[nowBox, daySec, replays, nightBox].filter(Boolean)); if (x.alive === false) b.appendChild(dirgePanel(x)); diaryTab(b, x, hourByHour); },
+        character: (b, x) => { b.appendChild(about); if (tro) b.appendChild(tro); charTab(b, x); b.appendChild(heroExtras(x)); recordTab(b, x, "Career"); },
+        people: (b, x) => { peopleTab(b, x); b.appendChild(repPanel(x)); b.appendChild(factionRows(x)); const tm = travellersMet(x); if (tm) b.appendChild(tm); },
+      })[k](body, h);
     }
     show(tab);
+    // a replay's "‹ X's day" opens the hour by hour on the replay's day
+    if (day && tab === "diary" && hourByHour && hourByHour.days.includes(day)) setTimeout(() => hourByHour.go(day), 0);
   }
 
   // the travellers this hero has met on the roads, each opening their card on the Places & Travellers page
@@ -699,7 +816,7 @@
   function keystoneBadges(h) {
     const keys = (h.skills || []).filter((s) => s.keystone).sort((a, b) => a.keystone - b.keystone);
     if (!keys.length) return null;
-    return el("div", { class: "row wrap", style: { gap: "4px", margin: "3px 0" } }, keys.map((s) => skillTip(el("span", { class: "ks-badge" }, "✦ ", s.name, el("span", { class: "lv" }, ` · level ${s.keystone}`)), s)));
+    return el("div", { class: "row wrap", style: { gap: "4px", margin: "3px 0" } }, keys.map((s) => skillTip(el("span", { class: "ks-badge" }, "✦ ", s.name, el("span", { class: "lv" }, ` · level ${s.keystone}`)), s)), guideQ("keystones"));
   }
   // the weapon icon knows whether the daggers are a pair or one blade beside a shield
   function kitIcon(x, h, scale) {
@@ -1323,7 +1440,7 @@
         [cap(`${m.colour} ${m.label}`), m.since > 0 ? ` · ridden since ${A.when(m.since, true)}` : "", status],
         m.does ? el("div", { class: "tiny" }, cap(m.does) + ".") : null, told(m.name)));
     }
-    return out.length ? el("div", { class: "companions" }, el("h3", null, "Companions"), out, el("h3", null, "People")) : null;
+    return out.length ? el("div", { class: "companions" }, el("h3", null, "Companions", guideQ("pets", "pets")), out, el("h3", null, "People")) : null;
   }
   function peopleTab(b, h) {
     const p = panel("Relationships", companionRows(h));
@@ -1404,14 +1521,14 @@
     return panel("Purse", el("p", { class: "small dim" }, `${A.money(now[1])} now. Hover or tap a day to see where the silver came from and went.`),
       el("div", { class: "purse-wrap" }, svg, tip));
   }
-  function recordTab(b, h) {
+  function recordTab(b, h, title) {
     const keys = [["kills", "Kills"], ["bosses", "Bosses slain"], ["fights", "Fights"], ["wins", "Wins"], ["fled", "Retreats"], ["downed", "Times downed"], ["floors", "Dungeon floors"],
       ["delves", "Delves"], ["gold_earned", "Silver earned"], ["loot_sold", "Loot sold"], ["days_worked", "Days worked"], ["travel_days", "Days on the road"], ["injuries", "Injuries"],
       ["gambled", "Silver gambled"], ["pvp_wins", "Hero fights won"], ["pvp_losses", "Hero fights lost"], ["robberies", "Robberies committed"], ["robbed", "Silver lost to robbers"], ["corpses_sold", "Bodies sold"], ["levels", "Levels gained"]];
     const t = el("table");
     t.appendChild(el("tr", null, el("th", null, ""), el("th", { class: "num" }, h.alive ? "This season" : "Final season"), el("th", { class: "num" }, "Career")));
     for (const [k, lab] of keys) t.appendChild(el("tr", null, el("td", null, lab), el("td", { class: "num" }, h.season[k] || 0), el("td", { class: "num" }, (h.career[k] || 0) + (k in h.career ? 0 : 0))));
-    b.appendChild(panel("Record", t));
+    b.appendChild(panel(title || "Record", t));
     if (h.past.length) {
       const p = panel("Past seasons");
       for (const s of h.past) p.appendChild(el("p", null, `Season ${s.season}: level ${s.level} ${A.clsName(s.cls)}, ${s.renown} renown, ${plural(s.stats.kills, "kill")}, ${s.stats.gold_earned} silver earned.`));
@@ -1498,7 +1615,7 @@
     const persona = [cap(p.disposition), ...strongTraits(t.traits, 3)].filter((w, i, a) => a.indexOf(w) === i);
     const fight = [t.mix, ...t.style.filter((s) => !temper.includes(s))];
     return el("div", null,
-      el("div", { class: "class-strip persona" }, ...persona.map((w) => el("span", { class: "pill soft" }, w))),
+      el("div", { class: "class-strip persona" }, ...persona.map((w) => el("span", { class: "pill soft" }, w)), guideQ("disposition", "a party's disposition")),
       el("div", { class: "class-strip" }, ...fight.map((w) => el("span", { class: "pill" }, w))));
   }
   function tacticsPanel(p) {
@@ -1705,15 +1822,19 @@
       el("p", { class: "small dim" }, "Wagons for sale: " + st.wagons_for_sale.map(([k, v]) => `${S.wagons[k].name} ${v}s`).join(", ")));
   }
   function partyCard(p, opts) {
-    const ms = el("div", { class: "row", style: { gap: "0" } });
-    for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
+    const ms = el("div", { class: "pc-members" });
+    for (const m of p.members) if (heroes[m]) ms.appendChild(el("span", { class: "pc-mem", title: `${heroes[m].name}, level ${heroes[m].level} ${heroes[m].title || A.clsName(heroes[m].cls)}` },
+      A.heroPortrait(heroes[m], 1, { cls: "grp big" }), el("span", { class: "tiny" }, heroes[m].name), el("span", { class: "tiny dim" }, `Lv ${heroes[m].level}`)));
+    const g = !p.disbanded && p.goal;
+    const goal = g ? el("div", { class: "small pc-goal" + (g.done ? " met" : g.missed ? " missed" : "") }, el("b", null, (g.done ? "✔ " : g.missed ? "○ " : "") + "Goal: "), g.text,
+      el("span", { class: "muted" }, ` · ${g.done ? "done" : g.missed ? "not this season" : g.progress}`)) : null;
     return el("a", { class: "panel", href: `#/party/${p.id}`, style: { display: "block", color: "inherit", opacity: p.disbanded ? 0.65 : 1 } },
       el("div", { class: "row" }, A.bannerSprite(p.banner, 3), el("div", null, el("h3", { style: { marginBottom: "2px" } }, p.name),
         p.motto ? el("div", { class: "small motto" }, `“${p.motto}”`) : null,
         el("div", { class: "small muted" }, p.disbanded ? `Disbanded ${A.when(p.disbanded, "on")}` : [el("span", { class: "has-tip", title: S.dispositions[p.disposition] || "" }, cap(p.disposition)),
           ` · ${p.renown} renown`]),
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
-      ms, p.disbanded ? null : moraleBar(p), opts && opts.noNews ? null : lastNews(p));
+      ms, goal, p.disbanded ? null : moraleBar(p), opts && opts.noNews ? null : lastNews(p));
   }
   function todayBox(route, today, label, tables, fights) {
     if (!route && !(today || []).length && !(tables || []).length) return null;
@@ -1732,7 +1853,7 @@
       el("div", { class: "party-head-body" }, el("h1", null, p.name), p.motto ? el("div", { class: "motto big" }, `“${p.motto}”`) : null, partyTags(p),
         el("p", { class: "muted" }, `Founded ${A.when(p.founded_day, "on")}`, p.disbanded ? ` · disbanded ${A.when(p.disbanded, "on")}` : ` · ${p.renown} renown`),
         el("p", null, S.dispositions[p.disposition]),
-        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
+        p.disbanded ? null : el("div", { style: { maxWidth: "320px" } }, `Morale ${p.morale}/100 · ${moraleWord(p.morale)}`, guideQ("morale", "morale"), A.bar(p.morale, 100, p.morale < 30 ? "red" : "gold"),
           el("div", { class: "tiny dim" }, "The party's mood. Wins and silver raise it; losses, arguments and skimming lower it. Below 20, members start leaving.")),
         p.disbanded ? null : el("p", { class: "small", style: { marginTop: "6px" } }, p.doing ? [cap(p.doing), p.doing.includes(p.loc_name) ? "" : ` · in ${p.loc_name}`] : `In ${p.loc_name}`,
           p.progress ? el("span", { class: "dim" }, ` · ${p.progress}`) : null),
@@ -2150,12 +2271,13 @@
     return el("section", { class: `hy-strip hy-${h.kind}` },
       el("div", { class: "hy-sprite" }, hyperSprite(h)),
       el("div", { class: "hy-body" },
-        el("div", { class: "hy-kick" }, el("span", { class: "hy-tag" }, tag), `The great event of the season · day ${today - h.start + 1}`),
-        el("div", { class: "hy-name" }, cap(h.name)),
+        el("div", { class: "hy-kick" }, el("span", { class: "hy-tag" }, tag), guideQ("great-event", "the great event"), ` The great event of the season · day ${today - h.start + 1}`),
+        el("div", { class: "hy-name" }, el("a", { href: "#/event" }, cap(h.name))),
         el("p", { class: "hy-line" }, line),
         counts.length ? el("div", { class: "hy-counts" }, counts) : null,
+        el("p", { class: "hy-more" }, el("a", { href: "#/event" }, "The great event ▸")),
         before.length ? el("details", { class: "hy-sofar" }, el("summary", null, `The story so far (${before.length})`),
-          el("ul", null, before.map((e) => el("li", null, el("b", null, `Day ${e.sday || e.day}. `), A.storyLine(e))))) : null));
+          el("ul", null, before.map((e) => el("li", null, el("b", null, `Day ${A.seasonOf(e.day)[1]}. `), A.storyLine(e)))), el("p", { class: "small" }, el("a", { href: "#/event" }, "Its route, countdown and story ▸"))) : null));
   }
 
   // ================= ARTIFACTS =================
@@ -2367,16 +2489,20 @@
     const line = shown.length > 1 ? shown.slice(0, -1).join(", ") + " and " + shown[shown.length - 1] : shown[0];
     return `In ${plural(days, "day")}, ${h.name} ${line}.`;
   }
-  function catchUp(h, today) {
+  const BIG_SHOWN = 3;
+  function catchUp(h, today, ctx) {
     const key = "al.seen." + h.id;
     let last = null;
-    try { last = +localStorage.getItem(key) || null; localStorage.setItem(key, String(today)); } catch (e) { /* storage unavailable */ }
+    try { last = +localStorage.getItem(key) || null; } catch (e) { /* storage unavailable */ }
     const from = last && last < today ? last : today - 1, gap = today - from;
+    ctx.seen.push([key, from]);
     const box = el("div", { class: "catchup" });
     const fill = (all, d) => {
       box.innerHTML = "";
       const mineEv = all.filter((e) => (e.heroes || []).includes(h.id));
-      const inGap = mineEv.filter((e) => e.day > from && e.imp >= 2).sort((a, b) => a.day - b.day || idNum(a.id) - idNum(b.id));
+      const gapEv = mineEv.filter((e) => e.day > from && e.imp >= 2).sort((a, b) => a.day - b.day || idNum(a.id) - idNum(b.id));
+      const shared = gapEv.filter(ctx.isShared), inGap = gapEv.filter((e) => !ctx.isShared(e));
+      ctx.also(shared);
       box.appendChild(el("div", { class: "small gold" }, gap > 1 ? `Since you last checked in (${plural(gap, "day")} ago):` : "Since yesterday:"));
       if (h.alive === false && h.died_day && h.died_day <= from) {
         const cause = (d || {}).death_cause;
@@ -2386,13 +2512,15 @@
       }
       const sum = gap >= 3 ? gapSummary(h, mineEv.filter((e) => e.day > from), gap) : null;
       if (sum) box.appendChild(el("p", { class: "catchup-sum" }, sum));
-      // a long gap shows its big moments first; the rest wait behind a button, still in order
-      const big = inGap.length > 10 ? inGap.filter((e) => e.imp >= 3).slice(-12) : inGap;
-      const empty = h.alive === false ? `${h.name} is gone, and the league is quieter for it.` : `${h.name} had a quiet time${h.doing ? ", " + h.doing : ""}.`;
-      box.appendChild(A.feed(big, { dayHeaders: gap > 1, empty }));
+      // the biggest few moments, in the order they happened; the rest wait behind a button
+      const keep = new Set(inGap.slice().sort((a, b) => b.imp - a.imp || b.day - a.day).slice(0, BIG_SHOWN));
+      const big = inGap.filter((e) => keep.has(e));
+      const empty = h.alive === false ? `${h.name} is gone, and the league is quieter for it.` : shared.length ? `Nothing of ${h.name}'s alone; the shared news is below.` : `${h.name} had a quiet time${h.doing ? ", " + h.doing : ""}.`;
+      const first = A.feed(big, { dayHeaders: gap > 1, empty });
+      box.appendChild(first);
       if (big.length < inGap.length) {
-        const rest = el("div", { hidden: true }, A.feed(inGap, { dayHeaders: true }));
-        box.appendChild(el("button", { class: "btn small", onclick: (ev) => { rest.hidden = !rest.hidden; big.length && (box.querySelector(".feed").hidden = !rest.hidden); ev.target.textContent = rest.hidden ? `Show all ${inGap.length}` : "Just the big moments"; } }, `Show all ${inGap.length}`));
+        const rest = el("div", { hidden: true }, A.feed(inGap, { dayHeaders: gap > 1 }));
+        box.appendChild(el("button", { class: "btn small", onclick: (ev) => { rest.hidden = !rest.hidden; first.hidden = !rest.hidden; ev.target.textContent = rest.hidden ? `Show all ${inGap.length}` : "Just the big moments"; } }, `Show all ${inGap.length}`));
         box.appendChild(rest);
       }
       if (h.alive !== false && gap <= 1) {
@@ -2410,7 +2538,7 @@
   }
 
   // shared with the route files (views_*.js) loaded after this one
-  window.Views = { fishPlaque, artifactsPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline,
+  window.Views = { fishPlaque, artifactsPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline, hyperSprite,
     legendsPanel, moveMark, panel, partyCard, pendingPanel, rivalryPanel, runnerUp, sortedHeroes, stablesBlock,
     tellOnce, tip, townLedger, treasuresPanel };
 })();

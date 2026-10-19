@@ -9,50 +9,54 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,600;0,700;1,400&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=0dc2e8e1eb">
-<link rel="stylesheet" href="css/daybook.css?v=0dc2e8e1eb">
-<link rel="stylesheet" href="css/road.css?v=0dc2e8e1eb">
-<link rel="stylesheet" href="css/town.css?v=0dc2e8e1eb">
+<link rel="stylesheet" href="css/app.css?v=d460f4b1cc">
+<link rel="stylesheet" href="css/pages.css?v=d460f4b1cc">
+<link rel="stylesheet" href="css/daybook.css?v=d460f4b1cc">
+<link rel="stylesheet" href="css/road.css?v=d460f4b1cc">
+<link rel="stylesheet" href="css/town.css?v=d460f4b1cc">
 </head>
 <body>
 <header class="top">
   <a class="brand" href="#/"><canvas id="brand-icon" width="16" height="16"></canvas><span id="brand-name">Adventurers League</span></a>
   <nav id="nav">
-    <a href="#/">Crier</a><a href="#/roster">Roster</a><a href="#/parties">Parties</a><a href="#/map">Map</a>
-    <a href="#/world">World</a><a href="#/songs">Songs</a><a href="#/history">History</a><a href="#/guide">Guide</a>
+    <a href="#/">Crier</a><a href="#/roster">Roster</a><a href="#/parties">Parties</a><a href="#/map">Map</a><a href="#/songs" class="nav-songs">Songs</a>
+    <button type="button" id="nav-more" class="nav-more-btn" aria-expanded="false" aria-controls="nav-more-list">More ▾</button>
+    <span id="nav-more-list" class="nav-more-list"><a href="#/world" class="nav-world">World</a><a href="#/replays" class="nav-replays">Replays</a><a href="#/history" class="nav-history">History</a><a href="#/guide" class="nav-guide">Guide</a><a href="#/settings" class="nav-settings">Settings</a></span>
   </nav>
   <div id="clock" class="clock"></div>
 </header>
 <main id="view"><p class="loading">Loading the league…</p></main>
 <footer class="foot"><span id="foot-text"></span></footer>
 <div id="toast" class="toast" hidden></div>
-<script>window.AL_V = "0dc2e8e1eb";</script>
-<script src="data/static.js?v=0dc2e8e1eb"></script>
-<script src="data/league.js?v=0dc2e8e1eb"></script>
-<script src="js/settings.js?v=0dc2e8e1eb"></script>
-<script src="js/audio.js?v=0dc2e8e1eb"></script>
-<script src="js/speech.js?v=0dc2e8e1eb"></script>
-<script src="js/art.js?v=0dc2e8e1eb"></script>
-<script src="js/daybook.js?v=0dc2e8e1eb"></script>
-<script src="js/paint.js?v=0dc2e8e1eb"></script>
-<script src="js/beasts.js?v=0dc2e8e1eb"></script>
-<script src="js/monster_game_art.js?v=0dc2e8e1eb"></script>
-<script src="js/anim.js?v=0dc2e8e1eb"></script>
-<script src="js/scenes.js?v=0dc2e8e1eb"></script>
-<script src="js/isle.js?v=0dc2e8e1eb"></script>
-<script src="js/app.js?v=0dc2e8e1eb"></script>
-<script src="js/views.js?v=0dc2e8e1eb"></script>
-<script src="js/views_roster.js?v=0dc2e8e1eb"></script>
-<script src="js/views_map.js?v=0dc2e8e1eb"></script>
-<script src="js/views_week.js?v=0dc2e8e1eb"></script>
-<script src="js/views_world.js?v=0dc2e8e1eb"></script>
-<script src="js/views_creel.js?v=0dc2e8e1eb"></script>
-<script src="js/views_history.js?v=0dc2e8e1eb"></script>
-<script src="js/views_guide.js?v=0dc2e8e1eb"></script>
-<script src="js/views_finale.js?v=0dc2e8e1eb"></script>
-<script src="js/views_settings.js?v=0dc2e8e1eb"></script>
-<script src="js/tarot_cards.js?v=0dc2e8e1eb"></script>
-<script src="js/quiz.js?v=0dc2e8e1eb"></script>
+<script>window.AL_V = "d460f4b1cc";</script>
+<script src="data/static.js?v=d460f4b1cc"></script>
+<script src="data/league.js?v=d460f4b1cc"></script>
+<script src="js/settings.js?v=d460f4b1cc"></script>
+<script src="js/audio.js?v=d460f4b1cc"></script>
+<script src="js/speech.js?v=d460f4b1cc"></script>
+<script src="js/art.js?v=d460f4b1cc"></script>
+<script src="js/daybook.js?v=d460f4b1cc"></script>
+<script src="js/paint.js?v=d460f4b1cc"></script>
+<script src="js/beasts.js?v=d460f4b1cc"></script>
+<script src="js/monster_game_art.js?v=d460f4b1cc"></script>
+<script src="js/anim.js?v=d460f4b1cc"></script>
+<script src="js/scenes.js?v=d460f4b1cc"></script>
+<script src="js/isle.js?v=d460f4b1cc"></script>
+<script src="js/app.js?v=d460f4b1cc"></script>
+<script src="js/views.js?v=d460f4b1cc"></script>
+<script src="js/views_roster.js?v=d460f4b1cc"></script>
+<script src="js/views_map.js?v=d460f4b1cc"></script>
+<script src="js/views_week.js?v=d460f4b1cc"></script>
+<script src="js/views_world.js?v=d460f4b1cc"></script>
+<script src="js/views_creel.js?v=d460f4b1cc"></script>
+<script src="js/views_history.js?v=d460f4b1cc"></script>
+<script src="js/views_guide.js?v=d460f4b1cc"></script>
+<script src="js/views_replays.js?v=d460f4b1cc"></script>
+<script src="js/views_event.js?v=d460f4b1cc"></script>
+<script src="js/views_finale.js?v=d460f4b1cc"></script>
+<script src="js/views_settings.js?v=d460f4b1cc"></script>
+<script src="js/tarot_cards.js?v=d460f4b1cc"></script>
+<script src="js/quiz.js?v=d460f4b1cc"></script>
 <script>App.start();</script>
 </body>
 </html>

@@ -1,13 +1,26 @@
-/* The Map page (#/map, #/map/<place>): the island, and the panel for the picked town, wild or dungeon. */
+/* The Map page (#/map, #/map/dungeons, #/map/<place>): the one "where" page, in three modes (Towns, Dungeons, and Roadside on #/places): the island,
+   the panel for the picked town, wild or dungeon, and every town or every dungeon below it. */
 (function () {
   const A = App;
-  const { L, S, cap, el } = A;
+  const { L, S, cap, el, plural } = A;
   const { boardPanel, byDayDesc, civicPanel, dangerWord, panel, stablesBlock, tip, townLedger } = Views;
 
   // the place headers, the town themes and the stables' horses
   A.needs(/^\/map/, A.PLACES.concat(["town_music", "mount_art"]));
+  // the three modes, shared with the Roadside page (views_places.js)
+  function modes(on) {
+    const found = (L.road_places || []).length;
+    return el("nav", { class: "tabs map-modes", "aria-label": "Map modes" },
+      [["towns", "Towns", "#/map"], ["dungeons", "Dungeons", "#/map/dungeons"], ["roadside", `Roadside${found ? " · " + found : ""}`, "#/places"]].map(([k, label, href]) =>
+        el("a", { class: k === on ? "on" : "", href, "aria-current": k === on ? "page" : null }, label)));
+  }
+  window.MapModes = { bar: modes, eventLine: (id) => eventLine(id) };
   A.route(/^\/map(?:\/(\w+))?$/, (v, sel) => {
+    if (sel === "roadside") { location.replace("#/places"); return; }
+    const mode = sel === "dungeons" || S.dungeons[sel] ? "dungeons" : "towns";
+    if (sel === "dungeons" || sel === "towns") sel = null;
     v.appendChild(el("h1", null, "The Realm"));
+    v.appendChild(modes(mode));
     const g = el("div");
     const wrap = el("div", { class: "mapwrap" });
     const cv = el("canvas");
@@ -15,9 +28,9 @@
     wrap.append(cv, tip);
     const side = el("div", { class: "grid2 even" });
     const found = (L.road_places || []).length;
-    g.append(el("div", null, wrap, el("p", { class: "small dim" }, "Tap a place to see who's there. Tap a hero to visit them.", found ? " Tap a pin to open that roadside place." : ""),
-      el("p", { class: "small map-places" }, el("a", { href: "#/places" }, `Roadside places (${found} found) and travellers ▸`))), side);
+    g.append(el("div", null, wrap, el("p", { class: "small dim" }, "Tap a place to see who's there. Tap a hero to visit them.", found ? " Tap a pin to open that roadside place." : "")), side);
     v.appendChild(g);
+    v.appendChild(mode === "dungeons" ? dungeonsTable() : townsList());
     let placed = Scenes.drawMap(cv, { scale: 3 });
     const toMap = (ev) => {
       const r = cv.getBoundingClientRect();
@@ -75,12 +88,56 @@
       const nd = Scenes.nearestNode(mx, my, cv);
       if (nd) showNode(side, nd);
     });
-    showNode(side, sel && (S.towns[sel] || S.wilds[sel] || S.dungeons[sel]) ? sel : mostPopulated());
+    showNode(side, sel && (S.towns[sel] || S.wilds[sel] || S.dungeons[sel]) ? sel : mostPopulated(mode === "dungeons" ? S.dungeons : null));
   });
-  function mostPopulated() {
+  function mostPopulated(among) {
     const c = {};
-    for (const h of L.heroes) if (h.alive && !h.travel) c[h.loc] = (c[h.loc] || 0) + 1;
-    return Object.entries(c).sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || "ironhaven";
+    for (const h of L.heroes) if (h.alive && !h.travel && (!among || among[h.loc])) c[h.loc] = (c[h.loc] || 0) + 1;
+    const first = among ? Object.keys(among).sort((a, b) => among[a].level - among[b].level)[0] : "ironhaven";
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || first;
+  }
+  // Dungeons mode: every dungeon in one table, easiest first
+  function dungeonsTable() {
+    const q = Views.helpLink ? (t, w) => Views.helpLink(t, w) : () => null;
+    const dt = el("table", { class: "dg-table" });
+    dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num dg-opt" }, "Floors"), el("th", null, "Boss"),
+      el("th", { class: "dg-opt" }, "Monsters ", q("monsters", "monsters")), el("th", null, "Explored ", q("explored", "explored")), el("th", { class: "num" }, "Delves")));
+    for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
+      const st = L.dungeons[id] || {};
+      const here = L.heroes.filter((h) => h.alive && h.loc === id && !h.travel).length;
+      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)),
+        el("td", null, el("a", { href: `#/dungeon/${id}` }, d.name), here ? el("div", { class: "tiny dim" }, `${plural(here, "hero")} below now`) : null),
+        el("td", { class: "num" }, d.level), el("td", { class: "num dg-opt" }, d.floors),
+        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", { class: "dg-opt" }, dangerWord(st.danger)),
+        el("td", null, st.explored_word || "untouched (0%)"), el("td", { class: "num" }, st.visits || 0)));
+    }
+    return panel("Every dungeon", el("div", { class: "scrollx" }, dt));
+  }
+  // Towns mode: every town, with its mood and deals today
+  function townsList() {
+    const tw = el("div", { class: "cols" });
+    for (const [tid, t] of Object.entries(S.towns)) {
+      const md = (L.town_mood || {})[tid];
+      tw.appendChild(el("div", { class: "panel tight" }, el("h3", null, el("a", { href: `#/map/${tid}` }, t.name), md ? [" ", el("span", { class: `mood-badge mood-${md.word}` }, cap(md.word))] : null),
+        el("p", { class: "small muted" }, t.desc),
+        el("p", { class: "tiny dim" }, `${t.folk.barkeep} keeps ${t.tavern}.${t.folk.special ? " " + t.folk.special[0] + " runs " + t.folk.special[1] + "." : ""}${md && (md.deals || []).length ? " Deals today." : ""}`)));
+    }
+    const p = panel("Every town", tw);
+    if (L.pip && L.pip[0] + L.pip[1]) p.appendChild(el("p", { class: "small" }, el("b", null, "Pip the Unstoppable Lutist: "), `${plural(L.pip[0], "win")}, ${plural(L.pip[1], "loss", "losses")} against the league's buskers.`));
+    return p;
+  }
+  // the great event, where it touches this place
+  function eventLine(id) {
+    const h = L.hyper;
+    if (!h) return null;
+    const go = el("a", { href: "#/event" }, "The great event ▸");
+    if (h.kind === "megabeast") {
+      const ahead = (h.ahead || []).find(([t]) => t === id);
+      if (h.loc === id) return el("p", { class: "ev-here" }, el("b", null, cap(h.name)), ` is here. ${h.path && h.path.length ? `It moves on in ${plural(h.moves_in, "day")}.` : "It has nowhere left to go."} `, go);
+      if (ahead) return el("p", { class: "ev-here" }, el("b", null, cap(h.name)), ` is heading here: about ${plural(ahead[1], "day")} away. `, go);
+    } else if (h.kind === "plague" && (h.towns || {})[id]) return el("p", { class: "ev-here" }, el("b", null, cap(h.name)), ` holds the town for another ${plural(h.towns[id], "day")}. `, go);
+    else if ((h.kind === "comet" && h.loc === id) || (h.kind === "tournament" && h.town === id)) return el("p", { class: "ev-here" }, el("b", null, cap(h.name)), h.kind === "comet" ? " came down here. " : " is held here. ", go);
+    return null;
   }
   // a town's own page: its colours, motto, people, what it's known for, today's mood and deals, and what's been happening
   const TOWN_ROLE = { barkeep: "Barkeep", priest: "Priest", smith: "Smith", merchant: "Merchant", guard: "Guard", special: "" };
@@ -165,6 +222,8 @@
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
     if (window.TownMusic) { try { t ? TownMusic.play(id) : TownMusic.stop(); } catch (e) { /* sound is optional */ } }
+    const evl = eventLine(id);
+    if (evl) p.appendChild(evl);
     if (t) townIdentity(p, id, t);
     if (d) {
       const st = L.dungeons[id] || {};
@@ -172,7 +231,7 @@
       p.appendChild(el("p", null, d.desc));
       p.appendChild(el("p", null, el("a", { class: "dg-open", href: `#/dungeon/${id}` }, "Open the map of its floors ▸")));
       const pct = Math.round(st.explored || 0);
-      p.appendChild(el("div", { class: "small" }, `Explored: ${st.explored_word || "untouched (0%)"}`,
+      p.appendChild(el("div", { class: "small" }, `Explored: ${st.explored_word || "untouched (0%)"} `, Views.helpLink ? Views.helpLink("explored", "explored") : null,
         el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));
       const mappers = L.heroes.filter((x) => (x.maps || []).some((m) => m.dungeon === id && m.pct >= 30));
       if (mappers.length) p.appendChild(el("p", { class: "small dim" }, "Holding maps of it: ", mappers.map((x, i) => [i ? ", " : "", A.heroLink(x.id)])));

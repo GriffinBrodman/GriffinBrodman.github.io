@@ -200,6 +200,8 @@
     // a font must be in before the sheet measures and writes its notes
     if (Pen.handMode === "font") Pen.fontsReady().then(go); else go();
   }
+  // the one-time shift (export: shifted) reset every lair; new tenants since then say it themselves
+  const shiftedOnly = (D) => !!D.shifted && !(D.tenant && D.tenant.day && D.tenant.day >= D.shifted);
   function lastFloorWalked(D) {
     let best = null;
     for (const f of D.floors) for (const r of f.rooms) if (r.state && (!best || r.state.d > best.d)) best = { d: r.state.d, f: f.floor };
@@ -214,10 +216,14 @@
     info.append(el("h1", { class: "dg-name" }, D.name),
       el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")} · `, el("a", { href: `#/map/${D.id}` }, "on the map")));
     if (D.desc) info.appendChild(el("p", { class: "small" }, D.desc));
+    const ev = window.MapModes && MapModes.eventLine ? MapModes.eventLine(D.id) : null;
+    if (ev) info.appendChild(ev);
+    const q = () => (window.Views && Views.helpLink ? Views.helpLink("explored", "explored") : null);
     const pct = Math.round(D.explored || 0);
     // a reset lair has nothing mapped yet: say so in words rather than draw an empty bar
-    if (D.tenant && D.tenant.day && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, "New tenants: not yet explored.")));
-    else info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `Explored: ${pct}% of its rooms`), el("div", { class: "bar" }, el("i", { style: { width: pct + "%" } }))));
+    if (shiftedOnly(D) && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `The tunnels shifted ${A.when(D.shifted, "on")}: the new rooms are not yet explored.`, q())));
+    else if (D.tenant && D.tenant.day && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, "New tenants: not yet explored.", q())));
+    else info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `Explored: ${pct}% of its rooms`, q()), el("div", { class: "bar" }, el("i", { style: { width: pct + "%" } }))));
     if (D.tenant && D.tenant.day) info.appendChild(el("p", { class: "tiny dim dg-tenant" }, `New tenants moved in ${A.when(D.tenant.day, "on")}; the old maps are gone.`));
     const B = D.boss || {}, kill = (B.kills || []).slice(-1)[0];
     const lairFloor = (D.floors.find((f) => f.rooms.some((r) => r.lair)) || {}).floor;
@@ -285,7 +291,7 @@
     const tabs = el("div", { class: "dg-tabs", role: "tablist" }, D.floors.map((f) => { const [w, t] = walkedOf(f); return el("button", { type: "button", role: "tab", "aria-selected": String(f.floor === floor.floor), class: "dg-tab" + (f.floor === floor.floor ? " on" : ""), onclick: () => ui.pick(f.floor) },
       el("b", null, `Floor ${f.floor}`, el("span", { class: "dg-tab-d" }, depth(f.floor))), el("span", { class: "dg-tab-n" }, `${w} of ${t} walked`)); }));
     sheet.append(el("h2", null, `${D.name}, floor ${floor.floor}${depth(floor.floor)}`), el("div", { class: "dg-floorbar" }, tabs, depthStack(D, floor.floor, ui)),
-      el("p", { class: "tiny dim dg-sub" }, walkedOf(floor)[0] ? `${walkedOf(floor)[0]} of ${walkedOf(floor)[1]} rooms walked. Inked as the crews come home; pencil marks the rooms a door away that nobody has opened.` : D.tenant && D.tenant.day ? `Nobody has walked this floor since the new tenants moved in ${A.when(D.tenant.day, "on")}. The old maps went with the old tenants.` : floor.floor > 1 && !(D.floors.find((f) => f.floor === floor.floor - 1) || { rooms: [] }).rooms.some((r) => r.stair && r.state) ? "Nobody has found the way down to this floor yet." : "Nobody has walked this floor yet. The way in and the doors off it are pencilled in."));
+      el("p", { class: "tiny dim dg-sub" }, walkedOf(floor)[0] ? `${walkedOf(floor)[0]} of ${walkedOf(floor)[1]} rooms walked. Inked as the crews come home; pencil marks the rooms a door away that nobody has opened.` : shiftedOnly(D) ? `The tunnels shifted ${A.when(D.shifted, "on")}, and nobody has walked the new rooms yet. The old maps went in the fire.` : D.tenant && D.tenant.day ? `Nobody has walked this floor since the new tenants moved in ${A.when(D.tenant.day, "on")}. The old maps went with the old tenants.` : floor.floor > 1 && !(D.floors.find((f) => f.floor === floor.floor - 1) || { rooms: [] }).rooms.some((r) => r.stair && r.state) ? "Nobody has found the way down to this floor yet." : "Nobody has walked this floor yet. The way in and the doors off it are pencilled in."));
     const seen = new Set(), notes = (D.notes || []).filter((n) => n.floor === floor.floor && (!replay || n.day < replay.before) && G.byN[key(n.room)] && !seen.has(n.hero + n.room + n.text) && seen.add(n.hero + n.room + n.text)).sort((a, b) => a.day - b.day);
     // the sheet carries the newest notes whose rooms are inked; the rest wait in the list below
     const onSheet = () => { const txt = new Set(); return notes.slice().reverse().filter((n) => n.text.length <= 90 && st.inked.has(key(n.room)) && !txt.has(n.text) && txt.add(n.text)).slice(0, 10); };
@@ -465,7 +471,10 @@
   function daysPanel(D, ui) {
     const p = panel("Days below");
     const list = (D.days || []).slice().sort((a, b) => b.day - a.day);
-    if (!list.length) { p.appendChild(el("p", { class: "small dim" }, "No crew has gone down yet.")); return p; }
+    if (!list.length) {
+      p.appendChild(el("p", { class: "small dim" }, shiftedOnly(D) ? `No crew has gone down since the tunnels shifted ${A.when(D.shifted, "on")}${((D.boss || {}).kills || []).length || (D.spoils || []).length ? "; the days below before that went with the old rooms" : ""}.` : "No crew has gone down yet."));
+      return p;
+    }
     const ul = el("ul", { class: "dg-days" });
     const PACE_SAY = { push: "pressing on", steady: "at a steady pace", cautious: "carefully" };
     // the day's best moment: a find, a wild or famous room, a fight, else the longest story

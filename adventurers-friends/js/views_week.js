@@ -51,7 +51,7 @@
   }
 
   function columnBlock(d) {
-    return el("div", { class: "week-column" }, el("h4", null, d.columnist ? `From the columnist: ${d.columnist}` : "From the columnist"), el("p", null, A.storyText(d.column)));
+    return el("div", { class: "week-column" }, el("h4", null, d.columnist ? `From the columnist: ${d.columnist}` : "From the columnist"), ...String(d.column).split(/\n\s*\n/).map((t) => el("p", null, A.storyText(t.trim()))));
   }
   const goods = (xs, cls) => xs.map((x, i) => [i ? ", " : "", el("span", { class: cls }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)]);
   const NUMS = [["fight", "fight", "fights"], ["boss_kill", "boss slain", "bosses slain"], ["death", "death", "deaths"], ["evolve", "class change", "class changes"],
