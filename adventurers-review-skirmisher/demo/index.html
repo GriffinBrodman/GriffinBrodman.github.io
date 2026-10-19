@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head><meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adventurers League</title>
+<meta name="description" content="A fantasy league you watch, not play. Make a hero with a quiz; check in daily to see what they got up to.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231b1424'/%3E%3Cpath d='M7 2h2v8H7zM5 10h6v1H5zM7 11h2v3H7z' fill='%23e8b84a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,600;0,700;1,400&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=d38aaf24c1">
+<link rel="stylesheet" href="css/daybook.css?v=d38aaf24c1">
+<link rel="stylesheet" href="css/road.css?v=d38aaf24c1">
+<link rel="stylesheet" href="css/town.css?v=d38aaf24c1">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/"><canvas id="brand-icon" width="16" height="16"></canvas><span id="brand-name">Adventurers League</span></a>
+  <nav id="nav">
+    <a href="#/">Crier</a><a href="#/roster">Roster</a><a href="#/parties">Parties</a><a href="#/map">Map</a>
+    <a href="#/world">World</a><a href="#/songs">Songs</a><a href="#/history">History</a><a href="#/guide">Guide</a>
+  </nav>
+  <div id="clock" class="clock"></div>
+</header>
+<main id="view"><p class="loading">Loading the league…</p></main>
+<footer class="foot"><span id="foot-text"></span></footer>
+<div id="toast" class="toast" hidden></div>
+<script>window.AL_V = "d38aaf24c1";</script>
+<script src="data/static.js?v=d38aaf24c1"></script>
+<script src="data/league.js?v=d38aaf24c1"></script>
+<script src="js/settings.js?v=d38aaf24c1"></script>
+<script src="js/audio.js?v=d38aaf24c1"></script>
+<script src="js/speech.js?v=d38aaf24c1"></script>
+<script src="js/art.js?v=d38aaf24c1"></script>
+<script src="js/daybook.js?v=d38aaf24c1"></script>
+<script src="js/paint.js?v=d38aaf24c1"></script>
+<script src="js/beasts.js?v=d38aaf24c1"></script>
+<script src="js/monster_game_art.js?v=d38aaf24c1"></script>
+<script src="js/anim.js?v=d38aaf24c1"></script>
+<script src="js/scenes.js?v=d38aaf24c1"></script>
+<script src="js/isle.js?v=d38aaf24c1"></script>
+<script src="js/app.js?v=d38aaf24c1"></script>
+<script src="js/views.js?v=d38aaf24c1"></script>
+<script src="js/views_roster.js?v=d38aaf24c1"></script>
+<script src="js/views_map.js?v=d38aaf24c1"></script>
+<script src="js/views_week.js?v=d38aaf24c1"></script>
+<script src="js/views_world.js?v=d38aaf24c1"></script>
+<script src="js/views_creel.js?v=d38aaf24c1"></script>
+<script src="js/views_history.js?v=d38aaf24c1"></script>
+<script src="js/views_guide.js?v=d38aaf24c1"></script>
+<script src="js/views_finale.js?v=d38aaf24c1"></script>
+<script src="js/views_settings.js?v=d38aaf24c1"></script>
+<script src="js/tarot_cards.js?v=d38aaf24c1"></script>
+<script src="js/quiz.js?v=d38aaf24c1"></script>
+<script>App.start();</script>
+</body>
+</html>

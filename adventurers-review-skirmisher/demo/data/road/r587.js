@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r587"]={"day":73,"kind":"meet","place":null,"road":"carrbridge~saltmarrow","biome":"plains","weather":"cloudy","tod":"morning","hour":11,"heroes":["h18","h19","h20","h8"],"lead":"h19","line":"Barnaby passes Mags Halloran for the first time sharpening something long at the roadside.","traveller":"mags","met":1,"outcome":"meet","id":"r587"};

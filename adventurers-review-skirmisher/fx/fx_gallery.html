@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head><meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fight Effects</title>
+<style>
+  :root { --bg: #1c1612; --panel: #2a211b; --ink: #efe2c8; --dim: #b7a68a; --line: #4a3a2c; --gold: #e8bd5a; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Georgia, serif; }
+  header { padding: 18px 20px 6px; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { margin: 18px 20px 8px; font-size: 19px; color: var(--gold); }
+  header p, h2 small { margin: 0; color: var(--dim); font-size: 13px; font-weight: normal; }
+  .bar { display: flex; gap: 10px; align-items: center; padding: 8px 20px 4px; flex-wrap: wrap; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 14px; padding: 0 16px 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px 10px; }
+  .card h3 { margin: 0 0 2px; font-size: 15px; }
+  .card .meta { color: var(--dim); font-size: 12px; margin-bottom: 6px; font-family: ui-monospace, Consolas, monospace; }
+  canvas.stage { width: 100%; image-rendering: pixelated; display: block; cursor: pointer; border-radius: 3px; }
+  pre { color: var(--dim); font-size: 12px; white-space: pre-wrap; padding: 0 20px; }
+  .warn { background: #6a1c14; color: #fff; padding: 8px 20px; }
+  body.dump { background: #000; }
+  body.dump canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<script>window.onerror = (m, s, l) => { const w = () => document.body.prepend(Object.assign(document.createElement("div"), { className: "warn", textContent: `${m} (${s}:${l})` })); document.body ? w() : document.addEventListener("DOMContentLoaded", w); };</script>
+<script src="fx_data.js"></script>
+<script src="art.js"></script>
+<script src="paint.js"></script>
+<script src="beasts.js"></script>
+<script src="fight_fx.js"></script>
+<script>
+(function () {
+  "use strict";
+  const q = new URLSearchParams(location.search), FX = window.FightFX, D = window.FXG, S = window.LD.static;
+  const W = 384, H = 216;
+  FX.config({ flat: 0.32, scale: 1 });
+
+  // ---------- the S stage: sky, a far field, a paved road on a ground plane ----------
+  function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  const BG = (() => {
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"), r = rng(7), F = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    const sky = ["#a8cce8", "#b4d4ec", "#c0dcee", "#cce2ee", "#d6e6ec", "#dee8e6"];
+    for (let y = 0; y < 72; y++) F(0, y, W, 1, sky[Math.min(5, Math.floor(y / 12))]);
+    for (const [cx, cy, w] of [[70, 18, 30], [210, 12, 40], [330, 24, 26]]) { F(cx - w / 2, cy, w, 3, "#f4f8fa"); F(cx - w / 4, cy - 2, w / 2, 3, "#ffffff"); }
+    for (let x = 0; x < W; x++) { const h = 8 + Math.round(Math.sin(x / 37) * 4 + Math.sin(x / 13 + 1) * 2); F(x, 72 - h, 1, h, "#9cb48c"); F(x, 72 - h, 1, 1, "#aac49a"); }
+    F(250, 52, 4, 14, "#d8d4cc"); F(262, 46, 4, 20, "#d8d4cc"); F(256, 56, 6, 10, "#c8c4bc"); F(262, 44, 4, 2, "#c84a3a");
+    for (let y = 72; y < 88; y++) F(0, y, W, 1, y < 80 ? "#8ab06a" : "#7aa060");
+    F(0, 88, W, 3, "#86a45f");
+    const STONE = ["#d6caab", "#ccbf9e", "#ded4b8", "#c5b998"], MORTAR = "#a09274";
+    let y = 91, i = 0;
+    while (y < 198) {
+      const h = Math.floor(4 + i * 1.25), sw = Math.floor(h * 3.1) + 6;
+      let x = (i % 2) * Math.floor(sw / 2) - Math.floor(r() * sw) - sw;
+      while (x < W) {
+        const w = sw + Math.floor(r() * 7) - 3, c = STONE[Math.floor(r() * 4)];
+        F(x, y, w, h, MORTAR); F(x + 1, y, w - 2, h - 1, c); F(x + 1, y, w - 2, 1, "#e4dcc4");
+        for (let k = 0; k < w / 8; k++) F(x + 2 + Math.floor(r() * (w - 4)), y + 1 + Math.floor(r() * Math.max(1, h - 3)), 1, 1, "#bcae8c");
+        x += w;
+      }
+      y += h; i++;
+    }
+    F(0, y, W, 3, "#8b8165"); F(0, y + 3, W, H - y - 3, "#7c9858");
+    for (let k = 0; k < 40; k++) { const tx = Math.floor(r() * W), ty = y + 4 + Math.floor(r() * (H - y - 6)); F(tx, ty, 1, 1, "#60804a"); F(tx + 1, ty - 1, 1, 1, "#60804a"); F(tx + 2, ty, 1, 1, "#60804a"); }
+    return cv;
+  })();
+
+  // ---------- fighters ----------
+  const HERO_SLOTS = [[150, 170], [118, 173], [90, 150], [60, 152]], MON_SLOTS = [[234, 170], [264, 173], [298, 150], [330, 152]];
+  function measure(cv) {
+    const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+    let top = cv.height, bot = 0;
+    for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3]) { if (y < top) top = y; if (y > bot) bot = y; }
+    return { top, bot };
+  }
+  const sprites = {};
+  function sprite(key, f) {
+    const k = key + f;
+    if (sprites[k]) return sprites[k];
+    let g;
+    if (key.startsWith("h")) { const h = D.heroes[+key.slice(1)]; g = Art.heroGrid(h, f, S.classes[h.cls]); }
+    else { const m = S.monsters[key.slice(2)]; g = Art.monsterGrid(m, f); if (key[0] === "m") g = g.flipX(); }
+    const cv = g.toCanvas(1), mm = measure(cv);
+    cv.feet = mm.bot + 1; cv.tall = mm.bot + 1 - mm.top;
+    return (sprites[k] = cv);
+  }
+  function lineup(cs) {
+    const units = {};
+    D.heroes.forEach((h, i) => { units["h" + i] = { key: "h" + i, x: HERO_SLOTS[i][0], y: HERO_SLOTS[i][1], side: 0, dir: 1 }; });
+    (cs.foes || D.foes).forEach((m, i) => { units["m" + i] = { key: "m:" + m, x: MON_SLOTS[i][0], y: MON_SLOTS[i][1], side: 1, dir: -1 }; });
+    if (cs.newcomer) {
+      const a = units[cs.a];
+      units.new = { key: (a.side ? "m:" : "n:") + cs.newcomer, x: a.side ? 210 : 184, y: 178, side: a.side, dir: a.side ? -1 : 1, summoned: true };
+    }
+    for (const u of Object.values(units)) { const s = sprite(u.key, 0); u.h = s.tall; }
+    return units;
+  }
+
+  // ---------- one case played like the replay engine would ----------
+  function prep(cs) {
+    if (cs.ready) return cs;
+    const units = lineup(cs), a = units[cs.a];
+    const to = cs.t === "self" ? a : cs.t === "new" ? units.new : cs.t.map((k) => units[k]);
+    const T = FX.timing(cs.family, cs.p, a, to);
+    const damaging = ["slash", "thrust", "smash", "arrow", "bolt", "beam", "nova"].includes(cs.family) || (cs.family === "curse" && cs.p.shape === "hex");
+    const stop = !damaging || cs.p.miss ? 0 : cs.ko ? FX.HITSTOP.ko : cs.p.crit ? FX.HITSTOP.crit : FX.HITSTOP.hit;
+    const imps = [...new Set(T.impacts.map((v) => Math.round(v * 1000) / 1000))].sort((x, y) => x - y);
+    const realOf = (e) => { let r = e; for (const ti of imps) if (e > ti) r += stop; return r; };
+    const effOf = (r) => { let off = 0; for (const ti of imps) { const at = ti + off; if (r < at) break; if (r < at + stop) return ti; off += stop; } return r - off; };
+    const tl = Array.isArray(to) ? to : [to];
+    Object.assign(cs, { ready: true, units, a, to, tl, T, stop, realOf, effOf, real: realOf(T.dur) + (imps.length ? stop : 0), floor: FX.floor(W, H) });
+    return cs;
+  }
+  const NUMS = [12, 9, 7, 14, 5, 21];
+  function drawUnit(ctx, u, o, f) {
+    const s = sprite(u.key, f), w = s.width * o.sx, h = s.height * o.sy;
+    ctx.save();
+    ctx.globalAlpha = o.alpha;
+    ctx.translate(Math.round(u.x + o.dx), Math.round(u.y + o.dy));
+    if (o.rot) ctx.rotate(o.rot);
+    const x = Math.round(-w / 2), y = Math.round(-s.feet * o.sy);
+    ctx.drawImage(s, x, y, Math.round(w), Math.round(h));
+    if (o.tint && o.tintAmt > 0.02) { ctx.globalAlpha = o.alpha * o.tintAmt; ctx.drawImage(FX.silhouette(s, o.tint), x, y, Math.round(w), Math.round(h)); }
+    if (o.white > 0.02) { ctx.globalAlpha = o.alpha * o.white; ctx.drawImage(FX.silhouette(s, "#ffffff"), x, y, Math.round(w), Math.round(h)); }
+    ctx.restore();
+  }
+  function render(ctx, cs, tau) {
+    prep(cs);
+    const e = cs.effOf(tau), fam = cs.family, p = cs.p, T = cs.T, frame = Math.floor(tau / 0.4) % 2;
+    const realImp = T.impacts.map((v) => cs.realOf(v));
+    let sx = 0, sy = 0;
+    const power = cs.ko ? 3 : p.crit ? 2 : fam === "smash" ? 1.5 : 1;
+    if (cs.stop) for (const ri of realImp.slice(0, 3)) { const [dx, dy] = FX.shake(tau - ri, power, 1); sx += dx; sy += dy; }
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    ctx.translate(sx, sy);
+    ctx.drawImage(BG, 0, 0);
+    cs.floor.clear();
+    for (const m of T.marks) if (m.at <= e) cs.floor.add(m.kind, m.x, m.y, m.opts, cs.realOf(m.at));
+    cs.floor.draw(ctx, tau);
+    FX.play(ctx, fam, p, cs.a, cs.to, e, "floor");
+    const order = Object.values(cs.units).sort((x, y) => x.y - y.y);
+    ctx.fillStyle = "rgba(40,28,18,0.32)";
+    for (const u of order) if (!u.summoned || e > T.impact - 0.2) ctx.fillRect(u.x - 8, u.y - 1, 16, 2);
+    for (const u of order) {
+      let o = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, white: 0, alpha: 1, tint: null, tintAmt: 0 };
+      if (u === cs.a) o = FX.pose(fam, p, "actor", e, cs.a, cs.to);
+      const ti = cs.tl.indexOf(u);
+      if (ti >= 0 && u !== cs.a) { o = FX.pose(fam, p, "target", e, cs.a, cs.to, ti); if (tau - realImp[ti] > 2 / 60) o.white = 0; }
+      if (u.summoned && (ti < 0 || e > T.dur)) o.alpha = e > T.dur ? 1 : 0;
+      if (cs.ko && ti === 0 && tau > realImp[0] + 0.35) { o.rot = -u.dir * Math.PI / 2 * Math.min(1, (tau - realImp[0] - 0.35) / 0.15); o.dy = -3; o.alpha = 0.85; }
+      drawUnit(ctx, u, o, u === cs.a || ti >= 0 ? 0 : frame);
+    }
+    FX.play(ctx, fam, p, cs.a, cs.to, e, "fx");
+    if (cs.status) cs.tl.forEach((u, i) => { if (tau >= realImp[i]) FX.status(ctx, cs.status, u, tau); });
+    cs.tl.forEach((u, i) => {
+      const t = tau - realImp[i], c = FX.chest(u);
+      if (t < 0) return;
+      const v = NUMS[i % NUMS.length] * (p.crit ? 2 : 1) + (cs.ko ? 9 : 0);
+      if (fam === "heal") FX.number(ctx, "heal", v, c.x, u.y - u.h - 2, t);
+      else if (cs.stamp) FX.stamp(ctx, "status", c.x, u.y - u.h - 10, t, cs.stamp);
+      else if (["buff", "guard", "summon", "curse"].includes(fam)) return;
+      else if (p.miss) FX.number(ctx, "miss", "", c.x, u.y - u.h - 2, t);
+      else FX.number(ctx, p.crit && i === 0 ? "crit" : "normal", v, c.x, u.y - u.h - 2, t);
+    });
+    if (p.crit && !p.miss) FX.stamp(ctx, "crit", cs.tl[0].x + 4, cs.tl[0].y - cs.tl[0].h - 38, tau - realImp[0]);
+    if (cs.ko) FX.stamp(ctx, "ko", cs.tl[0].x + 2, cs.tl[0].y - cs.tl[0].h - 22, tau - realImp[0] - 0.08);
+    ctx.restore();
+    if ((p.crit || cs.ko) && !p.miss) FX.flash(ctx, W, H, tau - realImp[0], cs.ko ? 1 : 0.8);
+  }
+
+  // ---------- modes ----------
+  const cases = D.cases.filter((c) => !q.get("ids") || q.get("ids").split(",").includes(c.id) || q.get("ids").split(",").includes(c.family));
+  function box(cs) {
+    const us = [cs.a, ...cs.tl].concat(cs.units.new ? [cs.units.new] : []);
+    let x0 = Math.min(...us.map((u) => u.x)) - 46, x1 = Math.max(...us.map((u) => u.x)) + 46;
+    if (x1 - x0 < 200) { const m = (x0 + x1) / 2; x0 = m - 100; x1 = m + 100; }
+    x0 = Math.max(0, Math.round(x0)); x1 = Math.min(W, Math.round(x1));
+    const y1 = Math.min(H, Math.max(...us.map((u) => u.y)) + 14), y0 = Math.max(0, y1 - Math.round((x1 - x0) * 0.62));
+    return [x0, y0, x1, y1];
+  }
+  if (q.has("dump")) {
+    document.body.className = "dump";
+    const fps = +(q.get("fps") || 24), cols = +(q.get("cols") || 8), hold = 0.5;
+    const plan = [];
+    let y = 0;
+    for (const cs of cases) { prep(cs); const n = Math.ceil((cs.real + hold) * fps) + 1; plan.push({ id: cs.id, y, n, cols }); y += Math.ceil(n / cols) * H; }
+    const cv = document.createElement("canvas"); cv.width = cols * W; cv.height = Math.max(1, y);
+    const g = cv.getContext("2d");
+    plan.forEach((pl, ci) => { const cs = cases[ci]; for (let i = 0; i < pl.n; i++) { g.save(); g.translate((i % cols) * W, pl.y + Math.floor(i / cols) * H); g.beginPath(); g.rect(0, 0, W, H); g.clip(); render(g, cs, i / fps); g.restore(); } });
+    document.body.appendChild(cv);
+    const pre = document.createElement("pre"); pre.id = "layout"; pre.style.display = "none";
+    pre.textContent = JSON.stringify({ fps, w: W, h: H, cols, width: cv.width, height: cv.height, cases: plan.map((pl, i) => Object.assign(pl, { box: box(cases[i]), label: cases[i].label, impacts: cases[i].T.impacts.map((v) => cases[i].realOf(v)), real: cases[i].real })) });
+    document.body.appendChild(pre);
+    return;
+  }
+  if (q.has("bench")) {
+    // the effect's own cost per frame (both layers), apart from sprites and the backdrop
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"), rows = [];
+    let total = 0, frames = 0;
+    for (const cs of cases) {
+      prep(cs);
+      let worst = 0, sum = 0, n = 0;
+      for (let t = 0; t < cs.T.dur; t += 1 / 60) {
+        const t0 = performance.now();
+        FX.play(g, cs.family, cs.p, cs.a, cs.to, t, "floor"); FX.play(g, cs.family, cs.p, cs.a, cs.to, t, "fx");
+        const dt = performance.now() - t0;
+        worst = Math.max(worst, dt); sum += dt; n++;
+      }
+      total += sum; frames += n;
+      rows.push([cs.id, sum / n, worst]);
+    }
+    rows.sort((a, b) => b[2] - a[2]);
+    const rep = document.createElement("pre"); rep.id = "report";
+    rep.textContent = `mean ${(total / frames).toFixed(3)} ms per frame over ${frames} frames\n` + rows.slice(0, 15).map((r) => `${r[0].padEnd(28)} mean ${r[1].toFixed(3)} ms  worst ${r[2].toFixed(3)} ms`).join("\n");
+    document.body.appendChild(rep);
+    return;
+  }
+  if (q.has("check")) {
+    // every case's sound in one offline render, a 2.5s window each, so a silent or clipping effect shows up
+    const rep = document.createElement("pre"); rep.id = "report"; document.body.appendChild(rep);
+    const SLOT = 2.5, evs = [];
+    cases.forEach((cs, i) => {
+      prep(cs);
+      const t0 = i * SLOT, hit = t0 + cs.realOf(cs.T.impact);
+      evs.push([t0, "family", cs.family, cs.p, "cast"], [hit, "family", cs.family, cs.p, "impact"]);
+      if (cs.ko) evs.push([hit, "sting", "ko", {}]);
+    });
+    FX.audio.render(evs, cases.length * SLOT + 1).then((buf) => {
+      const d = buf.getChannelData(0), sr = buf.sampleRate;
+      rep.textContent = cases.map((cs, i) => {
+        let peak = 0, sum = 0;
+        const a0 = Math.floor(i * SLOT * sr), a1 = Math.min(d.length, Math.floor((i + 1) * SLOT * sr));
+        for (let j = a0; j < a1; j++) { const v = Math.abs(d[j]); if (v > peak) peak = v; sum += v * v; }
+        const rms = Math.sqrt(sum / Math.max(1, a1 - a0));
+        return `${cs.id.padEnd(28)} peak ${peak.toFixed(3)} rms ${rms.toFixed(4)}${peak < 0.02 ? "  SILENT" : peak > 0.98 ? "  CLIPS" : ""}`;
+      }).join("\n");
+      document.title = "done";
+    }).catch((err) => { rep.textContent = "ERROR " + err.message; });
+    return;
+  }
+  const head = document.createElement("header");
+  head.innerHTML = `<h1>Fight effects</h1><p>web/js/fight_fx.js on the S stage (384x216, side view, ground flattened 0.32), with real sprites from art.js and beasts.js. ${cases.length} skills from ${Object.keys(FX.FAMILIES).length} families. Each card loops; click one to replay it with sound (sound follows the site's setting; click anywhere first to wake it).</p>`;
+  document.body.appendChild(head);
+  const bar = document.createElement("div"); bar.className = "bar";
+  const KEY = "al.sound", prefs = () => { try { return Object.assign({ on: true }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return { on: true }; } };
+  const sb = document.createElement("button"), lab = () => (sb.textContent = prefs().on ? "Sound: on" : "Sound: off");
+  sb.onclick = () => { const p = prefs(); p.on = !p.on; try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage unavailable */ } lab(); };
+  lab(); bar.appendChild(sb);
+  const slow = document.createElement("button"); let rate = 1; slow.textContent = "Speed 1x"; slow.onclick = () => { rate = rate === 1 ? 0.25 : rate === 0.25 ? 0.5 : 1; slow.textContent = `Speed ${rate}x`; }; bar.appendChild(slow);
+  document.body.appendChild(bar);
+  const live = [];
+  let fam = null, grid = null;
+  for (const cs of cases) {
+    if (cs.family !== fam) {
+      fam = cs.family;
+      const h = document.createElement("h2"); h.innerHTML = `${fam} <small>${FX.FAMILIES[fam].about}</small>`; document.body.appendChild(h);
+      grid = document.createElement("div"); grid.className = "grid"; document.body.appendChild(grid);
+    }
+    prep(cs);
+    const card = document.createElement("section"); card.className = "card";
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.className = "stage";
+    card.innerHTML = `<h3>${cs.label}</h3><div class="meta">${fam}(${JSON.stringify(cs.p).replace(/"/g, "").replace(/,/g, ", ")}) ${cs.T.dur.toFixed(2)}s, hit ${cs.T.impact.toFixed(2)}s</div>`;
+    card.appendChild(cv); grid.appendChild(card);
+    const L = { cs, g: cv.getContext("2d"), t0: performance.now() / 1000 + Math.random() * 0.8, clock: 0 };
+    cv.onclick = () => {
+      L.clock = 0; FX.audio.unlock();
+      FX.sound(cs.family, cs.p, "cast");
+      FX.sound(cs.family, cs.p, "impact", cs.realOf(cs.T.impact) / rate);
+      if (cs.ko) FX.sting("ko", cs.p.school, cs.realOf(cs.T.impact) / rate);
+    };
+    live.push(L);
+  }
+  // ---------- the impact kit on one stage: statuses, numbers, stamps, decals, rings ----------
+  const KIT = { floor: FX.floor(W, H), built: false };
+  function renderKit(ctx, t) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(BG, 0, 0);
+    if (!KIT.built) {
+      FX.DECALS.forEach((kind, i) => KIT.floor.add(kind, 26 + (i % 8) * 46, 112 + Math.floor(i / 8) * 26, { size: 0.8, seed: i, school: ["flame", "frost", "wild", "marksman", "road", "physical", "poison", "arcane", "holy", "death", "beast", "blade", "shadow", "riding", "fury"][i % 15], to: kind === "crack" ? null : undefined }, -9));
+      KIT.built = true;
+    }
+    KIT.floor.draw(ctx, t);
+    FX.DECALS.forEach((kind, i) => FX.text(ctx, kind, 26 + (i % 8) * 46, 120 + Math.floor(i / 8) * 26, "#3a2c22", 1, null));
+    FX.ring(ctx, 60, 196, 22, t % 2, { school: "flame" }, "tell");
+    FX.ring(ctx, 130, 196, 22, (t % 1.2) - 0.2, { school: "frost" }, "hit");
+    const sts = FX.STATUSES, foe = D.foes[0];
+    sts.forEach((st, i) => {
+      const u = { key: i % 2 ? "m:" + foe : "h" + (i % 4), x: 22 + i * 34, y: 88, dir: i % 2 ? -1 : 1 };
+      const sp = sprite(u.key, 0); u.h = sp.tall;
+      drawUnit(ctx, u, { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, white: 0, alpha: st === "stealth" ? 0.45 : 1, tint: null, tintAmt: 0 }, 0);
+      FX.status(ctx, st, u, t);
+      FX.text(ctx, st, u.x, 92, "#2a1e18", 1, null);
+    });
+    const styles = FX.NUMBER_STYLES;
+    styles.forEach((st, i) => FX.number(ctx, st, st === "heal" ? 14 : st === "crit" ? 31 : st === "miss" || st === "block" ? "" : 9 + i, 210 + i * 22, 214, (t * 0.8 + i * 0.07) % 1.3));
+    FX.stamp(ctx, "crit", 250, 150, (t % 1.6));
+    FX.stamp(ctx, "ko", 330, 150, ((t + 0.5) % 2));
+    FX.stamp(ctx, "status", 300, 186, ((t + 0.2) % 1.4), ["FROZEN", "ROOTED", "STUNNED", "MARKED"][Math.floor(t / 1.4) % 4]);
+    FX.sparks(ctx, 200, 150, t % 0.7, { school: "physical", dir: 1, crit: true, seed: Math.floor(t / 0.7) });
+    ctx.restore();
+  }
+  if (q.has("kit")) {
+    document.body.innerHTML = "";
+    document.body.className = "dump";
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.style.width = W * 3 + "px";
+    document.body.appendChild(cv);
+    renderKit(cv.getContext("2d"), +(q.get("t") || 0.35));
+    return;
+  }
+  if (!q.get("ids")) {
+    const h = document.createElement("h2"); h.innerHTML = "impact kit <small>statuses, number styles, stamps, sparks, every floor decal, a ring telling and a ring hitting</small>"; document.body.appendChild(h);
+    const g2 = document.createElement("div"); g2.className = "grid"; document.body.appendChild(g2);
+    const card = document.createElement("section"); card.className = "card";
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.className = "stage";
+    card.appendChild(cv); g2.appendChild(card);
+    live.push({ kit: true, g: cv.getContext("2d"), clock: 0 });
+  }
+  const still = q.get("still");
+  let last = performance.now() / 1000;
+  function tick() {
+    const now = performance.now() / 1000, dt = Math.min(0.1, now - last);
+    last = now;
+    for (const L of live) {
+      if (L.kit) { L.clock += dt * rate; renderKit(L.g, L.clock); continue; }
+      const r = L.cs.real + 0.8;
+      L.clock = still ? +still * L.cs.real : (L.clock + dt * rate) % r;
+      const rc = L.g.canvas.getBoundingClientRect();
+      if (rc.bottom < -50 || rc.top > innerHeight + 50) continue;
+      render(L.g, L.cs, L.clock);
+    }
+    if (!still) requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

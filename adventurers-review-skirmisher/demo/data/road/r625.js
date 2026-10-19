@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r625"]={"day":77,"kind":"inn","place":"slag_heap_arms","road":"redcrag~veldrock","biome":"hills","weather":"snow","tod":"afternoon","hour":15,"heroes":["h6","h9"],"lead":"h6","line":"Tobias follows a trail of black footprints into the Slag Heap Arms, and then adds a few more.","place_kind":"inn","tally":6,"outcome":"place","id":"r625"};

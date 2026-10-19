@@ -1,0 +1,128 @@
+<!doctype html>
+<html><head><meta name="robots" content="noindex"><meta charset="utf-8"><title>Class Looks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #2a1b11; --card: #f1e3c2; --ink: #2e2116; --edge: #b0915e; }
+  body { margin: 0; padding: 12px; background: var(--bg); color: var(--ink); font: 13px Georgia, serif; }
+  h2 { color: #ecdcb6; font: 600 16px "Courier New", monospace; margin: 12px 0 6px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fam { display: flex; gap: 4px; background: #3a2a1e; padding: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+  .card { background: var(--card); border: 2px solid var(--edge); padding: 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .card.parent { border-color: #ecc56a; background: #e8d3a0; }
+  .card .row { display: flex; gap: 4px; align-items: flex-end; }
+  .card .lbl { font-size: 11px; text-align: center; max-width: 220px; }
+  .card .sub { font-size: 10px; color: #6a5236; text-align: center; max-width: 220px; }
+  table { border-collapse: collapse; background: var(--card); }
+  td { border: 1px solid var(--edge); padding: 2px 6px; font-size: 12px; }
+  canvas { image-rendering: pixelated; }
+</style>
+<script src="class_looks_data.js"></script>
+<script src="class_looks_before.js"></script>
+<script src="art.js"></script>
+<script src="paint.js"></script>
+</head><body>
+<div id="out"></div>
+<script>
+(function () {
+  "use strict";
+  const D = CLG, CL = D.classes;
+  const q = new URLSearchParams(location.search), only = q.get("s"), Z = +(q.get("z") || 4);
+  const out = document.getElementById("out");
+  const LOOKS = [{ skin: "#e8b890", hair: "#5a3a22", fav: "#2f6aa8", style: 2, face: 1, scars: [] },
+    { skin: "#8a5a3a", hair: "#d8b060", fav: "#b8323a", style: 5, face: 2, scars: [] }];
+  // src: this tree (CLG) or the one before a change (CLG_BEFORE, from --before), each with its own looks and worn kit
+  const hero = (cid, base, li, src) => Object.assign({ id: (src ? "b" : "c") + cid + base + li, name: cid, cls: cid, look: LOOKS[li || 0], src: src || D }, (src || D).worn[cid][base]);
+  const sprite = (h, sc) => Art.heroGrid(h, 0, h.src.classes[h.cls]).toCanvas(sc);
+  const portrait = (h, sc) => Paint.portraitGrid(h, h.src.classes[h.cls]).toCanvas(sc);
+  const short = (l) => [l.outfit, l.head, l.offhand, l.aura || "-", l.mark || ""].filter(Boolean).join(" / ");
+  function card(cid, base, cls, src) {
+    const d = document.createElement("div"); d.className = "card" + (cls ? " " + cls : "");
+    const r = document.createElement("div"); r.className = "row";
+    r.append(sprite(hero(cid, base, 0, src), Z), sprite(hero(cid, base, 1, src), Z / 2), portrait(hero(cid, base, 0, src), Z / 2));
+    const l = document.createElement("div"); l.className = "lbl"; l.textContent = `${(src || D).classes[cid].name} (${base})`;
+    const s = document.createElement("div"); s.className = "sub"; s.textContent = short((src || D).classes[cid].look);
+    d.append(r, l, s); return d;
+  }
+  function section(id, title, fill) {
+    if (only && only !== id) return;
+    const h = document.createElement("h2"); h.textContent = title;
+    const g = document.createElement("div");
+    out.append(h, g);
+    try { fill(g); } catch (e) { const p = document.createElement("pre"); p.style.color = "#f88"; p.textContent = e.stack; out.appendChild(p); }
+  }
+  const kids = (p) => Object.values(CL).filter((c) => c.from.includes(p) && c.tier === CL[p].tier + 1).map((c) => c.id).sort();
+  const parents = Object.values(CL).filter((c) => kids(c.id).length).sort((a, b) => a.tier - b.tier || a.id.localeCompare(b.id)).map((c) => c.id);
+  const pick = q.get("f") ? q.get("f").split(",") : parents;
+
+  section("families", "Families: the parent (gold), then its children, once per base", (g) => pick.forEach((p) => {
+    const bs = CL[p].tier === 0 ? [p] : Object.keys(D.worn[p]);
+    bs.forEach((b) => {
+      const row = document.createElement("div"); row.className = "fam";
+      row.appendChild(card(p, b, "parent"));
+      kids(p).filter((k) => D.worn[k][b]).forEach((k) => row.appendChild(card(k, b)));
+      g.appendChild(row);
+    });
+  }));
+
+  // pixels that differ between two classes drawn on the same hero and base; the silhouette counts pixels filled in one and empty in the other
+  function diff(a, b, base) {
+    let px = 0, sil = 0;
+    for (const [fn, w] of [[(c) => Art.heroGrid(hero(c, base, 0), 0, CL[c]), 1], [(c) => Paint.portraitGrid(hero(c, base, 0), CL[c]), 0.25]]) {
+      const ga = fn(a), gb = fn(b);
+      for (let i = 0; i < ga.px.length; i++) if (ga.px[i] !== gb.px[i]) px += w;
+      if (w === 1) for (let i = 0; i < ga.px.length; i++) if (!ga.px[i] !== !gb.px[i]) sil++;
+    }
+    return { px: Math.round(px), sil };
+  }
+  const related = (a, b) => CL[a].from.includes(b) || CL[b].from.includes(a) ? "parent" : CL[a].tier === CL[b].tier && CL[a].from.some((p) => CL[b].from.includes(p)) && CL[a].tier > 0 ? "sibling" : "";
+  section("pairs", "Closest pairs (sprite pixels differing + a quarter of the portrait's), parent/child and siblings first", (g) => {
+    const ids = Object.keys(CL), rows = [];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = ids[i], b = ids[j], rel = related(a, b);
+      const shared = Object.keys(D.worn[a]).filter((x) => D.worn[b][x]);
+      if (!shared.length) continue;
+      let best = null;
+      for (const base of shared) { const d = diff(a, b, base); if (!best || d.px < best.px) best = Object.assign(d, { base }); }
+      rows.push({ a, b, rel, ...best });
+    }
+    rows.sort((x, y) => x.px - y.px);
+    const n = +(q.get("n") || 60);
+    const relRows = rows.filter((r) => r.rel).slice(0, n), anyRows = rows.filter((r) => !r.rel).slice(0, 30);
+    for (const [title, list] of [["related", relRows], ["unrelated", anyRows]]) {
+      const h = document.createElement("h2"); h.textContent = title; g.appendChild(h);
+      const grid = document.createElement("div"); grid.className = "grid"; g.appendChild(grid);
+      list.forEach((r) => {
+        const d = document.createElement("div"); d.className = "card";
+        const row = document.createElement("div"); row.className = "row";
+        row.append(sprite(hero(r.a, r.base, 0), 3), sprite(hero(r.b, r.base, 0), 3), portrait(hero(r.a, r.base, 0), 1), portrait(hero(r.b, r.base, 0), 1));
+        const l = document.createElement("div"); l.className = "lbl"; l.textContent = `${CL[r.a].name} | ${CL[r.b].name} (${r.base}${r.rel ? ", " + r.rel : ""}): ${r.px} px, ${r.sil} silhouette`;
+        d.append(row, l); grid.appendChild(d);
+      });
+    }
+    window.PAIRS = rows.map((r) => [r.a, r.b, r.base, r.rel, r.px, r.sil]);
+    const pre = document.createElement("pre"); pre.id = "pairs-json"; pre.style.display = "none"; pre.textContent = JSON.stringify(window.PAIRS); g.appendChild(pre);
+  });
+
+  section("compare", "Before | after, once per base", (g) => {
+    const B = window.CLG_BEFORE, ids = q.get("ids") ? q.get("ids").split(",") : D.ids;
+    ids.filter((c) => CL[c] && B && B.classes[c]).forEach((c) => {
+      const row = document.createElement("div"); row.className = "fam";
+      const lbl = document.createElement("div"); lbl.className = "card parent"; lbl.style.justifyContent = "center"; lbl.style.minWidth = "110px";
+      lbl.textContent = CL[c].name;
+      row.appendChild(lbl);
+      Object.keys(D.worn[c]).forEach((b) => row.appendChild(card(c, b, "", B)));
+      const arrow = document.createElement("div"); arrow.style.cssText = "color:#ecc56a;font:600 28px monospace;align-self:center;padding:0 6px"; arrow.textContent = "→";
+      row.appendChild(arrow);
+      Object.keys(D.worn[c]).forEach((b) => row.appendChild(card(c, b)));
+      g.appendChild(row);
+    });
+  });
+
+  section("sheet", "Selected classes, once per base", (g) => {
+    const ids = q.get("ids") ? q.get("ids").split(",") : D.ids;
+    const grid = document.createElement("div"); grid.className = "grid"; g.appendChild(grid);
+    ids.filter((c) => CL[c]).forEach((c) => Object.keys(D.worn[c]).forEach((b) => grid.appendChild(card(c, b))));
+  });
+})();
+</script>
+</body></html>
