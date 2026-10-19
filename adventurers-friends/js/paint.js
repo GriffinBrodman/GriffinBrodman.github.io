@@ -256,9 +256,9 @@
   const CROWNS = new Set(["flame_crown", "ice_crown", "leaf_crown", "elemental_crown", "storm_crown"]);
   const FINE = new Set(["rune_crown", "star_orbit", "spectacles", "domino", "veil", "triad", "raincloud", "goggles", "warpaint", "rose", "claw_scars", "eyepatch", "thundercloud", "spirits"]);
   const BODY_MARKS = new Set(["ward_sigil", "pendulum", "trap_belt", "rope_coil", "spellhand", "whip", "trophy_cord", "hunting_horn", "wanted_poster", "satchel", "mortar", "poison_vial", "ladle",
-    "tabard", "pauldrons", "spare_blades", "slung_lute", "wolf_mantle", "bedroll", "stag_trophy"]);
+    "tabard", "pauldrons", "spare_blades", "slung_lute", "wolf_mantle", "bedroll", "stag_trophy", "trail_scarf"]);
   // body marks carried on the back are drawn behind the figure first (part "back"); a tabard goes over the armour, under the arms
-  const BEHIND = new Set(["spare_blades", "slung_lute", "bedroll", "stag_trophy"]);
+  const BEHIND = new Set(["spare_blades", "slung_lute", "stag_trophy"]);
   const MARKS = new Set(["halo", "antlers", ...CROWNS, ...FINE, ...BODY_MARKS]);
   const OUTFIT_MAT = { robe: "cloth", robe_dark: "cloth", vestments: "cloth", fancy: "cloth", vest: "cloth", motley: "cloth", leather: "leather", fur: "leather", cloak: "leather", chain: "chain", plate: "plate", plate_dark: "plate" };
   const BASE = { robe: "robe", robe_dark: "robed", vestments: "shirt", fancy: "robe", vest: "shirt", motley: "robe", leather: "hide", fur: "hide", cloak: "cloth", chain: "metal", plate: "metal" };
@@ -418,7 +418,12 @@
     if (c.mark === "star_orbit") fineMark(P, c, "back");
     if (c.mark === "halo") {
       const hy = (HEAD_TOP[c.head] == null ? 6 : HEAD_TOP[c.head]) - (c.head === "none" && HAIR_LIFT[st] ? HAIR_LIFT[st] : c.head === "circlet" ? 4.5 : 2);
-      for (let a = 0; a < 48; a++) { const t = (a / 48) * Math.PI * 2; P.px(cx + Math.cos(t) * 7, hy + Math.sin(t) * 2, "#ffe88a", 0); }
+      // a gold band, not a wire: two rings so it holds at sprite size, the near rim lit and the far rim in shade
+      for (const [rx, ry] of [[7.6, 2.3], [6.9, 1.7]]) for (let a = 0; a < 64; a++) {
+        const t = (a / 64) * Math.PI * 2;
+        P.px(cx + Math.cos(t) * rx, hy + Math.sin(t) * ry, "gold", Math.sin(t) > 0 ? 0.75 - Math.cos(t) * 0.15 : 0.15 - Math.cos(t) * 0.15);
+      }
+      P.px(cx - 5, hy + 1.5, "#fffbe0");
     }
     if (!covered && (st === 1 || st === 6)) P.poly([[cx - 8, 10], [cx + 8, 10], [cx + 10, st === 1 ? 33 : 26], [cx - 10, st === 1 ? 33 : 26]], "hair", (x, y) => -0.3 + hairTex(x, y) - (y - 10) * 0.02);
     if (!covered && st === 2) P.ell(cx + 8.5, 19, 2.6, 6.5, "hair", { s: -0.25, fn: (x, y, s) => s + hairTex(x, y) });
@@ -622,9 +627,12 @@
       }
       case "thundercloud": {
         // a squall that follows the hero about: a dark cloud beside the head with a bolt forking out of it
-        const [x0, y0, k] = sp ? [20.5, 1.2, 0.6] : [8, 2.5, 1];
-        for (const [dx, dy, r] of [[-3.6, 0.8, 2.4], [0, -0.6, 3.2], [3.8, 0.6, 2.6]]) P.ell(x0 + dx * k * 1.15, y0 + dy * k, r * k + 0.3, r * k * 0.8 + 0.3, "storm", { s: 0.15 });
-        if (sp) { for (const [x, y] of f ? [[20, 4], [21, 5], [20, 6], [21, 7]] : [[21, 4], [20, 5], [21, 6], [20, 7]]) P.px(x, y, y % 2 ? "#fff8c0" : "#f8e050"); P.px(19, 1, "cloud", 0.4); }
+        const [x0, y0, k] = sp ? [21.6, 2, 0.78] : [8, 2.5, 1];
+        for (const [dx, dy, r] of [[-3.6, 0.8, 2.4], [0, -0.6, 3.2], [3.8, 0.6, 2.6]]) P.ell(x0 + dx * k * 1.15, y0 + dy * k, r * k + 0.3, r * k * 0.8 + 0.3, "storm", { s: 0.15, fn: (x, y, s, nx, ny) => s + (ny < -0.4 ? 0.45 : ny > 0.45 ? -0.35 : 0) });
+        if (sp) {
+          for (const [x, y] of f ? [[22, 4], [21, 5], [21, 6], [22, 7], [21, 8], [20, 9]] : [[21, 4], [22, 5], [22, 6], [21, 7], [22, 8], [23, 9]]) P.px(x, y, y === 6 || y === 7 ? "#fff8c0" : "#f8e050");
+          P.px(19, 0, "cloud", 0.5); P.px(20, 0, "cloud", 0.3); P.px(23, 0, "cloud", 0.2);
+        }
         else {
           P.poly(f ? [[9, 5], [11, 5], [9.5, 8], [11.5, 8], [7, 14], [8, 9.4], [6.2, 9.4]] : [[7.5, 5], [9.5, 5], [8, 8], [10, 8], [5.5, 14], [6.5, 9.4], [4.8, 9.4]], "#f8e050", 0.4);
           P.px(f ? 9 : 7.5, 8, "#fff8c0"); P.ell(6, 0.8, 1.6, 1, "cloud", { s: 0.4 });
@@ -662,7 +670,7 @@
         }
         break;
       case "warpaint":
-        if (sp) { for (const [x, y] of [[11, 11], [12, 12], [16, 11], [15, 12], [13, 8], [14, 8]]) P.px(x, y, "warp", 0.2); }
+        if (sp) { for (const [x, y] of [[11, 11], [11, 12], [16, 11], [16, 12], [13, 8], [14, 8]]) P.px(x, y, "warp", y === 11 ? 0.4 : 0.1); }
         else { for (const [x0, x1] of [[15.6, 15], [17.6, 17], [22.4, 23], [24.4, 25]]) P.line(x0, 19, x1, 22.4, "warp", 0.2); P.rect(19.5, 11.5, 1, 3, "warp", 0.1); }
         break;
       case "rose":
@@ -703,9 +711,25 @@
         break;
       }
       case "pendulum": {
-        const sw = f ? 1 : 0;
-        if (sp) { P.px(21, 26, "silver", 0.3); P.px(21 + sw * 0.5, 27, "silver", 0); P.px(21 + sw, 28, "silver", 0.2); P.ell(21.5 + sw, 30, 1.6, 1.6, "gold", { s: 0.3 }); P.px(21 + sw, 30, "#3a2410"); P.px(20 + sw, 29, "#fff8d0"); }
-        else { P.line(30.5, 28.5, 31 + sw, 32, "silver", 0.2); P.ell(31.5 + sw, 34.4, 2.4, 2.4, "gold", { s: 0.25 }); P.ell(31.5 + sw, 34.4, 1.2, 1.2, "#5a3818"); P.px(31 + sw, 34, "gold", 0.6); P.px(30 + sw, 33, "#fff8d0"); }
+        // a hypnotist's watch held out on its chain from the free hand: a broad gold face with a rose spiral, swinging between
+        // the frames, the far end of its arc left as a faint trail
+        const sw = f ? 1 : -1;
+        if (sp) {
+          P.px(21, 26, "silver", 0.4); P.px(21, 27, "silver", 0.1); P.px(21 + (sw > 0 ? 1 : 0), 28, "silver", -0.1);
+          const x0 = 21.5 + sw * 1.2, y0 = 30.2;
+          P.ell(x0, y0, 2.2, 2.2, "gold", { s: 0.2, fn: (x, y, s, nx, ny) => s + (nx * nx + ny * ny > 0.55 ? -0.35 : 0.25) - nx * 0.2 - ny * 0.2 });
+          P.px(x0 - 0.5, y0 - 0.5, "illus", 0.1); P.px(x0 + 0.5, y0 - 0.5, "illus", -0.3); P.px(x0 - 0.5, y0 + 0.5, "illus", -0.4);
+          P.px(x0 - 1.5, y0 - 1.5, "#fff8d0");
+          P.px(21.5 - sw * 2.4, 29.5, "illus", 0.5);
+        } else {
+          const x0 = 32 + sw * 1.6, y0 = 36;
+          P.line(30.5, 27, x0, y0 - 3.4, "silver", 0.3, 0.45);
+          P.ell(x0, y0 - 3.6, 0.9, 0.9, "gold", { s: 0.4 });
+          P.ell(x0, y0, 3.4, 3.4, "gold", { s: 0.25, fn: (x, y, s, nx, ny) => s + (nx * nx + ny * ny > 0.62 ? -0.4 : 0.15) - nx * 0.15 - ny * 0.15 });
+          ringAt(P, x0 + 0.5, y0 + 0.5, 1.9, 1.9, "illus", (t) => 0.3 - Math.cos(t + 0.8) * 0.3, (t) => Math.floor(t * 2.2) % 3 !== 2);
+          P.px(x0, y0, "illus", 0.6); P.px(x0 - 2, y0 - 2, "#fff8d0");
+          for (let i = 0; i < 4; i++) P.px(32 - sw * (2.5 + i * 0.9), 35.4 - i * 0.7, "illus", 0.4 - i * 0.25);
+        }
         break;
       }
       case "trap_belt": {
@@ -729,13 +753,17 @@
         break;
       case "spellhand": {
         // a spell held ready in the off hand: a bright core, and a flame, an ice shard and a spark circling it
-        const [x0, y0, r] = sp ? [21, 24.5, 3.4] : [31, 30, 5.2], a0 = f * 1.05;
-        if (sp) { P.px(20, 23, "#fff8d0"); P.px(21, 23, "#ffe8a0"); P.px(20, 22, "#ffe8a0"); }
-        else { P.ell(x0, y0 - 1, 1.8, 1.8, "#ffe8a0"); P.ell(x0 - 0.4, y0 - 1.4, 0.9, 0.9, "#fffbe8"); }
+        const [x0, y0, r] = sp ? [21.5, 21.5, 4] : [31, 29.5, 5.6], a0 = f * 1.05;
+        if (sp) {
+          for (const [x, y, m] of [[21, 19, "#f8e050"], [19, 21, "#f8e050"], [23, 21, "#ffd070"], [21, 23, "#ffd070"]]) P.px(x, y, m);
+          P.rect(20, 20, 3, 3, "#ffe8a0"); P.px(20, 20, "#ffffff"); P.px(21, 20, "#fffbe8"); P.px(20, 21, "#fffbe8");
+        } else {
+          P.ell(x0, y0, 3.2, 3.2, "#f8d870"); P.ell(x0, y0, 2.3, 2.3, "#ffe8a0"); P.ell(x0 - 0.5, y0 - 0.5, 1.2, 1.2, "#fffbe8"); P.px(x0 - 1, y0 - 1, "#ffffff");
+        }
         ELEM.forEach((m, i) => {
-          const t = a0 + i * 2.094 - 1.9, x = x0 + Math.cos(t) * r, y = y0 + Math.sin(t) * r * 0.75;
-          if (sp) { P.rect(Math.round(x - 1), Math.round(y - 1), 2, 2, m, (xx, yy) => (xx + yy) % 2 ? 0.5 : -0.1); }
-          else P.ell(x, y, 1.5, 1.5, m, { s: 0.4 });
+          const t = a0 + i * 2.094 - 1.9, x = x0 + Math.cos(t) * r, y = y0 + Math.sin(t) * r * 0.8;
+          if (sp) { P.rect(Math.round(x - 1), Math.round(y - 1), 2, 2, m, (xx, yy) => (xx + yy) % 2 ? 0.55 : -0.1); }
+          else { P.ell(x, y, 1.8, 1.8, m, { s: 0.4 }); P.px(x - 0.5, y - 0.5, "#fffbe8"); }
         });
         break;
       }
@@ -888,6 +916,33 @@
           }
         }
         break;
+      case "trail_scarf": {
+        // a long red scarf knotted at the throat, both tails streaming out to one side as they do on someone who never stops moving
+        const wave = (q, ph) => Math.sin(q * 4.2 + ph + f * 1.4) * (0.3 + q * 1.1);
+        if (sp) {
+          P.rect(11, 15, 6, 1, "warp", (x) => 0.4 - (x - 11) * 0.06);
+          P.rect(12, 16, 5, 1, "warp", -0.3);
+          P.px(17, 15, "warp", 0.55); P.px(17, 16, "warp", 0.2); P.px(18, 16, "warp", -0.1);
+          for (const [y0, len, ph, sh] of [[15, 9, 0, 0.35], [16.6, 7, 1.6, -0.25]]) {
+            for (let i = 1; i <= len; i++) { const q = i / len; P.px(18 + i, Math.round(y0 - q * 1.6 + wave(q, ph)), "warp", sh - q * 0.25); }
+          }
+          P.px(27, 13, "cream", -0.1);
+        } else {
+          const cx = c.cx;
+          P.ell(cx, 27.4, 7, 2.3, "warp", { s: 0.1, fn: (x, y, s, nx, ny) => s + (ny < -0.2 ? 0.3 : ny > 0.4 ? -0.35 : 0) + ((x + y) % 5 === 0 ? -0.15 : 0) });
+          P.ell(cx + 6, 28.4, 2.1, 1.9, "warp", { s: 0.35 });
+          P.ell(cx + 6.2, 28.2, 0.8, 0.7, "warp", { s: 0.7 });
+          for (const [y0, len, ph, w, sh] of [[27.2, 13, 0, 2.6, 0.3], [29.8, 10.5, 1.7, 2.2, -0.2]]) {
+            for (let i = 0; i <= 24; i++) {
+              const q = i / 24, x = cx + 7.6 + q * len, y = y0 - q * 3.4 + wave(q, ph) * 1.6, r = w * (1 - q * 0.45);
+              P.ell(x, y, 1.2, r / 2, "warp", { s: sh - q * 0.2 + (i % 6 === 0 ? -0.2 : 0) });
+            }
+            const ex = cx + 7.6 + len, ey = y0 - 3.4 + wave(1, ph) * 1.6;
+            for (const d of [-0.6, 0.6]) P.line(ex, ey + d, ex + 1.6, ey + d * 1.8, "cream", -0.1);
+          }
+        }
+        break;
+      }
       case "wolf_mantle":
         // a whole grey wolfskin over the shoulders, its forepaws hanging on the chest
         if (sp) {
@@ -936,19 +991,31 @@
         } else if (sp) P.line(19.5, 16.6, 9, 25, "strap", -0.05);
         else P.line(c.cx + 12, 28.5, c.cx - 8, 40, "strap", -0.05, 0.6);
         break;
-      case "bedroll":
-        // a blanket rolled and strapped across the top of the back, an end showing past each shoulder
-        if (part !== "back") break;
+      case "bedroll": {
+        // a blanket roll worn horseshoe-fashion over the near shoulder and across to the far hip, tied off in two places:
+        // on the back it hid behind the hood and the quiver, across the chest it reads at a glance
+        const roll = (x0, y0, x1, y1, r, n) => {
+          for (let i = 0; i <= n; i++) {
+            const q = i / n, x = x0 + (x1 - x0) * q, y = y0 + (y1 - y0) * q;
+            P.ell(x, y, r, r, q < 0.06 || q > 0.94 || Math.abs(q - 0.4) < 0.05 ? "blanket" : "parch", { s: -0.1, fn: (xx, yy, s, nx, ny) => s + (ny < -0.35 ? 0.35 : ny > 0.35 ? -0.45 : 0) + ((xx * 2 + yy) % 7 === 0 ? -0.15 : 0) });
+          }
+        };
         if (sp) {
-          P.rect(5, 13, 18, 3, "blanket", (x, y) => (y === 13 ? 0.35 : y === 15 ? -0.35 : 0.05) - (x - 5) * 0.02);
-          P.px(5, 14, "blanket", -0.7); P.px(22, 14, "cream", 0.1);
-          P.rect(7, 13, 1, 3, "strap", 0.1); P.rect(20, 13, 1, 3, "strap", -0.1);
+          roll(8, 16.5, 19.5, 24.5, 1.2, 12);
+          for (const q of [0.12, 0.62]) { const x = 8 + 11.5 * q, y = 16.5 + 8 * q; P.line(x - 0.6, y + 1.2, x + 0.8, y - 1.2, "strap", 0.1); }
+          P.px(20, 26, "blanket", -0.3); P.px(21, 26, "cream", 0);
         } else {
-          P.ell(20, 26.6, 13.5, 3.4, "blanket", { s: 0.05, fn: (x, y, s) => s + ((x + y) % 7 === 0 ? -0.25 : 0) });
-          P.ell(7, 26.6, 1.3, 3.2, "blanket", { s: -0.5 }); P.ell(7.2, 26.6, 0.6, 1.4, "cream", { s: -0.2 });
-          for (const x of [11, 29]) P.rect(x - 0.7, 22.8, 1.6, 7.6, "strap", (xx) => 0.2 - (xx - x) * 0.2);
+          roll(c.cx - 13, 28.4, c.cx + 9, 42, 2.4, 30);
+          for (const x of [c.cx - 13.5, c.cx - 12.5]) P.px(x, 27, "blanket", 0.5);
+          for (const q of [0.18, 0.6]) {
+            const x = c.cx - 13 + 22 * q, y = 28.4 + 13.6 * q;
+            P.line(x - 1.4, y + 2.4, x + 1.6, y - 2.4, "strap", 0.15, 0.6);
+            P.px(x + 0.2, y, "gold", 0.35);
+          }
+          P.line(c.cx - 11, 27.6, c.cx + 6, 38.2, "cream", -0.15, 0.4);
         }
         break;
+      }
       case "stag_trophy": {
         // the skull of a great stag strapped on the back, its antlers rising over the far shoulder; on the bust it rides the near
         // shoulder in front, where the quiver and the hat can't hide it
