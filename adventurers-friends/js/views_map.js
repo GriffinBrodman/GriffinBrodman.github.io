@@ -1,4 +1,4 @@
-/* The Map page (#/map, #/map/dungeons, #/map/<place>): the one "where" page, in three modes (Towns, Dungeons, and Roadside on #/places): the island,
+/* The Map page (#/map, #/map/dungeons, #/map/<town or wild>): the one "where" page, in three modes (Towns, Dungeons, and Roadside on #/places): the island,
    the panel for the picked town, wild or dungeon, and every town or every dungeon below it. */
 (function () {
   const A = App;
@@ -6,7 +6,7 @@
   const { boardPanel, byDayDesc, civicPanel, dangerWord, panel, stablesBlock, tip, townLedger } = Views;
 
   // the place headers, the town themes and the stables' horses
-  A.needs(/^\/map/, A.PLACES.concat(["town_music", "mount_art"]));
+  A.needs(/^\/(map|dungeon\/)/, A.PLACES.concat(["town_music", "mount_art"]));
   // the three modes, shared with the Roadside page (views_places.js)
   function modes(on) {
     const found = (L.road_places || []).length;
@@ -14,11 +14,20 @@
       [["towns", "Towns", "#/map"], ["dungeons", "Dungeons", "#/map/dungeons"], ["roadside", `Roadside${found ? " · " + found : ""}`, "#/places"]].map(([k, label, href]) =>
         el("a", { class: k === on ? "on" : "", href, "aria-current": k === on ? "page" : null }, label)));
   }
-  window.MapModes = { bar: modes, eventLine: (id) => eventLine(id) };
+  window.MapModes = { bar: modes, eventLine: (id) => eventLine(id), realm: (v) => realm(v, "dungeons", null), dungeonsTable: () => dungeonsTable() };
+  // a dungeon has one page: the island on top in Dungeons mode, then the dungeon itself (views_dungeon.js)
   A.route(/^\/map(?:\/(\w+))?$/, (v, sel) => {
     if (sel === "roadside") { location.replace("#/places"); return; }
-    const mode = sel === "dungeons" || S.dungeons[sel] ? "dungeons" : "towns";
+    if (S.dungeons[sel]) { location.replace(`#/dungeon/${sel}`); return; }
+    const mode = sel === "dungeons" ? "dungeons" : "towns";
     if (sel === "dungeons" || sel === "towns") sel = null;
+    // Dungeons mode has no picked-place panel: a tap on a dungeon opens its page, and the table of every dungeon sits under the island
+    const side = mode === "dungeons" && !sel ? null : el("div", { class: "grid2 even" });
+    realm(v, mode, side);
+    v.appendChild(mode === "dungeons" ? dungeonsTable() : townsList());
+    if (side) showNode(side, sel && (S.towns[sel] || S.wilds[sel]) ? sel : mostPopulated());
+  });
+  function realm(v, mode, side) {
     v.appendChild(el("h1", null, "The Realm"));
     v.appendChild(modes(mode));
     const g = el("div");
@@ -26,11 +35,9 @@
     const cv = el("canvas");
     const tip = el("div", { class: "maptip", hidden: true });
     wrap.append(cv, tip);
-    const side = el("div", { class: "grid2 even" });
     const found = (L.road_places || []).length;
-    g.append(el("div", null, wrap, el("p", { class: "small dim" }, "Tap a place to see who's there. Tap a hero to visit them.", found ? " Tap a pin to open that roadside place." : "")), side);
+    g.append(el("div", null, wrap, el("p", { class: "small dim" }, "Tap a place to see who's there. Tap a hero to visit them.", found ? " Tap a pin to open that roadside place." : "")), side || "");
     v.appendChild(g);
-    v.appendChild(mode === "dungeons" ? dungeonsTable() : townsList());
     let placed = Scenes.drawMap(cv, { scale: 3 });
     const toMap = (ev) => {
       const r = cv.getBoundingClientRect();
@@ -86,13 +93,14 @@
       const pin = pinAt(mx, my);
       if (pin) { location.hash = `#/places/${pin.id}`; return; }
       const nd = Scenes.nearestNode(mx, my, cv);
-      if (nd) showNode(side, nd);
+      if (nd && S.dungeons[nd]) location.hash = `#/dungeon/${nd}`;
+      else if (nd && side) showNode(side, nd);
+      else if (nd) location.hash = `#/map/${nd}`;
     });
-    showNode(side, sel && (S.towns[sel] || S.wilds[sel] || S.dungeons[sel]) ? sel : mostPopulated(mode === "dungeons" ? S.dungeons : null));
-  });
+  }
   function mostPopulated(among) {
     const c = {};
-    for (const h of L.heroes) if (h.alive && !h.travel && (!among || among[h.loc])) c[h.loc] = (c[h.loc] || 0) + 1;
+    for (const h of L.heroes) if (h.alive && !h.travel && (among ? among[h.loc] : !S.dungeons[h.loc])) c[h.loc] = (c[h.loc] || 0) + 1;
     const first = among ? Object.keys(among).sort((a, b) => among[a].level - among[b].level)[0] : "ironhaven";
     return Object.entries(c).sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || first;
   }

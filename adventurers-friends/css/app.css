@@ -866,6 +866,7 @@ table.lifetime td.live { font-style: italic; color: var(--muted); }
 .week-mast .sub { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: 15px; color: var(--muted); font-style: italic; margin-top: 4px; }
 .week-column { border-top: 1px solid #b0915e; border-bottom: 1px solid #b0915e; padding: 8px 0; margin: 8px 0 12px; }
 .week-column p { font-size: 19px; line-height: 1.3; margin: 0; }
+.week-column p + p { margin-top: 8px; }
 .week-awards { margin-bottom: 4px; align-items: start; }
 .week-awards .hcard, .week-awards > div > .panel { margin-bottom: 0; }
 .week-note { margin: 4px 0 10px; }

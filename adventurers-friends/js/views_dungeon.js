@@ -1,4 +1,4 @@
-/* The dungeon page (#/dungeon/<id>[/<floor>[/<room>]]): floor tabs, each floor's inked map with the heroes' margin notes, a room's card on a tap (its story, notes and vignette), and a day's delve replayed on the map. */
+/* The dungeon page (#/dungeon/<id>[/<floor>[/<room>]], and #/map/<dungeon>): the island in Dungeons mode on top, then floor tabs, each floor's inked map with the heroes' margin notes, a room's card on a tap (its story, notes and vignette), and a day's delve replayed on the map. */
 (function () {
   "use strict";
   const A = App;
@@ -174,9 +174,17 @@
   }
 
   // ---------- the page ----------
-  A.route(/^\/dungeon\/(\w+)(?:\/(\w+))?(?:\/(\w+))?$/, (v, id, fl, rn) => A.load(`dungeon/${id}`).then((D) => page(v, D, fl, rn), () => {
-    v.appendChild(panel("No map of this place", el("p", null, "Nobody has drawn this dungeon yet. ", el("a", { href: `#/map/${id}` }, "Back to the map."))));
-  }));
+  // one page per dungeon: the island in Dungeons mode on top (views_map.js), the dungeon below, every dungeon at the foot
+  A.route(/^\/dungeon\/(\w+)(?:\/(\w+))?(?:\/(\w+))?$/, (v, id, fl, rn) => {
+    if (window.MapModes && MapModes.realm) MapModes.realm(v);
+    const body = el("div");
+    v.appendChild(body);
+    const foot = () => { if (window.MapModes && MapModes.dungeonsTable) v.appendChild(MapModes.dungeonsTable()); };
+    return A.load(`dungeon/${id}`).then((D) => { page(body, D, fl, rn); foot(); }, () => {
+      body.appendChild(panel("No map of this place", el("p", null, "Nobody has drawn this dungeon yet.")));
+      foot();
+    });
+  });
 
   function page(v, D, fl, rn) {
     const sd = S.dungeons[D.id] || {};
@@ -214,7 +222,7 @@
     p.append(info);
     if (window.TownScenes) { try { const bd = TownScenes.header(D.id, 560, 150); bd.classList.add("dg-header-art"); info.appendChild(bd); } catch (e) { /* the picture is optional */ } }
     info.append(el("h1", { class: "dg-name" }, D.name),
-      el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")} · `, el("a", { href: `#/map/${D.id}` }, "on the map")));
+      el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")}`));
     if (D.desc) info.appendChild(el("p", { class: "small" }, D.desc));
     const ev = window.MapModes && MapModes.eventLine ? MapModes.eventLine(D.id) : null;
     if (ev) info.appendChild(ev);
