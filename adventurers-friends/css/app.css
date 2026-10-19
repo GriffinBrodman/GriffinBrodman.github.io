@@ -761,7 +761,6 @@ input[type=text].pick-search { margin-top: 6px; font-size: 17px; max-width: 320p
 .jumps { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0; }
 .jump { font: 12px var(--px); color: #2a1a0b; background: linear-gradient(180deg, #f2d27a, var(--brass)); border: 1px solid var(--brass0); padding: 0 6px; border-radius: 2px; }
 table.lifetime td.live { font-style: italic; color: var(--muted); }
-table.boxscore { margin-bottom: 8px; }
 .today-box { margin: 6px 0 4px; padding: 6px 10px; border-left: 3px solid var(--edge); background: var(--parch2); max-width: 520px; }
 .today-box > div + div { margin-top: 2px; }
 .mount-row { gap: 12px; align-items: center; }
@@ -805,7 +804,24 @@ table.boxscore { margin-bottom: 8px; }
 .trophy-icon { font-size: 26px; line-height: 1; }
 .trophy-mount { flex: none; width: 92px; height: 96px; margin: -2px 0; }
 
-/* Lady Luck's Ledger: the gambling hall's noticeboard (digest) */
+/* The Week: the Crier's section on a week's last day (views_week.js) */
+.week-mast { text-align: center; border-top: 4px double var(--edge2); border-bottom: 1px solid var(--edge2); padding: 8px 0 6px; margin-bottom: 12px; }
+.week-title { font-family: var(--px); font-size: 32px; font-weight: 700; letter-spacing: 2px; line-height: 1; color: var(--ink); }
+.week-mast .sub { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: 15px; color: var(--muted); font-style: italic; margin-top: 4px; }
+.week-column { border-top: 1px solid #b0915e; border-bottom: 1px solid #b0915e; padding: 8px 0; margin: 8px 0 12px; }
+.week-column p { font-size: 19px; line-height: 1.3; margin: 0; }
+.week-awards { margin-bottom: 4px; align-items: start; }
+.week-awards .hcard, .week-awards > div > .panel { margin-bottom: 0; }
+.week-note { margin: 4px 0 10px; }
+.week .lg-panel { margin: 4px 0 14px; }
+.week-foot { margin-bottom: 8px; }
+.week-market p { margin: 0 0 4px; }
+.week-nums { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--edge2); font-size: 16px; }
+.week-nums b { font-family: var(--px); font-size: 13px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.week-nums i { font-family: var(--px); font-style: normal; font-size: 18px; color: var(--crimson); }
+@media (max-width: 600px) { .week-title { font-size: 26px; } .week-column p { font-size: 17px; } }
+
+/* Lady Luck's Ledger: the gambling hall's noticeboard (in The Week) */
 .lg-panel { padding: 0; border: 0; background: none; }
 .lg-board { position: relative; padding: 12px; border: 6px solid var(--wood3); box-shadow: inset 0 0 0 2px var(--wood1), 0 0 0 2px var(--wood0), 3px 4px 0 rgba(0, 0, 0, 0.35);
   background-color: #a8764a;
@@ -911,3 +927,7 @@ table.boxscore { margin-bottom: 8px; }
 .daybook-fold > .daybook-sum::after { content: "▾  hide"; font-size: 12px; color: var(--dim, #8a7a60); white-space: pre; }
 .daybook-fold:not([open]) > .daybook-sum::after { content: "▸  show"; }
 .daybook-fold:not([open]) > .daybook-sum { margin-bottom: 0; }
+
+.crew-mounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.crew-mount { display: flex; gap: 8px; align-items: center; padding: 6px; border: 1px solid var(--edge, #b0915e); background: rgba(255, 250, 235, 0.35); }
+.crew-mount .mount-art { flex: 0 0 auto; }

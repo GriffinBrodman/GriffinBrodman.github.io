@@ -154,7 +154,9 @@
     // a trail on the ground under every hour of reading sign, and under any other hour whose line is about prints
     const trail = ph === "sign" || /\b(prints?|tracks?|hoofprints?|pugmarks?|slots)\b/.test(L);
     return { act, game, named, bird, good, outcome, kind, marks, tracks, trail, dish, phase: ph, weapon, perch, gulls: /\bgulls?\b/.test(L), mist: /\b(mist|fog|haze)\b/.test(L),
-      foes: foesOf(b.line), skull: /\b(skull|rack|trophy|mask)\b/.test(L), hide: /\b(hide|pelt|skin)\b/.test(L) };
+      foes: foesOf(b.line), skull: /\b(skull|rack|trophy|mask)\b/.test(L), hide: /\b(hide|pelt|skin)\b/.test(L),
+      // a find looked at and left be: the patch stays whole and the hero stands off it
+      leaves: b.branch === "leave" || /\b(leaves? (the \w+ |it |them )?(alone|be)|lets? (it|them) be|steps wide|takes nothing)\b/.test(L) };
   }
   // the prints an animal leaves; a trail nobody has named is plain scuffed prints
   const printOf = (g) => (!g ? "scuff" : g === "duck" ? "webbed" : HA.BIRDS.has(g) ? "bird" : g === "boar" ? "boar" : g === "goat" || g === "ibex" ? "goat"
@@ -618,7 +620,7 @@
     // foraging: knelt at the patch (herbs, mushrooms by a log, a bramble, a nest in the grass, moss on a boulder, roots dug up,
     // a bed of greens, a hazel, the shore rocks, a wild hive), picking into the basket
     forage: { dur: 8, beats: [0.4, 2.8, 5.4], draw(img, I, c, t) {
-      const px = c.cx + 12, picked = Math.floor(seg(t, 2, 5.4) * 4);
+      const px = c.cx + 12, picked = c.leaves ? 0 : Math.floor(seg(t, 2, 5.4) * 4);
       const kind = c.kind;
       if (kind === "mushrooms") { gridAt(img, I, HA.prop("log"), px + 24, I.feet - 1); gridAt(img, I, HA.prop("mushrooms", { red: c.biome === "forest" && hash(c.line) % 3 === 0, n: 4 - picked }), px + 6, I.feet + 3); }
       else if (kind === "berries") gridAt(img, I, HA.prop("berries", { red: c.biome !== "forest" || /\b(haws|rose ?hips?|rowan)\b/i.test(c.line) }), px + 10, I.feet + 2);
@@ -635,17 +637,19 @@
       else if (kind === "apples") { gridAt(img, I, HA.prop("apples", { n: 6 - Math.min(5, picked * 2) }), px + 16, I.feet + 2); for (let k = 0; k < 3; k++) { const q = seg(t, 2.2 + k * 0.9, 2.7 + k * 0.9); if (q > 0 && q < 1) img.px(R(px + 8 + k * 7), R(I.feet - 20 + q * 20), I.G("#c8a838", 0)); } }
       else if (kind === "pool") { gridAt(img, I, HA.prop("pool"), px + 12, I.feet + 6); if (t > 3) drawBeast(img, I, "fish", t < 4.6 ? "walk" : "down", walkK(t, 9) & 1, px + 2 + seg(t, 3, 3.6) * -8, { lift: t < 3.6 ? R(Math.sin(seg(t, 3, 3.6) * Math.PI) * 10) : 0 }); }
       else gridAt(img, I, HA.prop("herbs", { red: kind === "pepper" }), px + 6, I.feet + 2);
-      const w = walkTo(t, 0, 1.8, c.cx - 64, px - 12);
+      const w = walkTo(t, 0, 1.8, c.cx - 64, c.leaves ? px - 30 : px - 12);
+      // a nest left alone: the hen comes back to it once the hero has stepped off
+      if (c.leaves && kind === "nest" && t > 3.4) drawBeast(img, I, "pheasant", t < 6 ? "walk" : "down", walkK(t, 6) & 1, px + 6 + (1 - seg(t, 3.4, 6)) * 46);
       // what it goes into: the basket a line names, a sack, a kerchief spread on the ground, or only the hands
       const L = c.line.toLowerCase(), pick = hash(c.line) % 4;
-      const box = /\bbasket\b/.test(L) ? "basket" : /\b(sack|bag)\b/.test(L) ? "sack" : /\b(pocket|hat|hatful|handful|fistful)\b/.test(L) ? null : kind === "pool" || kind === "honey" ? null : ["kerchief", "sack", null, "basket"][pick];
+      const box = c.leaves ? null : /\bbasket\b/.test(L) ? "basket" : /\b(sack|bag)\b/.test(L) ? "sack" : /\b(pocket|hat|hatful|handful|fistful)\b/.test(L) ? null : kind === "pool" || kind === "honey" ? null : ["kerchief", "sack", null, "basket"][pick];
       const fill = { mushrooms: "#b07a3e", berries: c.biome === "forest" ? "#2e1838" : "#c8302a", nest: "#e8e0c8", honey: "#e8b040", shore: "#2a2a3a", herbs: "#5e9a3a", pepper: "#d8402a", moss: "#7a9a48", roots: "#d8c49a", greens: "#4e8a34", nuts: "#a8743a", ferns: "#8ab048", samphire: "#6ab840", flowers: "#e8e0c0", apples: "#c8a838", pool: "#9aa08a" }[kind];
       if (box === "basket") { gridAt(img, I, HA.prop("basket"), px - 34, I.feet + 3); for (let i = 0; i < picked * 3; i++) img.px(px - 39 + (i * 3) % 10, I.feet - 5 - (i % 2), I.G(fill, 0)); }
       else if (box === "sack") gridAt(img, I, HA.prop("sack"), px - 34, I.feet + 3);
       else if (box === "kerchief") { gridAt(img, I, HA.prop("kerchief"), px - 32, I.feet + 4); for (let i = 0; i < picked * 3; i++) img.px(px - 40 + (i * 4) % 14, I.feet + 1 - (i % 2), I.G(fill, 0)); }
       mates(img, I, c, t, Math.min(w.x - 14, c.cx - 30), w.moving ? "walk" : "stand");
-      const lift = t > 2 && t < 5.4 && Math.sin(t * 4.2) > 0.2;
-      drawFig(img, I, c.cast.lead, w.x, { mode: w.moving ? "walk" : t > 5.6 ? "free" : "kneel", k: walkK(t), dip: lift ? 1 : 0 });
+      const lift = !c.leaves && t > 2 && t < 5.4 && Math.sin(t * 4.2) > 0.2;
+      drawFig(img, I, c.cast.lead, w.x, { mode: w.moving ? "walk" : c.leaves || t > 5.6 ? "free" : "kneel", k: walkK(t), dip: lift ? 1 : 0 });
       if (lift) { img.px(R(w.x + 7), I.feet - 4, I.Gf(c.cast.lead.skin, 0)); img.px(R(w.x + 8), I.feet - 5, I.G(fill, 0)); }
       if (kind === "honey" && !c.good && t > 4) bubble(img, I, R(w.x), I.feet - 40, "!");
     } },

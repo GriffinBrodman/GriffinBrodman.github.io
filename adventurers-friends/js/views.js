@@ -271,6 +271,7 @@
       p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day." }));
       smallerHappenings(p, small);
       v.appendChild(p);
+      if (iss.week) v.appendChild(Views.theWeek(iss.week, { rankings: true }));
       if (elsewhere.length) v.appendChild(panel("Elsewhere in the realm", el("ul", { class: "diary" }, elsewhere.slice(0, 5).map((e) => el("li", null, A.storyLine(e))))));
     });
   });
@@ -323,6 +324,10 @@
     const today = lastDay();
     const { elsewhere, lead, second, roundup, main, small } = crierDay(today, L.events);
     leadAndSecond(parch, lead, second, today, roundup);
+    // the week's column runs all week; on the week's last day it heads The Week instead
+    const wk = L.week && L.week.season === meta.season ? L.week : null;
+    if (wk && wk.done && wk.day_to === meta.season_day) v.insertBefore(Views.theWeek(wk), parch.nextSibling);
+    else if (wk && wk.column) parch.appendChild(Views.columnBlock(wk));
 
     const lastSeason = (L.seasons || [])[L.seasons.length - 1];
     if (lastSeason && (meta.phase === "offseason" || lastSeason.end_day >= meta.day - 1)) v.appendChild(finalePanel(lastSeason));
@@ -1314,7 +1319,7 @@
       const cats = r[2] ? Object.entries(r[2]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])) : null;
       if (!cats) tip.appendChild(el("div", { class: "dim" }, "Before the ledger began: the end-of-day purse only."));
       else if (!cats.length) tip.appendChild(el("div", { class: "dim" }, "No money changed hands."));
-      else for (const [k, v] of cats) tip.appendChild(el("div", { class: v > 0 ? "green" : "red" }, `${v > 0 ? "+" : "−"}${A.money(v)} ${k}`));
+      else for (const [k, v] of cats) tip.appendChild(el("div", { class: v > 0 ? "green" : "red" }, el("b", null, `${v > 0 ? "+" : "−"}${A.money(v)}`), el("span", { class: "dim" }, " · "), k));
       tip.hidden = false;
       tip.style.left = `${Math.min(70, Math.max(0, (X(r[0]) / W) * 100 - 15))}%`;
     };
@@ -1594,6 +1599,24 @@
         w.paid && w.paid.length ? el("div", { class: "tiny dim" }, "Paid for by " + w.paid.map(([n, v]) => `${n} (${v}s)`).join(", ") + ".") : null)),
       who, gap);
   }
+  // with a wagon on the road, the crew's animals travel as one string: every member's mount in one place, ridden, hitched or resting
+  function crewMounts(p) {
+    if (!p.wagon) return null;
+    const ms = p.members.map((m) => heroes[m]).filter((h) => h && h.alive && h.mount);
+    const pull = p.wagon.puller && !ms.some((h) => h.mount.hitched) ? p.wagon.puller : null;
+    if (!ms.length && !pull) return null;
+    const cart = pull ? el("div", { class: "crew-mount" }, el("div", { class: "mount-art" }, mountArt(pull, 3)),
+      el("div", null, el("b", null, pull.name), el("div", { class: "tiny muted" }, cap(`${pull.colour || ""} ${pull.label}`.trim())),
+        el("div", { class: "tiny" }, pull.owner ? `${pull.owner}'s` : "The crew's"), el("div", { class: "tiny gold" }, "Pulling the wagon"))) : null;
+    return panel("The crew's mounts", el("div", { class: "crew-mounts" }, cart, ...ms.map((h) => {
+      const m = h.mount;
+      const status = m.lame ? el("div", { class: "tiny red" }, `Lame: resting ${plural(m.lame, "more day")}`)
+        : m.hitched ? el("div", { class: "tiny gold" }, "Pulling the wagon") : el("div", { class: "tiny dim" }, "Ridden");
+      return el("div", { class: "crew-mount" }, el("div", { class: "mount-art" }, mountArt(m, 3)),
+        el("div", null, el("b", null, m.name), m.rare ? el("span", { class: "gold" }, " ✦") : null,
+          el("div", { class: "tiny muted" }, cap(`${m.colour} ${m.label}`)), el("div", { class: "tiny" }, A.heroLink(h.id), "'s"), status));
+    })));
+  }
   function stablesBlock(id) {
     const st = (L.stables || {})[id];
     if (!st) return null;
@@ -1612,7 +1635,7 @@
       el("p", { class: "small gold" }, "For sale: " + st.sells.map(([k, v]) => `${S.mounts[k].name} ${v}s`).join(", ")),
       el("p", { class: "small dim" }, "Wagons for sale: " + st.wagons_for_sale.map(([k, v]) => `${S.wagons[k].name} ${v}s`).join(", ")));
   }
-  function partyCard(p) {
+  function partyCard(p, opts) {
     const ms = el("div", { class: "row", style: { gap: "0" } });
     for (const m of (p.disbanded ? p.members : p.members)) if (heroes[m]) ms.appendChild(A.heroPortrait(heroes[m], 1, { cls: "grp big" }));
     return el("a", { class: "panel", href: `#/party/${p.id}`, style: { display: "block", color: "inherit", opacity: p.disbanded ? 0.65 : 1 } },
@@ -1621,7 +1644,7 @@
         el("div", { class: "small muted" }, p.disbanded ? `Disbanded ${A.when(p.disbanded, "on")}` : [el("span", { class: "has-tip", title: S.dispositions[p.disposition] || "" }, cap(p.disposition)),
           ` · ${p.renown} renown`]),
         el("div", { class: "small dim" }, p.disbanded ? "" : cap(p.doing || "in " + p.loc_name)))),
-      ms, p.disbanded ? null : moraleBar(p), lastNews(p));
+      ms, p.disbanded ? null : moraleBar(p), opts && opts.noNews ? null : lastNews(p));
   }
   function todayBox(route, today, label, tables, fights) {
     if (!route && !(today || []).length && !(tables || []).length) return null;
@@ -1663,7 +1686,7 @@
         q.floors ? el("div", { class: "small" }, `Floor ${Math.min(q.floors, (q.floor || 0) + 1)} of ${q.floors}`, A.bar((q.floor || 0) + 1, q.floors, "gold")) : null,
         q.why ? el("p", { class: "small muted", style: { fontStyle: "italic", marginTop: "4px" } }, `Why: ${q.why}.`) : null))) : null;
     if (quest) v.appendChild(quest);
-    if (!p.disbanded) { const gp = gettingAbout(p); if (gp) v.appendChild(gp); }
+    if (!p.disbanded) { const gp = gettingAbout(p); if (gp) v.appendChild(gp); const cm = crewMounts(p); if (cm) v.appendChild(cm); }
     const tac = p.disbanded ? null : tacticsPanel(p);
     v.appendChild(panel("Members", mem,
       p.fallen.length ? el("p", { class: "small red", style: { marginTop: "8px" } }, "Fallen: ", p.fallen.map((f, i) => [i ? ", " : "", A.heroLink(f)])) : null,
