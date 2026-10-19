@@ -17,7 +17,7 @@
     dt.appendChild(el("tr", null, el("th", null, ""), el("th", null, "Dungeon"), el("th", { class: "num" }, "Level"), el("th", { class: "num" }, "Floors"), el("th", null, "Boss"), el("th", null, "Monsters"), el("th", null, "Explored"), el("th", { class: "num" }, "Delves")));
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
       const st = L.dungeons[id] || {};
-      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)), el("td", null, el("a", { href: `#/map/${id}` }, d.name)), el("td", { class: "num" }, d.level), el("td", { class: "num" }, d.floors),
+      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)), el("td", null, el("a", { href: `#/dungeon/${id}` }, d.name)), el("td", { class: "num" }, d.level), el("td", { class: "num" }, d.floors),
         el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", null, dangerWord(st.danger)), el("td", null, st.explored_word || "untouched (0%)"), el("td", { class: "num" }, st.visits || 0)));
     }
     v.appendChild(panel("Dungeons", el("div", { class: "scrollx" }, dt)));

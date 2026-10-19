@@ -93,6 +93,38 @@
       "..pppqqpppP...", "...pppppppP...", "...pqpqpqpP...", "....pPpPpP...."],
     camp: ["......o.......", ".....ooo......", "....ooyoo.....", "...rooyyoo....", "...rooyyyor...", "...rrooyoor...", "....rroorr....",
       ".WWw......wWW.", "..dwWw..wWwd..", "....dwWWwd....", "..dwWw..wWwd..", ".WWw......wWW."],
+    // setting out: a full leather waterskin with its cork and carrying cord, a drop at the spout
+    depart: ["....nn........", "...n..dd......", "..n..dWWd.....", "..n...dd......", "..n..wWWw.....", "..n.wWWWWw....", "...wWhWWWWw...",
+      "..wWhWWWWWww..", "..wWWWWWWwwd..", "..wWWWWWwwwd.b", "..wwWWWwwwdd.c", "...wwwwwwdd...", "....dddddd...."],
+    // something happening on the road (the "On the road" stretch): a walking boot mid-stride on a strip of rutted road, kicking up dust
+    road_event: ["..............", "...dnnnnd.....", "...dWnnnd.....", "...dWpnpd.....", "...dWnpnd.....", "...dWpnpd.....", "...dWnnnnd....",
+      "1.dnWnnnnnd...", "..dWnnnnnnnd..", "1.dnnnnnnnnnd.", "..qqqqqqqqqqq.", "..............", "PWWPWWWPWWPWWP", "PPwPPPwPPPPwPP"],
+    // the road's stretches (league/roads.py): the midday halt, the roadside places by kind, and a traveller met on the way
+    halt: ["..............", "...oooooo.....", "..oyoooyoo....", ".oooooooooo...", ".OoooooooooO..", "..OOOOOOOOO...", "..............",
+      "........ssss..", "........shhs..", "........shhss.", "........shhs.s", "........shhss.", "........ssss.."],
+    inn: ["WWWWWWWWWW....", "W....d...d....", "W....d...d....", "W...rrrrrrr...", "W...rgggggr...", "W...rgyyygr...", "W...rgggggr...",
+      "W...rrrrrrr...", "W.............", "W.............", "W.............", "W.............", "ww............"],
+    shrine: ["......dd......", ".....dWWd.....", "....dWWWWd....", "...dWWWWWWd...", "....aaaaaa....", "....a.o..a....", "....a.y..a....",
+      "....a.h..a....", "....a.h..a....", "...aaaaaaaa...", "..AAAAAAAAAA.."],
+    toll: ["..............", "rhrhrhrhrhrh..", "rhrhrhrhrhrh..", ".........W....", ".........W....", "..gg.....W....", ".gyyg....W....",
+      ".gyyg....W....", "..gg.....W....", ".........W....", "........www..."],
+    ferry: ["......W.......", "......Wh......", "......Whh.....", "......Whhh....", "......W.......", "dWWWWWWWWWWWd.", ".dwwwwwwwwwd..",
+      "..dddddddddd..", "bcbbcbbbcbbcbb", ".bbbbcbbbbcbb."],
+    // a ford: a row of stepping stones across a stream (a ferry is a boat)
+    ford: ["..............", "..............", "..............", "..............", "cbbcbbbbcbbbcb", "bbbbbcbbbbbcbb", ".SA.SA..SA.SA.",
+      "aaAaaAbaaAbaaA", "AAbAAbbAAbbAAb", "bbcbbbbcbbbbcb", ".bbbbcbbbbcbb."],
+    // a squared milestone with a cap stone and its mileage cut in, never a rounded headstone
+    milestone: [".aaaaaaaaaaa..", ".aSSSSSSSSSa..", ".aaaaaaaaaaa..", "..aSssssssAa..", "..aSqqqsssAa..", "..aSssqsssAa..", "..aSsqssssAa..",
+      "..aSsqssssAa..", "..aSssssssAa..", "..aSqqqqqsAa..", "..aSsssqssAa..", "..aSssssssAa..", ".EeEeeEeEeEe.."],
+    // a town day's own stretches (league/town_day.py): the sun up over the bed, a steaming bowl, a mug by candlelight
+    wake: ["..........gg..", ".........gyyg.", "..........gg..", "W.............", "W.............", "Whhh..........", "Whhhrrrrrrrrrr", "WrrrrrrrrrrrrR",
+      "WRRRRRRRRRRRRR", "WWWWWWWWWWWWWW", "W............W"],
+    breakfast: ["...1...1......", "....1...1.....", "...1...1......", "..........s...", ".........s....", "..PPPPPPPPP...", ".PoooooooooP..", "PPPPPPPPPPPPP.",
+      ".PWWWWWWWWWP..", "..PWWWWWWWP...", "...PPPPPPP...."],
+    evening: ["..........y...", ".........yoy..", "..........o...", "..hh.hh...h...", ".hhhhhhh.hhh..", ".dWggggd.hhh..", ".dWggggdddhh..", ".dWggggd.dhh..",
+      ".dWggggdd.hh..", ".dWggggd..hh..", ".dGGGGGd.WWWW.", "..ddddd......."],
+    traveller: [".....nnn....W.", "....nnfnn...W.", "....nfffn...W.", ".....fff....W.", "....nnnnn..fW.", "...nnnnnnnn.W.", "...nnnnnn...W.",
+      "....nnnn....W.", "....nnnn....W.", "....n..n....W.", "....n..n....W.", "...dd..dd...w."],
   };
   const NIGHT_ART = {
     bed: ["W.............", "W.............", "W.............", "Whhh..........", "Whhhrrrrrrrrrr", "WrrrrrrrrrrrrR", "WRRRRRRRRRRRRR",
@@ -116,14 +148,6 @@
     return g;
   }
   const FN = {
-    depart(g) {
-      for (let i = 0; i <= 10; i++) { g.set(i, 13 - i, PAL.W); g.set(i + 1, 13 - i, PAL.w); }
-      for (let y = 4; y <= 12; y++) for (let x = 5; x <= 13; x++) {
-        const d = ((x + 0.5 - 9.5) / 4.2) ** 2 + ((y + 0.5 - 8.6) / 3.9) ** 2;
-        if (d <= 1) g.set(x, y, d > 0.6 && x + y > 18 ? PAL.B : (x % 2 === 0) !== (y % 2 === 0) ? PAL.c : PAL.b);
-      }
-      g.set(9, 4, PAL.B); g.set(10, 4, PAL.B); g.set(8, 3, PAL.b); g.set(11, 3, PAL.b); g.set(9, 5, PAL.B); g.set(10, 5, PAL.B);
-    },
     auction(g) {
       for (let i = 0; i <= 6; i++) { g.set(6 + i, 6 + i, PAL.W); g.set(6 + i, 7 + i, PAL.w); }
       const ax = Math.SQRT1_2, ay = -Math.SQRT1_2;
@@ -153,6 +177,39 @@
       for (let x = 2; x <= 10; x++) g.set(x, 7, PAL.W);
       g.set(13, 7, PAL.S); g.set(12, 7, PAL.s); g.set(11, 7, PAL.s); g.set(11, 6, PAL.s); g.set(11, 8, PAL.s); g.set(12, 6, PAL.S); g.set(12, 8, PAL.z);
       g.set(2, 6, PAL.r); g.set(3, 6, PAL.r); g.set(2, 8, PAL.R); g.set(3, 8, PAL.R);
+    },
+    // a hunt's hours each keep their own glyph: a trail of cloven prints for reading sign, an eye over the bracken for the stalk,
+    // a knife over a stretched hide for dressing the kill, a limping crutch for the way back
+    hunt_sign(g) {
+      const print = (x, y) => { for (const [dx, dy, c] of [[0, 0, "W"], [2, 0, "W"], [0, 1, "d"], [2, 1, "d"], [0, 2, "d"], [2, 2, "d"], [-1, 1, "n"], [3, 1, "n"], [-1, 2, "n"], [3, 2, "n"], [0, 3, "n"], [2, 3, "n"]]) g.set(x + dx, y + dy, PAL[c]); };
+      print(1, 10); print(5, 6); print(9, 2);
+      g.set(12, 0, PAL.W); g.set(13, 0, PAL.w);
+    },
+    hunt_stalk(g) {
+      for (let x = 1; x <= 12; x++) for (let y = 1; y <= 7; y++) {
+        const dx = (x - 6.5) / 5.6, dy = (y - 4) / 3.2, d = dx * dx + dy * dy;
+        if (d > 1) continue;
+        const r = Math.hypot(x - 6.5, (y - 4) * 1.1);
+        g.set(x, y, d > 0.72 ? PAL.q : r < 1.2 ? PAL.q : r < 2.4 ? (y < 4 ? PAL.e : PAL.E) : PAL.h);
+      }
+      g.set(6, 3, PAL.h);
+      for (let x = 0; x < 14; x++) { const hgt = 3 + ((x * 5) % 4); for (let k = 0; k < hgt; k++) g.set(x, 13 - k, k === hgt - 1 ? PAL.l : (x + k) % 2 ? PAL.e : PAL.E); }
+    },
+    hunt_dress(g) {
+      for (let y = 2; y <= 12; y++) for (let x = 1; x <= 11; x++) {
+        const dx = (x - 6) / 4.8, dy = (y - 7) / 4.6;
+        if (dx * dx + dy * dy <= 1) g.set(x, y, dx * dx + dy * dy < 0.35 ? PAL.P : y < 6 ? PAL.W : PAL.w);
+      }
+      for (const [x, y] of [[1, 2], [11, 2], [1, 12], [11, 12]]) g.set(x, y, PAL.w);
+      for (let i = 0; i < 6; i++) { g.set(7 + i, 7 - i, PAL.S); g.set(8 + i, 7 - i, PAL.s); }
+      g.set(6, 8, PAL.d); g.set(5, 9, PAL.d); g.set(4, 10, PAL.n); g.set(5, 10, PAL.d);
+    },
+    hunt_retreat(g) {
+      for (let y = 2; y <= 13; y++) g.set(6, y, PAL.W);
+      for (let y = 2; y <= 13; y++) g.set(7, y, PAL.w);
+      for (let x = 3; x <= 10; x++) { g.set(x, 1, PAL.W); g.set(x, 2, PAL.n); }
+      for (let x = 5; x <= 8; x++) g.set(x, 8, PAL.n);
+      for (let y = 4; y <= 6; y++) { g.set(10, y, PAL.h); g.set(11, y, PAL.h); g.set(12, y, PAL.r); }
     },
     fair(g) {
       g.vline(6, 0, 3, PAL.W); g.set(7, 0, PAL.r); g.set(8, 0, PAL.r); g.set(7, 1, PAL.r);
@@ -215,7 +272,7 @@
   }
   const ICONS = {}, NIGHT = {};
   for (const [k, rows] of Object.entries(ART)) ICONS[k] = make(rows);
-  for (const k of ["spar", "hunt", "fair", "depart", "auction"]) ICONS[k] = make(FN[k]);
+  for (const k of ["spar", "hunt", "fair", "auction", "hunt_sign", "hunt_stalk", "hunt_dress", "hunt_retreat"]) ICONS[k] = make(FN[k]);
   ICONS.song = ICONS.busk;
   const EXTRA = { compass: make(FN.compass), moon: make(FN.moon), sun: make(FN.sun) };
   const NIGHT_ICON = { inn: "bed", room: "key", stable: "hay", cell: "bars", dungeon: "torch", road: "bedroll" };
@@ -231,13 +288,17 @@
     infirmary: "Infirmary", bath: "Bathhouse", fishing: "Fishing", dice: "Dice", bakery: "Bakery", pet: "With the pet", mount: "With the mount",
     crew: "With the crew", meet: "A meeting", spar: "Sparring", odd_request: "Odd request", fair: "The fair", yeti: "Yeti!", auction: "Auction",
     event: "Town event", song: "Music", wander: "Wandering", carousing: "Carousing", hunt: "Hunting", delve: "Delving", camp: "Camp",
+    wake: "Waking up", breakfast: "Breakfast", evening: "The evening",
+    halt: "Midday halt", road_event: "On the road", inn: "The inn", shrine: "A shrine", toll: "The toll", ferry: "The crossing", ford: "The ford", milestone: "A landmark", traveller: "A traveller",
   };
   const KINDS = { inn: "At the inn", camp: "At camp", stable: "In the stables", room: "A rented room", dungeon: "Below ground", cell: "In the cells", road: "By the roadside" };
   const CAT = {
     road: "road", arrive: "road", depart: "road", wander: "road", camp: "road",
+    halt: "road", road_event: "road", inn: "road", shrine: "road", toll: "road", ferry: "road", ford: "road", milestone: "road", traveller: "road",
+    wake: "town", breakfast: "town", evening: "town",
     errands: "town", bakery: "town", bath: "town", dice: "town", fair: "town", auction: "town", event: "town", carousing: "town", meet: "town", odd_request: "town", busk: "town", song: "town",
     work: "craft", labour: "craft", forge: "craft", brew: "craft", study: "craft", forage: "craft", fishing: "craft", rest: "craft",
-    train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms",
+    train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms", hunt_sign: "arms", hunt_stalk: "arms", hunt_dress: "arms", hunt_retreat: "arms",
     service: "church", confession: "church", blessing: "church", poorhouse: "church", church_work: "church", infirmary: "church",
     graverob: "shady", pickpocket: "shady",
     pet: "kin", mount: "kin", crew: "kin",
@@ -316,10 +377,33 @@
   // names in a line link to their pages when the site is around it (a gallery page draws the daybook alone)
   const txt = (s) => (window.App && App.storyText ? App.storyText(s) : s);
   // the fights of a stretch of the day, each linked to its replay while it is kept
+  // a town stretch plays as its scene on its own page (#/day/hero/day/block) while its day's file is kept
+  // and an hour of a hunt plays as its act on the wild's strip, the same way
+  const hunting = (b) => b.act === "hunt" && !!b.stretch;
+  // each phase of a hunt has its own icon (the bow is the quarry, crossed blades when the quarry turned into a fight)
+  const HUNT_ICON = { sign: "hunt_sign", stalk: "hunt_stalk", quarry: "hunt", forage: "forage", dress: "hunt_dress", camp: "camp", walk: "wander", retreat: "hunt_retreat" };
+  const huntIcon = (b) => (b.fought ? "spar" : HUNT_ICON[b.stretch] || "hunt");
+  function townLink(b) {
+    if (!(b.scene || hunting(b)) || b.wday == null || !b.hero || !window.App) return null;
+    return [" ", h("a", { class: "watch", href: `#/day/${b.hero}/${b.wday}/${b.i}` }, "▶ watch")];
+  }
   function fightLinks(b) {
     const own = b.ref && window.App ? App.storyLink(b.ref) : null;
-    if (own) return [" ", own];
-    const ids = (b.fights || []).filter((id) => kept("fight", id));
+    const room = roomLink(b);
+    if (own) return [" ", own, room];
+    if (b.rec && kept("road", b.rec)) return [" ", h("a", { class: "watch", href: `#/road/${b.rec}` }, "▶ watch")];
+    if (b.scene || (hunting(b) && !b.fought)) return townLink(b) || [];
+    if (room) return [room, ...fightIds(b)];
+    return fightIds(b);
+  }
+  // a room underground opens that floor of the dungeon's map with the room picked out
+  function roomLink(b) {
+    const r = b.room;
+    if (!r || !r.dungeon || !window.App) return null;
+    return [" ", h("a", { class: "watch db-room", href: `#/dungeon/${r.dungeon}/${r.floor}/${r.room}` }, "▸ on the map")];
+  }
+  function fightIds(b) {
+    const ids = [...new Set([...(b.fights || []), ...(b.room && b.room.fight ? [b.room.fight] : [])])].filter((id) => kept("fight", id));
     return ids.flatMap((id, i) => [" ", h("a", { class: "watch", href: `#/fight/${id}` }, ids.length > 1 ? `▶ fight ${i + 1}` : "▶ watch")]);
   }
   let uid = 0;
@@ -327,7 +411,8 @@
     opts = opts || {};
     if (!db) return null;
     const ev = db.evening && (db.evening.kind || db.evening.line) ? db.evening : null;
-    const list = (db.blocks || []).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
+    // each block knows its place in the day's file and its hero, so a town stretch can link its scene
+    const list = (db.blocks || []).map((b, i) => (b && (b.scene || hunting(b)) ? Object.assign({}, b, { i, wday: db.wday, hero: opts.hero }) : b)).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
     if (!list.length && !ev) return null;
     const id = "db" + ++uid;
     const start = Math.floor(Math.min(6, ...list.map((b) => b.from))), end = Math.ceil(Math.max(18, ...list.map((b) => b.to)));
@@ -335,11 +420,13 @@
     const caps = h("ol", { class: "db-caps" + (opts.captions === false ? " db-sr" : "") });
     const rows = [];
     let cursor = start;
+    const roadOf = list.filter((b) => b.stretch).pop();
     list.forEach((b, i) => {
       const from = Math.max(b.from, cursor), to = b.to;
       if (to <= from) return;
       cursor = to;
-      const act = b.act, label = b.label || LABELS[act] || (act ? act.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Busy");
+      // a town event and a happening on the road share the act; the road's gets the boot, not the fair's gold star
+      const act = b.stretch && b.act === "event" ? "road_event" : hunting(b) ? huntIcon(b) : b.act, label = b.label || LABELS[act] || (act ? act.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Busy");
       const parts = spanParts(from, to), when = parts.join("–"), mid = (from + to) / 2, tipId = `${id}-t${i}`;
       const say = b.line || label;
       const cap = h("li", { class: "db-cap" }, icon(act, 1), h("b", { class: "db-when" }, when),
@@ -350,7 +437,7 @@
       const li = h("li", {
         class: "db-b" + (right ? " db-r" : "") + (to - from <= 1 ? " db-short" : ""),
         "data-act": act || "", "data-cat": CAT[act] || "misc",
-        style: { gridColumn: `${(from - start) * 2 + 1} / ${(to - start) * 2 + 1}`, "--h": String(to - from), "--sky": sky(mid) },
+        style: { gridColumn: `${Math.round((from - start) * 2) + 1} / ${Math.max(Math.round((from - start) * 2) + 2, Math.round((to - start) * 2) + 1)}`, "--h": String(to - from), "--sky": sky(mid) },
         onmouseenter: () => cap.classList.add("on"), onmouseleave: () => cap.classList.remove("on"),
       },
       h("div", { class: "db-gut", "aria-hidden": "true" }, h("span", { class: "db-gut-t" }, clock(from)), h("span", { class: "db-gut-to" }, "to " + clock(to)),
@@ -358,10 +445,33 @@
       h("button", {
         class: "db-btn", type: "button", "aria-describedby": tipId, "aria-label": `${when}: ${label}${b.line ? ". " + b.line : ""}`,
         onclick: (e) => { const open = !li.classList.contains("open"); for (const o of li.parentNode.querySelectorAll(".db-b.open")) o.classList.remove("open"); li.classList.toggle("open", open); e.stopPropagation(); },
-      }, icon(act, 2), h("span", { class: "db-txt" }, h("span", { class: "db-lbl" }, label), h("span", { class: "db-hrs" }, parts[0] + "–", h("wbr"), parts[1]))),
-      b.line ? h("p", { class: "db-line" }, txt(b.line), fightLinks(b)) : null,
+      }, icon(act, 2), h("span", { class: "db-txt" }, h("span", { class: "db-lbl" }, label), h("span", { class: "db-hrs" }, parts[0] + "–", h("wbr"), parts[1]), h("span", { class: "db-hrs-s" }, clock(from).replace(/(am|pm)$/, "")))),
+      b.line ? h("p", { class: "db-line" }, txt(b.line), fightLinks(b)) : b.room ? h("p", { class: "db-line" }, roomLink(b)) : null,
       b.table ? h("p", { class: "db-line db-table" }, tableLink(b)) : null,
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
+      // a road stretch gets its still road strip behind the line when the road art is loaded (road_scenes.js)
+      // and the town errands after a road day get the street at the town's edge, so the day's last tile isn't a bare box
+      const roadDay = roadOf || null, street = !b.stretch && !b.scene && roadDay && CAT[act] === "town" && from >= roadDay.to;
+      // an hour of a hunt acts out its own act on the wild's ground (hunt_scenes.js, loaded with the first hunt day)
+      if (hunting(b) && window.HuntScenes) {
+        let strip = null;
+        try { strip = HuntScenes.strip(b, { hero: (window.App && App.heroes || {})[opts.hero] || (opts.heroes || [])[0], band: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 }); } catch (e) { if (window.console) console.error(e); }
+        if (strip) li.append(strip);
+      } else if ((b.stretch || street) && window.RoadScenes && RoadScenes.strip) {
+        const base = b.stretch ? b : { stretch: "town", biome: roadDay.biome, weather: roadDay.weather, line: b.line };
+        const dressed = RoadScenes.dress ? RoadScenes.dress(Object.assign({}, base, { seed: db.day })) : {};
+        const strip = RoadScenes.strip(Object.assign({ biome: base.biome, hour: from, weather: base.weather, place_kind: b.place_kind, heroes: opts.heroes || [] }, dressed),
+          // the canvas grows with the stretch, so a long tile shows more road at the same pixel size rather than a bigger band
+          { heroes: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 });
+        if (strip) { strip.classList.add("road-strip"); li.append(strip); }
+      }
+      // a town stretch gets its scene along the tile's foot, the act looping on its set (town_day_replay.js, loaded with the first town day)
+      if (b.scene && window.TownDay && TownDay.strip) {
+        let strip = null;
+        // a scene that can't be drawn leaves the tile as it was, never the day
+        try { strip = TownDay.strip(b, { hero: (window.App && App.heroes || {})[opts.hero] || (opts.heroes || [])[0], heroes: window.App && App.heroes, w: Math.round(Math.max(160, Math.min(320, (to - from) * 110))), h: 64, phase: i * 0.7 }); } catch (e) { if (window.console) console.error(e); }
+        if (strip) { strip.classList.add("town-strip"); li.append(strip); }
+      }
       rows.push(li);
     });
     const ticks = h("div", { class: "db-ruler", "aria-hidden": "true" });

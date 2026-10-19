@@ -13,7 +13,7 @@
   // ---------- the players load with their first page (A.need); the words below each one still tell it if one can't ----------
   const KIT = {
     fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "food_eat", "meal_replay", "meal_tavern"],
-    reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
+    road: ["food_art", "road_scenes", "road_art", "scene_kits", "stage", "road_hints", "road_replay"], town: A.TOWN_ART, hunt: A.HUNT_ART, reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
   };
   const kit = (k) => A.need(KIT[k]).catch((e) => { if (window.console) console.error(e); });
 
@@ -31,7 +31,8 @@
       class: "btn small spd" + (sp === 1 ? " on" : ""), type: "button", title: ctl.rate ? `Play at ${sp}× speed` : "A song keeps its own time", disabled: !ctl.rate,
       onclick: () => { ctl.rate(sp); speeds.forEach((b, k) => b.classList.toggle("on", BAR_SPEEDS[k] === sp)); },
     }, `${sp}×`));
-    const snd = btn("🔊", "Sound", "Sound on or off", (e) => { e.stopPropagation(); const t = document.querySelector(".snd-panel .btn"); if (t) t.click(); sync(); });
+    // while the browser still holds sound back, a tap on the bar's own button is the gesture that frees it, not a switch to off
+    const snd = btn("🔊", "Sound", "Sound on or off", (e) => { e.stopPropagation(); const wait = window.Sound && Sound.locked; const t = document.querySelector(".snd-panel .btn"); if (t && !wait) t.click(); setTimeout(sync, 60); });
     const box = el("div", { class: "controls replay-bar" }, play,
       btn("↺", "Restart", "Watch from the start", () => { ctl.restart(); sync(); }),
       btn("⏭", "Skip", "Skip to the end", () => { ctl.skip(); sync(); }),
@@ -45,8 +46,10 @@
     function sync() {
       const on = ctl.playing;
       set(play, on ? "❚❚" : "▶", on ? "Pause" : "Play");
+      const wait = !!(window.Sound && Sound.locked);
       set(snd, window.Sound && Sound.on ? "🔊" : "🔇", "Sound");
-      tap.hidden = !(window.Sound && Sound.locked);
+      snd.classList.toggle("snd-wait", wait);
+      tap.hidden = !wait;
       if (plate) plate.classList.toggle("gone", ctl.t > (o.titleUntil || 0));
     }
     sync();
@@ -81,7 +84,9 @@
   const fadedPage = (v, title, why) => v.appendChild(el("section", { class: "panel faded" }, el("h2", null, title), el("p", null, why),
     el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
 
-  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => replayPage(v, f)).catch((err) => {
+  // a fight with a traveller in the line brings the road art, so they are drawn as themselves
+  const withTravellers = (f) => ((f.lineup || []).some((u) => u.kind === "traveller") && !window.RoadArt ? A.roadArt(["road_art"]).then(() => f, () => f) : f);
+  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => replayPage(v, f)).catch((err) => {
     if (window.console && err && err.stack && !/load/i.test(String(err))) console.error(err);
     const art = Scenes.backdrop("plains", 200, 50, Art.hash(id));
     art.className = "faded-art";
@@ -173,6 +178,81 @@
     v.appendChild(p);
   }).catch(() => fadedPage(v, "That catch isn't on file", "The anglers' book has no record of it.")));
 
+  // a stretch of road worth a vignette (league/roads.py records): a meeting, a place, a scene; RoadReplay dresses it, the words below still tell it
+  A.route(/^\/road\/(\w+)$/, (v, id) => A.load(`road/${id}`).then((g) => A.roadArt(g.hunt ? KIT.hunt : KIT.road).then(() => g, () => g)).then((g) => {
+    if (g.hunt) return huntPage(v, g);
+    const R = S.road || {}, place = (R.places || {})[g.place] || null, trav = (R.travellers || {})[g.traveller] || null;
+    const ends = (g.road || "").split("~").filter(Boolean).map((n) => A.nodeName(n));
+    const last = trav && g.arc_step && g.arc_step >= (g.arc_len || 99);
+    const title = trav ? (last ? `${trav.name.replace(/^./, (c) => c.toUpperCase())}, at the end of the road` : `${g.met > 1 ? "Again, " : ""}${trav.name}`)
+      : place ? place.name.replace(/^./, (c) => c.toUpperCase()) : "On the road";
+    const sub = trav ? trav.what : place ? `on the road between ${ends.join(" and ")}` : "";
+    const p = el("section", { class: "panel" }, el("h2", null, title),
+      el("p", { class: "small muted" }, ...lineup((g.heroes || []).map((x) => A.heroLink(x))), ends.length ? ` on the road between ${ends.join(" and ")}` : " on the road",
+        `, ${A.when(g.day, "on")}.`, trav && g.met > 1 ? ` They have met ${g.met} times now.` : ""));
+    if (window.RoadReplay) {
+      try { stage(p, RoadReplay.player(g), { title: [(window.RoadScenes ? RoadScenes.hourOf(g) : 12) >= 18 ? "Evening" : (window.RoadScenes ? RoadScenes.hourOf(g) : 12) >= 12.5 ? "Afternoon" : "Morning", title, sub], titleUntil: 1.2,
+        share: () => `${title}: ${g.line}\n${A.shareUrl("#/road/" + g.id)}`, shared: "The road and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (g.line) p.appendChild(el("p", null, A.storyText(g.line)));
+    // not "part 3 of 3": a reader may have seen only some of the steps, which other heroes took
+    if (trav && g.arc_step) p.appendChild(el("p", { class: "small dim" }, g.arc_step >= (g.arc_len || 99) ? `The end of ${trav.name}'s story on the roads.` : g.arc_step === 1 ? `Where ${trav.name}'s story on the roads begins.` : `A chapter of ${trav.name}'s story on the roads.`));
+    v.appendChild(p);
+  }).catch(() => fadedPage(v, "That stretch of road isn't on file", "Nobody wrote that part of the road down.")));
+
+  // a hunt's moment worth a record (league/hunt.py, hunt: True): acted out on the wild's own ground by HuntScenes
+  function huntPage(v, g) {
+    const where = A.nodeName(g.wild || g.road), hr = g.hour != null ? g.hour : 12;
+    const p = el("section", { class: "panel" }, el("h2", null, `Hunting in ${where}`),
+      el("p", { class: "small muted" }, ...lineup((g.heroes || []).map((x) => A.heroLink(x))), ` in ${where}, ${A.when(g.day, "on")}.`));
+    if (window.HuntScenes) {
+      try { stage(p, HuntScenes.player(g, { heroes: A.heroes }), { title: [hr >= 16 ? "Evening" : hr >= 12.5 ? "Afternoon" : "Morning", `Hunting in ${where}`, ""], titleUntil: 1.0,
+        share: () => `${where}: ${g.line}
+${A.shareUrl("#/road/" + g.id)}`, shared: "The hunt and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (g.line) p.appendChild(el("p", null, A.storyText(g.line)));
+    v.appendChild(p);
+  }
+
+  // an hour of a hero's town day (league/town_day.py), or of a hunt day (league/hunt.py): its scene played from the day's own file
+  // (export.save_daybook), the words below it
+  A.route(/^\/day\/(\w+)\/(\d+)\/(\d+)$/, (v, hid, wday, i) => A.load(`daybook/${hid}/${wday}`).then((db) => {
+    const b = (db.blocks || [])[+i];
+    return (b && b.act === "hunt" && b.stretch ? kit("hunt") : kit("town")).then(() => db);
+  }).then((db) => {
+    const b = (db.blocks || [])[+i];
+    if (b && b.act === "hunt" && b.stretch) return huntHour(v, hid, wday, i, b);
+    if (!b || !b.scene) throw new Error("no town hour " + i);
+    const hero = A.heroes[hid] || { id: hid }, at = A.nodeName(b.scene.town), span = window.Daybook ? `${Daybook.clock(b.from)} to ${Daybook.clock(b.to)}` : "";
+    const p = el("section", { class: "panel" }, el("h2", null, b.label || "An hour in town"),
+      el("p", { class: "small muted" }, A.heroLink(hid), ` in ${at}, ${span}, ${A.when(+wday, "on")}.`));
+    if (window.TownDay) {
+      try { stage(p, TownDay.player(b, { hero, heroes: A.heroes }), { title: [span, b.label || "", at], titleUntil: 1.0,
+        share: () => `${hero.name || ""}, ${b.label}: ${b.line}
+${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (b.line) p.appendChild(el("p", null, A.storyText(b.line), b.why ? el("span", { class: "dim" }, " " + b.why) : null));
+    p.appendChild(el("p", { class: "small" }, el("a", { href: `#/hero/${hid}` }, `‹ ${hero.name || "The hero"}'s day`)));
+    v.appendChild(p);
+  }).catch(() => fadedPage(v, "That hour isn't on file", "Only the days kept in the hero's daybook can be watched.")));
+
+  function huntHour(v, hid, wday, i, b) {
+    const hero = A.heroes[hid] || { id: hid }, party = hero.party && A.parties && A.parties[hero.party];
+    const band = [hero, ...((party && party.members) || []).filter((id) => id !== hid).map((id) => A.heroes[id]).filter(Boolean)];
+    const span = window.Daybook ? `${Daybook.clock(b.from)} to ${Daybook.clock(b.to)}` : "";
+    // the crew that day, from the hour itself (older days without it fall back to the party now)
+    const crew = (b.crew || []).filter((id) => id !== hid && A.heroes[id]).map((id) => A.heroLink(id));
+    const p = el("section", { class: "panel" }, el("h2", null, b.label || "Hunting"), el("p", { class: "small muted" }, A.heroLink(hid), crew.length ? [" with ", ...lineup(crew)] : b.crew ? " alone" : "", ` hunting, ${span}, ${A.when(+wday, "on")}.`));
+    if (window.HuntScenes) {
+      try { stage(p, HuntScenes.player(b, { hero, band, heroes: A.heroes }), { title: [span, b.label || "", ""], titleUntil: 1.0,
+        share: () => `${hero.name || ""}, ${b.label}: ${b.line}
+${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (b.line) p.appendChild(el("p", null, A.storyText(b.line)));
+    p.appendChild(el("p", { class: "small" }, el("a", { href: `#/hero/${hid}` }, `‹ ${hero.name || "The hero"}'s day`)));
+    v.appendChild(p);
+  }
+
   // a tarot reading; the pixel player (TarotReplay) draws it when loaded, otherwise the spread is told in words.
   // It opens on the laid table under a title plate, before the deal
   const READING_PRE = 1.8;
@@ -235,7 +315,10 @@
   }
 
   function unitGrid(u, frame) {
+    if (u.kind === "traveller" && window.RoadArt) return RoadArt.fighter(u, frame);
     const look = u.look || {};
+    // without the road art, a traveller who fights is drawn with the stat block's own sprite
+    if (u.kind === "traveller" && look.monster && S.monsters[look.monster]) return Art.monsterGrid(S.monsters[look.monster], frame);
     if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroes[u.ref], frame, A.heroLook(heroes[u.ref]));
     if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name, coat: look.coat }, frame);
     const m = S.monsters[u.ref];
@@ -627,7 +710,7 @@
     const sideList = (s) => el("div", { class: "fside s" + s }, el("div", { class: "fside-name" }, A.cap(label(s))),
       units.filter((u) => u && u.side === s).map((u) => {
         const fill = el("i"), num = el("span", { class: "fhp" }), row = el("div", { class: "fighter", hidden: !!u.summoned },
-          el("span", { class: "fmark s" + s }, marks[u.i]), u.kind === "hero" && heroes[u.ref] ? A.heroLink(u.ref) : el("span", { title: u.name }, u.summoned ? summonName(u.name) : u.name),
+          el("span", { class: "fmark s" + s }, marks[u.i]), u.kind === "hero" && heroes[u.ref] ? A.heroLink(u.ref) : el("span", { title: u.name }, u.summoned ? summonName(u.name) : u.name, u.kind === "traveller" ? el("span", { class: "dim" }, " · traveller") : null),
           el("div", { class: "fbar" }, fill), num);
         rows[u.i] = { row, fill, num, key: "" };
         return row;
@@ -1399,9 +1482,12 @@
       const name = (f.place_name || "").toUpperCase();
       txt(name, cvw / 2, cvh * 0.3, 13, "#ffd65a", "center", B);
       const sides = (s) => units.filter((q) => q && q.side === s && !q.summoned);
-      const count = (s) => { const L = sides(s), hs = L.filter((q) => q.kind === "hero").length, pets = L.filter((q) => q.look && q.look.pet).length, mons = L.length - hs - pets;
-        return [hs ? `${hs} ${hs === 1 ? "hero" : "heroes"}` : "", pets ? `${pets} ${pets === 1 ? "pet" : "pets"}` : "", mons ? label(s) : ""].filter(Boolean).join(" + ") || label(s); };
-      txt(`${f.kind === "pve" ? count(0) : label(0)}  vs  ${f.kind === "pve" ? label(1) : label(1)}`, cvw / 2, cvh * 0.3 + 12 * B, 6.5, "#f6ebd0", "center", B);
+      // a traveller walking with the band is counted as one, not read as a second crew
+      const count = (s) => { const L = sides(s), hs = L.filter((q) => q.kind === "hero").length, pets = L.filter((q) => q.look && q.look.pet).length,
+        trav = L.filter((q) => q.kind === "traveller").length, mons = L.length - hs - pets - trav;
+        return [hs ? `${hs} ${hs === 1 ? "hero" : "heroes"}` : "", pets ? `${pets} ${pets === 1 ? "pet" : "pets"}` : "", trav ? `${trav} ${trav === 1 ? "traveller" : "travellers"}` : "",
+          mons ? label(s) : ""].filter(Boolean).join(" + ") || label(s); };
+      txt(trunc(`${f.kind === "pve" ? count(0) : label(0)}  vs  ${label(1)}`, 56), cvw / 2, cvh * 0.3 + 12 * B, 6.5, "#f6ebd0", "center", B);
       ctx.globalAlpha = 1;
     }
     function banner(msg, u, B, len) {

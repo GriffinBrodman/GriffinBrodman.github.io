@@ -38,6 +38,13 @@
   const IRREGULAR = { hero: "heroes", party: "parties" };
   function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
   function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+  // as league/content/world_map.py floor_words: n counts from 1, and the last of several floors reads "the bottom floor" (of two) or "the deepest floor"
+  const FLOOR_ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  function floorOrd(n) { return FLOOR_ORD[n - 1] || `${n}th`; }
+  function floorWords(n, did, capital, deep = true) {
+    const t = ((S.dungeons || {})[did] || {}).floors || 0;
+    return `${capital ? "The" : "the"} ${deep && t > 1 && n >= t ? (t === 2 ? "bottom" : "deepest") : floorOrd(n)} floor`;
+  }
   // a crew's own exported possessive when there is one (party.poss), else as league/heroes.py poss: "The Mossy Cats'", "Brix's"
   function poss(s, pid) {
     const p = pid && parties[pid];
@@ -151,9 +158,9 @@
   }
   // ---------- links to what a story line tells ----------
   // an event, diary line or snippet carries the ids of the records it is about (league/export.py LINKS); the link shows only while that record is kept
-  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"]];
+  const ROUTES = [["fight", "fight"], ["in_fight", "fight"], ["night", "night"], ["meal", "meal"], ["reading", "reading"], ["game", "table"], ["catch", "catch"], ["road_rec", "road"]];
   function kept(route, id) {
-    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds }[route];
+    const ids = { fight: fightIds, night: nightIds, meal: mealIds, reading: readingIds, table: gameIds, catch: catchIds, road: roadIds }[route];
     return !!id && !!ids && ids.has(id);
   }
   function storyHref(x) {
@@ -180,9 +187,11 @@
   function places() {
     if (placeNames) return placeNames;
     placeNames = [];
-    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), `#/map/${id}`]);
+    for (const src of [S.towns, S.dungeons]) for (const [id, n] of Object.entries(src || {})) if (n && n.name) placeNames.push([n.name.replace(/^The /, ""), placeHref(id)]);
     return placeNames;
   }
+  // a dungeon has its own page with its floors; every other place opens on the map
+  function placeHref(id) { return S.dungeons && S.dungeons[id] ? `#/dungeon/${id}` : `#/map/${id}`; }
   // turns plain story text into nodes with hero & party names linked, and the first mention of each town and dungeon
   function richText(text, heroIds, partyIds) {
     const names = [];
@@ -271,7 +280,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     for (const id of hs) who.appendChild(heroPortrait(heroes[id], 1, { noGray: true }));
     const meta = [];
     if (!opts.noDay) meta.push(dayLabel(e));
-    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: `#/map/${e.loc}` }, nodeName(e.loc)) : nodeName(e.loc));
+    if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: placeHref(e.loc) }, nodeName(e.loc)) : nodeName(e.loc));
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
     const fightLink = storyLink(e) || (e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, "♪ hear it") : null);
@@ -290,6 +299,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   for (const e of (L && L.events) || []) if (e.kind === "big_move" && e.cause) movesOf[e.cause] = (movesOf[e.cause] || []).concat(e.moves || [], e.party_moves || []);
   function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   const fightIds = new Set((L && L.fights_index) || []), nightIds = new Set((L && L.nights_index) || []), mealIds = new Set((L && L.meals_index) || []), readingIds = new Set((L && L.readings_index) || []);
+  const roadIds = new Set((L && L.roads_index) || []);
   const catchIds = new Set((L && L.catches_index) || []), gameIds = new Set((L && L.games_index) || []), songIds = new Set(((L && L.songs) || []).map((s) => s.id));
   const heroSongBy = {};
   for (const s of (L && L.hero_songs) || []) heroSongBy[s.id] = s.author;
@@ -333,6 +343,35 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
       s.onerror = () => { delete scripts[n]; reject(new Error("could not load " + n)); };
       document.head.appendChild(s);
     }))), Promise.resolve());
+  }
+  // the heavy drawing and sound files load with the first page that uses them (eval #92), in this order: the place headers before the
+  // tavern and camp that stand in them, the tavern before the ballad stage
+  const PLACES = ["town_scenes", "wild_scenes"];
+  const STAGE = PLACES.concat(["mount_art", "tavern", "camp", "ballad"]);
+  const SONG = STAGE.concat(["music"]);
+  // a part of a page whose file isn't in yet: an empty slot now, swapped for the drawing once the file loads (nothing draws before it)
+  function later(names, make) {
+    const slot = document.createElement("span");
+    slot.className = "later";
+    need(names).then(() => { let out = null; try { out = make(); } catch (e) { console.error(e); } if (out) slot.replaceWith(out); else slot.remove(); },
+      (e) => { console.error(e); slot.remove(); });
+    return slot;
+  }
+  // a story vignette: a song is staged on the ballad stage, a dungeon framed from its own header; anything else draws now
+  function vignette(e, W, H, cls) {
+    const make = () => { const c = Scenes.vignette(e, W, H); if (cls) c.className = cls; return c; };
+    const names = e.kind === "song" && S.towns[e.loc] ? ["town_scenes", "wild_scenes", "tavern", "music", "ballad"] : S.dungeons[e.loc] ? PLACES : null;
+    return names ? later(names, make) : make();
+  }
+  // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
+  const ROAD_ART = ["road_scenes", "road_art"];
+  // a town day's scenes: the sets, the acts and the player (and what they draw with), loaded with the first town day a page draws
+  const TOWN_ART = STAGE.concat(["road_scenes", "road_art", "scene_kits", "stage", "town_day_sets", "town_day_sets_b", "town_day_sets_c", "town_day_sets_e", "town_day_flat", "town_day_flat_sets", "town_day_flat_sets_b", "town_day_acts", "town_day_replay"]);
+  // a hunt day's acts on the wilds' own ground, with the game and the hunt's props
+  const HUNT_ART = ["road_scenes", "road_art", "scene_kits", "stage", "hunt_art", "hunt_scenes"];
+  // the art and the road cast (data/road_cast.js: travellers' looks and the places) arrive together
+  function roadArt(names) {
+    return Promise.all([need(names || ROAD_ART), S.road ? null : load("road_cast").then((c) => { S.road = c; })]);
   }
 
   // ---------- follow ("my heroes") ----------
@@ -394,6 +433,26 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // ---------- router ----------
   const routes = [];
   function route(re, fn) { routes.push([re, fn]); }
+  // a page that draws with lazily loaded files names them here, and is drawn once they are in
+  const NEEDS = [];
+  function needs(re, names) { NEEDS.push([re, names]); }
+  // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
+  const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
+    [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
+    // the replay pages (replay.js) and everything their players stand on
+    [/^\/(fight|night|meal|catch|road|reading|table|day)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
+      "js/music.js", "js/replay.js"], []]];
+  const lazyLoaded = new Set();
+  function lazy(hash) {
+    const hit = LAZY.find(([re]) => re.test(hash));
+    if (!hit || lazyLoaded.has(hit)) return false;
+    lazyLoaded.add(hit);
+    const v = window.AL_V ? `?v=${window.AL_V}` : "";
+    for (const href of hit[2]) document.head.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: href + v }));
+    // in order, and never twice: later page files build on the earlier ones, and a page may already have loaded some
+    need(hit[1].map((src) => src.replace(/^js\/|\.js$/g, ""))).then(render, (e) => console.error(e));
+    return true;
+  }
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
@@ -409,7 +468,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
         view.innerHTML = "";
         animated.clear();
         try {
-          const out = fn(view, ...m.slice(1));
+          const want = NEEDS.filter(([re2]) => re2.test(hash)).flatMap(([, n]) => n);
+          const out = want.length ? need(want).then(() => fn(view, ...m.slice(1))) : fn(view, ...m.slice(1));
           if (out && out.catch) out.catch((err) => { view.appendChild(el("p", { class: "red" }, "Couldn't load that page: " + err.message)); });
         } catch (err) {
           console.error(err);
@@ -419,6 +479,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
         return;
       }
     }
+    if (lazy(hash)) return;
     view.innerHTML = "";
     view.appendChild(el("div", { class: "panel" }, el("h2", null, "Lost in the woods"), el("p", null, "That page doesn't exist. ", el("a", { href: "#/" }, "Back to the Crier."))));
   }
@@ -452,7 +513,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, HUNT_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd,
   };
 })();

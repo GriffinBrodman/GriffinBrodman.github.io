@@ -38,6 +38,7 @@
     return el("div", null, wrap, btns, el("p", { class: "tiny dim" }, "Sounds start after your first click or key press on the page."));
   }
 
+  A.needs(/^\/settings$/, A.PLACES.concat(["tavern"]));
   A.route(/^\/settings$/, (v) => {
     v.appendChild(el("h1", null, "Settings"));
     v.appendChild(el("p", { class: "muted" }, "Kept in this browser only, and they apply straight away."));

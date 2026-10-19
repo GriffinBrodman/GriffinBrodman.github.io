@@ -654,6 +654,60 @@
     return project(m[0], m[1]);
   }
 
+  // a roadside place a hero has found (league road_places: {road: [a, b], at}): a tiny pin on the road where it bends, as the road was drawn
+  const PIN = { inn: "#c8963e", waystation: "#c8963e", shrine: "#f6ead0", toll: "#c0402c", ferry: "#4a7ab8", ford: "#4a7ab8" };
+  function placeXY(p) {
+    const S = App.S, nodeById = Object.fromEntries(T.N.map((d) => [d.id, d]));
+    const r = S.roads.find(([a, b]) => (a === p.road[0] && b === p.road[1]) || (a === p.road[1] && b === p.road[0]));
+    if (!r || !nodeById[r[0]] || !nodeById[r[1]]) return null;
+    const A = nodeById[r[0]].xy, B = nodeById[r[1]].xy, t = r[0] === p.road[0] ? p.at : 1 - p.at;
+    const len = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, wob = (T.n2(A[0] / 9, B[1] / 9) - 0.5) * 14, bend = Math.sin(t * Math.PI) * wob;
+    return project(A[0] + (B[0] - A[0]) * t - ((B[1] - A[1]) / len) * bend, A[1] + (B[1] - A[1]) * t + ((B[0] - A[0]) / len) * bend);
+  }
+  function roadPins(ctx, k) {
+    for (const p of App.L.road_places || []) {
+      const xy = placeXY(p);
+      if (!xy) continue;
+      const x = Math.round(xy[0] * k), y = Math.round(xy[1] * k), s = k;
+      if (window.RoadArt && RoadArt.drawPin) { RoadArt.drawPin(ctx, p.kind, x, y, k); continue; }
+      ctx.fillStyle = "#2a1b11"; ctx.fillRect(x - 2 * s, y - 5 * s, 4 * s, 4 * s); ctx.fillRect(x - s / 2, y - 2 * s, s, 2 * s);
+      ctx.fillStyle = PIN[p.kind] || "#b4bcc4"; ctx.fillRect(x - s, y - 4 * s, 2 * s, 2 * s);
+    }
+  }
+
+  // map marks as pixels, never text: phones turn symbols like a cross, a sun or a snowflake into colour emoji
+  const MARK = {
+    cross: { rows: ["..#..", "#####", "..#..", "..#..", "..#..", "..#.."] },
+    closed: { line: true, pal: { r: "#c0402c", R: "#e8644a" }, rows: ["rr...rr", "rRr.rRr", ".rRrRr.", "..rRr..", ".rRrRr.", "rRr.rRr", "rr...rr"] },
+    sun: { pal: { y: "#e8b23a", Y: "#fff2b0", o: "#f6d77a" }, rows: ["....y....", ".y.....y.", "...ooo...", "..oYYYo..", "y.oYYYo.y", "..oYYYo..", "...ooo...", ".y.....y.", "....y...."] },
+    cloudy: { pal: { w: "#f4f6f8", g: "#b8c4cc" }, rows: ["...ww....", ".wwwwww..", "wwwwwwwww", "wwwwwwwww", ".ggggggg."] },
+    rain: { pal: { w: "#c8d0d8", g: "#8a96a2", b: "#5aa0e0" }, rows: ["...ww....", ".wwwwww..", "wwwwwwwww", ".ggggggg.", ".b..b..b.", "b..b..b.."] },
+    storm: { pal: { w: "#9aa2ac", g: "#6a7280", y: "#ffd84a" }, rows: ["...ww....", ".wwwwww..", "wwwwwwwww", ".ggggggg.", "....yy...", "...yy....", "....y...."] },
+    fog: { pal: { f: "#e4e8ec" }, rows: [".fffffff.", ".........", "fffffff..", ".........", "..fffffff"] },
+    snow: { pal: { s: "#f4fbff", S: "#a8d0ec" }, rows: ["...s...", ".s.s.s.", "..sss..", "sssSsss", "..sss..", ".s.s.s.", "...s..."] },
+    heat: { pal: { r: "#e8502a", y: "#ffb030", Y: "#fff0a0" }, rows: ["..r..", ".rr..", ".rrr.", "rryrr", "ryyyr", "ryYyr", ".rrr."] },
+    comet: { pal: { c: "#a8c8e8", y: "#ffd84a", Y: "#fff6d0" }, rows: ["......yy.", "...c.yYYy", ".cc.yYYYy", "cc..yYYy.", ".....yy.."] },
+  };
+  MARK.clear = MARK.sun;
+  // a mark centred on (x, y) at px canvas pixels per pixel; col paints a one-colour mark, and a dark line rings the ones that sit on open ground
+  function mark(ctx, m, x, y, px, col) {
+    const w = m.rows[0].length, h = m.rows.length, x0 = Math.round(x - (w * px) / 2), y0 = Math.round(y - (h * px) / 2);
+    const on = (i, j) => j >= 0 && j < h && i >= 0 && i < w && m.rows[j][i] !== ".";
+    if (m.line) {
+      ctx.fillStyle = "#1a100a";
+      for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) {
+        if (!on(i, j) && (on(i - 1, j) || on(i + 1, j) || on(i, j - 1) || on(i, j + 1))) ctx.fillRect(x0 + i * px, y0 + j * px, px, px);
+      }
+    } else if (!col) {
+      ctx.fillStyle = "rgba(20,16,10,0.4)";
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (on(i, j)) ctx.fillRect(x0 + (i + 1) * px, y0 + (j + 1) * px, px, px);
+    }
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      if (!on(i, j)) continue;
+      ctx.fillStyle = col || m.pal[m.rows[j][i]] || "#fff"; ctx.fillRect(x0 + i * px, y0 + j * px, px, px);
+    }
+  }
+
   function drawMap(cv, opts) {
     opts = opts || {};
     const k = opts.small ? 1 : 2;
@@ -664,13 +718,13 @@
     const bctx = base.getContext("2d");
     bctx.imageSmoothingEnabled = false;
     bctx.drawImage(ter, 0, 0, TW * k, TH * k);
-    // heroes, labels and markers go on a clear sheet above the moving water and clouds
+    // pins, labels and figures go on a clear sheet above the moving water and clouds
     const over = document.createElement("canvas");
     over.width = cv.width; over.height = cv.height;
     const ctx = over.getContext("2d");
     ctx.imageSmoothingEnabled = false;
-    const S = App.S, placed = [], groups = {}, extra = {};
-    for (const h of App.L.heroes) {
+    const S = App.S, L = App.L, placed = [], groups = {}, extra = {};
+    for (const h of L.heroes) {
       if (!h.alive) continue;
       const [x, y] = heroPos(h), key = Math.round(x) + "," + Math.round(y);
       const off = (groups[key] = (groups[key] || 0) + 1) - 1;
@@ -680,89 +734,139 @@
       placed.push({ h, g, x: hx + (g.w * hs) / 2, y: hy + (g.h * hs) / 2, r: 12 * hs, hx, hy, z: fan[1] });
     }
     placed.sort((a, b) => a.z - b.z);
-    for (const p of placed) {
-      ctx.fillStyle = "rgba(20,30,20,0.35)";
-      ctx.beginPath(); ctx.ellipse(p.x, p.hy + p.g.h * k - 2 * k, 8 * k, 2.5 * k, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.drawImage(p.g.toCanvas(k), Math.round(p.hx), Math.round(p.hy));
-    }
-    for (const [x, y, c] of Object.values(extra)) {
-      const bx = Math.round(x * k + 16 * k), by = Math.round(y * k - 30 * k);
-      ctx.fillStyle = "#2a1b11"; ctx.fillRect(bx - 1, by - 1, 12 * k + 2, 8 * k + 2);
-      ctx.fillStyle = "#8e2a22"; ctx.fillRect(bx, by, 12 * k, 8 * k);
-      ctx.fillStyle = "#ffe9b8"; ctx.font = `600 ${7 * k}px "League Five", "Pixelify Sans", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("+" + c, bx + 6 * k, by + 4 * k + 1);
-    }
-    const L = App.L, WXI = { clear: "☀", cloudy: "☁", rain: "🌧", fog: "🌫", storm: "⛈", snow: "❄", heat: "🔥" };
-    if (!opts.small && S.regions && L.weather) {
-      ctx.font = `${22}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      for (const [r, nodesIn] of Object.entries(S.regions)) {
-        const pts = nodesIn.map((id) => (S.towns[id] || S.wilds[id] || S.dungeons[id] || {}).xy).filter(Boolean);
-        if (!pts.length || !L.weather[r]) continue;
-        const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-        const [x, y] = project(cx, cy);
-        ctx.globalAlpha = 0.85; ctx.fillText(WXI[L.weather[r]] || "", x * k, (y - 14) * k); ctx.globalAlpha = 1;
-      }
-    }
+    const phone = !opts.small && window.innerWidth < 700;
+    // canvas pixels per css pixel where the map is shown: marks are sized for the screen, never below the map's own pixel
+    const scr = cv.clientWidth ? cv.width / cv.clientWidth : 1;
+    const mpx = (css, cells) => Math.max(k, Math.round((css * scr) / cells));
     const hy = L.hyper;
-    if (hy && (hy.kind === "megabeast" || hy.kind === "comet") && hy.loc) {
+    let beast = null;
+    if (hy && hy.kind === "megabeast" && hy.loc && S.monsters[hy.body]) {
       const xy = (S.towns[hy.loc] || S.wilds[hy.loc] || S.dungeons[hy.loc] || {}).xy;
       if (xy) {
-        const [x, y] = project(xy[0], xy[1]);
-        if (hy.kind === "megabeast" && S.monsters[hy.body]) {
-          const g = Art.monsterGrid(Object.assign({}, S.monsters[hy.body], { boss: true }), 0);
-          ctx.fillStyle = "rgba(160,20,20,0.35)"; ctx.beginPath(); ctx.arc(x * k, (y - 6) * k, 22 * k, 0, Math.PI * 2); ctx.fill();
-          ctx.drawImage(g.toCanvas(k), Math.round(x * k - g.w * k / 2), Math.round((y - 4) * k - g.h * k));
-        } else { ctx.font = `${30}px serif`; ctx.textAlign = "center"; ctx.fillText("☄", x * k, (y - 10) * k); }
+        const [x, y] = project(xy[0], xy[1]), g = Art.monsterGrid(Object.assign({}, S.monsters[hy.body], { boss: true }), 0);
+        beast = { g, x, y, hx: Math.round(x * k - g.w * k / 2), hy: Math.round((y - 4) * k - g.h * k) };
       }
     }
-    const dawn = (L.factions || {}).dawn;
-    if (!opts.small && dawn && dawn.loc && dawn.loc !== "ironhaven") {
-      const xy = (S.towns[dawn.loc] || S.wilds[dawn.loc] || S.dungeons[dawn.loc] || {}).xy;
-      if (xy) { const [x, y] = project(xy[0], xy[1]); ctx.font = "20px serif"; ctx.textAlign = "center"; ctx.fillStyle = "#f6d77a"; ctx.fillText("☀", (x + 10) * k, (y - 16) * k); }
-    }
-    for (const [id, until] of Object.entries(L.closed || {})) {
-      if (until <= L.meta.day) continue;
-      const xy = (S.wilds[id] || {}).xy;
-      if (xy) { const [x, y] = project(xy[0], xy[1]); ctx.font = "bold 18px sans-serif"; ctx.fillStyle = "#b02a1a"; ctx.textAlign = "center"; ctx.fillText("✖", x * k, (y - 10) * k); }
-    }
-    const phone = !opts.small && window.innerWidth < 700;
-    // on a phone the map is shrunk to the screen, so labels are sized for the screen: about 11px tall where they land
-    const shrink = phone && cv.clientWidth ? cv.width / cv.clientWidth : 0;
-    const fs = opts.small ? 11 : phone ? (shrink ? Math.round(10 * shrink) : 30) : 13;
-    const taken = [];
-    const busy = new Set(App.L.heroes.filter((h) => h.alive && !h.travel).map((h) => h.loc));
-    const plaque = (txt, x, y, kind) => {
-      ctx.font = `${kind === "town" ? 600 : 400} ${kind === "town" ? fs + 2 : fs}px "League Five", "Pixelify Sans", monospace`;
-      const w = Math.ceil(ctx.measureText(txt).width) + 10, h = fs + 6;
-      x = Math.max(w / 2 + 2, Math.min(cv.width - w / 2 - 2, x));
-      const x0 = Math.round(x - w / 2), y0 = Math.round(y);
-      // a crowded phone map keeps the towns and drops whatever would sit on top of them; the panel below names every place
-      if (phone && taken.some((r) => x0 < r[0] + r[2] + 4 && r[0] < x0 + w + 4 && y0 < r[1] + r[3] + 2 && r[1] < y0 + h + 2)) return;
-      taken.push([x0, y0, w, h]);
-      ctx.fillStyle = "#2a1b11"; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
-      ctx.fillStyle = kind === "town" ? "#f1e3c2" : kind === "dungeon" ? "#e8cfc0" : "#dfe6c4"; ctx.fillRect(x0, y0, w, h);
-      ctx.fillStyle = kind === "town" ? "#c8963e" : "rgba(0,0,0,0)"; ctx.fillRect(x0, y0 + h - 2, w, 2);
-      ctx.fillStyle = kind === "dungeon" ? "#8e2a22" : kind === "wild" ? "#3a5a2a" : "#2e2116";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(txt, x0 + w / 2, y0 + h / 2 + 1);
+    // where the figures' drawn pixels are, so a name can step aside instead of hiding under one
+    const solid = (g, x, y) => {
+      let x0 = g.w, y0 = g.h, x1 = -1, y1 = -1;
+      for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) if (g.px[j * g.w + i]) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); }
+      return x1 < 0 ? null : [x + x0 * k, y + y0 * k, (x1 - x0 + 1) * k, (y1 - y0 + 1) * k];
     };
-    const rank = { town: 0, dungeon: 1, wild: 2 };
-    for (const d of phone ? T.N.slice().sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3)) : T.N) {
-      if (opts.small && d.kind !== "town") continue;
-      if (d.kind === "wild" && !busy.has(d.id)) continue;
-      const [x, y] = project(d.xy[0], d.xy[1]);
-      let txt = d.name;
-      if (d.kind === "dungeon") { const st = (App.L.dungeons || {})[d.id] || {}; if (st.boss_alive === false) txt += " ✝"; }
-      plaque(txt, x * k, (y + (d.kind === "town" ? 8 : 6)) * k, d.kind);
-    }
+    for (const p of placed) p.box = solid(p.g, p.hx, p.hy);
+    const figs = placed.map((p) => p.box).concat(beast ? [solid(beast.g, beast.hx, beast.hy)] : []).filter(Boolean);
+    const paint = () => {
+      ctx.clearRect(0, 0, over.width, over.height);
+      // lowest: the roadside pins, just above the roads, so names and figures always cover them
+      if (!opts.small) roadPins(ctx, k);
+      if (!opts.small && S.regions && L.weather) {
+        ctx.globalAlpha = 0.9;
+        for (const [r, nodesIn] of Object.entries(S.regions)) {
+          const pts = nodesIn.map((id) => (S.towns[id] || S.wilds[id] || S.dungeons[id] || {}).xy).filter(Boolean);
+          const m = MARK[L.weather[r]];
+          if (!pts.length || !m) continue;
+          const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+          const [x, y] = project(cx, cy);
+          mark(ctx, m, x * k, (y - 14) * k, mpx(10, 9));
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (hy && hy.kind === "comet" && hy.loc) {
+        const xy = (S.towns[hy.loc] || S.wilds[hy.loc] || S.dungeons[hy.loc] || {}).xy;
+        if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, MARK.comet, x * k, (y - 14) * k, mpx(16, 9)); }
+      }
+      const dawn = (L.factions || {}).dawn;
+      if (!opts.small && dawn && dawn.loc && dawn.loc !== "ironhaven") {
+        const xy = (S.towns[dawn.loc] || S.wilds[dawn.loc] || S.dungeons[dawn.loc] || {}).xy;
+        if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, MARK.sun, (x + 10) * k, (y - 20) * k, mpx(12, 9)); }
+      }
+      for (const [id, until] of Object.entries(L.closed || {})) {
+        if (until <= L.meta.day) continue;
+        const xy = (S.wilds[id] || {}).xy;
+        if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, MARK.closed, x * k, (y - 14) * k, mpx(10, 9)); }
+      }
+      // on a phone the map is shrunk to the screen, so labels are sized for the screen: about 11px tall where they land
+      const shrink = phone && cv.clientWidth ? cv.width / cv.clientWidth : 0;
+      const fs = opts.small ? 11 : phone ? (shrink ? Math.round(10 * shrink) : 30) : 13;
+      const taken = [];
+      const busy = new Set(L.heroes.filter((h) => h.alive && !h.travel).map((h) => h.loc));
+      const fontOf = (kind) => `${kind === "town" ? 600 : 400} ${kind === "town" ? fs + 2 : fs}px "League Five", "Pixelify Sans", monospace`;
+      const cp = Math.max(1, Math.round((fs * 0.7) / 6));
+      const rank = { town: 0, dungeon: 1, wild: 2 };
+      const labels = [];
+      for (const d of phone ? T.N.slice().sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3)) : T.N) {
+        if (opts.small && d.kind !== "town") continue;
+        if (d.kind === "wild" && !busy.has(d.id)) continue;
+        const [px, py] = project(d.xy[0], d.xy[1]);
+        const slain = d.kind === "dungeon" && ((L.dungeons || {})[d.id] || {}).boss_alive === false;
+        ctx.font = fontOf(d.kind);
+        const cw = slain ? 5 * cp + Math.round(fs / 3) : 0, tw = Math.ceil(ctx.measureText(d.name).width), w = tw + cw + 10, h = fs + 6;
+        const x = Math.max(w / 2 + 2, Math.min(cv.width - w / 2 - 2, px * k));
+        labels.push({ d, slain, cw, tw, w, h, x0: Math.round(x - w / 2), y0: Math.round((py + (d.kind === "town" ? 8 : 6)) * k) });
+      }
+      const meets = (a, b, w, h, r, g) => a < r[0] + r[2] + g && r[0] < a + w + g && b < r[1] + r[3] + g / 2 && r[1] < b + h + g / 2;
+      for (const lb of labels) {
+        const { d, slain, cw, tw, w, h } = lb;
+        let { x0, y0 } = lb;
+        const clash = (a, b) => phone && taken.some((r) => meets(a, b, w, h, r, 4));
+        // figures are drawn over the names: a name a figure would cover steps down or aside, clear of every figure and the other
+        // names' own spots, by the least it can; above would bury the town's own buildings, and with nowhere to go it stays put
+        const under = figs.filter((f) => meets(x0, y0, w, h, f, 2));
+        if (under.length) {
+          const l = Math.min(...under.map((f) => f[0])), r = Math.max(...under.map((f) => f[0] + f[2])), b = Math.max(...under.map((f) => f[1] + f[3]));
+          // a phone gives up a wild's name first, so a moving name only keeps clear of the towns' and dungeons' spots there
+          const homes = labels.filter((o) => o !== lb && (!phone || o.d.kind !== "wild")).map((o) => [o.x0, o.y0, o.w, o.h]);
+          const fit = ([a, c]) => a >= 2 && a + w <= cv.width - 2 && c + h <= cv.height - 2 && !figs.some((f) => meets(a, c, w, h, f, 2)) &&
+            !homes.some((o) => meets(a, c, w, h, o, 4)) && !clash(a, c);
+          const best = [[x0, b + 3], [l - w - 4, y0], [r + 4, y0]].filter(fit).sort((p, q) => Math.hypot(p[0] - x0, p[1] - y0) - Math.hypot(q[0] - x0, q[1] - y0))[0];
+          if (best && Math.hypot(best[0] - x0, best[1] - y0) < 3 * h + w / 2) [x0, y0] = best;
+        }
+        // a crowded phone map keeps the towns and drops whatever would sit on top of them; the panel below names every place
+        if (clash(x0, y0)) continue;
+        taken.push([x0, y0, w, h]);
+        ctx.font = fontOf(d.kind);
+        ctx.fillStyle = "#2a1b11"; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+        ctx.fillStyle = d.kind === "town" ? "#f1e3c2" : d.kind === "dungeon" ? "#e8cfc0" : "#dfe6c4"; ctx.fillRect(x0, y0, w, h);
+        ctx.fillStyle = d.kind === "town" ? "#c8963e" : "rgba(0,0,0,0)"; ctx.fillRect(x0, y0 + h - 2, w, 2);
+        const ink = d.kind === "dungeon" ? "#8e2a22" : d.kind === "wild" ? "#3a5a2a" : "#2e2116";
+        ctx.fillStyle = ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(d.name, x0 + 5 + tw / 2, y0 + h / 2 + 1);
+        // a dungeon whose boss is slain: a small cross after its name
+        if (slain) mark(ctx, MARK.cross, x0 + 5 + tw + cw - 2.5 * cp, y0 + h / 2, cp, ink);
+      }
+      // highest: the figures, a megabeast and then the heroes, over every name and pin
+      if (beast) {
+        ctx.fillStyle = "rgba(160,20,20,0.35)"; ctx.beginPath(); ctx.arc(beast.x * k, (beast.y - 6) * k, 22 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.drawImage(beast.g.toCanvas(k), beast.hx, beast.hy);
+      }
+      for (const p of placed) {
+        ctx.fillStyle = "rgba(20,30,20,0.35)";
+        ctx.beginPath(); ctx.ellipse(p.x, p.hy + p.g.h * k - 2 * k, 8 * k, 2.5 * k, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.drawImage(p.g.toCanvas(k), Math.round(p.hx), Math.round(p.hy));
+      }
+      for (const [x, y, c] of Object.values(extra)) {
+        const bx = Math.round(x * k + 16 * k), by = Math.round(y * k - 30 * k);
+        ctx.fillStyle = "#2a1b11"; ctx.fillRect(bx - 1, by - 1, 12 * k + 2, 8 * k + 2);
+        ctx.fillStyle = "#8e2a22"; ctx.fillRect(bx, by, 12 * k, 8 * k);
+        ctx.fillStyle = "#ffe9b8"; ctx.font = `600 ${7 * k}px "League Five", "Pixelify Sans", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("+" + c, bx + 6 * k, by + 4 * k + 1);
+      }
+    };
+    paint();
     const water = { z: 0, draw: (c, t) => { c.imageSmoothingEnabled = false; c.drawImage(phase(Math.floor(t * 2.5) % PH), 0, 0, TW * k, TH * k); } };
     const sky = { z: 1, draw: (c, t) => {
       c.imageSmoothingEnabled = false;
       for (const cl of T.clouds) c.drawImage(cl.cv, Math.round((cloudAt(cl, t) - cl.ox) * k), Math.round((cl.y - cl.oy) * k), cl.cv.width * k, cl.cv.height * k);
     } };
     if (cv.anim) cv.anim.stop();
+    const show = () => {
+      if (cv.anim && cv.anim.draw) { cv.anim.draw(cv.anim.still); return; }
+      const c = cv.getContext("2d"); c.drawImage(base, 0, 0); water.draw(c, 0); sky.draw(c, 0); c.drawImage(over, 0, 0);
+    };
     if (window.Anim) Anim.stage(cv, base, [water, sky], { over, fps: 8, still: 0 });
-    else { const c = cv.getContext("2d"); c.drawImage(base, 0, 0); water.draw(c, 0); sky.draw(c, 0); c.drawImage(over, 0, 0); }
+    else show();
+    // the road art loads late: the whole sheet is painted again with its pins, so they stay under the names and figures
+    if (!opts.small && !window.RoadArt && (L.road_places || []).length) App.roadArt().then(() => { if (window.RoadArt && cv.isConnected) { paint(); show(); } }, () => {});
     return placed;
   }
 
@@ -776,5 +880,11 @@
     return bd < 26 * 26 ? best : null;
   }
 
-  window.Isle = { drawMap, nearestNode, project, TW, TH, tree, pine, rock, house, SURF };
+  // the found places' pins on a drawn map, in its canvas pixels: { p (league road_places row), x, y (the pin's point), cy (its head's middle) }
+  function pinsOn(cv) {
+    const k = cv._k || 2;
+    const R = window.RoadArt, px = R && R.pinPx ? R.pinPx(cv.getContext("2d"), k) : k, up = R && R.PIN ? (R.PIN.tipY - 5) * px : 3 * k;
+    return (App.L.road_places || []).map((p) => { const xy = placeXY(p); return xy && { p, x: xy[0] * k, y: xy[1] * k, cy: xy[1] * k - up }; }).filter(Boolean);
+  }
+  window.Isle = { drawMap, nearestNode, project, pinsOn, TW, TH, tree, pine, rock, house, SURF };
 })();
