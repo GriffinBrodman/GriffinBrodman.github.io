@@ -9,7 +9,7 @@
   RoadArt.fighter(u, frame)     -> Grid facing right for a fight lineup (u.ref or u.traveller = traveller id, u.member = crew member).
   RoadArt.icon(kind)            -> Grid 16x16: a place kind's daybook icon. RoadArt.KINDS lists the kinds.
   RoadArt.pin(kind)             -> Grid 11x14 map pin (RoadArt.PIN = { w, h, tipX, tipY }); RoadArt.drawPin(ctx, kind, x, y, k) draws one with
-                                   its point at (x, y), at least k px per pixel (more where the map is shown small, so a pin is ~13 css px
+                                   its point at (x, y), at least k px per pixel (more where the map is shown small, so a pin is ~9 css px
                                    wide on a phone), and returns its box { x, y, w, h, k } in canvas pixels (for tap targets);
                                    RoadArt.pinPx(ctx, k) is that pixel size: a tap target is PIN.w * pinPx by PIN.h * pinPx.
   RoadArt.spec(t)               -> the traveller spec RoadArt resolves an id, a name or an object to: { key, id, name, what, kind, members }.
@@ -741,9 +741,9 @@
   // a pin is drawn at whatever whole pixel size makes it about PIN_CSS css pixels wide where the map is shown: a phone shows the
   // 1280px map at ~375px, where k = 2 alone leaves a 6px pin; a desktop map keeps k. The shown width is read from the canvas when it
   // is laid out, else guessed from the window (the map spans the column)
-  // 13, not bigger: a league late in its run has found forty places, and fatter pins bury the town names; the tap target can be
-  // wider than the drawing
-  const PIN_CSS = 13;
+  // 10, not bigger: a league late in its run has found forty places, and on a phone a 13px pin (4 canvas px a pixel) read heavy and
+  // buried the names; 10 gives 3 a pixel there. The tap target is wider than the drawing
+  const PIN_CSS = 10;
   function pinPx(ctx, k) {
     k = k || 1;
     const cv = ctx && ctx.canvas;

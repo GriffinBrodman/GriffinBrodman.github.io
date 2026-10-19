@@ -23,16 +23,25 @@
       const r = cv.getBoundingClientRect();
       return [((ev.clientX - r.left) / r.width) * cv.width, ((ev.clientY - r.top) / r.height) * cv.height, ev.clientX - r.left, ev.clientY - r.top];
     };
-    const hit = (mx, my) => placed.find((p) => Math.abs(p.x - mx) < p.r && Math.abs(p.y - my) < p.r * 1.3);
+    // heroes are drawn over everything, so they win a tap: the topmost figure whose drawn pixels are under the finger, with a little
+    // slack on a phone; a pin peeking out beside one can still be tapped on its visible edge
+    const hit = (mx, my) => {
+      const box = cv.getBoundingClientRect().width, pad = (box < 520 ? 3 : 0) * (cv.width / box);
+      for (let i = placed.length - 1; i >= 0; i--) {
+        const p = placed[i], b = p.box;
+        if (b ? mx >= b[0] - pad && mx <= b[0] + b[2] + pad && my >= b[1] - pad && my <= b[1] + b[3] + pad : Math.abs(p.x - mx) < p.r && Math.abs(p.y - my) < p.r * 1.3) return p;
+      }
+      return null;
+    };
     // a found roadside place: its pin stands above its point on the road; a tap anywhere near it says what it is
-    const pins = window.Isle && Isle.pinsOn ? Isle.pinsOn(cv) : [];
+    let pins = window.Isle && Isle.pinsOn ? Isle.pinsOn(cv) : [];
     const pinAt = (mx, my) => {
-      const k = cv._k || 2;
+      if (window.RoadArt && !pins.art) { pins = Isle.pinsOn(cv); pins.art = true; }
       // a finger is wider than a pin: the target reaches 12 screen pixels round it, 22 on a phone
-      const box = cv.getBoundingClientRect().width, ph = ((window.RoadArt && RoadArt.PIN) || { h: 14 }).h;
+      const box = cv.getBoundingClientRect().width;
       const reach = (box < 520 ? 22 : 12) * (cv.width / box);
       let best = null, bd = reach ** 2;
-      for (const q of pins) { const d = (q.x - mx) ** 2 + (q.y - (ph / 2) * k - my) ** 2; if (d < bd) { bd = d; best = q.p; } }
+      for (const q of pins) { const d = (q.x - mx) ** 2 + ((q.cy ?? q.y) - my) ** 2; if (d < bd) { bd = d; best = q.p; } }
       return best;
     };
     const pinText = (p) => {

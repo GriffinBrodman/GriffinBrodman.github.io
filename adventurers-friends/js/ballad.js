@@ -251,6 +251,110 @@
   const DROP = [".x.", "xyx", "xyx", ".x."];
   const glyph = (rows, pal) => (window.Anim ? Anim.sprite(rows, pal) : (() => { const c = document.createElement("canvas"); c.width = rows[0].length; c.height = rows.length; pix(c.getContext("2d"), 0, 0, rows, pal); return c; })());
 
+  // ---------- the bard's instrument: the song's lead (music.js), held in both hands; music_replay.js floats the same ones ----------
+  const OL = "#160d07", WOOD = { b: "#c8823e", B: "#9a5a26", o: "#2a160a", n: "#5a3418", h: "#3a2010", s: "#f0d8a0" };
+  const INST = {
+    lute: [["...........xh", "..........xhx", ".........xnx.", "..xxxx..xnx..", ".xbbbbBxnx...", "xbbsbbbnx....", "xbboobbBx....", "xbboobbBx....", "xBbbbbBx.....", ".xBBBBx......", "..xxxx......."], WOOD],
+    fiddle: [[".xh.", ".xn.", ".xn.", "xbbx", "bbbB", "xoBx", "bbbB", "bbbB", "xBBx"], { b: "#b8562a", B: "#7a2e16", o: "#2a100a", n: "#3a1c0e", h: "#2a140a", x: OL }],
+    flute: [["xxxxxxxxxxxx", "wbobobwbbbbw", "xxxxxxxxxxxx"], { x: "#6a4a2a", w: "#e8d8b0", b: "#c8a878", o: "#2a1a0a" }],
+    horn: [["......bb", ".....bBb", "....bBb.", "ccbbBb..", "cBBbb...", "cc......"], { b: "#d8b04a", B: "#a87a22", c: "#f0d890" }],
+    bagpipes: [[".d..d...", ".d..d...", ".d..d.c.", "ttttttc.", "tTtTttt.", "tttttt..", ".tttt...", "..c....."], { d: "#3a2a1a", t: "#3a7a4a", T: "#c8463a", c: "#2a1a10" }],
+  };
+  // held to the chest the bag's two red checks read as eyes, so the stage's bag carries a lighter green check instead
+  const PIPE_BAG = { d: "#7a5432", t: "#3f8a50", T: "#8ac88a", c: "#2a1a10" };
+  // the fiddle lies along the shoulder, scroll outward: its upright rows turned a quarter clockwise
+  const turn = (rows) => [...rows[0]].map((_, i) => rows.map((r) => r[i]).reverse().join(""));
+  const instSprites = {};
+  // at the lips the flute is its bore alone, one pixel thick, so it doesn't bar the face
+  const instSprite = (k) => instSprites[k] || (instSprites[k] = k === "fiddle_side" ? Anim.sprite(turn(INST.fiddle[0]), INST.fiddle[1], OL)
+    : k === "flute" ? Anim.sprite(INST.flute[0].slice(1, 2), INST.flute[1], OL) : k === "bagpipes" ? Anim.sprite(INST.bagpipes[0], PIPE_BAG, OL) : Anim.sprite(INST[k][0], INST[k][1], OL));
+  const leadOf = (song) => (window.Music && Music.arrangement ? Music.arrangement(song).lead : "lute");
+  // a figure canvas with its hanging forearms cleared, and the sleeve and skin it had, so the arms can be redrawn holding something
+  function armless(a) {
+    const w = a.right.width, c = a.right.getContext("2d"), d = c.getImageData(0, 0, w, a.right.height).data;
+    const at = (x, y) => { const i = (y * w + x) * 4; return "#" + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, "0")).join(""); };
+    const tone = { sleeve: at(6, 21), shade: at(7, 21), skin: at(6, 24), skinD: at(7, 24) };
+    c.clearRect(5, 20, 3, 7); c.clearRect(20, 20, 3, 7);
+    const l = document.createElement("canvas"); l.width = w; l.height = a.right.height;
+    const lc = l.getContext("2d"); lc.translate(w, 0); lc.scale(-1, 1); lc.drawImage(a.right, 0, 0);
+    a.left = l;
+    return tone;
+  }
+  // an arm from the shoulder through its elbow to the hand, two pixels thick with an outline; the hand ends it
+  function limb(ctx, tone, pts) {
+    const dots = [];
+    for (let k = 1; k < pts.length; k++) {
+      const [x0, y0] = pts[k - 1], [x1, y1] = pts[k], n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+      for (let i = k === 1 ? 0 : 1; i <= n; i++) dots.push([R(x0 + ((x1 - x0) * i) / n), R(y0 + ((y1 - y0) * i) / n)]);
+    }
+    const [hx, hy] = dots[dots.length - 1];
+    ctx.fillStyle = OL;
+    for (const [x, y] of dots.slice(1)) ctx.fillRect(x - 1, y - 1, 4, 4);
+    ctx.fillStyle = tone.sleeve;
+    for (const [x, y] of dots.slice(0, -1)) ctx.fillRect(x, y, 2, 2);
+    ctx.fillStyle = tone.shade;
+    for (const [x, y] of dots.slice(0, -1)) ctx.fillRect(x + 1, y + 1, 1, 1);
+    ctx.fillStyle = tone.skin; ctx.fillRect(hx, hy, 2, 2);
+    ctx.fillStyle = tone.skinD; ctx.fillRect(hx + 1, hy + 1, 1, 1);
+  }
+  const putAt = (ctx, cv, x, y) => ctx.drawImage(cv, x - (cv.pad || 0), y - (cv.pad || 0));
+  // the instrument and the arms playing it, in the figure's own pixels (facing right; the caller mirrors it). k: 0..1 through
+  // the beat, hit: a note just sounded, n: notes so far. Returns where the music leaves the instrument
+  function playInst(ctx, lead, tone, k, hit, n, calm) {
+    const L = (pts) => limb(ctx, tone, pts), px = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
+    const swing = calm ? 0 : Math.sin(k * Math.PI * 2);
+    if (lead === "fiddle") {
+      // under the chin on the near shoulder, the scroll out front; the bow saws across the strings at the bridge
+      putAt(ctx, instSprite("fiddle_side"), 14, 15);
+      L([[20, 17], [24, 20], [22, 16]]);
+      const s = 2 + swing * 2.2, bx = 17.5, by = 16.5, dx = 0.6, dy = -0.8;
+      const hx = bx - (6 - s) * dx, hy = by - (6 - s) * dy, ex = hx + 14 * dx, ey = hy + 14 * dy;
+      const steps = 14;
+      for (let i = 0; i <= steps; i++) { const x = R(hx + ((ex - hx) * i) / steps), y = R(hy + ((ey - hy) * i) / steps); px(x, y + 1, OL); }
+      for (let i = 0; i <= steps; i++) { const x = R(hx + ((ex - hx) * i) / steps), y = R(hy + ((ey - hy) * i) / steps); px(x, y, i < 2 ? "#3a2010" : "#e8dcc0"); }
+      px(R(ex), R(ey), "#3a2010");
+      L([[6, 17], [6, 22], [R(hx) - 1, R(hy) - 1]]);
+      return [19, 13];
+    }
+    if (lead === "flute") {
+      // across the lips to the facing side, both hands on it, the fingers lifting and closing on each note
+      putAt(ctx, instSprite("flute"), 12, 12);
+      L([[6, 17], [8, 21], [14, 14]]);
+      L([[20, 17], [23, 19], [19, 14]]);
+      const shut = calm ? [1, 1, 0, 0] : [[1, 1, 0, 1], [1, 0, 1, 1], [0, 1, 1, 0], [1, 1, 1, 0]][n % 4];
+      [14, 16, 20, 22].forEach((x, i) => { if (shut[i]) px(x, 12, tone.skin); });
+      return [23, 10];
+    }
+    if (lead === "horn") {
+      // raised to the lips, bell up and out; it lifts on each held note and dips between breaths
+      const up = calm ? 1 : hit ? 2 : swing > 0.3 ? 1 : 0;
+      putAt(ctx, instSprite("horn"), 12, 8 - up);
+      L([[20, 17], [22, 18], [17, 13 - up]]);
+      L([[6, 17], [5, 21], [8, 23]]);
+      return [20, 6 - up];
+    }
+    if (lead === "bagpipes") {
+      // the bag hugged under the far arm, drones up over the shoulder, the pipe to the lips, both hands down the chanter;
+      // the elbow squeezes the bag on the beat
+      const sq = !calm && (hit || k < 0.25) ? 1 : 0;
+      L([[6, 17], [2 + sq, 19], [5, 21]]);
+      ctx.fillStyle = OL; ctx.fillRect(3, 8, 3, 6); ctx.fillRect(6, 9, 3, 5); ctx.fillRect(4, 18, 3, 8);
+      for (const [x, y0] of [[4, 9], [7, 10]]) { ctx.fillStyle = "#7a5432"; ctx.fillRect(x, y0, 1, 4); px(x, y0, "#e8d8b0"); px(x, y0 + 2, "#c8a060"); }
+      ctx.fillStyle = "#2a1a10"; ctx.fillRect(5, 19, 1, 6);
+      putAt(ctx, instSprite("bagpipes"), 3 - sq, 12 + sq);
+      for (const [x, y] of [[10, 15], [11, 14], [12, 14]]) { px(x, y + 1, OL); px(x, y, "#7a5432"); }
+      px(13, 13, "#e8d8b0");
+      L([[20, 17], [16, 22], [6, 23]]);
+      return [5, 7];
+    }
+    // the lute across the body, the far hand on the neck, the near one strumming over the rose
+    putAt(ctx, instSprite("lute"), 5, 14);
+    L([[20, 17], [21, 21], [16, 15]]);
+    const down = calm ? 0 : hit ? 2 : swing > 0 ? 1 : 0;
+    L([[6, 17], [5, 21], [9, 19 + down]]);
+    return [8, 18];
+  }
+
   // the song's own event, for the night's weather
   function eventOf(song) {
     const L = App.L || {};
@@ -296,8 +400,25 @@
     // depth is u + v, which is (y - OY) / 4 for anyone standing on the floor
     const add = (a, x, y, extra) => { const f = figure(a, x, y, extra); f.key = (y - OY) / 4; figs.push(f); return f; };
     // a crew's tavern set (music_replay.js) puts its own players on the stage in the bard's place
-    const bard = o.cast ? null : add(Tv.actor(BARD, 0, 0, { look: bardCls }), OX, OY + 12, { role: "bard", face: 1, ph: 0.1 });
-    if (bard) bard.key = 4;
+    // the bard plays the song's own lead, with nothing else in hand or slung on the back
+    const lead = o.cast ? null : leadOf(song);
+    let bard = null, tone = null;
+    if (!o.cast) {
+      const bl = Object.assign({}, bardCls, { look: Object.assign({}, bardCls.look, { offhand: "none", mark: null }) });
+      const ba = Tv.actor(Object.assign({}, BARD, { weapon: "none" }), 0, 0, { look: bl });
+      tone = armless(ba);
+      bard = add(ba, OX, OY + 12, { role: "bard", face: 1, ph: 0.1 });
+      bard.key = 4;
+      bard.extra = (ctx, t, p, f) => {
+        const img = f.img[1], X = R(f.x) - (img.width >> 1) + (p.dx || 0), Y = R(f.y) - img.height + 1 - (p.lift || 0) + (p.dip || 0);
+        const bps = cur.playing ? 2.2 : 1.5;
+        ctx.save();
+        if (p.face > 0) ctx.translate(X, Y); else { ctx.translate(X + img.width, Y); ctx.scale(-1, 1); }
+        const [ex, ey] = playInst(ctx, lead, tone, frac(t * bps / 2), performance.now() - strum < 140, strums, cur.still);
+        ctx.restore();
+        f.emit = [p.face > 0 ? X + ex : X + img.width - 1 - ex, Y + ey, Math.sign(ex - 13.5) * p.face];
+      };
+    }
     for (const c of o.cast || []) { const f = add(c.a, c.x, c.y, { role: c.role || "band", face: c.face || 1, ph: c.ph || 0 }); f.key = c.key; f.id = c.id; f.extra = c.extra; c.f = f; }
     const about = o.cast ? [] : (song.heroes || []).map((id) => H[id]).filter((h) => h && h.alive !== false).slice(0, 3);
     const SPOTS = [[OX - 26, OY + 42], [OX + 28, OY + 44], [OX - 52, OY + 50]];
@@ -323,7 +444,8 @@
 
     const notes = [0, 1].map((k) => glyph(NOTE[k], { x: k ? "#ffe8a0" : "#fff4dc" }));
     const star = glyph(STAR, { x: "#e8b84a", y: "#fff4c0" }), drop = glyph(DROP, { x: "#9ac8f0", y: "#e8f6ff" });
-    let strum = -9;
+    let strum = -9, strums = 0;
+    const cur = { playing: false, still: false };
 
     function pose(f, t, playing) {
       const bps = playing ? 2.2 : 1.5, beat = t * bps, onBeat = frac(beat) < 0.3;
@@ -357,6 +479,7 @@
       return p;
     }
     function draw(ctx, t, still, playing) {
+      cur.playing = playing; cur.still = still;
       for (const v of views) v.draw(ctx, t, still);
       const flick = 0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.08;
       Tv.flames(ctx, st, t, FIRE.v0, FIRE.v1, flick, 1, true);
@@ -372,15 +495,15 @@
       { const [x, y] = st.rwall(5.5, 28); lights.push({ x, y: y + 10, r: 30, k: 0.5, cool: true }); }
       shine(ctx, t, lights, o.ambient != null ? o.ambient : 0.42);
       if (o.over) o.over(ctx, t);
-      // the tune rising off the lute, a little faster while the song is on
+      // the tune rising off the instrument, a little faster while the song is on
       const per = playing ? 0.42 : 0.95, life = 2.6;
       for (let k = Math.floor((t - life) / per); bard && k <= Math.floor(t / per); k++) {
         const age = t - k * per - h01(k, 3) * per * 0.5;
         if (age < 0 || age > life) continue;
         const g = notes[Math.floor(h01(k, 1) * 2)], s = age / life, side = h01(k, 2) < 0.5 ? -1 : 1;
         ctx.globalAlpha = s < 0.1 ? s / 0.1 : s > 0.65 ? (1 - s) / 0.35 : 1;
-        const out = -bardFace * (side > 0 ? 1 : 0.55);
-        ctx.drawImage(g, R(bard.x - bardFace * 10 + out * (2 + age * 9) + Math.sin(age * 3 + k) * 2.5) - 3, R(bard.y - 20 - age * 13));
+        const [ex, ey, dir] = bard.emit || [bard.x - bardFace * 10, bard.y - 20, -bardFace], out = (dir || -bardFace) * (side > 0 ? 1 : 0.55);
+        ctx.drawImage(g, R(ex + out * (2 + age * 9) + Math.sin(age * 3 + k) * 2.5) - 3, R(ey - 6 - age * 13));
         ctx.globalAlpha = 1;
       }
       // the hero's side of it: a glint of pride, or a bead of sweat
@@ -391,7 +514,7 @@
         if (f.how === "shy") { const s = frac(t / 4.2 + f.ph); if (s < 0.25) ctx.drawImage(drop, R(f.x - 8 * f.toBard) - 2, R(top + 6 + s * 16)); }
       }
     }
-    return { bg, draw, strum: () => { strum = performance.now(); }, figs, st, OX, OY, look, W };
+    return { bg, draw, strum: () => { strum = performance.now(); strums++; }, figs, st, OX, OY, look, W };
   }
 
   // the Songbook's stage: a live canvas W x H; .ballad.playing(on) speeds the bard up, .ballad.strum() on each sung syllable

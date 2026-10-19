@@ -52,6 +52,16 @@
     window.addEventListener("resize", set);
   }
 
+  // hiding the grey and hooded cards is a reader's choice, kept for both tabs until they show them again
+  const HIDE_KEY = "al.placeshide";
+  function hiding() { try { return localStorage.getItem(HIDE_KEY) === "1"; } catch (e) { return false; } }
+  function hideToggle(label, redraw) {
+    const box = el("input", { type: "checkbox" });
+    box.checked = hiding();
+    box.addEventListener("change", () => { try { localStorage.setItem(HIDE_KEY, box.checked ? "1" : "0"); } catch (e) { /* storage unavailable */ } redraw(); });
+    return el("label", { class: "small pl-hide" }, box, " ", label);
+  }
+
   // ---------- places ----------
   const KIND = { inn: "Inn", shrine: "Shrine", toll: "Toll", ford: "Ford", ferry: "Ferry", milestone: "Milestone", crossroads: "Crossroads", ruin: "Ruin", waystation: "Waystation" };
   const HOUR = { inn: 18.5, waystation: 17.5, shrine: 7.5, ruin: 16, crossroads: 13, milestone: 10, ford: 11, ferry: 9, toll: 14 };
@@ -62,7 +72,9 @@
     body.appendChild(el("div", { class: "pl-count" },
       el("div", { class: "pl-count-n" }, el("b", null, D.found), ` of ${D.total} found`),
       el("div", { class: "bar pl-bar" }, el("i", { style: { width: pct + "%" } })),
-      el("div", { class: "tiny dim" }, D.found < D.total ? `${D.total - D.found} still out there. Grey cards are places nobody has found yet.` : "Every roadside place on the island has been found.")));
+      el("div", { class: "tiny dim" }, D.found < D.total ? `${D.total - D.found} still out there. Grey cards are places nobody has found yet.` : "Every roadside place on the island has been found."),
+      D.found < D.total ? hideToggle("Hide places not found yet", () => { body.innerHTML = ""; placesTab(body, D); }) : null));
+    const hide = hiding();
     const roads = new Map();
     for (const p of D.places) {
       const k = p.road.join("~");
@@ -73,9 +85,10 @@
     const grid = el("div", { class: "pl-roads" });
     for (const [, ps] of order) {
       const n = ps.filter((p) => p.found != null).length;
+      if (hide && !n) continue;
       grid.appendChild(el("section", { class: "pl-road", "data-biome": ps[0].biome },
         el("h3", { class: "pl-road-name" }, el("span", null, roadName(ps[0].road)), el("span", { class: "tiny dim" }, `${n}/${ps.length}`)),
-        ps.map((p) => (p.found != null ? placeCard(p) : unfoundCard(p)))));
+        ps.filter((p) => !hide || p.found != null).map((p) => (p.found != null ? placeCard(p) : unfoundCard(p)))));
     }
     body.appendChild(grid);
   }
@@ -150,8 +163,10 @@
     body.appendChild(el("div", { class: "pl-count" },
       el("div", { class: "pl-count-n" }, el("b", null, D.met), ` of ${D.travellers.length} met`),
       el("div", { class: "bar pl-bar" }, el("i", { style: { width: Math.round((D.met / Math.max(1, D.travellers.length)) * 100) + "%" } })),
-      el("div", { class: "tiny dim" }, "Each traveller has a story told a part at a time, to whoever they meet on the road. Hooded cards are travellers nobody has met.")));
-    body.appendChild(el("div", { class: "tr-grid" }, ts.map((t) => (t.met ? travellerCard(t) : hoodedCard(t)))));
+      el("div", { class: "tiny dim" }, "Each traveller has a story told a part at a time, to whoever they meet on the road. Hooded cards are travellers nobody has met."),
+      D.met < D.travellers.length ? hideToggle("Hide travellers nobody has met", () => { body.innerHTML = ""; travellersTab(body, D); }) : null));
+    const hide = hiding();
+    body.appendChild(el("div", { class: "tr-grid" }, ts.filter((t) => !hide || t.met).map((t) => (t.met ? travellerCard(t) : hoodedCard(t)))));
   }
 
   function travellerCard(t) {

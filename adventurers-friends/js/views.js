@@ -303,7 +303,7 @@
     const wxs = weatherStrip();
     if (wxs) parch.appendChild(wxs);
     const hb = hyperBanner();
-    if (hb) v.appendChild(hb);
+    if (hb) parch.appendChild(hb);
 
     if (meta.phase === "preseason" || !L.heroes.length) {
       parch.appendChild(el("div", { class: "lead" },
@@ -600,7 +600,7 @@
       el("p", null, el("a", { class: "btn", href: "#/roster" }, "The Roster"), " ", el("a", { class: "btn", href: "#/" }, "Back to the Crier")))); };
     if (!heroes[id]) { lost(); return; }
     v.appendChild(el("p", { class: "loading" }, "Loading hero…"));
-    return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "story"); }, lost);
+    return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "diary"); }, lost);
   });
 
   function heroPage(page, h, tab) {
@@ -657,14 +657,18 @@
         el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
     v.appendChild(head);
     const cal = dayCalendar(h);
+    let hourByHour = null;
     if (cal) {
       // folding the day away is a reader's choice that holds on every hero page until they open it again
-      let shut = false;
+      let shut = false, opening = false;
       try { shut = localStorage.getItem("al.daybook") === "closed"; } catch (e) { /* storage unavailable */ }
       const fold = el("details", { class: "daybook-fold" }, el("summary", { class: "daybook-sum" }, el("h2", null, "Hour by hour")), cal);
       fold.open = !shut;
-      fold.addEventListener("toggle", () => { try { localStorage.setItem("al.daybook", fold.open ? "open" : "closed"); } catch (e) { /* storage unavailable */ } });
-      v.appendChild(el("section", { class: "panel daybook-panel" }, fold));
+      // a diary link that unfolds the day for one look doesn't overrule the reader's choice to keep it folded
+      fold.addEventListener("toggle", () => { if (opening) { opening = false; return; } try { localStorage.setItem("al.daybook", fold.open ? "open" : "closed"); } catch (e) { /* storage unavailable */ } });
+      const sec = el("section", { class: "panel daybook-panel" }, fold);
+      v.appendChild(sec);
+      hourByHour = { days: cal.days, go: (d) => { if (!fold.open) { opening = true; fold.open = true; } cal.go(d); sec.scrollIntoView({ behavior: "smooth", block: "start" }); } };
     }
     const tro = trophyShelf(h.trophies, (h.angler || {}).legends);
     if (tro) v.appendChild(tro);
@@ -673,14 +677,14 @@
 
     const tabs = el("div", { class: "tabs" });
     const body = el("div");
-    const T = [["story", "Story"], ["diary", "Diary"], ["character", "Character"], ["people", "People"], ["record", "Record"]];
-    if (!T.some((t) => t[0] === tab)) tab = "story";
+    const T = [["diary", "Diary"], ["character", "Character"], ["people", "People"], ["record", "Record"]];
+    if (!T.some((t) => t[0] === tab)) tab = "diary";
     for (const [k, label] of T) tabs.appendChild(el("button", { class: k === tab ? "on" : "", onclick: () => history.replaceState(null, "", `#/hero/${h.id}/${k}`) || show(k) }, label));
     v.append(tabs, body);
     function show(k) {
       for (const b of tabs.children) b.classList.toggle("on", b.textContent === T.find((t) => t[0] === k)[1]);
       body.innerHTML = "";
-      ({ story: (b, x) => { if (x.alive === false) b.appendChild(dirgePanel(x)); storyTab(b, x); }, character: (b, x) => { charTab(b, x); b.appendChild(heroExtras(x)); }, diary: diaryTab, people: (b, x) => { peopleTab(b, x); b.appendChild(repPanel(x)); b.appendChild(factionRows(x)); const tm = travellersMet(x); if (tm) b.appendChild(tm); }, record: recordTab })[k](body, h);
+      ({ diary: (b, x) => { if (x.alive === false) b.appendChild(dirgePanel(x)); diaryTab(b, x, hourByHour); }, character: (b, x) => { charTab(b, x); b.appendChild(heroExtras(x)); }, people: (b, x) => { peopleTab(b, x); b.appendChild(repPanel(x)); b.appendChild(factionRows(x)); const tm = travellersMet(x); if (tm) b.appendChild(tm); }, record: recordTab })[k](body, h);
     }
     show(tab);
   }
@@ -758,10 +762,11 @@
   }
   function threadsPanel(h) {
     if (!(h.threads || []).length) return null;
-    const p = panel("Threads", el("p", { class: "small dim" }, "How one thing led to another."));
-    for (const ch of h.threads) p.appendChild(el("ol", { class: "thread" }, ch.map((e, i) => el("li", { class: i === ch.length - 1 ? "now" : "" },
+    const fold = el("details", { class: "daybook-fold" }, el("summary", { class: "daybook-sum" }, el("h2", null, `Threads (${h.threads.length})`)),
+      el("p", { class: "small dim" }, "How one thing led to another."));
+    for (const ch of h.threads) fold.appendChild(el("ol", { class: "thread" }, ch.map((e, i) => el("li", { class: i === ch.length - 1 ? "now" : "" },
       el("span", { class: "when" }, A.when(e.day)), el("div", null, A.storyLine(e))))));
-    return p;
+    return el("section", { class: "panel" }, fold);
   }
   function lettersPanel(h) {
     const ls = (h.letters || []).slice().reverse();
@@ -774,29 +779,58 @@
     if (ls.length > 1) p.appendChild(el("details", null, el("summary", { class: "small" }, `Earlier letters (${ls.length - 1})`), ...ls.slice(1).map(letter)));
     return p;
   }
-  function storyTab(b, h) {
+  // the Diary: the hero's events as the big moments and the small stuff under them, one day at a time, newest first
+  function diaryTab(b, h, hourByHour) {
     const lp = lettersPanel(h);
     if (lp) b.appendChild(lp);
     const th = threadsPanel(h);
     if (th) b.appendChild(th);
-    const list = h.events.map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
-    b.appendChild(panel(`${h.name}'s story`, A.feed(list, { dayHeaders: true, empty: "Their story hasn't started yet." })));
-  }
-  function diaryTab(b, h) {
-    const ul = el("ul", { class: "diary" });
-    let lastD = null;
+    const list = (h.events || []).map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
     const meals = {};
     for (const x of (h.table || {}).recent || []) meals[`${x.day}|${x.text}`] = x.meal;
-    for (const [d, t, ref] of h.diary.slice().reverse()) {
-      if (d !== lastD) { ul.appendChild(el("li", { class: "daydiv", style: { listStyle: "none", marginLeft: "-18px" } }, A.when(d))); lastD = d; }
-      ul.appendChild(el("li", null, A.storyLine(Object.assign({ meal: meals[`${d}|${t}`] }, ref), cap(t))));
+    const norm = (t) => String(t || "").toLowerCase().replace(/\s+/g, " ").replace(/[\s.!?'"]+$/, "").trim();
+    const told = new Set(), said = new Set();
+    for (const e of list) {
+      said.add(`${e.day}|${norm(e.text)}`);
+      for (const [k, v] of Object.entries(e)) if (typeof v === "string") told.add(`${k}:${v}`);
     }
-    b.appendChild(panel("Diary", el("p", { class: "small dim" }, "The small stuff: shifts worked, dice lost, conversations had."), ul));
+    const days = new Map();
+    const day = (d) => { if (!days.has(d)) days.set(d, { ev: [], lines: [] }); return days.get(d); };
+    for (const e of list) day(e.day).ev.push(e);
+    // a diary line an event already tells (the same record, or the same words) shows once, as the event
+    for (const [d, t, ref] of h.diary || []) {
+      if (ref && Object.entries(ref).some(([k, v]) => typeof v === "string" && told.has(`${k}:${v}`))) continue;
+      if (said.has(`${d}|${norm(t)}`)) continue;
+      day(d).lines.push([t, ref]);
+    }
+    const order = [...days.keys()].sort((x, y) => y - x);
+    let big = false;
+    try { big = localStorage.getItem("al.diarybig") === "1"; } catch (e) { /* storage unavailable */ }
+    const ul = el("ul", { class: "feed diary-feed" });
+    const draw = () => {
+      ul.replaceChildren();
+      for (const d of order) {
+        const { ev, lines } = days.get(d);
+        if (big && !ev.length) continue;
+        const hbh = hourByHour && hourByHour.days.includes(d) ? el("a", { class: "hbh", href: "javascript:void 0", onclick: () => hourByHour.go(d) }, "hour by hour ›") : null;
+        ul.appendChild(el("li", { class: "daydiv" }, el("span", null, A.when(d).replace(/^S(\d+) /, "Season $1 ")), hbh));
+        for (const e of ev) ul.appendChild(A.eventRow(e, { noDay: true }));
+        if (!big && lines.length) ul.appendChild(el("li", { class: "dl-lines" }, el("ul", { class: "diary" },
+          lines.map(([t, ref]) => el("li", null, A.storyLine(Object.assign({ meal: meals[`${d}|${t}`] }, ref), cap(t)))))));
+      }
+      if (!ul.children.length) ul.appendChild(el("li", { class: "empty" }, "Their story hasn't started yet."));
+    };
+    const box = el("input", { type: "checkbox" });
+    box.checked = big;
+    box.addEventListener("change", () => { big = box.checked; try { localStorage.setItem("al.diarybig", big ? "1" : "0"); } catch (e) { /* storage unavailable */ } draw(); });
+    draw();
+    b.appendChild(el("section", { class: "panel" },
+      el("div", { class: "diary-head" }, el("h2", null, `${h.name}'s diary`), el("label", { class: "small diary-big" }, box, " Big moments only")),
+      el("p", { class: "small dim" }, "The big moments in bold; under them, the small stuff: shifts worked, dice lost, conversations had."), ul));
   }
   function charTab(b, h) {
     if (h.alive) b.appendChild(fightCard(h));
-    if (h.kit) b.appendChild(kitPanel(h));
-    const g = el("div", { class: "grid2" });
+    const g = el("div", { class: "grid2 char-grid" });
     const left = el("div"), right = el("div");
     g.append(left, right);
     b.appendChild(g);
@@ -821,10 +855,13 @@
       h.ambition ? el("p", null, `${h.name} wants ${h.ambition}.`) : null,
       h.ambitions_done.length ? el("p", { class: "small green" }, "Achieved: " + h.ambitions_done.map((x) => x.replace(/^to /, "")).join("; ")) : null));
     left.appendChild(classTree(h));
+    if (h.kit) { const kp = kitPanel(h); kp.classList.add("char-kit"); right.appendChild(kp); }
     const om = omensPanel(h);
     if (om) right.appendChild(om);
     right.appendChild(skillsPanel(h));
     right.appendChild(gearPanel(h));
+    const pc = purseChart(h);
+    if (pc) right.appendChild(pc);
     const hob = hobbyPanel(h);
     if (hob) left.appendChild(hob);
   }
@@ -1256,8 +1293,40 @@
     }
     return p;
   }
+  // the pet and the mount stand with the people: their art, how long they've been along, what they do, and the latest of their stories
+  function companionRows(h) {
+    const all = (h.events || []).map((x) => (typeof x === "string" ? events[x] : x)).filter(Boolean).sort(byDayDesc);
+    // a whole-word match, so a pet called Bear isn't found in "Bearded"
+    const letter = (c) => !!c && /\p{L}/u.test(c);
+    const told = (name) => all.filter((e) => {
+      const t = e.text || "";
+      for (let i = t.indexOf(name); i >= 0; i = t.indexOf(name, i + 1)) if (!letter(t[i - 1]) && !letter(t[i + name.length])) return true;
+      return false;
+    });
+    const row = (art, head, sub, notes, stories) => el("div", { class: "companion" }, el("div", { class: "companion-art" }, art),
+      el("div", { class: "companion-body" }, head, el("div", { class: "tiny muted" }, sub), notes,
+        stories.length ? el("div", { class: "small companion-tale" }, A.storyLine(stories[0]), el("span", { class: "tiny dim" }, ` · ${A.when(stories[0].day)}`)) : null,
+        stories.length > 1 ? el("details", { class: "small" }, el("summary", { class: "tiny" }, `More about them (${stories.length - 1})`),
+          el("ul", { class: "diary" }, stories.slice(1, 9).map((e) => el("li", null, A.storyLine(e), el("span", { class: "tiny dim" }, ` · ${A.when(e.day)}`))))) : null));
+    const out = [];
+    const pt = h.pet;
+    if (pt) {
+      let art = null;
+      try { art = A.petSprite(pt, 3); } catch (e) { art = null; }
+      out.push(row(art, el("b", null, pt.name), `${cap(pt.kind)} · ${h.joined ? "along since " + h.name + " joined the league" : "along from the start"}`,
+        pt.sang_line ? el("div", { class: "tiny" }, `When ${h.name} sings: ${pt.sang_line.replace(/\{pet\}/g, pt.name)}`) : null, told(pt.name)));
+    }
+    const m = h.mount;
+    if (m) {
+      const status = m.lame ? el("span", { class: "red" }, ` · lame, resting ${plural(m.lame, "more day")}`) : m.hitched ? el("span", { class: "gold" }, " · pulling the crew's wagon") : null;
+      out.push(row(mountArt(m, 2), el("span", null, el("b", null, m.name), m.rare ? el("span", { class: "gold" }, " ✦ rare") : null),
+        [cap(`${m.colour} ${m.label}`), m.since > 0 ? ` · ridden since ${A.when(m.since, true)}` : "", status],
+        m.does ? el("div", { class: "tiny" }, cap(m.does) + ".") : null, told(m.name)));
+    }
+    return out.length ? el("div", { class: "companions" }, el("h3", null, "Companions"), out, el("h3", null, "People")) : null;
+  }
   function peopleTab(b, h) {
-    const p = panel("Relationships");
+    const p = panel("Relationships", companionRows(h));
     const symbols = { sweethearts: ["♥ sweethearts", "green"], "best friends": ["★ best friends", "green"], friends: ["☺ friends", "green"], rivals: ["⚔ rivals", "red"], nemeses: ["☠ nemeses", "red"] };
     if (!h.rels.length) p.appendChild(el("p", { class: "empty" }, `${h.name} hasn't really gotten to know anyone yet.`));
     for (const r of h.rels) {
@@ -1336,8 +1405,6 @@
       el("div", { class: "purse-wrap" }, svg, tip));
   }
   function recordTab(b, h) {
-    const pc = purseChart(h);
-    if (pc) b.appendChild(pc);
     const keys = [["kills", "Kills"], ["bosses", "Bosses slain"], ["fights", "Fights"], ["wins", "Wins"], ["fled", "Retreats"], ["downed", "Times downed"], ["floors", "Dungeon floors"],
       ["delves", "Delves"], ["gold_earned", "Silver earned"], ["loot_sold", "Loot sold"], ["days_worked", "Days worked"], ["travel_days", "Days on the road"], ["injuries", "Injuries"],
       ["gambled", "Silver gambled"], ["pvp_wins", "Hero fights won"], ["pvp_losses", "Hero fights lost"], ["robberies", "Robberies committed"], ["robbed", "Silver lost to robbers"], ["corpses_sold", "Bodies sold"], ["levels", "Levels gained"]];
@@ -1539,7 +1606,10 @@
     const go = (d) => (d === today ? draw(d, h.daybook) : A.load(`daybook/${h.id}/${d}`).then((db) => draw(d, db), () => draw(d, null)));
     draw(today, h.daybook);
     // the buttons sit above the day, so they don't move when a day is taller or shorter than the last
-    return el("div", null, days.length > 1 ? nav : null, huntRow, body);
+    const out = el("div", null, days.length > 1 ? nav : null, huntRow, body);
+    out.go = go;
+    out.days = days;
+    return out;
   }
   const endDot = (t) => (/[.!?'"]$/.test(t) ? t : t + ".");
   function aOrAn(x) { return (/^[aeiou]/i.test(x) ? "an " : "a ") + x; }
@@ -1982,14 +2052,110 @@
     if (L.wonder) row.appendChild(el("span", { class: "wx wonder" }, `${WONDER_NAMES[L.wonder.kind] || L.wonder.kind} over the ${L.wonder.region}`));
     return row;
   }
+  // the plague's chalked door and the tournament's crown are drawn here; a megabeast is its own monster sprite
+  const HY_INK = "#1a0c08";
+  function hyperGrid(kind) {
+    if (kind === "comet") {
+      const g = new Art.Grid(22, 22), C = ["#7a2410", "#b0401c", "#e0902e", "#f6d77a", "#fff8d8"];
+      for (let i = 0; i <= 40; i++) {
+        const t = i / 40, x = 6 + t * 14, y = 15 - t * 13, r = 2.4 * (1 - t) + 0.4;
+        const c = C[Math.max(0, 3 - Math.floor(t * 4.2))];
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (dx * dx + dy * dy <= r * r) g.set(Math.round(x + dx), Math.round(y + dy), c);
+      }
+      g.blob(5.5, 15.5, 3.6, 3.6, C);
+      g.set(4, 14, C[4]); g.set(5, 14, C[4]); g.set(4, 15, C[4]);
+      g.outline(HY_INK);
+      for (const [x, y] of [[2, 3], [16, 17], [10, 20], [1, 9]]) { g.set(x, y, C[3]); }
+      g.set(19, 9, C[4]); g.set(18, 9, C[3]); g.set(20, 9, C[3]); g.set(19, 8, C[3]); g.set(19, 10, C[3]);
+      return g;
+    }
+    if (kind === "plague") {
+      const W = 16, H = 22, g = new Art.Grid(W, H);
+      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        const ax = (x + 0.5 - W / 2) / (W / 2 - 1), ay = (y - 6) / 5;
+        if (y < 6 && ax * ax + ay * ay > 1) continue;
+        const seam = (x - 1) % 5 === 4, strap = y === 7 || y === 16;
+        g.set(x, y, strap ? "#3a3632" : seam ? "#4a2c16" : x % 5 === 1 ? "#8a5a30" : "#6a4424");
+      }
+      g.outline(HY_INK);
+      const chalk = (x, y) => { g.set(x, y, "#f2ecda"); g.set(x + 1, y, "#cfc7b0"); };
+      for (let i = 0; i <= 9; i++) { chalk(3 + i, 6 + i); chalk(12 - i, 6 + i); }
+      g.set(12, 11, "#8a8a84"); g.set(12, 12, "#2a2826"); g.set(13, 12, "#8a8a84");
+      return g;
+    }
+    const rows = [".K......K......K.", "KLK....KLK....KLK", "KYK....KYK....KYK", "KYYK..KYYYK..KYYK", "KYLYKKYYLYYKKYLYK", "KYYYYYYYYYYYYYYYK",
+      "KDDDDDDDDDDDDDDDK", "KYLYRYLYBYLYRYLYK", "KYYRRRYBBBYRRRYYK", "KYYYRYYYBYYYRYYYK", "KDDDDDDDDDDDDDDDK", ".KKKKKKKKKKKKKKK."];
+    const P = { K: HY_INK, L: "#fff1a8", Y: "#e8b83a", D: "#9a6a14", R: "#c0283a", B: "#3a6ac0" };
+    const g = new Art.Grid(17, rows.length);
+    rows.forEach((r, y) => [...r].forEach((c, x) => g.set(x, y, P[c])));
+    return g;
+  }
+  function hyperSprite(h) {
+    const m = h.kind === "megabeast" && S.monsters[h.body];
+    if (m) {
+      // cropped to the body, so the scale is set by the beast and not by the padding round it
+      const full = (f) => Art.monsterGrid(Object.assign({}, m, { boss: true }), f);
+      const g0 = full(0);
+      let x0 = g0.w, y0 = g0.h, x1 = -1, y1 = -1;
+      for (let y = 0; y < g0.h; y++) for (let x = 0; x < g0.w; x++) if (g0.get(x, y)) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      if (x1 < 0) return null;
+      const w = x1 - x0 + 3, hh = y1 - y0 + 3;
+      const fn = (f) => { const g = full(f), c = new Art.Grid(w, hh); for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) c.set(x, y, g.get(x + x0 - 1, y + y0 - 1)); return c; };
+      return A.spriteCanvas(fn, Math.max(1, Math.min(5, Math.floor(100 / Math.max(w, hh)))), "hy-px", true);
+    }
+    const g = hyperGrid(h.kind);
+    return A.spriteCanvas(() => g, h.kind === "tournament" ? 5 : 4, "hy-px");
+  }
   function hyperBanner() {
     const h = L.hyper;
     if (!h) return null;
-    const line = h.kind === "megabeast" ? `${h.name} is loose. Last seen in ${A.nodeName(h.loc, true)}. It ${h.habit}.`
-      : h.kind === "plague" ? `${cap(h.name)} is spreading: ${Object.keys(h.towns || {}).map(A.nodeName).join(", ") || "fading"}.`
-      : h.kind === "comet" ? `A star has fallen in ${A.nodeName(h.loc, true)}. Whoever reaches it first gets the star-metal.`
-      : h.kind === "tournament" ? `The Tournament of Crowns in Ironhaven, ${plural(h.left, "day")} away.` : h.name;
-    return el("section", { class: "panel hyper-banner" }, el("div", { class: "finale-kicker" }, "The great event of the season"), el("h2", null, cap(h.name)), el("p", null, line));
+    const place = (id) => el("a", { href: A.placeHref(id) }, A.nodeName(id));
+    const names = (ids) => (ids || []).filter((id) => heroes[id]).slice(0, 6).map((id, i, all) => [i ? (i === all.length - 1 ? " and " : ", ") : null, A.heroLink(id)]);
+    const counts = [];
+    const chip = (big, small) => counts.push(el("div", { class: "hy-count" }, el("b", null, big), el("span", null, small)));
+    const count = (n, what, tail) => chip(n <= 0 ? "Today:" : n === 1 ? "Tomorrow:" : `${n} days`, n <= 1 ? what : `until ${what}${tail || ""}`);
+    let tag, line;
+    if (h.kind === "megabeast") {
+      const ahead = h.ahead || [], inTown = !!S.towns[h.loc];
+      tag = "Loose";
+      line = [`${h.short} ${inTown ? "is in" : "was last seen in"} `, place(h.loc), `. It ${h.habit}.`,
+        ahead.length ? [" Heading for ", ahead.map(([t], i) => [i ? (i === ahead.length - 1 ? " and then " : ", then ") : null, place(t)]), "."] : " It has nowhere left to go."];
+      if (ahead.length && ahead[0][1] <= h.season_left) count(ahead[0][1], `it reaches ${A.nodeName(ahead[0][0])}`);
+      else if (ahead.length) line.push(` The season ends before it reaches ${A.nodeName(ahead[0][0])}.`);
+      if (inTown && h.moves_in != null) count(h.moves_in, `it leaves ${A.nodeName(h.loc)}`);
+      if (h.market) count(h.market[1], `market day in ${A.nodeName(h.market[0])}`);
+      if (h.stands) chip(String(h.stands), h.stands === 1 ? "stand against it so far" : "stands against it so far");
+      if ((h.stood || []).length) line.push([" It has met ", names(h.stood), "."]);
+    } else if (h.kind === "plague") {
+      const held = Object.entries(h.towns || {}).sort((a, b) => b[1] - a[1]);
+      tag = "Spreading";
+      line = [`${cap(h.name)} holds `, held.map(([t], i) => [i ? (i === held.length - 1 ? " and " : ", ") : null, place(t)]), ". Heroes who stay there may come down with it, and it creeps to towns nearby."];
+      for (const [t, d] of held.slice(0, 3)) count(d, `it lifts from ${A.nodeName(t)}`);
+      count(h.left, "it burns out", ", at most");
+    } else if (h.kind === "comet") {
+      tag = "Fallen";
+      line = ["It came down in ", place(h.loc), ". The first hero to reach the crater pulls out the star-metal and has it forged.",
+        (h.there || []).length ? [" At the crater now: ", names(h.there), "."] : null, (h.coming || []).length ? [" On the way: ", names(h.coming), "."] : null];
+      count(h.left, "it cools");
+      if ((h.coming || []).length) chip(String(h.coming.length), h.coming.length === 1 ? "hero on the way" : "heroes on the way");
+    } else if (h.kind === "tournament") {
+      tag = "Soon";
+      line = [place(h.town), " hosts it. The heralds will call in the league's best; the winner takes a named blade, 150 silver and a place in the songs.",
+        (h.there || []).length ? [" In town already: ", names(h.there), (h.there.length > 6 ? " and more" : ""), "."] : null];
+      count(h.left, "the first bout");
+      if ((h.there || []).length) chip(String(h.there.length), `${h.there.length === 1 ? "hero" : "heroes"} in ${A.nodeName(h.town)} already`);
+    } else line = [];
+    const today = lastDay();
+    const before = L.events.filter((e) => e.kind === "hyper" && e.day >= h.start && e.day < today);
+    return el("section", { class: `hy-strip hy-${h.kind}` },
+      el("div", { class: "hy-sprite" }, hyperSprite(h)),
+      el("div", { class: "hy-body" },
+        el("div", { class: "hy-kick" }, el("span", { class: "hy-tag" }, tag), `The great event of the season · day ${today - h.start + 1}`),
+        el("div", { class: "hy-name" }, cap(h.name)),
+        el("p", { class: "hy-line" }, line),
+        counts.length ? el("div", { class: "hy-counts" }, counts) : null,
+        before.length ? el("details", { class: "hy-sofar" }, el("summary", null, `The story so far (${before.length})`),
+          el("ul", null, before.map((e) => el("li", null, el("b", null, `Day ${e.sday || e.day}. `), A.storyLine(e))))) : null));
   }
 
   // ================= ARTIFACTS =================
