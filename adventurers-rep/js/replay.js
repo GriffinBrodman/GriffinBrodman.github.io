@@ -84,9 +84,30 @@
   const fadedPage = (v, title, why) => v.appendChild(el("section", { class: "panel faded" }, el("h2", null, title), el("p", null, why),
     el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
 
+  // the way back from a replay, above and below it: the hero's day, that day's paper, the crew and the place, as far as the record knows them
+  function backBar(o) {
+    const L = A.L, who = [...new Set((o.heroes || []).filter((id) => heroes[id]))], pinned = A.mine();
+    const hid = who.find((id) => pinned.includes(id)) || who[0], day = o.day;
+    const place = o.place && (S.towns[o.place] || S.wilds[o.place] || S.dungeons[o.place]) ? o.place : null;
+    const party = o.party && A.parties[o.party] ? o.party : null;
+    const items = [hid ? el("a", { href: A.heroDayHref(hid, day) }, `‹ ${A.poss(heroes[hid].name)} day`) : null,
+      day ? el("a", { href: day === L.meta.day ? "#/" : `#/day/${day}` }, `Day ${A.seasonOf(day)[1]} paper`) : null,
+      party ? el("a", { href: `#/party/${party}` }, A.parties[party].name) : null,
+      place ? el("a", { href: A.placeHref(place) }, A.nodeName(place)) : null].filter(Boolean);
+    if (!items.length) return null;
+    return el("div", { class: "back-bar", role: "navigation", "aria-label": "Back from this replay" }, items.map((x, i) => [i ? el("span", { class: "sep", "aria-hidden": "true" }, "·") : null, x]));
+  }
+  function backBars(v, o) {
+    const top = backBar(o);
+    if (!top) return;
+    v.prepend(top);
+    v.appendChild(backBar(o));
+  }
+  const ids = (xs) => (xs || []).map((x) => (x && typeof x === "object" ? x.id : x)).filter(Boolean);
+
   // a fight with a traveller in the line brings the road art, so they are drawn as themselves
   const withTravellers = (f) => ((f.lineup || []).some((u) => u.kind === "traveller") && !window.RoadArt ? A.roadArt(["road_art"]).then(() => f, () => f) : f);
-  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => replayPage(v, f)).catch((err) => {
+  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => { replayPage(v, f); backBars(v, { heroes: f.heroes, day: f.day, party: (f.parties || [])[0], place: f.place }); }).catch((err) => {
     if (window.console && err && err.stack && !/load/i.test(String(err))) console.error(err);
     const art = Scenes.backdrop("plains", 200, 50, Art.hash(id));
     art.className = "faded-art";
@@ -108,6 +129,7 @@
       }
       if (g.text) p.appendChild(el("p", null, g.text));
       v.appendChild(p);
+      backBars(v, { heroes: [g.lead && g.lead.id, ...ids(g.joiners), ...ids(g.onlookers)], day: g.day, party: g.anthem && g.anthem.party });
       return;
     }
     const names = (g.players || []).map((x) => (x.goblin ? x.name : A.heroLink(x.id)));
@@ -121,6 +143,7 @@
     }
     if (g.text) p.appendChild(el("p", null, g.text));
     v.appendChild(p);
+    backBars(v, { heroes: [...ids((g.players || []).filter((x) => !x.goblin)), ...ids(g.onlookers)], day: g.day });
   }).catch(() => {
     // a night whose song a hero is still writing isn't faded, only unfinished: it appears once the song is written down (round 31)
     const pending = (((window.LD && LD.league) || {}).nights_pending || []).includes(id);
@@ -151,6 +174,7 @@
     if (g.text) p.appendChild(el("p", null, g.text));
     if (dish.desc) p.appendChild(el("p", { class: "small dim" }, dish.desc));
     v.appendChild(p);
+    backBars(v, { heroes: [g.cook, g.baker, ...ids(g.eaters)], day: g.day, place: g.town || g.place });
   }).catch(() => fadedPage(v, "That meal isn't on file", "The kitchen has no record of it.")));
 
   // a fishing session: the pixel player (FishReplay) draws it when loaded, otherwise it is told in words. Catch files are never deleted,
@@ -176,6 +200,7 @@
     else if (sp.desc) p.appendChild(el("p", { class: "small dim" }, sp.desc));
     p.appendChild(el("p", { class: "small" }, el("a", { href: "#/creel" }, "The Creel Book →")));
     v.appendChild(p);
+    backBars(v, { heroes: [g.hero, ...ids(g.crew)], day: g.day, place: g.place });
   }).catch(() => fadedPage(v, "That catch isn't on file", "The anglers' book has no record of it.")));
 
   // a stretch of road worth a vignette (league/roads.py records): a meeting, a place, a scene; RoadReplay dresses it, the words below still tell it
@@ -198,6 +223,7 @@
     // not "part 3 of 3": a reader may have seen only some of the steps, which other heroes took
     if (trav && g.arc_step) p.appendChild(el("p", { class: "small dim" }, g.arc_step >= (g.arc_len || 99) ? `The end of ${trav.name}'s story on the roads.` : g.arc_step === 1 ? `Where ${trav.name}'s story on the roads begins.` : `A chapter of ${trav.name}'s story on the roads.`));
     v.appendChild(p);
+    backBars(v, { heroes: [g.lead, ...(g.heroes || [])], day: g.day });
   }).catch(() => fadedPage(v, "That stretch of road isn't on file", "Nobody wrote that part of the road down.")));
 
   // a hunt's moment worth a record (league/hunt.py, hunt: True): acted out on the wild's own ground by HuntScenes
@@ -212,6 +238,7 @@ ${A.shareUrl("#/road/" + g.id)}`, shared: "The hunt and a link copied." }); } ca
     }
     if (g.line) p.appendChild(el("p", null, A.storyText(g.line)));
     v.appendChild(p);
+    backBars(v, { heroes: g.heroes, day: g.day, place: g.wild });
   }
 
   // an hour of a hero's town day (league/town_day.py), or of a hunt day (league/hunt.py): its scene played from the day's own file
@@ -232,8 +259,8 @@ ${A.shareUrl("#/road/" + g.id)}`, shared: "The hunt and a link copied." }); } ca
 ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
     }
     if (b.line) p.appendChild(el("p", null, A.storyText(b.line), b.why ? el("span", { class: "dim" }, " " + b.why) : null));
-    p.appendChild(el("p", { class: "small" }, el("a", { href: `#/hero/${hid}` }, `‹ ${hero.name || "The hero"}'s day`)));
     v.appendChild(p);
+    backBars(v, { heroes: [hid], day: +wday, place: b.scene.town });
   }).catch(() => fadedPage(v, "That hour isn't on file", "Only the days kept in the hero's daybook can be watched.")));
 
   function huntHour(v, hid, wday, i, b) {
@@ -249,8 +276,8 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
 ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
     }
     if (b.line) p.appendChild(el("p", null, A.storyText(b.line)));
-    p.appendChild(el("p", { class: "small" }, el("a", { href: `#/hero/${hid}` }, `‹ ${hero.name || "The hero"}'s day`)));
     v.appendChild(p);
+    backBars(v, { heroes: [hid], day: +wday });
   }
 
   // a tarot reading; the pixel player (TarotReplay) draws it when loaded, otherwise the spread is told in words.
@@ -277,6 +304,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
     })));
     if (g.text) p.appendChild(el("p", null, g.text));
     v.appendChild(p);
+    backBars(v, { heroes: [g.sitter.id, g.reader.kind === "hero" ? g.reader.id : null, ...ring], day: g.day, party: crewP && crewP.id, place: g.town });
   }).catch(() => fadedPage(v, "That reading has faded", "Only a fortnight of readings is kept, and the ones that came true.")));
 
   // a sitting at a town table; the pixel player (TablesReplay) draws it when loaded, otherwise the night is told in words
@@ -292,6 +320,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
     }
     p.appendChild(el("ol", { class: "small" }, g.rounds.map((r) => el("li", null, roundWords(g.game, r)))));
     v.appendChild(p);
+    backBars(v, { heroes: [g.hero], day: g.day, place: g.town });
   }).catch(() => fadedPage(v, "That night at the tables has faded", "Only a fortnight of table nights is kept, and the ones that made the paper.")));
 
   // one round of a table sitting in words: what the pieces did, then what it paid

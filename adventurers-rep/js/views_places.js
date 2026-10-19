@@ -1,4 +1,4 @@
-/* The Places & Travellers page (#/places[/<place>], #/places/travellers[/<traveller>]): the roadside places by road, found or still to find, and the travellers met on the roads. */
+/* The Map's Roadside mode, Places & Travellers (#/places[/<place>], #/places/travellers[/<traveller>]): the roadside places by road, found or still to find, and the travellers met on the roads. */
 (function () {
   "use strict";
   const A = App;
@@ -16,8 +16,10 @@
   function page(v, D, tab, focus) {
     v.classList.add("places-page");
     v.appendChild(el("div", { class: "pl-head" },
-      el("h1", null, "Places & Travellers"),
-      el("p", { class: "small muted" }, "Everything the league has found and met out on the roads between the towns. ", el("a", { href: "#/map" }, "◂ Back to the map"))));
+      el("h1", null, "The Realm"),
+      window.MapModes ? MapModes.bar("roadside") : null,
+      el("h2", null, "Places & Travellers"),
+      el("p", { class: "small muted" }, "Everything the league has found and met out on the roads between the towns.")));
     const T = [["places", `Places · ${D.found}/${D.total}`], ["travellers", `Travellers · ${D.met}/${D.travellers.length}`]];
     const tabs = el("div", { class: "tabs pl-tabs" });
     const body = el("div");

@@ -152,6 +152,11 @@
     if (!h) return el("span", null, "someone");
     return el("a", { href: `#/hero/${id}`, class: opts && opts.cls }, h.name);
   }
+  // a hero's page opened on one day's hour by hour, while that day is kept in their daybook
+  function heroDayHref(id, day) {
+    const h = heroes[id];
+    return h && day && (day === L.meta.day || (h.daybook_days || []).includes(day)) ? `#/hero/${id}/diary/${day}` : `#/hero/${id}`;
+  }
   function partyLink(id) {
     const p = parties[id];
     return p ? el("a", { href: `#/party/${id}` }, p.name) : el("span", null, "a party");
@@ -260,8 +265,9 @@
   }
 
   // ---------- events ----------
+  // by the world day, never e.sday: a story written while a save was being upgraded carries the day before's season day (round 38)
   function dayLabel(e) {
-    return e.sday ? `S${e.season} · Day ${e.sday}` : when(e.day);
+    return when(e.day);
   }
   const SHARE_KINDS = new Set(["showdown", "pvp", "rescue", "boss_kill", "boss", "death", "evolve", "keystone", "legend", "vow_kept", "epithet", "race_won", "funeral"]);
   function shareBtn(text, hash, msg) {
@@ -289,7 +295,9 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     const jump = (movesOf[e.id] || []).filter((m) => heroes[m.hero] || parties[m.party]);
     const chips = jump.slice(0, 3).map((m) => el("span", { class: "jump", title: `${m.from ? ordinal(m.from) : "unranked"} to ${ordinal(m.to)}` },
       `${heroes[m.hero] ? heroes[m.hero].name : parties[m.party].name} +${m.gain}${m.to < m.from ? " ▲" + (m.from - m.to) : ""}`));
-    return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}` }, who,
+    const marks = opts.mark && (opts.mark instanceof Set ? opts.mark : mineSet());
+    const pinned = marks && (e.heroes || []).some((id) => marks.has(id));
+    return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}${pinned ? " pinned" : ""}` }, who,
       el("div", { class: "body" }, el("div", { class: "text" }, storyText(e.text), fightLink ? " " : "", fightLink),
         chips.length ? el("div", { class: "jumps" }, chips) : null,
         el("div", { class: "meta" }, tag ? el("span", { class: "ks-tag" }, tag) : null, tag && meta.length ? " · " : null, meta.map((x, i) => [i ? " · " : "", x]), share ? [" ", share] : null)));
@@ -306,9 +314,14 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   function feed(list, opts) {
     const ul = el("ul", { class: "feed" });
     let lastDay = null;
+    // a renown jump already rides as chips on the story that caused it, so in the same list it isn't told a second time
+    const ids = new Set(list.map((e) => e.id));
+    list = list.filter((e) => !(e.kind === "big_move" && e.cause && ids.has(e.cause) && (movesOf[e.cause] || []).length));
+    if (opts && opts.mark && !(opts.mark instanceof Set)) opts = Object.assign({}, opts, { mark: mineSet() });
     for (const e of list) {
       if (opts && opts.dayHeaders && e.day !== lastDay) {
-        ul.appendChild(el("li", { class: "daydiv" }, e.sday ? `Season ${e.season} · Day ${e.sday}` : when(e.day)));
+        const [s, d] = seasonOf(e.day);
+        ul.appendChild(el("li", { class: "daydiv" }, `Season ${s} · Day ${d}`));
         lastDay = e.day;
       }
       ul.appendChild(eventRow(e, Object.assign({ noDay: opts && opts.dayHeaders }, opts)));
@@ -378,6 +391,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   function mine() {
     try { const v = JSON.parse(localStorage.getItem("al.mine") || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch (e) { return []; }
   }
+  function mineSet() { return new Set(mine()); }
   function setMine(ids) { try { localStorage.setItem("al.mine", JSON.stringify(ids)); } catch (e) { /* storage unavailable */ } }
   function toggleMine(id) {
     const m = mine();
@@ -453,15 +467,33 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     need(hit[1].map((src) => src.replace(/^js\/|\.js$/g, ""))).then(render, (e) => console.error(e));
     return true;
   }
+  // a deep page lights the tab it belongs under; a replay keeps the tab the reader came from
+  const TAB_OF = [[/^\/(hero|roster)(\/|$)/, "/roster"], [/^\/(party|parties)(\/|$)/, "/parties"], [/^\/(map|dungeon|places)(\/|$)/, "/map"],
+    [/^\/(days?|digest)(\/|$)/, "/"], [/^\/(finale|history)(\/|$)/, "/history"], [/^\/songs(\/|$)/, "/songs"], [/^\/guide(\/|$)/, "/guide"], [/^\/(event|world)(\/|$)/, "/world"],
+    [/^\/replays(\/|$)/, "/replays"]];
+  const REPLAY = /^\/((fight|night|meal|catch|road|reading|table)\/|day\/\w*[a-z]\w*\/\d+\/\d+$)/;
+  let navTab = "/";
+  function lightNav(hash) {
+    const links = [...document.querySelectorAll("#nav a")], has = (t) => links.some((a) => a.getAttribute("href") === "#" + t);
+    let tab;
+    if (REPLAY.test(hash)) tab = navTab;
+    else if (/^\/annals/.test(hash)) tab = has("/annals") ? "/annals" : "/history";
+    else {
+      const hit = TAB_OF.find(([re]) => re.test(hash));
+      tab = hit ? hit[1] : hash === "/" ? "/" : "/" + hash.split("/")[1];
+    }
+    if (!has(tab)) tab = REPLAY.test(hash) ? "/" : tab;
+    navTab = tab;
+    for (const a of links) a.classList.toggle("on", a.getAttribute("href") === "#" + tab);
+    const more = document.getElementById("nav-more");
+    if (more) more.classList.toggle("on", links.some((a) => a.classList.contains("on") && a.closest(".nav-more-list")));
+  }
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
     if (window.Music) Music.stop();
     if (window.Sound) Sound.setPage(hash);
-    for (const a of document.querySelectorAll("#nav a")) {
-      const target = a.getAttribute("href").slice(1);
-      a.classList.toggle("on", target === "/" ? hash === "/" : hash.startsWith(target));
-    }
+    lightNav(hash);
     for (const [re, fn] of routes) {
       const m = hash.match(re);
       if (m) {
@@ -498,7 +530,16 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     if (L.annals && !document.querySelector('#nav a[href="#/annals"]')) {
       const a = document.createElement("a");
       a.href = "#/annals"; a.textContent = "Annals"; a.className = "annals-link";
-      document.getElementById("nav").insertBefore(a, document.querySelector('#nav a[href="#/guide"]'));
+      const guide = document.querySelector('#nav a[href="#/guide"]');
+      guide.parentNode.insertBefore(a, guide);
+    }
+    // the phone nav is one row of five and a "More" menu (round 38); on a desktop the menu's links sit in the row
+    const more = document.getElementById("nav-more"), nav = document.getElementById("nav");
+    if (more) {
+      const shut = () => { nav.classList.remove("more-open"); more.setAttribute("aria-expanded", "false"); };
+      more.addEventListener("click", (e) => { e.stopPropagation(); const open = nav.classList.toggle("more-open"); more.setAttribute("aria-expanded", String(open)); });
+      document.addEventListener("click", (e) => { if (!more.contains(e.target)) shut(); });
+      window.addEventListener("hashchange", shut);
     }
     const clock = document.getElementById("clock");
     if (meta.phase === "preseason") clock.innerHTML = `<b>Preseason</b> · ${plural(L.pending.length, "hero")} signed up`;
@@ -514,6 +555,6 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
     nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, HUNT_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd,
+    animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd, seasonOf, heroDayHref, mineSet,
   };
 })();

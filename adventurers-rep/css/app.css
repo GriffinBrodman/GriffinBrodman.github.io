@@ -73,6 +73,12 @@ nav a:hover { color: var(--brass2); text-decoration: none; }
 nav a.on { color: var(--brass2); background: linear-gradient(180deg, #a83428, #7a1f18); box-shadow: inset 0 0 0 1px #c8563c, 0 0 0 1px #3a0e0a;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); padding-bottom: 14px; }
 nav a.join { color: #b8e08a; }
+.nav-more-btn { display: none; background: none; border: 0; cursor: pointer; color: var(--on-wood); font-family: var(--px); text-shadow: 0 1px 0 #120a05; }
+.nav-more-btn:hover, .nav-more-btn.on { color: var(--brass2); }
+.nav-more-btn.on { background: linear-gradient(180deg, #a83428, #7a1f18); box-shadow: inset 0 0 0 1px #c8563c; }
+.nav-more-list { display: contents; }
+.nav-more-list .nav-settings { display: none; }
+@media (min-width: 601px) { nav .nav-world { order: 1; } nav .nav-songs { order: 2; } nav .nav-replays { order: 3; } nav .nav-history { order: 4; } nav .annals-link { order: 5; } nav .nav-guide { order: 6; } }
 nav a.join.on { color: #f3f0c8; background: linear-gradient(180deg, #4f7a34, #33521f); box-shadow: inset 0 0 0 1px #79a050; }
 .clock { margin-left: auto; font-family: var(--px); font-size: 14px; color: var(--on-wood); text-align: right; padding-bottom: 6px; }
 .clock b { color: var(--brass2); }
@@ -85,7 +91,8 @@ nav a.join.on { color: #f3f0c8; background: linear-gradient(180deg, #4f7a34, #33
   .brand { min-width: 6em; flex: 0 1 auto; }
   #brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   nav { flex: none; flex-wrap: nowrap; }
-  .clock { flex: 1 1 0; min-width: 8em; }
+  nav a { padding-left: 8px; padding-right: 8px; }
+  .clock { flex: 1 0 auto; min-width: 8em; white-space: nowrap; }
   .snd-wrap { flex: none; }
 }
 
@@ -494,8 +501,15 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
   .clock { order: 1; display: block; margin-left: auto; width: auto; padding: 0 78px 2px 0; font-size: 12px; }
   .clock .clock-long { display: none; }
   .clock .clock-short { display: inline; }
-  /* every section in sight on a phone: two rows of five instead of a row that scrolls off the edge */
-  nav { order: 2; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; gap: 0 2px; align-items: stretch; }
+  /* one row on a phone: five sections and a "More" menu for the rest (round 38) */
+  nav { order: 2; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; gap: 0 2px; align-items: stretch; position: relative; }
+  .nav-more-btn { display: block; padding: 4px 2px 5px; font-size: 13px; white-space: nowrap; }
+  .nav-more-list { display: none; }
+  nav.more-open .nav-more-list { display: flex; flex-direction: column; position: absolute; right: 0; top: 100%; z-index: 20; min-width: 150px;
+    background: linear-gradient(180deg, #4a301d, #2e1d12); border: 2px solid var(--brass0); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+  nav.more-open .nav-more-list a { padding: 9px 14px; font-size: 15px; text-align: left; }
+  nav .nav-more-list a.on { clip-path: none; padding-bottom: 9px; }
+  .nav-more-list .nav-settings { display: block; }
   nav a { padding: 4px 2px 5px; font-size: 13px; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; }
   nav a.on { padding-bottom: 7px; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); }
   .snd-wrap { position: absolute; right: 8px; top: 4px; padding: 0; }
@@ -852,6 +866,7 @@ table.lifetime td.live { font-style: italic; color: var(--muted); }
 .week-mast .sub { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: 15px; color: var(--muted); font-style: italic; margin-top: 4px; }
 .week-column { border-top: 1px solid #b0915e; border-bottom: 1px solid #b0915e; padding: 8px 0; margin: 8px 0 12px; }
 .week-column p { font-size: 19px; line-height: 1.3; margin: 0; }
+.week-column p + p { margin-top: 8px; }
 .week-awards { margin-bottom: 4px; align-items: start; }
 .week-awards .hcard, .week-awards > div > .panel { margin-bottom: 0; }
 .week-note { margin: 4px 0 10px; }
@@ -975,3 +990,54 @@ table.lifetime td.live { font-style: italic; color: var(--muted); }
 .crew-mount .mount-art { flex: 0 0 auto; }
 
 .pl-hide { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; cursor: pointer; }
+
+/* round 38: ways back, the week strip, back issues with headlines, pinned heroes first */
+.week-strip { margin-top: 4px; font-size: 14px; color: var(--muted); letter-spacing: 0.2px; line-height: 1.3; }
+.week-strip a { white-space: nowrap; }
+.back-bar { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; font-size: 15px; margin: 0 0 10px; color: var(--dim); }
+.back-bar:last-child { margin: 10px 0 0; }
+.back-bar a { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.back-bar a:nth-of-type(-n+2) { flex-shrink: 0; }
+.back-bar .sep { flex: none; }
+.issue-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.issue-list li { border-bottom: 1px dashed rgba(138, 106, 66, 0.5); }
+.issue-list li:last-child { border-bottom: 0; }
+.issue-row { display: flex; gap: 8px; align-items: baseline; padding: 5px 2px; color: var(--ink); }
+.issue-row:hover { text-decoration: none; background: rgba(255, 250, 235, 0.45); }
+.issue-row:hover .issue-hl { text-decoration: underline; }
+.issue-day { flex: 0 0 4.2em; font-family: var(--px); font-size: 13px; color: var(--crimson); }
+.issue-hl { flex: 1; min-width: 0; font-size: 16px; line-height: 1.25; }
+.issue-mark { flex: none; font-family: var(--px); font-size: 11px; padding: 0 4px; border: 1px solid var(--edge2); color: var(--muted); white-space: nowrap; }
+.issue-mark.week { color: var(--green); border-color: var(--green); }
+.issue-mark.finale, .issue-mark.great { color: var(--gold); border-color: var(--gold2); }
+.ev.pinned { background-color: rgba(63, 106, 44, 0.07); box-shadow: inset 3px 0 0 rgba(63, 106, 44, 0.55); padding-left: 8px; }
+.pick-row { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; margin: -4px 0 10px; padding: 0 0 8px; border-bottom: 1px solid var(--edge2); font-size: 15px; }
+.pick-ask { font-size: 15px; }
+.pick-chips { display: flex; gap: 4px; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; order: 3; }
+.pick-chip { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 7px 1px 2px; background: var(--parch); border: 1px solid var(--edge); font-family: var(--body); font-size: 15px; color: var(--ink); cursor: pointer; }
+.pick-chip[hidden] { display: none; }
+.pick-chip:hover, .pick-chip:focus-visible { border-color: var(--crimson); background: #fbf1d6; }
+.pick-chip.me { border-color: var(--green); }
+.pick-chip canvas.mini { width: 20px; height: 20px; }
+input[type=text].pick-find { width: 7.5em; font-size: 15px; padding: 2px 6px; }
+.pick-skip { margin-left: auto; background: none; border: 0; padding: 2px 0; font-family: var(--body); font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; box-shadow: none; }
+.pick-skip:hover { color: var(--crimson); }
+.rank-now { margin-top: 2px; }
+.caught-up { margin: 6px 0 0; }
+.also-yours { margin-top: 4px; }
+.also-yours h3 { font-size: 17px; margin: 4px 0 2px; }
+.since-visit h3 { margin: 0; }
+.since-list { margin: 4px 0 0; }
+.since-list .since-day { font-family: var(--px); font-size: 12px; color: var(--crimson); white-space: nowrap; }
+.hero-now { display: flex; flex-direction: column; gap: 4px; }
+.hero-replays { margin: -8px 0 12px; }
+.hero-about { display: flex; flex-direction: column; gap: 4px; }
+.pc-members { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 6px 0 4px; }
+.pc-mem { display: flex; flex-direction: column; align-items: center; min-width: 48px; max-width: 72px; line-height: 1.1; text-align: center; }
+.pc-mem .tiny { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-mem canvas.portrait-px.grp { margin-left: 0; }
+.pc-goal { margin: 2px 0 4px; }
+.pc-goal.met b { color: var(--green); }
+.pc-goal.missed { opacity: 0.75; }
+.hy-more { margin: 4px 0 0; font-size: 15px; }
+.hy-name a { color: inherit; }

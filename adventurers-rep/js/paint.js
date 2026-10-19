@@ -256,13 +256,13 @@
   const CROWNS = new Set(["flame_crown", "ice_crown", "leaf_crown", "elemental_crown", "storm_crown"]);
   const FINE = new Set(["rune_crown", "star_orbit", "spectacles", "domino", "veil", "triad", "raincloud", "goggles", "warpaint", "rose", "claw_scars", "eyepatch", "thundercloud", "spirits"]);
   const BODY_MARKS = new Set(["ward_sigil", "pendulum", "trap_belt", "rope_coil", "spellhand", "whip", "trophy_cord", "hunting_horn", "wanted_poster", "satchel", "mortar", "poison_vial", "ladle",
-    "tabard", "pauldrons", "spare_blades", "slung_lute", "wolf_mantle", "bedroll", "stag_trophy", "trail_scarf"]);
+    "tabard", "pauldrons", "spare_blades", "slung_lute", "wolf_mantle", "bedroll", "stag_trophy", "trail_scarf", "woad"]);
   // body marks carried on the back are drawn behind the figure first (part "back"); a tabard goes over the armour, under the arms
   const BEHIND = new Set(["spare_blades", "slung_lute", "stag_trophy"]);
   const MARKS = new Set(["halo", "antlers", ...CROWNS, ...FINE, ...BODY_MARKS]);
   const OUTFIT_MAT = { robe: "cloth", robe_dark: "cloth", vestments: "cloth", fancy: "cloth", vest: "cloth", motley: "cloth", leather: "leather", fur: "leather", cloak: "leather", chain: "chain", plate: "plate", plate_dark: "plate" };
   const BASE = { robe: "robe", robe_dark: "robed", vestments: "shirt", fancy: "robe", vest: "shirt", motley: "robe", leather: "hide", fur: "hide", cloak: "cloth", chain: "metal", plate: "metal" };
-  const COVERS = new Set(["great_helm", "skull_helm", "hood", "skull_hood", "beast_hood", "helm", "top_hat", "mitre", "tricorn", "bandana", "feather_cap", "leather_cap", "fur_cap"]);
+  const COVERS = new Set(["great_helm", "skull_helm", "hood", "skull_hood", "beast_hood", "helm", "top_hat", "mitre", "tricorn", "bandana", "feather_cap", "leather_cap", "fur_cap", "slouch_hat"]);
   const HAIRY = new Set(["helm", "bandana", "feather_cap", "leather_cap", "fur_cap"]);
   const FULL = new Set(["great_helm", "skull_helm"]);
   const HOODS = new Set(["hood", "skull_hood", "beast_hood"]);
@@ -270,7 +270,7 @@
   const FRINGE_LOCKS = new Set([1, 5, 6, 8, 9, 16, 17, 20]);
   // where a crown sits on top of each kind of headgear (portrait space)
   const CROWN_Y = { none: 10, hood: 7.2, skull_hood: 7.2, beast_hood: 7.2, leather_cap: 8.2, helm: 7.2, horns: 8.6, great_helm: 6.6, skull_helm: 6.6, wizard_hat: 9.4,
-    mitre: 10.4, wide_hat: 7.6, top_hat: 6.8, tricorn: 8.2, bandana: 8.6, feather_cap: 8.2, circlet: 10.6, crown: 10.6, mask: 10, fur_cap: 7.4, herb_wreath: 10 };
+    mitre: 10.4, wide_hat: 7.6, top_hat: 6.8, tricorn: 8.2, bandana: 8.6, feather_cap: 8.2, circlet: 10.6, crown: 10.6, mask: 10, fur_cap: 7.4, herb_wreath: 10, slouch_hat: 7.2 };
   // players picked these colours in the quiz, so the hue stays; only the loudest saturation is reined in toward the earthy palette
   const softCache = {};
   function soften(hex) {
@@ -281,7 +281,7 @@
   // faces and hair are drawn in flat ramps; dither is for cloth and backdrops
   const FLAT = new Set(["skin", "hair", "lip", "stub", "hd"]);
   const HEAD_TOP = { none: 5.5, hood: 5.5, skull_hood: 5.5, beast_hood: 3, leather_cap: 5.5, helm: 4.5, great_helm: 4.5, skull_helm: 4.5, horns: 4.5, wizard_hat: -1,
-    mitre: -1, wide_hat: 2.5, top_hat: 0, tricorn: 4, bandana: 6, feather_cap: 6, circlet: 5, crown: 5, mask: 5.5, fur_cap: 5, herb_wreath: 5 };
+    mitre: -1, wide_hat: 2.5, top_hat: 0, tricorn: 4, bandana: 6, feather_cap: 6, circlet: 5, crown: 5, mask: 5.5, fur_cap: 5, herb_wreath: 5, slouch_hat: 0.5 };
   const tierOf = (x, d) => Math.max(0, Math.min(3, x && x.tier != null ? x.tier : x && x.glow ? 3 : d));
 
   function kitView(h, cl) {
@@ -316,6 +316,7 @@
     wizard_hat: (t, f) => ["#7a6044", f, f, mix(f, "#1a1630", 0.3)][t],
     wide_hat: (t) => ["#d8b45a", "#7a5034", "#6a4a30", "#3a3444"][t],
     top_hat: (t) => ["#5e4c40", "#4a4656", "#3a3644", "#2e2a36"][t],
+    slouch_hat: (t) => ["#7a6450", "#5e3230", "#4e2a2c", "#2e2630"][t],
     tricorn: (t) => ["#6a4e34", "#3a3444", "#2e2a3a", "#26263a"][t],
     bandana: (t, f) => ["#8a7a64", f, f, "#8e3a3e"][t],
     feather_cap: (t, f) => ["#6a5a48", mix(f, "#1a1622", 0.45), mix(f, "#1a1622", 0.3), mix(f, "#1a1622", 0.15)][t],
@@ -350,7 +351,7 @@
       robe: ramp(cloth), robed: ramp(mix(cloth, "#1a1622", 0.45)), shirt: ramp(at === 1 ? "#cdc2aa" : "#e4dac4"), hide: ramp(LEATHER[at]),
       patch: ramp(k.mat === "leather" ? "#a8845a" : mix(fav, "#d8c8a0", 0.55)),
       hd: ramp(["circlet", "crown", "mask"].includes(k.head) ? head : soften(head)), pale: ramp("#b4844e"), hmet: ramp(TMETAL[ht]), omet: ramp(TMETAL[ot]), bk: ramp(back), silver: ramp("#c4cad4"), copper: ramp("#b87440"),
-      mana: ramp("#3ab8b8"), illus: ramp("#e07aa8"), mint: ramp("#8ad8c4"), brass: ramp("#c8963a"), cloud: ramp("#a4aebc"), warp: ramp("#b4302a"),
+      mana: ramp("#3ab8b8"), illus: ramp("#e07aa8"), mint: ramp("#8ad8c4"), brass: ramp("#c8963a"), cloud: ramp("#a4aebc"), warp: ramp("#b4302a"), woad: ramp("#3a62a8"),
       rosec: ramp("#c82a44"), rope: ramp("#c4a26a"),
       parch: ramp("#e0cea0"), stone: ramp("#8e887c"), tox: ramp("#86cc4a"), herb: ramp("#58784a"), sage: ramp("#8e9e6a"), lav: ramp("#8e7ab8"), berry: ramp("#a8303a"),
       scarp: ramp("#e4a8a0"), fox: ramp("#b0643a"), storm: ramp("#5c6478"), ghost: ramp("#bfe8cc"), blanket: ramp("#8e4a3a"),
@@ -773,6 +774,35 @@
         for (const d of [0, sp ? 1 : 1.4]) P.ell(x0 + d * 0.4, y0 + d * 0.6, rx, ry, "rope", { s: 0.25 - d * 0.25, fn: (x, y, s, nx, ny) => (nx * nx + ny * ny < 0.35 ? false : s + ((x + y) % 2 ? 0.25 : -0.2)) });
         if (sp) { P.px(18, 25, "dwood", 0.3); P.px(18, 26, "dwood", 0); P.px(23, 30, "rope", -0.2); P.px(23, 31, "rope", -0.3); P.px(24, 32, "rope", -0.4); }
         else { P.line(12, 31.5, 9.5, 28.5, "dwood", 0.3, 0.7); P.px(9, 28, "gold", 0.4); P.line(6, 38, 4, 41, "rope", -0.3); }
+        break;
+      }
+      case "woad": {
+        // blue war paint on the face and the bare arms (the clothes stay on: owner, 2026-10-19); anything worn over the skin hides it
+        const at = (x, y) => { const [X, Y] = P.tf ? P.T(x + 0.5, y + 0.5) : [x + 0.5, y + 0.5]; return P.matAt(Math.floor(X), Math.floor(Y)); };
+        const paint = (pts, s) => { for (const [x, y, d] of pts) if (at(x, y) === "skin") P.px(x, y, "woad", s + (d || 0)); };
+        if (sp) {
+          // the near half of the face, ragged at the nose and the jaw
+          const half = [];
+          for (const [y, x0, x1] of [[8, 10, 12], [9, 10, 13], [10, 10, 13], [11, 10, 14], [12, 10, 12], [13, 11, 11]]) for (let x = x0; x <= x1; x++) half.push([x, y, 0.3 - (x - 10) * 0.12 - (y - 8) * 0.06]);
+          paint(half, 0);
+          paint([[6, 19, 0.3], [7, 19], [20, 19, -0.1], [21, 19, -0.3], [6, 21, 0.1], [7, 21, -0.2]], 0);
+          for (const x of [12, 15]) { const m = at(x, 10); if (m && m[0] === "#" && (at(x - 1, 10) === "woad" || at(x + 1, 10) === "woad")) P.px(x, 10, "#f2e6cc"); }
+          // the war cry: the mouth thrown open
+          for (const [x, y] of [[13, 13], [14, 13], [13, 14], [14, 14]]) if (["skin", "lip", "stub"].includes(at(x, y))) P.px(x, y, y === 13 ? "#3a1a1c" : "#2a1216");
+        } else {
+          const cx = c.cx;
+          const half = [];
+          for (let y = 12; y <= 25; y++) for (let x = cx - 9; x <= cx; x++) {
+            const edge = cx - 1 + ((y * 7) % 3 === 0 ? 1 : 0) - (y > 20 ? 1 : 0), foot = 21 + ((x * 5) % 4 === 0 ? 3 : (x * 3) % 4 === 1 ? 1 : 0);
+            if (x <= edge && y <= foot) half.push([x, y, 0.3 - (x - cx + 9) * 0.05 - (y - 12) * 0.03]);
+          }
+          paint(half, 0);
+          // the war cry: the mouth thrown open on a row of teeth
+          for (let y = 21; y <= 24; y++) for (let x = cx - 2; x <= cx + 1; x++) {
+            if (!["skin", "lip", "stub", "woad"].includes(at(x, y)) || ((y === 21 || y === 24) && (x === cx - 2 || x === cx + 1))) continue;
+            P.px(x, y, y === 21 ? "#ece4d0" : y === 24 ? "lip" : "#2a1216", y === 24 ? -0.4 : 0);
+          }
+        }
         break;
       }
       case "trophy_cord":
@@ -1752,6 +1782,24 @@
         P.ell(cx, 10, fw + [2, 3, 4.2, 5.4][t], 1.8, "hd", { s: -0.1 });
         break;
       }
+      case "slouch_hat": {
+        // a fence's hat: a soft crown, the brim pinned up on one side by a brooch and drooping on the other, a plume swept back over it
+        const reach = fw + [5, 6, 6.5, 7][t];
+        P.ell(cx + 0.5, 7.6, 5.4, 4.2, "hd", { s: 0.1, fn: (x, y, s) => (y > 10 ? false : s - (x - cx) * 0.05 + (Math.abs(x + 0.5 - cx) < 1 && y < 5 ? -0.4 : 0) + (t === 0 && (x + y) % 3 === 0 ? -0.3 : 0)) });
+        P.rect(cx - 4.5, 8.4, 10, 1.6, t === 0 ? "hd" : t === 3 ? "gold" : "fav", t === 0 ? -0.4 : 0.05);
+        P.poly([[cx - 4, 10.2], [cx + reach - 1, 9.4], [cx + reach + 0.8, 12.8], [cx + reach - 2.5, 12.4], [cx - 1, 11.8], [cx - 4, 11.8]], "hd", (x, y) => -0.05 - (x - cx) * 0.03 + (y > 11.5 ? -0.3 : 0));
+        P.poly([[cx - 3, 11.8], [cx - fw - 3, 11.4], [cx - fw - 5, 2.6], [cx - fw - 2.6, 1.4], [cx - 4.6, 6], [cx - 3, 9.6]], "hd", (x, y) => (x < cx - fw - 3 ? 0.5 : -0.3) - (y - 2) * 0.02);
+        if (t >= 1) {
+          const tip = [[cx + 5, 3], [cx + 10.5, 5.5], [cx + 12, 9]][Math.min(2, t - 1)], pts = [], bx = cx - fw - 2.8;
+          for (let i = 0; i <= 10; i++) { const q = i / 10; pts.push([bx + (tip[0] - bx) * q, 4.6 - Math.sin(q * 2.8) * (t === 1 ? 2 : 3) + (tip[1] - 4.6) * q * q]); }
+          const plume = "feather";
+          P.tube(pts, t === 1 ? 1.1 : 1.6, t === 1 ? 1.5 : 2.3, plume, 0.3);
+          if (t >= 2) for (let i = 3; i < 10; i += 2) P.px(pts[i][0], pts[i][1] + 1.4, plume, -0.2);
+        }
+        P.ell(cx - fw - 2.8, 5, 1.3, 1.3, t === 0 ? "dleather" : t === 1 ? "metal" : "gold", { s: 0.35 });
+        if (t === 3) P.px(cx - fw - 3, 5, "crim", 0.5);
+        break;
+      }
       case "tricorn": {
         const wv = [3, 4, 5, 5][t];
         P.poly([[cx - fw - wv, 10], [cx, 4], [cx + fw + wv, 10], [cx, 12]], "hd", (x, y) => 0.1 - (x - cx) * 0.05);
@@ -1878,7 +1926,7 @@
     }
     if (c.hglow) {
       const spot = { helm: [cx, 13], great_helm: [cx, 14], skull_helm: [cx, 9], hood: [cx, 30], skull_hood: [cx, 9], beast_hood: [cx - 3, 8], wizard_hat: [cx, 8], mitre: [cx, 4], wide_hat: [cx, 8],
-        top_hat: [cx, 7], tricorn: [cx + 3, 8], circlet: [cx, 12], crown: [cx, 6], mask: [cx, 14], bandana: [cx, 10], feather_cap: [cx, 10], leather_cap: [cx, 13], horns: [cx, 13], fur_cap: [cx, 12], herb_wreath: [cx, 11] }[head];
+        top_hat: [cx, 7], tricorn: [cx + 3, 8], circlet: [cx, 12], crown: [cx, 6], mask: [cx, 14], bandana: [cx, 10], feather_cap: [cx, 10], leather_cap: [cx, 13], horns: [cx, 13], fur_cap: [cx, 12], herb_wreath: [cx, 11], slouch_hat: [cx - 5, 7] }[head];
       if (spot) { P.px(spot[0], spot[1], c.hglow); P.px(spot[0] - 1, spot[1], mix(c.hglow, "#ffffff", 0.5)); }
     }
   }
