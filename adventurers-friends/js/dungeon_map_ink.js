@@ -349,6 +349,8 @@
     if (G.wide) {
       const crews = [];
       for (const v of st.inked.values()) if (!crews.includes(v.crew)) crews.push(v.crew);
+      // a crew sleeping on this floor tonight is on the legend too, even before its rooms are inked
+      for (const pin of st.crews || []) if (!crews.includes(pin.crew)) crews.push(pin.crew);
       let ly = ny + 30;
       for (const crew of crews.slice(0, 4)) {
         const A = window.App || {}, hero = (A.heroes || {})[crew];
@@ -364,9 +366,13 @@
     const onPaper = (notes || []).filter((n) => roomCls.get(key(n.room)) === 1);
     const texts = [];
     const placed = G.wide && onPaper.length ? margins(S, G, onPaper, occ, block, texts) : [];
+    // crews sharing a room for the night stand their pennants side by side, not one hidden under the other
+    const shared = {};
     for (const pin of st.crews || []) {
       const b = G.byN[key(pin.n)];
-      if (b) crewPin(S, Math.round(b.x0 + b.w - 5), Math.round(b.y0 + 4), pin.crew);
+      if (!b) continue;
+      const k = key(pin.n), i = (shared[k] = (shared[k] || 0) + 1) - 1;
+      crewPin(S, Math.round(b.x0 + b.w - 5 - i * 13), Math.round(b.y0 + 4), pin.crew);
     }
     for (const [x, y] of [[SX + 2, SY + 2], [SX + SW - 5, SY + 2], [SX + 2, SY + SH - 5], [SX + SW - 5, SY + SH - 5]]) tack(S, x, y);
     S.canvas(cv);
