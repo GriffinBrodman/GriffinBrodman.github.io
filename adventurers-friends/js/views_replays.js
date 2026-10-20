@@ -8,6 +8,8 @@
   const PAGE = 60;
   const week = (r) => `${r.s}-${Math.ceil((r.sd || 1) / 7)}`;
 
+  // the whole day as one film lives at #/echo (views_echo.js); the old address still gets there
+  A.route(/^\/replays\/day(?:\/(\d+))?(?:\?.*)?$/, (v, d) => { location.replace(`#/echo${d ? "/" + d : ""}`); });
   A.route(/^\/replays(?:\/(\w+))?(?:\?(.*))?$/, (v, hid, query) => {
     v.appendChild(el("p", { class: "loading" }, "Fetching the reels…"));
     return A.load("replays").then((D) => {
@@ -20,7 +22,8 @@
   function page(v, all, hid, f) {
     const h = hid && heroes[hid];
     v.classList.add("rp-page");
-    v.appendChild(el("h1", null, h ? `${h.name}'s replays` : "Replays"));
+    v.appendChild(el("div", { class: "rp-head" }, el("h1", null, h ? `${h.name}'s replays` : "Replays"),
+      el("a", { class: "btn primary rp-echo", href: "#/echo", title: "Everyone's day at once, dawn to night" }, "▶ The Daily Echo")));
     v.appendChild(el("p", { class: "small muted" }, h ? [A.heroLink(hid), ` has ${plural(all.filter((r) => (r.h || []).includes(hid)).length, "replay")} on file. `, el("a", { href: "#/replays" }, "Everyone's replays ▸")]
       : `Every fight, camp night, meal, catch, reading, road scene and table the league has kept: ${all.length} in all.`));
     const pick = el("select", { class: "rp-who", "aria-label": "Whose replays" }, el("option", { value: "" }, "Every hero"),

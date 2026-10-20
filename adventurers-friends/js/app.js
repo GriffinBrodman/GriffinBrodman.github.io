@@ -373,7 +373,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // a story vignette: a song is staged on the ballad stage, a dungeon framed from its own header; anything else draws now
   function vignette(e, W, H, cls) {
     const make = () => { const c = Scenes.vignette(e, W, H); if (cls) c.className = cls; return c; };
-    const names = e.kind === "song" && S.towns[e.loc] ? ["town_scenes", "wild_scenes", "tavern", "music", "ballad"] : S.dungeons[e.loc] ? PLACES : null;
+    const names = e.kind === "song" && S.towns[e.loc] ? ["town_scenes", "wild_scenes", "tavern", "music", "ballad"] : S.dungeons[e.loc] ? PLACES
+      : e.kind === "mount" ? ["mount_art"] : null;
     return names ? later(names, make) : make();
   }
   // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
