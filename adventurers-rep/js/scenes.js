@@ -514,6 +514,13 @@
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(mx + 3, ground - 1, g.w - 6, 2);
         sprite(g, Art.monsterGrid(mm, 1).flipX(), mx, my, i + 5);
       });
+    } else if (e.kind === "mount" && hs[0] && hs[0].mount && window.MountArt) {
+      // the horse the story is about stands beside its rider
+      const m = hs[0].mount, g0 = MountArt.mountGrid(m.kind, m.colour, 0, true), g1 = MountArt.mountGrid(m.kind, m.colour, 1, true);
+      const mx = startX + 30, my = ground - g0.height;
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(mx + 4, ground - 1, g0.width - 8, 2);
+      if (A) actors.push(A.flip({ a: g0, b: g1, x: mx, y: my, z: 5e3, rate: 0.8, seed: 9, front: true }));
+      else ctx.drawImage(g0, mx, my);
     } else if (e.kind === "party_formed" || e.kind === "party_join") {
       const p = App.parties[(e.parties || [])[0]];
       if (p) prop(Art.bannerGrid(p.banner), px, ground - 20);
