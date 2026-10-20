@@ -11,7 +11,7 @@
   function modes(on) {
     const found = (L.road_places || []).length;
     return el("nav", { class: "tabs map-modes", "aria-label": "Map modes" },
-      [["towns", "Towns", "#/map"], ["dungeons", "Dungeons", "#/map/dungeons"], ["roadside", `Roadside${found ? " · " + found : ""}`, "#/places"]].map(([k, label, href]) =>
+      [["towns", "Towns", "#/map"], ["dungeons", "Dungeons", "#/map/dungeons"], ["tonight", "Tonight", "#/map/tonight"], ["roadside", `Roadside${found ? " · " + found : ""}`, "#/places"]].map(([k, label, href]) =>
         el("a", { class: k === on ? "on" : "", href, "aria-current": k === on ? "page" : null }, label)));
   }
   window.MapModes = { bar: modes, eventLine: (id) => eventLine(id), realm: (v) => realm(v, "dungeons", null), dungeonsTable: () => dungeonsTable() };
@@ -19,6 +19,7 @@
   A.route(/^\/map(?:\/(\w+))?$/, (v, sel) => {
     if (sel === "roadside") { location.replace("#/places"); return; }
     if (S.dungeons[sel]) { location.replace(`#/dungeon/${sel}`); return; }
+    if (sel === "tonight") { realm(v, "tonight", null); v.appendChild(tonightList()); return; }
     const mode = sel === "dungeons" ? "dungeons" : "towns";
     if (sel === "dungeons" || sel === "towns") sel = null;
     // Dungeons mode has no picked-place panel: a tap on a dungeon opens its page, and the table of every dungeon sits under the island
@@ -27,6 +28,30 @@
     v.appendChild(mode === "dungeons" ? dungeonsTable() : townsList());
     if (side) showNode(side, sel && (S.towns[sel] || S.wilds[sel]) ? sel : mostPopulated());
   });
+  // where everyone sleeps tonight, place by place: the inns and rooms of each town, the camps by the road and in the wilds, the camps at a
+  // lair's door, and the rooms below ground (each a link to the dungeon page, where the room is marked)
+  function tonightList() {
+    const p = panel("Where everyone sleeps tonight");
+    const hs = L.heroes.filter((h) => h.alive && h.sleep);
+    if (!hs.length) { p.appendChild(el("p", { class: "empty" }, "Nobody has made camp anywhere yet.")); return p; }
+    const groups = new Map();
+    for (const h of hs) {
+      const k = h.sleep.place;
+      if (!groups.has(k)) groups.set(k, { s: h.sleep, loc: h.loc, hs: [] });
+      groups.get(k).hs.push(h);
+    }
+    const rank = (s) => (s.setting === "dungeon" ? 3 : s.gate ? 2 : s.town_id ? 0 : 1);
+    const order = [...groups.values()].sort((a, b) => rank(a.s) - rank(b.s) || a.s.place.localeCompare(b.s.place));
+    const head = { 0: "In town", 1: "Out on the roads and in the wilds", 2: "At a lair's door", 3: "Below ground" };
+    let last = -1;
+    for (const g of order) {
+      const r = rank(g.s);
+      if (r !== last) { p.appendChild(el("h3", null, head[r])); last = r; }
+      const where = r === 3 && S.dungeons[g.loc] ? el("a", { href: `#/dungeon/${g.loc}` }, g.s.place) : g.s.town_id ? el("a", { href: `#/map/${g.s.town_id}` }, g.s.place) : el("span", null, g.s.place);
+      p.appendChild(el("p", { class: "small" }, el("b", null, where), ": ", g.hs.map((h, i) => [i ? ", " : "", A.heroLink(h.id)])));
+    }
+    return p;
+  }
   function realm(v, mode, side) {
     v.appendChild(el("h1", null, "The Realm"));
     v.appendChild(modes(mode));
@@ -38,7 +63,7 @@
     const found = (L.road_places || []).length;
     g.append(el("div", null, wrap, el("p", { class: "small dim" }, "Tap a place to see who's there. Tap a hero to visit them.", found ? " Tap a pin to open that roadside place." : "")), side || "");
     v.appendChild(g);
-    let placed = Scenes.drawMap(cv, { scale: 3 });
+    let placed = Scenes.drawMap(cv, { scale: 3, tonight: mode === "tonight" });
     const toMap = (ev) => {
       const r = cv.getBoundingClientRect();
       return [((ev.clientX - r.left) / r.width) * cv.width, ((ev.clientY - r.top) / r.height) * cv.height, ev.clientX - r.left, ev.clientY - r.top];

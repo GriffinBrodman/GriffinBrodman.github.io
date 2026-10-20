@@ -687,6 +687,10 @@
     snow: { pal: { s: "#f4fbff", S: "#a8d0ec" }, rows: ["...s...", ".s.s.s.", "..sss..", "sssSsss", "..sss..", ".s.s.s.", "...s..."] },
     heat: { pal: { r: "#e8502a", y: "#ffb030", Y: "#fff0a0" }, rows: ["..r..", ".rr..", ".rrr.", "rryrr", "ryyyr", "ryYyr", ".rrr."] },
     comet: { pal: { c: "#a8c8e8", y: "#ffd84a", Y: "#fff6d0" }, rows: ["......yy.", "...c.yYYy", ".cc.yYYYy", "cc..yYYy.", ".....yy.."] },
+    // where heroes sleep tonight (the Tonight view): a campfire by the road or in the wilds, a tent at a lair's door, a lantern below ground
+    fire: { line: true, pal: { r: "#e8502a", y: "#ffb030", Y: "#fff0a0", b: "#6a4428" }, rows: ["...r...", "..ryr..", ".ryYyr.", ".ryYyr.", "b.b.b.b", ".bbbbb."] },
+    tent: { line: true, pal: { t: "#c8a060", T: "#e8c890", d: "#3a2616" }, rows: ["...t...", "..tTt..", ".tTdTt.", "tTTdTTt", "ttTdTtt"] },
+    lantern: { line: true, pal: { k: "#2a1b11", y: "#ffd84a", Y: "#fff6d0" }, rows: ["..kkk..", ".k...k.", "kkkkkkk", "kyYYYyk", "kyYYYyk", "kkkkkkk"] },
   };
   MARK.clear = MARK.sun;
   // a mark centred on (x, y) at px canvas pixels per pixel; col paints a one-colour mark, and a dark line rings the ones that sit on open ground
@@ -724,9 +728,15 @@
     const ctx = over.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     const S = App.S, L = App.L, placed = [], groups = {}, extra = {};
+    const nights = {};
     for (const h of L.heroes) {
       if (!h.alive) continue;
       const [x, y] = heroPos(h), key = Math.round(x) + "," + Math.round(y);
+      const sl = opts.tonight && h.sleep;
+      if (sl && !nights[key]) {
+        const m = sl.setting === "dungeon" ? "lantern" : sl.gate ? "tent" : sl.setting === "camp" ? "fire" : null;
+        if (m) nights[key] = [x, y, m];
+      }
       const off = (groups[key] = (groups[key] || 0) + 1) - 1;
       if (off >= 3) { extra[key] = [x, y, off - 2]; continue; }
       const g = Art.heroGrid(h, 0, App.heroLook(h)), hs = k, fan = [[0, 0], [-10, -4], [10, -4]][off];
@@ -834,6 +844,8 @@
         // a dungeon whose boss is slain: a small cross after its name
         if (slain) mark(ctx, MARK.cross, x0 + 5 + tw + cw - 2.5 * cp, y0 + h / 2, cp, ink);
       }
+      // under the heroes' feet in the Tonight view: what kind of night each group has
+      for (const [x, y, m] of Object.values(nights)) mark(ctx, MARK[m], (x - 11) * k, (y + 2) * k, mpx(15, 7));
       // highest: the figures, a megabeast and then the heroes, over every name and pin
       if (beast) {
         ctx.fillStyle = "rgba(160,20,20,0.35)"; ctx.beginPath(); ctx.arc(beast.x * k, (beast.y - 6) * k, 22 * k, 0, Math.PI * 2); ctx.fill();

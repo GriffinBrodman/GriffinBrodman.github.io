@@ -279,7 +279,20 @@
         old.shown.length ? [el("b", null, "From earlier tenants:"), el("ul", { class: "dg-spoils-list" }, old.shown.map((s) => row(s, true))), more(old.more)] : null));
     }
     const ins = D.inside || [];
-    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", ins.map((x, i) => [i ? ", " : "", el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label), ` on ${A.floorWords(x.floor, D.id)}`]), "."]
+    // tonight: each crew below, the room it sleeps in and who keeps the watch; crews sharing a room are told together
+    const groups = [];
+    for (const x of ins) {
+      const g = x.room != null && groups.find((g) => g[0].floor === x.floor && g[0].room === x.room);
+      if (g) g.push(x); else groups.push([x]);
+    }
+    const watch = (xs) => xs.map((x) => x.camp && x.camp.watch).filter(Boolean);
+    const said = (xs) => {
+      const x = xs[0], room = x.camp && x.camp.room, w = watch(xs);
+      return [xs.map((y, i) => [i ? (i === xs.length - 1 ? " and " : ", ") : "", el("span", { class: "dg-swatch", style: { background: crewInk(y.crew) } }), crewLink(y.crew, y.label)]),
+        xs.length > 1 ? ` are sharing ${room || "one room"}` : room ? ` camped in ${room}` : "", ` on ${A.floorWords(x.floor, D.id)}`, x.room != null ? ` (room ${x.room})` : "",
+        w.length ? `, ${w.join(" and ")} on watch` : ""];
+    };
+    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", groups.map((xs, i) => [i ? "; " : "", said(xs)]), "."]
       : "Nobody is below tonight."));
     void ui;
     return p;
@@ -294,7 +307,7 @@
     const G = Ink.layout(D, floor, { wide });
     const st = replay ? replay.state : Pen.known(D, floor);
     st.rumour = !!(D.boss && D.boss.rumoured);
-    if (!replay) st.crews = (D.inside || []).filter((x) => x.floor === floor.floor).map((x) => ({ crew: x.crew, n: crewRoom(D, x.crew, floor) })).filter((x) => x.n != null);
+    if (!replay) st.crews = (D.inside || []).filter((x) => x.floor === floor.floor).map((x) => ({ crew: x.crew, n: x.room != null ? x.room : crewRoom(D, x.crew, floor) })).filter((x) => x.n != null);
     const depth = (n) => { const w = Ink.depthWord(n, D.floors.length); return w ? ` · ${w}` : ""; };
     const tabs = el("div", { class: "dg-tabs", role: "tablist" }, D.floors.map((f) => { const [w, t] = walkedOf(f); return el("button", { type: "button", role: "tab", "aria-selected": String(f.floor === floor.floor), class: "dg-tab" + (f.floor === floor.floor ? " on" : ""), onclick: () => ui.pick(f.floor) },
       el("b", null, `Floor ${f.floor}`, el("span", { class: "dg-tab-d" }, depth(f.floor))), el("span", { class: "dg-tab-n" }, `${w} of ${t} walked`)); }));
@@ -444,8 +457,13 @@
     card.innerHTML = "";
     card.className = "dg-card";
     card.appendChild(el("button", { type: "button", class: "dg-x", "aria-label": "Close", onclick: () => (card.hidden = true) }, "×"));
+    const sleeping = (D.inside || []).filter((x) => x.floor === floor.floor && x.room != null && key(x.room) === key(r.n));
+    const tonight = sleeping.length ? el("p", { class: "small dg-tonight" }, "Tonight: ", sleeping.map((x, i) => [i ? (i === sleeping.length - 1 ? " and " : ", ") : "",
+      el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label)]), sleeping.length > 1 ? " are camped here" : " is camped here",
+      sleeping.some((x) => x.camp && x.camp.watch) ? ` (${sleeping.filter((x) => x.camp && x.camp.watch).map((x) => x.camp.watch).join(" and ")} on watch)` : "", ".") : null;
     if (!st.inked.has(key(r.n))) {
       card.append(el("div", { class: "dg-card-head" }, el("div", null, el("b", null, "Not yet explored"))));
+      if (tonight) card.appendChild(tonight);
       return;
     }
     const s = r.state || st.inked.get(key(r.n)) || {};
@@ -454,6 +472,7 @@
     card.append(el("div", { class: "dg-card-head" }, icon, el("div", null, el("b", null, cap(r.name)),
       el("div", { class: "tiny dim" }, [KIND[r.kind] || cap(r.kind), r.side ? "off the main way" : null, `floor ${floor.floor}`, `room ${r.n}`].filter(Boolean).join(" · ")))));
     if (r.desc) card.appendChild(el("p", { class: "small" }, r.desc));
+    if (tonight) card.appendChild(tonight);
     if (s.crew || s.by) card.appendChild(el("p", { class: "small" }, el("span", { class: "dg-swatch", style: { background: crewInk(s.crew) } }), s.s === "passed" ? "Passed through by " : "Cleared by ", crewLink(s.crew, s.by), s.d != null ? ` ${A.when(s.d, "on")}.` : ".",
       s.s === "wander" ? " Something has wandered back in since." : null,
       r.trap ? el("span", { class: "red" }, ` Trap: ${r.trap}${st.sprung.has(key(r.n)) ? ", sprung" : ""}.`) : null));
