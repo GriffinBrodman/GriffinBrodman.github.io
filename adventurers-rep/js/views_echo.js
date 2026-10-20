@@ -445,15 +445,14 @@
 
     const grid = el("div", { class: "echo-groups" });
     v.appendChild(grid);
-    const tiles = [];
+    const tiles = [], sections = [];
     for (const [k, xs] of order) {
       const p = k !== "_solo" ? A.parties[k] : null;
       const gh = el("div", { class: "echo-ghead" }, p ? A.bannerSprite(p.banner, 2) : null, p ? A.partyLink(k) : el("span", null, groups.size > 1 ? "On their own" : "Everyone"));
       const g = el("div", { class: "echo-grid" });
-      g.style.setProperty("--n", String(Math.min(5, xs.length)));
       const gi = tiles.length;
       for (const id of xs) {
-        const h = heroes[id], db = dbs.get(id), t = { h, db, list: sorted(db), info: dayInfo(h, db), key: null, rec: null, group: gi, cols: Math.min(5, xs.length) };
+        const h = heroes[id], db = dbs.get(id), t = { h, db, list: sorted(db), info: dayInfo(h, db), key: null, rec: null, group: gi };
         t.pic = el("div", { class: "echo-pic" });
         t.what = el("span", { class: "echo-what" });
         t.line = el("div", { class: "echo-line" });
@@ -466,8 +465,27 @@
         g.appendChild(t.a);
         tiles.push(t);
       }
-      grid.appendChild(el("section", { class: "echo-group" }, gh, g));
+      const sec = el("section", { class: "echo-group" }, gh, g);
+      sections.push({ sec, g, gi });
+      grid.appendChild(sec);
     }
+    // every crew sits on one shared set of columns, as wide as the tiles it shows this hour, and the grid packs small crews into the gaps
+    function layout() {
+      const w = grid.clientWidth;
+      if (!w) return;
+      const min = w < 700 ? 150 : 200, gap = 10;
+      const cols = Math.max(1, Math.floor((w + gap) / (min + gap)));
+      grid.style.setProperty("--cols", String(cols));
+      for (const s of sections) {
+        const shown = tiles.filter((t) => t.group === s.gi && !t.a.hidden);
+        const wide = (t) => t.a.classList.contains("wide") && cols > 1;
+        const span = Math.max(1, Math.min(cols, shown.reduce((n, t) => n + (wide(t) ? 2 : 1), 0)));
+        s.sec.style.gridColumn = `span ${span}`;
+        s.g.style.setProperty("--n", String(span));
+        for (const t of shown) t.a.style.gridColumn = wide(t) ? `span ${Math.min(2, span)}` : "";
+      }
+    }
+    if (window.ResizeObserver) new ResizeObserver(layout).observe(grid);
 
     if (list.length) {
       v.appendChild(el("section", { class: "panel echo-list" }, el("h2", null, "The day's big moments"),
@@ -546,12 +564,12 @@
         for (const t of rest) t.a.hidden = true;
         lead.a.hidden = false;
         lead.a.classList.toggle("wide", xs.length > 1);
-        lead.a.style.gridColumn = xs.length > 1 ? `span ${Math.min(xs.length, lead.cols)}` : "";
         lead.faces.replaceChildren(...xs.map((t) => t.face));
         const nm = xs.map((t) => t.h.name);
         lead.nameEl.textContent = nm.length > 1 ? `${nm.slice(0, -1).join(", ")} and ${nm[nm.length - 1]}` : nm[0];
         lead.a.classList.toggle("mine", xs.some((t) => mine.includes(t.h.id)));
       }
+      layout();
     }
     function sync() {
       playBtn.textContent = playing ? "❚❚" : si >= STEPS.length - 1 ? "↺" : "▶";
