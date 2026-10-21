@@ -33,7 +33,7 @@ a {
   width: 18cm;
   height: 27.8cm;
   margin: 0.5cm;
-  padding-top: 1.8cm;
+  padding-top: 1cm;
   padding-bottom: 1.8cm;
   padding-left: 1.8cm;
   padding-right: 1.8cm;
@@ -54,7 +54,7 @@ body {
 
 .pageheader {
   font-size: 0;
-  margin-bottom: 4mm; }
+  margin-bottom: 0; }
   .pageheader p {
     display: inline; }
   .pageheader > img, .pageheader > section {
@@ -250,6 +250,8 @@ span .nested > ul > li {
   margin: 0; }
 
 @media print {
+  body {
+    background-color: #fafafa; }
   body, .page {
     overflow: hidden; }
   .page {
