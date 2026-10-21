@@ -291,26 +291,6 @@ a { color: inherit; }
 .roles li + li { position: relative; }
 .timeline > li:first-child .roles li:first-child { color: var(--ink); font-weight: 600; }
 
-/* painting desk */
-.minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 6px 0 22px; }
-.mini {
-  position: relative; margin: 0;
-  aspect-ratio: 4 / 5;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #1c2c55;
-  box-shadow: 0 14px 26px -18px rgba(2,22,24,.8);
-}
-.mini svg, .mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.mini img { z-index: 1; opacity: 0; transition: opacity .4s ease; }
-.mini img.is-loaded { opacity: 1; }
-.mini figcaption {
-  position: absolute; left: 10px; bottom: 10px; z-index: 2;
-  font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  color: #f6eedb; background: rgba(10, 16, 34, 0.55); padding: 5px 9px; border-radius: 999px;
-}
-.mini img.is-loaded ~ figcaption { display: none; }
-
 /* footer */
 .foot-wrap { padding: 0 var(--gutter) clamp(20px, 5vh, 48px); position: relative; z-index: 1; }
 .foot {
@@ -331,9 +311,6 @@ a { color: inherit; }
   .card { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); --paper: rgba(253, 246, 232, 0.90); -webkit-backdrop-filter: blur(16px) brightness(1.1) sepia(0.12); backdrop-filter: blur(16px) brightness(1.1) sepia(0.12); }
   .links { gap: 8px; }
   .btn { padding: 0 15px; font-size: 14.5px; }
-  .minis { gap: 8px; }
-  .mini { border-radius: 12px; }
-  .mini figcaption { display: none; }
   .flow { gap: 56px; }
   .foot { border-radius: 20px; flex-wrap: wrap; }
 }
