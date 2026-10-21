@@ -498,11 +498,16 @@
       for (let i = 0; i < 7; i++) { const q = rng(seed + i * 13); pts.push([lx + 2 + Math.floor(q() * 24), ly + Math.floor(q() * 30)]); }
       if (A) actors.push(A.twinkle({ pts, col: "#fff4c8", arm: "#e8b84a", seed, z: 9e4, front: true }));
     } else if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
-      const m = S.monsters[S.dungeons[e.loc].boss];
+      const id = S.dungeons[e.loc].boss, m = S.monsters[id];
       const g = Art.monsterGrid(m, 0);
-      // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
-      ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
-      ctx.translate(px + (g.w >> 1), Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
+      // the boss lies as its own death leaves it (deaths.js, the replay's last frame), facing the heroes who felled it
+      // a big body lying down is wider than it stood: it lies past the last of the crew, not on top of them
+      const cx = Math.min(W - g.w * 0.6, Math.max(px + (g.w >> 1), startX + hs.length * 30 + g.w * 0.75));
+      if (!(window.Deaths && Deaths.draw(ctx, { ref: id, boss: true }, 0, cx, ground, -1, { calm: true }))) {
+        // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
+        ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
+        ctx.translate(px + (g.w >> 1), Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
+      }
       if (A) actors.push(A.smoke({ x: px + g.w / 2, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
     } else if (["fight", "ambush", "boss"].includes(e.kind) && (e.foes || []).length) {
       e.foes.slice(0, 3).forEach((mid, i) => {
