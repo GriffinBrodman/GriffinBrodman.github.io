@@ -1,0 +1,256 @@
+/* http://pltts.me/palettes/143880 */
+@font-face {
+  font-family: 'Myriad';
+  src: url("../Myriad/MyriadPro-Light.otf"); }
+
+@font-face {
+  font-family: 'Proxima';
+  src: url("../Proxima/ProximaNova-Regular.otf"); }
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box !important;
+  -moz-box-sizing: border-box !important; }
+
+body {
+  background-color: #333333;
+  text-align: center;
+  font-size: 0.3cm;
+  max-width: 46.2cm;
+  margin-left: auto;
+  margin-right: auto; 
+}
+
+a {
+  color: #140A8F;
+  text-decoration: none; }
+
+.page {
+  display: inline-block;
+  text-align: left;
+  font-size: 0.3cm;
+  width: 18cm;
+  height: 27.8cm;
+  margin: 0.5cm;
+  padding-top: 1.8cm;
+  padding-bottom: 1.8cm;
+  padding-left: 1.8cm;
+  padding-right: 1.8cm;
+  background-color: #fafafa;
+  position: relative; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: Myriad; }
+
+p b {
+  color: #140A8F;
+  font-weight: normal;
+}
+
+
+body {
+  font-family: Proxima; }
+
+.pageheader {
+  font-size: 0;
+  margin-bottom: 4mm; }
+  .pageheader p {
+    display: inline; }
+  .pageheader > img, .pageheader > section {
+    display: inline-block;
+    vertical-align: top; }
+  .pageheader img {
+    height: 20mm;
+    width: 13.75mm;
+    margin-right: 0.5cm; }
+  .pageheader h1 {
+    color: #05012c;
+    font-size: 8mm;
+    display: inline-block;
+    height: 10mm;
+    position: relative; }
+    .pageheader h1 em {
+      font-style: normal;
+      color: #140A8F; }
+    .pageheader h1:after {
+      content: "";
+      display: block;
+      width: 100%;
+      position: absolute;
+      bottom: 0;
+      left: 0px;
+      border-bottom: 0.5mm solid #05012c; }
+    .pageheader h1:after {
+      bottom: -0.25mm; }
+  .pageheader h2 {
+    font-size: 7mm;
+    color: #6c1725; }
+  .pageheader .addrs {
+    height: 10mm;
+    padding-top: 2mm;
+    color: #666666; }
+  .pageheader address {
+    display: inline;
+    font-size: 4mm;
+    margin: 0;
+    font-style: normal; }
+    .pageheader address:nth-child(3n + 1):not(:last-child):after, .pageheader address:nth-child(3n + 2):not(:last-child):after {
+      content: "|";
+      margin-left: 2mm;
+      margin-right: 2mm; }
+    .pageheader address:nth-child(3n):after {
+      content: "\A";
+      white-space: pre; }
+
+span h1 {
+  font-size: 7mm;
+  color: #140A8F;
+  display: inline-block;
+  margin: 0;
+  margin-top: 15px;
+  font-weight: normal; }
+
+span h2 {
+  font-size: 4mm;
+  color: #05012c;
+  font-weight: normal; }
+
+span p {
+  font-size: 3mm;
+  font-weight: normal;
+  font-family: Proxima;
+  line-height: 4mm;
+  color: #666666; }
+
+span ul {
+  padding-left: 6mm;
+}
+
+span b p {
+  margin-left: 8px;
+}
+
+span li p {
+  font-size: 3mm;
+  font-weight: normal;
+  font-family: Proxima;
+  line-height: 4mm;
+  color: #666666; }
+  span p sub {
+    display: inline-block;
+    position: relative;
+    top: 0.3em;
+    vertical-align: bottom; }
+
+span li::marker {
+  color: #666666;
+}
+
+span .nested > ul {
+  margin-left: 0.5mm; }
+
+span .nested > ul > li {
+  margin-bottom: 1mm; }
+
+.minor {
+  display: inline-block;
+  vertical-align: top;
+  width: 5.8cm;
+  margin-right: 0.1mm; }
+  .minor > li:not(.nested) > ul > li {
+    font-size: 3mm;
+    line-height: 4.5mm;
+    color: #666666;
+    margin-bottom: 0.0cm; }
+  .minor > li {
+    margin-left: 0.5mm; }
+  .minor > li:not(:first-child) {
+    margin-top: 0.3cm; }
+
+.major .nested .detail, .minor .nested .detail {
+  position: relative; }
+
+.major .nested .detail .platform, .minor .nested .detail .platform {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin-top: 0;
+  line-height: 4mm;
+  font-style: italic;
+  font-size: 3mm;
+  color: #666666;
+  opacity: 0.8; }
+
+.major {
+  display: inline-block;
+  vertical-align: top;
+  width: 18cm; }
+  .major .nested {
+    margin-bottom: 5mm; }
+    .major .nested li:not(:first-child) h2 {
+      padding-top: 1.5mm; }
+    .major .nested .detail:not(:first-child) .platform {
+      top: 1.5mm; }
+  .major .detail ul:not(.info) {
+    font-size: 3mm;
+    color: #666666; }
+    .major .detail ul:not(.info) li {
+      position: relative;
+      left: 1em;
+      padding-top: 0.6mm;
+      min-height: 1em; }
+    .major .detail ul:not(.info) li:before {
+      content: "\2022";
+      position: absolute;
+      left: -0.75em;
+      display: inline-block; }
+  .major aside {
+    margin-top: 3mm;
+    display: inline-block;
+    height: 3mm;
+    font-size: 3mm;
+    color: #666666; }
+
+.info {
+  display: block;
+  font-size: 3mm;
+  font-size: 0; 
+  padding-left: 0mm;}
+  .info li {
+    display: inline-block;
+    font-size: 3mm;
+    margin-top: 0.4mm;
+    margin-bottom: 0.4mm; }
+    .info li:not(:last-child):after {
+      content: "||";
+      display: inline-block;
+      margin-left: 2mm;
+      margin-right: 2mm;
+      color: #05012c; }
+
+.info li::before {
+  content: none;
+  color:red;
+  display: inline-block; 
+  width: 1em;
+  margin-left: -1em;
+}
+
+.footer {
+  display: inline-block;
+  position: absolute;
+  bottom: 1.8cm;
+  right: 1.8cm;
+  text-align: right;
+  color: #666666;
+  font-size: 3mm; }
+
+@page {
+  margin: 0; }
+
+@media print {
+  body, .page {
+    overflow: hidden; }
+  .page {
+    margin: 0; } }
