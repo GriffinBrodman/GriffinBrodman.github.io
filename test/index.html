@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two directions · Griffin Brodman</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Two design directions for griffinbrodman.com. Which one should ship?">
+  <meta name="theme-color" content="#111111">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Inter:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #111111;
+      color: #f2efe8;
+    }
+    header {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 24px 28px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-family: "Bree Serif", Georgia, serif;
+      font-weight: 400;
+      font-size: clamp(32px, 5vw, 48px);
+      line-height: 1.1;
+    }
+    header p { margin: 0; max-width: 46ch; color: #bdb8ad; font-size: 17px; line-height: 1.55; }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 56px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+      gap: 20px;
+    }
+    .pick {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      min-height: 340px;
+      padding: 28px;
+      border-radius: 20px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      isolation: isolate;
+      transition: transform .3s ease, box-shadow .3s ease;
+    }
+    .pick:hover { transform: translateY(-3px); box-shadow: 0 24px 48px -24px rgba(0,0,0,.8); }
+    .pick:focus-visible { outline: 3px solid #f2efe8; outline-offset: 4px; }
+    .pick::before { content: ""; position: absolute; inset: 0; z-index: -1; }
+    .arcane::before {
+      background:
+        radial-gradient(circle at 78% 30%, transparent 0 64px, rgba(201,169,106,.55) 65px 66px, transparent 67px 92px, rgba(201,169,106,.3) 93px 94px, transparent 95px),
+        radial-gradient(120% 90% at 85% 0%, #1b3557 0%, #0a1120 60%);
+    }
+    .koi::before {
+      background:
+        radial-gradient(40% 30% at 70% 35%, rgba(255,255,255,.12), transparent 70%),
+        radial-gradient(14px 6px at 66% 38%, #e9e4d6 98%, transparent),
+        radial-gradient(9px 5px at 70% 37%, #b3261e 98%, transparent),
+        radial-gradient(14px 6px at 78% 52%, #e2b13c 98%, transparent),
+        radial-gradient(120% 100% at 70% 30%, #2f6f62 0%, #0f3b3b 70%);
+    }
+    .tag { font-size: 12px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; opacity: .75; margin-bottom: 8px; }
+    .pick h2 { margin: 0 0 8px; font-family: "Bree Serif", Georgia, serif; font-weight: 400; font-size: 34px; }
+    .pick p { margin: 0 0 18px; max-width: 36ch; font-size: 16px; line-height: 1.5; opacity: .9; }
+    .go { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+    .arcane .go { color: #ecd7a4; }
+    .koi .go { color: #f6f1e6; }
+    .extra { display: block; margin-top: 6px; font-size: 14px; }
+    footer { max-width: 1100px; margin: 0 auto; padding: 0 24px 48px; color: #8f8a80; font-size: 14px; line-height: 1.6; }
+    footer a { color: #d9d4c9; display: inline-block; padding: 10px 0; }
+    @media (prefers-reduced-motion: reduce) { .pick { transition: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Two directions for my new site</h1>
+    <p>Same content, two very different styles. Have a look at both, on your phone too, and tell me which one you'd pick and why.</p>
+  </header>
+  <main>
+    <a class="pick arcane" href="arcane/">
+      <span class="tag">Option A</span>
+      <h2>Arcane</h2>
+      <p>Night navy and brass. An engraved astrolabe draws itself around the portrait, with gold dust drifting in lamplight.</p>
+      <span class="go">Open Arcane <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="pick koi" href="koi/">
+      <span class="tag">Option B</span>
+      <h2>Koi Pond</h2>
+      <p>A live koi pond under frosted cards. Move your mouse to ripple the water, and tap or click it to feed the koi.</p>
+      <span class="go">Open Koi Pond <span aria-hidden="true">→</span></span>
+    </a>
+  </main>
+  <footer>
+    Each one has its own "page not found" too:
+    <a href="arcane/404.html">Arcane 404</a> ·
+    <a href="koi/404.html">Koi Pond 404</a>
+  </footer>
+</body>
+</html>

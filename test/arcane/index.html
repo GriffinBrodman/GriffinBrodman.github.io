@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Griffin Brodman</title>
+  <meta name="description" content="Griffin Brodman, engineering leader in Buffalo, NY. Engineering Lead for Core at Apollo.io and a coach for engineering managers.">
+  <meta name="theme-color" content="#0a1120">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://griffinbrodman.com/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://griffinbrodman.com/">
+  <meta property="og:site_name" content="Griffin Brodman">
+  <meta property="og:title" content="Griffin Brodman">
+  <meta property="og:description" content="Engineering leader. I like startups, scaling them, and fixing whatever crops up along the way.">
+  <meta name="twitter:card" content="summary">
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a1120'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23c9a96a' stroke-width='2.5'/%3E%3Ccircle cx='32' cy='32' r='15.5' fill='none' stroke='%23c9a96a' stroke-width='1.2' opacity='.7'/%3E%3Ccircle cx='32' cy='27' r='9' fill='none' stroke='%23ecd7a4' stroke-width='1.2' opacity='.8'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23ecd7a4'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500&display=swap">
+  <link rel="stylesheet" href="assets/arcane.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="atmos" aria-hidden="true"></div>
+  <canvas id="dust" aria-hidden="true"></canvas>
+
+  <div class="page">
+    <main id="main" class="wrap">
+
+      <header class="hero">
+        <div class="hero__text">
+          <p class="eyebrow label" data-r>Buffalo, NY</p>
+          <h1 class="name" data-r><span>Griffin</span> <span>Brodman</span></h1>
+          <p class="tagline" data-r>Engineering leader. I like startups, scaling them, and fixing whatever crops up along the way.</p>
+
+          <nav class="links" aria-label="Elsewhere">
+            <ul>
+              <li data-r>
+                <button class="row" type="button" id="mail-btn" aria-controls="mail-out">
+                  <span class="label">Email</span>
+                  <span class="row__text">Email me</span>
+                  <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 7h12M8 2l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                </button>
+                <div class="mail" id="mail-out" hidden>
+                  <span class="label">Email</span>
+                  <!-- address is assembled in assets/main.js -->
+                  <a id="mail-link" href="#"></a>
+                  <button class="btn" type="button" id="mail-copy">Copy</button>
+                </div>
+                <p class="visually-hidden" id="mail-status" aria-live="polite"></p>
+              </li>
+              <li data-r>
+                <a class="row" href="https://www.linkedin.com/in/griffinbrodman" rel="me noopener">
+                  <span class="label">LinkedIn</span>
+                  <span class="row__text">in/griffinbrodman</span>
+                  <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 11L11 3M4.5 3H11v6.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                </a>
+              </li>
+              <li data-r>
+                <a class="row" href="https://github.com/GriffinBrodman" rel="me noopener">
+                  <span class="label">GitHub</span>
+                  <span class="row__text">GriffinBrodman</span>
+                  <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 11L11 3M4.5 3H11v6.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                </a>
+              </li>
+              <li data-r>
+                <!-- TODO: replace with Griffin's MentorCruise profile URL -->
+                <a class="row" href="https://mentorcruise.com/" rel="noopener">
+                  <span class="label">Mentoring</span>
+                  <span class="row__text">Coaching on MentorCruise</span>
+                  <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 11L11 3M4.5 3H11v6.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                </a>
+              </li>
+              <li data-r>
+                <!-- TODO: replace with Griffin's Instagram profile URL -->
+                <a class="row" href="https://www.instagram.com/p/C_dSvOFOVC8/" rel="noopener">
+                  <span class="label">Instagram</span>
+                  <span class="row__text">Miniature painting</span>
+                  <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 11L11 3M4.5 3H11v6.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="orrery" data-r style="--d:120ms">
+          <canvas id="astrolabe" aria-hidden="true"></canvas>
+          <figure class="portrait">
+            <div class="portrait__ph" aria-hidden="true">
+              <svg viewBox="0 0 200 200">
+                <defs>
+                  <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#ecd7a4"/>
+                    <stop offset=".55" stop-color="#c9a96a"/>
+                    <stop offset="1" stop-color="#8f7445"/>
+                  </linearGradient>
+                </defs>
+                <g fill="none" stroke="#c9a96a" stroke-width=".5" opacity=".22">
+                  <circle cx="100" cy="100" r="78"/>
+                  <circle cx="100" cy="100" r="62"/>
+                </g>
+                <text x="100" y="112" text-anchor="middle" class="mono" fill="url(#pg)" fill-opacity=".55">GB</text>
+              </svg>
+            </div>
+            <!-- Swap in a real portrait by adding assets/headshot.jpg -->
+            <img src="assets/headshot.jpg" alt="Portrait of Griffin Brodman" width="400" height="400" decoding="async"
+                 onload="this.classList.add('ok');this.previousElementSibling.hidden=true" onerror="this.remove()">
+          </figure>
+        </div>
+      </header>
+
+      <section class="sec" id="now" aria-labelledby="now-h">
+        <div class="sec__head" data-r><span class="numeral" aria-hidden="true">I</span><h2 id="now-h">Now</h2></div>
+        <div class="sec__body">
+          <p class="lede" data-r>Engineering Lead for <em>Core</em> at Apollo.io.</p>
+          <ul class="areas" aria-label="Areas" data-r style="--d:80ms">
+            <li>Rep Experience</li>
+            <li>Controls</li>
+            <li>Deliverability</li>
+            <li>Warm Outbound</li>
+          </ul>
+          <p class="prose" data-r style="--d:140ms">I care most about building autonomous teams. I also coach engineering managers on <a href="https://mentorcruise.com/" rel="noopener">MentorCruise</a>.</p>
+        </div>
+      </section>
+
+      <section class="sec" id="before" aria-labelledby="before-h">
+        <div class="sec__head" data-r><span class="numeral" aria-hidden="true">II</span><h2 id="before-h">Before</h2></div>
+        <ol class="timeline" reversed>
+          <li class="entry" data-r>
+            <p class="when"><time datetime="2021">2021</time><span class="dash">–</span><small>present</small></p>
+            <div class="entry__body">
+              <h3>Apollo.io</h3>
+              <ul class="roles">
+                <li>Engineering Lead, Core</li>
+                <li>Engineering Manager II, Search &amp; Discovery</li>
+                <li>Engineering Manager, Prospecting &amp; Chrome Extension</li>
+              </ul>
+            </div>
+          </li>
+          <li class="entry" data-r>
+            <p class="when"><time datetime="2021">2021</time></p>
+            <div class="entry__body">
+              <h3>Barracuda FX</h3>
+              <ul class="roles">
+                <li>Senior Engineering Manager<span class="note">Led an engineering team of nine on the flagship dealer-to-customer product.</span></li>
+              </ul>
+            </div>
+          </li>
+          <li class="entry" data-r>
+            <p class="when"><time datetime="2016">2016</time><span class="dash">–</span><time datetime="2021">2021</time></p>
+            <div class="entry__body">
+              <h3>Broadway Technology</h3>
+              <ul class="roles">
+                <li>Senior Software Engineering Manager</li>
+                <li>Software Development Consultant<span class="note">Building trading systems in Python and C++.</span></li>
+              </ul>
+            </div>
+          </li>
+          <li class="entry" data-r>
+            <p class="when"><time datetime="2015">2015</time></p>
+            <div class="entry__body">
+              <h3>Riot Games</h3>
+              <ul class="roles">
+                <li>Development Management Intern</li>
+              </ul>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="sec" id="desk" aria-labelledby="desk-h">
+        <div class="sec__head" data-r><span class="numeral" aria-hidden="true">III</span><h2 id="desk-h">The painting desk</h2></div>
+        <div class="sec__body">
+          <p class="lede" data-r>Currently painting the <em>Thousand Sons</em>.</p>
+
+          <ul class="plates">
+            <li data-r>
+              <figure class="plate">
+                <div class="plate__frame">
+                  <svg viewBox="0 0 200 250" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <radialGradient id="pl1" cx=".45" cy=".38" r=".8"><stop offset="0" stop-color="#121c33"/><stop offset="1" stop-color="#090f1d"/></radialGradient>
+                    </defs>
+                    <rect width="200" height="250" fill="url(#pl1)"/>
+                    <g transform="translate(100 120)">
+                      <circle r="40" fill="none" stroke="#c9a96a" stroke-width=".5" opacity=".32"/>
+                      <circle r="36.5" fill="none" stroke="#c9a96a" stroke-width=".35" opacity=".18"/>
+                      <text y="11" text-anchor="middle" font-family="'Cormorant Garamond', Garamond, Georgia, serif" font-style="italic" font-weight="500" font-size="32" fill="#c9a96a" fill-opacity=".45">I</text>
+                    </g>
+                  </svg>
+                  <!-- Swap: add assets/mini-1.jpg -->
+                  <img src="assets/mini-1.jpg" alt="Thousand Sons miniature, photo 1" loading="lazy" decoding="async" onload="this.classList.add('ok')" onerror="this.remove()">
+                </div>
+                <figcaption><span class="label">Plate I</span></figcaption>
+              </figure>
+            </li>
+            <li data-r style="--d:90ms">
+              <figure class="plate">
+                <div class="plate__frame">
+                  <svg viewBox="0 0 200 250" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <radialGradient id="pl2" cx=".55" cy=".4" r=".8"><stop offset="0" stop-color="#121c33"/><stop offset="1" stop-color="#090f1d"/></radialGradient>
+                    </defs>
+                    <rect width="200" height="250" fill="url(#pl2)"/>
+                    <g transform="translate(100 120)">
+                      <circle r="40" fill="none" stroke="#c9a96a" stroke-width=".5" opacity=".32"/>
+                      <circle r="36.5" fill="none" stroke="#c9a96a" stroke-width=".35" opacity=".18"/>
+                      <text y="11" text-anchor="middle" font-family="'Cormorant Garamond', Garamond, Georgia, serif" font-style="italic" font-weight="500" font-size="32" fill="#c9a96a" fill-opacity=".45">II</text>
+                    </g>
+                  </svg>
+                  <!-- Swap: add assets/mini-2.jpg -->
+                  <img src="assets/mini-2.jpg" alt="Thousand Sons miniature, photo 2" loading="lazy" decoding="async" onload="this.classList.add('ok')" onerror="this.remove()">
+                </div>
+                <figcaption><span class="label">Plate II</span></figcaption>
+              </figure>
+            </li>
+            <li data-r style="--d:180ms">
+              <figure class="plate">
+                <div class="plate__frame">
+                  <svg viewBox="0 0 200 250" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                      <radialGradient id="pl3" cx=".5" cy=".42" r=".8"><stop offset="0" stop-color="#121c33"/><stop offset="1" stop-color="#090f1d"/></radialGradient>
+                    </defs>
+                    <rect width="200" height="250" fill="url(#pl3)"/>
+                    <g transform="translate(100 120)">
+                      <circle r="40" fill="none" stroke="#c9a96a" stroke-width=".5" opacity=".32"/>
+                      <circle r="36.5" fill="none" stroke="#c9a96a" stroke-width=".35" opacity=".18"/>
+                      <text y="11" text-anchor="middle" font-family="'Cormorant Garamond', Garamond, Georgia, serif" font-style="italic" font-weight="500" font-size="32" fill="#c9a96a" fill-opacity=".45">III</text>
+                    </g>
+                  </svg>
+                  <!-- Swap: add assets/mini-3.jpg -->
+                  <img src="assets/mini-3.jpg" alt="Thousand Sons miniature, photo 3" loading="lazy" decoding="async" onload="this.classList.add('ok')" onerror="this.remove()">
+                </div>
+                <figcaption><span class="label">Plate III</span></figcaption>
+              </figure>
+            </li>
+          </ul>
+
+          <div class="desk-foot" data-r>
+            <!-- TODO: replace with Griffin's Instagram profile URL -->
+            <a class="row" href="https://www.instagram.com/p/C_dSvOFOVC8/" rel="noopener">
+              <span class="row__text">Follow the progress on Instagram</span>
+              <svg class="row__arrow" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 11L11 3M4.5 3H11v6.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot wrap">
+      <p class="label">Buffalo, NY <span aria-hidden="true">&nbsp;·&nbsp;</span> © 2026 <span class="bree">Griffin Brodman</span></p>
+      <p class="dust-line">All is dust.</p>
+    </footer>
+  </div>
+
+  <script src="assets/dust.js" defer></script>
+  <script src="assets/astrolabe.js" defer></script>
+  <script src="assets/main.js" defer></script>
+</body>
+</html>
