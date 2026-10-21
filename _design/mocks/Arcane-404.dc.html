@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>404 · Arcane</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=Cormorant+Garamond:ital,wght@0,500;1,500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1A2B}
+a{color:#E2BE6A}a:hover{color:#EDE6D6}
+a:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid #E2BE6A;outline-offset:3px}
+@keyframes a4Spin{to{transform:rotate(360deg)}}
+@keyframes a4Pulse{0%,100%{filter:drop-shadow(0 0 0 rgba(226,190,106,0))}50%{filter:drop-shadow(0 0 18px rgba(226,190,106,.45))}}
+.a4-fossil{animation:a4Spin 90s linear infinite,a4Pulse 5s ease-in-out infinite;transform-origin:50% 50%}
+@media (prefers-reduced-motion:reduce){.a4-fossil{animation:none}}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #EDE6D6; background: radial-gradient(ellipse at 50% 20%, #1B3557 0%, #0E1A2B 60%), #0E1A2B; min-height: 100%">
+<div style="max-width: 640px; margin: 0 auto; padding: 88px 24px 64px; display: flex; flex-direction: column; align-items: center; gap: 26px; text-align: center">
+
+<svg class="a4-fossil" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="The Helix Fossil">
+<circle cx="100" cy="100" r="96" fill="#16263D" stroke="#3A4E6B" stroke-width="1"></circle>
+<path d="{{ribs}}" fill="none" stroke="#7A6331" stroke-width="1.2"></path>
+<path d="{{spiral}}" fill="none" stroke="#E2BE6A" stroke-width="2.2" stroke-linecap="round"></path>
+</svg>
+
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.32em; color: #C9A24B">404 · THIS PAGE IS LOST</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 46px; line-height: 1.12; color: #E2BE6A">Confess your sins to the Helix Fossil.</h1>
+
+<sc-if value="{{notConfessed}}" hint-placeholder-val="{{ true }}">
+<form aria-label="Confession" style="width: 100%; display: flex; flex-direction: column; gap: 12px; text-align: left">
+<label for="a4-confession" style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 20px">What have you done?</label>
+<textarea id="a4-confession" rows="3" placeholder="I typed the URL by hand…" style="width: 100%; box-sizing: border-box; padding: 14px; border: 1px solid #3A4E6B; background: #16263D; color: #EDE6D6; font: inherit; font-size: 16px; resize: vertical"></textarea>
+<button type="button" onClick="{{confess}}" style="align-self: flex-start; min-height: 48px; padding: 0 24px; border: 1px solid #C9A24B; background: #C9A24B; color: #0E1A2B; font: inherit; font-weight: 600; letter-spacing: 0.08em; cursor: pointer">CONFESS</button>
+</form>
+</sc-if>
+
+<sc-if value="{{confessed}}" hint-placeholder-val="{{ false }}">
+<div style="width: 100%; padding: 32px; border: 1px solid #C9A24B; background: rgba(201,162,75,.06); display: flex; flex-direction: column; align-items: center; gap: 18px">
+<div style="font-family: 'Bree Serif', serif; font-size: 30px; color: #E2BE6A">The Helix Fossil has forgiven you.</div>
+<a href="Arcane-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; background: #C9A24B; color: #0E1A2B; text-decoration: none; font-weight: 600; letter-spacing: 0.08em">GO HOME</a>
+</div>
+</sc-if>
+
+<a href="Arcane-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px">Or skip the confession and go home</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":960}}'>
+class Component extends DCLogic {
+fossil() {
+const cx = 100, cy = 100, maxR = 84, turns = 3.2, T = turns * 2 * Math.PI;
+const b = Math.log(maxR / 2) / T;
+const r = (t) => 2 * Math.exp(b * t);
+const pt = (t, rr) => (cx + rr * Math.cos(t)).toFixed(1) + ' ' + (cy + rr * Math.sin(t)).toFixed(1);
+let spiral = '';
+for (let t = 0; t <= T; t += 0.1) spiral += (spiral ? ' L' : 'M') + pt(t, r(t));
+let ribs = '';
+for (let t = 2 * Math.PI + 0.3; t <= T; t += 0.42) ribs += ' M' + pt(t, r(t - 2 * Math.PI)) + ' L' + pt(t, r(t));
+return { spiral: spiral, ribs: ribs.trim() };
+}
+renderVals() {
+const s = this.state || {};
+const f = this.fossil();
+return {
+spiral: f.spiral,
+ribs: f.ribs,
+confessed: !!s.confessed,
+notConfessed: !s.confessed,
+confess: () => this.setState({ confessed: true })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>404 · Koi Pond</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF4F1}
+a{color:#12312E}a:hover{color:#B8461A}
+a:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid #B8461A;outline-offset:3px}
+@keyframes k4Orbit{to{transform:rotate(360deg)}}
+@keyframes k4Ripple{0%{transform:scale(.4);opacity:.6}100%{transform:scale(1.6);opacity:0}}
+.k4-orbit{animation:k4Orbit 14s linear infinite;transform-origin:130px 130px}
+.k4-orbit2{animation:k4Orbit 22s linear infinite reverse;transform-origin:130px 130px}
+.k4-rip{animation:k4Ripple 5s ease-out infinite;transform-origin:130px 130px}
+@media (prefers-reduced-motion:reduce){.k4-orbit,.k4-orbit2,.k4-rip{animation:none}}
+</style>
+</helmet>
+<div style="font-family: 'DM Sans', system-ui, sans-serif; color: #12312E; background: linear-gradient(180deg, #D7E8E2 0%, #EEF4F1 45%); min-height: 100%">
+<div style="max-width: 620px; margin: 0 auto; padding: 72px 24px 64px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center">
+
+<svg viewBox="0 0 260 260" width="260" height="260" role="img" aria-label="The Helix Fossil, resting at the bottom of a koi pond">
+<circle cx="130" cy="130" r="124" fill="#BFD9D1"></circle>
+<circle class="k4-rip" cx="130" cy="130" r="80" fill="none" stroke="#8DB7AC" stroke-width="1.5"></circle>
+<g transform="translate(30 30)">
+<circle cx="100" cy="100" r="62" fill="#E9DCC0"></circle>
+<path d="{{ribs}}" fill="none" stroke="#C2A877" stroke-width="1.2"></path>
+<path d="{{spiral}}" fill="none" stroke="#8C6B3A" stroke-width="2.4" stroke-linecap="round"></path>
+</g>
+<g class="k4-orbit"><g transform="translate(118 8)"><path d="M10 20 C 26 3, 60 3, 76 20 C 60 37, 26 37, 10 20 Z" fill="#E0612B" transform="rotate(90 40 20) scale(.7)"></path></g></g>
+<g class="k4-orbit2"><g transform="translate(220 140)"><path d="M10 20 C 26 3, 60 3, 76 20 C 60 37, 26 37, 10 20 Z" fill="#FFFFFF" transform="rotate(-90 40 20) scale(.55)"></path></g></g>
+</svg>
+
+<div style="font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: #B8461A">404 · THIS PAGE SANK</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 42px; line-height: 1.15">Confess your sins to the Helix Fossil.</h1>
+
+<sc-if value="{{notConfessed}}" hint-placeholder-val="{{ true }}">
+<form aria-label="Confession" style="width: 100%; box-sizing: border-box; padding: 24px; border-radius: 22px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px; text-align: left">
+<label for="k4-confession" style="font-size: 15px; font-weight: 700">Your confession</label>
+<textarea id="k4-confession" rows="3" placeholder="I typed the URL by hand…" style="width: 100%; box-sizing: border-box; padding: 14px; border: 1.5px solid #C9DDD6; border-radius: 14px; background: #F6FAF8; color: #12312E; font: inherit; font-size: 16px; resize: vertical"></textarea>
+<button type="button" onClick="{{confess}}" style="align-self: flex-start; min-height: 48px; padding: 0 24px; border: 0; border-radius: 999px; background: #12312E; color: #FFFFFF; font: inherit; font-weight: 700; cursor: pointer">Confess</button>
+</form>
+</sc-if>
+
+<sc-if value="{{confessed}}" hint-placeholder-val="{{ false }}">
+<div style="width: 100%; box-sizing: border-box; padding: 32px; border-radius: 22px; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; gap: 18px">
+<div style="font-family: 'Bree Serif', serif; font-size: 28px">The Helix Fossil has forgiven you.</div>
+<a href="Koi-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border-radius: 999px; background: #12312E; color: #FFFFFF; text-decoration: none; font-weight: 700">Swim home</a>
+</div>
+</sc-if>
+
+<a href="Koi-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px">Or skip the confession and go home</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":960}}'>
+class Component extends DCLogic {
+fossil() {
+const cx = 100, cy = 100, maxR = 54, turns = 3, T = turns * 2 * Math.PI;
+const b = Math.log(maxR / 2) / T;
+const r = (t) => 2 * Math.exp(b * t);
+const pt = (t, rr) => (cx + rr * Math.cos(t)).toFixed(1) + ' ' + (cy + rr * Math.sin(t)).toFixed(1);
+let spiral = '';
+for (let t = 0; t <= T; t += 0.1) spiral += (spiral ? ' L' : 'M') + pt(t, r(t));
+let ribs = '';
+for (let t = 2 * Math.PI + 0.3; t <= T; t += 0.42) ribs += ' M' + pt(t, r(t - 2 * Math.PI)) + ' L' + pt(t, r(t));
+return { spiral: spiral, ribs: ribs.trim() };
+}
+renderVals() {
+const s = this.state || {};
+const f = this.fossil();
+return {
+spiral: f.spiral,
+ribs: f.ribs,
+confessed: !!s.confessed,
+notConfessed: !s.confessed,
+confess: () => this.setState({ confessed: true })
+};
+}
+}
+</script>
+</body>
+</html>

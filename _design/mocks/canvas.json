@@ -1,0 +1,32 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-21T17:30:00Z"},
+  "title": "Personal Site Mocks",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1280, "h": 2500, "title": "A · The Operator (résumé-forward)", "expand": "fill"},
+    "Writer.dc.html": {"x": 1360, "y": 0, "w": 1280, "h": 2100, "title": "B · The Writer (essays-first)", "expand": "fill"},
+    "Mentor.dc.html": {"x": 2720, "y": 0, "w": 1280, "h": 2300, "title": "C · The Coach (mentorship-first)", "expand": "fill"},
+    "Index.dc.html": {"x": 4080, "y": 0, "w": 1280, "h": 1500, "title": "D · The Index (one-screen hub)", "expand": "fill"},
+    "NotFound.dc.html": {"x": 4080, "y": 1620, "w": 1280, "h": 900, "title": "D · 404 (Helix Fossil)", "expand": "fill", "is_interactive": true},
+    "D1-Arcane.dc.html": {"x": 0, "y": 2900, "w": 1280, "h": 1500, "title": "D1 · Arcane", "expand": "fill"},
+    "D2-Terminal.dc.html": {"x": 1360, "y": 2900, "w": 1280, "h": 1500, "title": "D2 · Terminal", "expand": "fill"},
+    "D3-Swiss.dc.html": {"x": 2720, "y": 2900, "w": 1280, "h": 1500, "title": "D3 · Swiss", "expand": "fill"},
+    "D4-Koi.dc.html": {"x": 4080, "y": 2900, "w": 1280, "h": 1500, "title": "D4 · Koi Pond", "expand": "fill"},
+    "D5-Notebook.dc.html": {"x": 5440, "y": 2900, "w": 1280, "h": 1500, "title": "D5 · Field Notebook", "expand": "fill"},
+    "Arcane-Mid.dc.html": {"x": 0, "y": 5000, "w": 1280, "h": 1700, "title": "Arcane · mid-fi", "expand": "fill", "is_interactive": true},
+    "Arcane-404.dc.html": {"x": 1360, "y": 5000, "w": 1280, "h": 960, "title": "Arcane · 404", "expand": "fill", "is_interactive": true},
+    "Koi-Mid.dc.html": {"x": 2720, "y": 5000, "w": 1280, "h": 1700, "title": "Koi Pond · mid-fi", "expand": "fill", "is_interactive": true},
+    "Koi-404.dc.html": {"x": 4080, "y": 5000, "w": 1280, "h": 960, "title": "Koi Pond · 404", "expand": "fill", "is_interactive": true},
+    "Notebook-Mid.dc.html": {"x": 5440, "y": 5000, "w": 1280, "h": 1700, "title": "Field Notebook · mid-fi", "expand": "fill", "is_interactive": true},
+    "Notebook-404.dc.html": {"x": 6800, "y": 5000, "w": 1280, "h": 960, "title": "Field Notebook · 404", "expand": "fill", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "Writer.dc.html", "Mentor.dc.html", "Index.dc.html", "NotFound.dc.html", "D1-Arcane.dc.html", "D2-Terminal.dc.html", "D3-Swiss.dc.html", "D4-Koi.dc.html", "D5-Notebook.dc.html", "Arcane-Mid.dc.html", "Arcane-404.dc.html", "Koi-Mid.dc.html", "Koi-404.dc.html", "Notebook-Mid.dc.html", "Notebook-404.dc.html"],
+  "notes": {
+    "heading": {"x": 0, "y": -300, "text": "griffinbrodman.com — four lo-fi directions", "kind": "title1", "maxW": 5360},
+    "heading2": {"x": 0, "y": 2600, "text": "Direction D — five styles", "kind": "title1", "maxW": 6720},
+    "heading3": {"x": 0, "y": 4700, "text": "Mid-fi — Arcane, Koi Pond, Field Notebook (each with its 404)", "kind": "title1", "maxW": 8080}
+  },
+  "designSystems": []
+}

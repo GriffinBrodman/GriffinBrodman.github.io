@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>D · 404</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Bree+Serif&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F4F2}
+a{color:#1A1A1A}a:hover{color:#2F5BD3}
+.ph{background:repeating-linear-gradient(45deg,#E2E2DF 0 10px,#EBEBE8 10px 20px);border:1.5px solid #BDBDBD}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #1A1A1A; background: #F4F4F2; min-height: 100%">
+<div style="max-width: 640px; margin: 0 auto; padding: 96px 24px 64px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center">
+
+<div class="ph" style="width: 200px; height: 200px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #555555">[ HELIX FOSSIL ]</div>
+
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #555555; letter-spacing: 0.06em">404 · PAGE NOT FOUND</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 44px; line-height: 1.15">This page is lost. Confess your sins to the Helix Fossil.</h1>
+
+<sc-if value="{{notConfessed}}" hint-placeholder-val="{{ true }}">
+<form style="width: 100%; display: flex; flex-direction: column; gap: 12px; text-align: left" aria-label="Confession">
+<label for="confession" style="font-size: 15px; font-weight: 600">Your confession</label>
+<textarea id="confession" rows="3" placeholder="I typed the URL by hand…" style="width: 100%; box-sizing: border-box; padding: 14px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font: inherit; font-size: 16px; resize: vertical"></textarea>
+<button type="button" onClick="{{confess}}" style="align-self: flex-start; min-height: 48px; padding: 0 22px; border: 0; background: #1A1A1A; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Confess</button>
+</form>
+</sc-if>
+
+<sc-if value="{{confessed}}" hint-placeholder-val="{{ false }}">
+<div style="width: 100%; padding: 28px; background: #FFFFFF; border: 1.5px solid #BDBDBD; display: flex; flex-direction: column; align-items: center; gap: 16px">
+<div style="font-family: 'Bree Serif', serif; font-size: 28px">The Helix Fossil has forgiven you.</div>
+<a href="Index.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; background: #1A1A1A; color: #FFFFFF; text-decoration: none; font-weight: 600">Go home</a>
+</div>
+</sc-if>
+
+<a href="Index.dc.html" style="font-size: 15px">Or skip the confession and go home</a>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const confessed = !!(this.state && this.state.confessed);
+return {
+confessed: confessed,
+notConfessed: !confessed,
+confess: () => this.setState({ confessed: true })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Griffin Brodman · Koi Pond</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF4F1}
+a{color:#12312E}a:hover{color:#B8461A}
+a:focus-visible,button:focus-visible{outline:2px solid #B8461A;outline-offset:3px}
+@keyframes kmA{0%{transform:translate(-140px,70px) rotate(10deg)}35%{transform:translate(380px,30px) rotate(-8deg)}70%{transform:translate(820px,90px) rotate(8deg)}100%{transform:translate(1500px,50px) rotate(-4deg)}}
+@keyframes kmB{0%{transform:translate(1500px,190px) scaleX(-1) rotate(-6deg)}50%{transform:translate(700px,150px) scaleX(-1) rotate(6deg)}100%{transform:translate(-180px,200px) scaleX(-1) rotate(-4deg)}}
+@keyframes kmC{0%{transform:translate(-120px,240px) rotate(-4deg)}100%{transform:translate(1500px,210px) rotate(6deg)}}
+@keyframes kmTail{0%,100%{transform:skewY(0)}50%{transform:skewY(12deg)}}
+@keyframes kmRipple{0%{transform:scale(.15);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+@keyframes kmDrift{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(6px) rotate(8deg)}}
+.km-a{animation:kmA 30s linear infinite}
+.km-b{animation:kmB 40s linear infinite}
+.km-c{animation:kmC 52s linear 6s infinite}
+.km-tail{animation:kmTail .9s ease-in-out infinite;transform-origin:74px 20px}
+.km-r1{animation:kmRipple 7s ease-out infinite}
+.km-r2{animation:kmRipple 7s ease-out 2.3s infinite}
+.km-r3{animation:kmRipple 7s ease-out 4.6s infinite}
+.km-pad{animation:kmDrift 9s ease-in-out infinite}
+.km-card{transition:transform .25s ease,box-shadow .25s ease}
+.km-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(18,49,46,.12)}
+.km-pill{transition:background .2s ease,color .2s ease}
+.km-pill:hover{background:#12312E;color:#FFFFFF}
+@media (prefers-reduced-motion:reduce){.km-a,.km-b,.km-c,.km-tail,.km-r1,.km-r2,.km-r3,.km-pad{animation:none}.km-card,.km-pill{transition:none}}
+</style>
+</helmet>
+<div style="font-family: 'DM Sans', system-ui, sans-serif; color: #12312E; background: #EEF4F1; min-height: 100%">
+
+<div aria-hidden="true" style="position: relative; height: 300px; overflow: hidden; background: linear-gradient(180deg, #BFD9D1 0%, #D7E8E2 55%, #EEF4F1 100%)">
+<div class="km-r1" style="position: absolute; left: 14%; top: 90px; width: 130px; height: 130px; border-radius: 50%; border: 1.5px solid #8DB7AC"></div>
+<div class="km-r2" style="position: absolute; left: 58%; top: 50px; width: 130px; height: 130px; border-radius: 50%; border: 1.5px solid #8DB7AC"></div>
+<div class="km-r3" style="position: absolute; left: 82%; top: 150px; width: 130px; height: 130px; border-radius: 50%; border: 1.5px solid #8DB7AC"></div>
+<svg class="km-pad" width="90" height="80" viewBox="0 0 90 80" style="position: absolute; left: 72%; top: 70px"><path d="M45 6 A38 34 0 1 1 44 6 L45 40 Z" fill="#7FAF8E"></path><path d="M45 6 L45 40" stroke="#5E8F6E" stroke-width="1.5"></path></svg>
+<svg class="km-pad" width="64" height="58" viewBox="0 0 90 80" style="position: absolute; left: 8%; top: 190px; animation-delay: -4s"><path d="M45 6 A38 34 0 1 1 44 6 L45 40 Z" fill="#8DBB9B"></path></svg>
+<svg class="km-a" width="110" height="46" viewBox="0 0 96 40" style="position: absolute; left: 0; top: 0"><g class="km-tail"><path d="M74 20 L94 5 L88 20 L94 35 Z" fill="#E0612B"></path></g><path d="M10 20 C 26 3, 60 3, 76 20 C 60 37, 26 37, 10 20 Z" fill="#E0612B"></path><ellipse cx="42" cy="15" rx="11" ry="6" fill="#FFFFFF"></ellipse><ellipse cx="60" cy="24" rx="6" ry="4" fill="#FFFFFF"></ellipse><circle cx="18" cy="17" r="2" fill="#12312E"></circle></svg>
+<svg class="km-b" width="88" height="37" viewBox="0 0 96 40" style="position: absolute; left: 0; top: 0"><g class="km-tail"><path d="M74 20 L94 5 L88 20 L94 35 Z" fill="#FFFFFF"></path></g><path d="M10 20 C 26 3, 60 3, 76 20 C 60 37, 26 37, 10 20 Z" fill="#FFFFFF"></path><ellipse cx="46" cy="20" rx="13" ry="7" fill="#E0612B"></ellipse><circle cx="18" cy="17" r="2" fill="#12312E"></circle></svg>
+<svg class="km-c" width="70" height="30" viewBox="0 0 96 40" style="position: absolute; left: 0; top: 0"><g class="km-tail"><path d="M74 20 L94 5 L88 20 L94 35 Z" fill="#E8B23A"></path></g><path d="M10 20 C 26 3, 60 3, 76 20 C 60 37, 26 37, 10 20 Z" fill="#E8B23A"></path><circle cx="18" cy="17" r="2" fill="#12312E"></circle></svg>
+</div>
+
+<div style="max-width: 1080px; margin: -96px auto 0; padding: 0 24px 56px; position: relative; display: flex; flex-wrap: wrap; gap: 48px">
+
+<div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 22px">
+<div style="width: 144px; height: 144px; border-radius: 50%; background: #FFFFFF; border: 5px solid #FFFFFF; box-shadow: 0 8px 24px rgba(18,49,46,.16); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #4A6662">Headshot</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 50px; line-height: 1.05">Griffin Brodman</h1>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #2E4C48">Engineering leader in Buffalo, NY. I like startups, scaling them, and fixing whatever crops up along the way.</p>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-if value="{{hidden}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{reveal}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: #12312E; color: #FFFFFF; font: inherit; font-weight: 700; cursor: pointer">Email me</button>
+</sc-if>
+<sc-if value="{{shown}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 6px 6px 18px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 2px 10px rgba(18,49,46,.08)">
+<a href="mailto:griffinbrodman@gmail.com" style="flex: 1; font-weight: 700">griffinbrodman@gmail.com</a>
+<button type="button" onClick="{{copy}}" style="min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #12312E; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">{{copyLabel}}</button>
+</div>
+</sc-if>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<a href="#" class="km-pill" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">LinkedIn</a>
+<a href="#" class="km-pill" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">GitHub</a>
+<a href="#" class="km-pill" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">Mentoring</a>
+<a href="#" class="km-pill" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">Instagram</a>
+</div>
+</div>
+</div>
+
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 112px">
+<section class="km-card" style="padding: 30px; border-radius: 22px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: #B8461A">NOW</h2>
+<p style="margin: 0; font-size: 19px; line-height: 1.55">Engineering Lead for <strong>Core</strong> at Apollo.io: Rep Experience, Controls, Deliverability and Warm Outbound. I also coach engineering managers on MentorCruise.</p>
+</section>
+
+<section class="km-card" style="padding: 30px; border-radius: 22px; background: #FFFFFF; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0 0 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: #B8461A">BEFORE</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 12px 0"><span style="flex: 999 1 280px; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 17px">Apollo.io</strong><span style="font-size: 15px; color: #4A6662">Eng Lead, Core · EM II, Search &amp; Discovery · EM, Prospecting</span></span><span style="font-size: 14px; color: #4A6662">2021–</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 12px 0; border-top: 1px solid #DCE8E4"><span style="flex: 999 1 280px; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 17px">Barracuda FX</strong><span style="font-size: 15px; color: #4A6662">Sr. Engineering Manager, team of nine</span></span><span style="font-size: 14px; color: #4A6662">2021</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 12px 0; border-top: 1px solid #DCE8E4"><span style="flex: 999 1 280px; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 17px">Broadway Technology</strong><span style="font-size: 15px; color: #4A6662">Trading systems in Python and C++, then Sr. EM</span></span><span style="font-size: 14px; color: #4A6662">2016–21</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 12px 0; border-top: 1px solid #DCE8E4"><span style="flex: 999 1 280px; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 17px">Riot Games</strong><span style="font-size: 15px; color: #4A6662">Development management intern</span></span><span style="font-size: 14px; color: #4A6662">2015</span></div>
+</section>
+
+<section class="km-card" style="padding: 30px; border-radius: 22px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: #B8461A">AT THE PAINTING DESK</h2>
+<p style="margin: 0; font-size: 19px">Currently painting the Thousand Sons.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<a href="#" style="flex: 1 1 130px; aspect-ratio: 1 / 1; border-radius: 16px; background: linear-gradient(150deg, #DCE8E4, #C9DDD6); display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; text-decoration: none; font-size: 12px; color: #4A6662">Mini photo</a>
+<a href="#" style="flex: 1 1 130px; aspect-ratio: 1 / 1; border-radius: 16px; background: linear-gradient(150deg, #DCE8E4, #C9DDD6); display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; text-decoration: none; font-size: 12px; color: #4A6662">Mini photo</a>
+<a href="#" style="flex: 1 1 130px; aspect-ratio: 1 / 1; border-radius: 16px; background: linear-gradient(150deg, #DCE8E4, #C9DDD6); display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; text-decoration: none; font-size: 12px; color: #4A6662">Mini photo</a>
+</div>
+<a href="#" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-weight: 700">See more on Instagram ↗</a>
+</section>
+
+<footer style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 16px 4px 0; font-size: 14px; color: #4A6662"><span>Buffalo, NY</span><span>© 2026 Griffin Brodman</span></footer>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1700}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+return {
+hidden: !s.shown,
+shown: !!s.shown,
+copyLabel: s.copied ? 'Copied' : 'Copy',
+reveal: () => this.setState({ shown: true }),
+copy: () => {
+try { navigator.clipboard.writeText('griffinbrodman@gmail.com'); } catch (e) {}
+this.setState({ copied: true });
+}
+};
+}
+}
+</script>
+</body>
+</html>

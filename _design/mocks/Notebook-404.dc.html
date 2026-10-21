@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>404 · Field Notebook</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=Caveat:wght@500;700&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3ECDD}
+a{color:#24507A}a:hover{color:#2A2520}
+a:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px dashed #B03A2E;outline-offset:3px}
+@keyframes n4Draw{from{stroke-dashoffset:900}to{stroke-dashoffset:0}}
+@keyframes n4Stamp{0%{transform:rotate(-6deg) scale(1.8);opacity:0}70%{transform:rotate(-6deg) scale(.94);opacity:1}100%{transform:rotate(-6deg) scale(1);opacity:1}}
+.n4-draw{stroke-dasharray:900;animation:n4Draw 2.4s ease-out both}
+.n4-stamp{animation:n4Stamp .5s ease-out both}
+@media (prefers-reduced-motion:reduce){.n4-draw,.n4-stamp{animation:none}}
+</style>
+</helmet>
+<div style="font-family: 'Source Serif 4', Georgia, serif; color: #2A2520; background-color: #F3ECDD; background-image: radial-gradient(#D6CBB4 1px, transparent 1px); background-size: 22px 22px; min-height: 100%">
+<div style="max-width: 640px; margin: 0 auto; padding: 72px 24px 64px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center">
+
+<div style="padding: 14px 14px 44px; background: #FFFFFF; box-shadow: 0 4px 14px rgba(42,37,32,.14); transform: rotate(2deg); position: relative">
+<div aria-hidden="true" style="position: absolute; top: -12px; left: 50%; width: 80px; height: 24px; margin-left: -40px; background: rgba(214,196,150,.75); transform: rotate(-3deg)"></div>
+<svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="A sketch of the Helix Fossil" style="display: block; background: #FBF8F1">
+<path class="n4-draw" d="{{ribs}}" fill="none" stroke="#8C7B63" stroke-width="1.2"></path>
+<path class="n4-draw" d="{{spiral}}" fill="none" stroke="#2A2520" stroke-width="2" stroke-linecap="round"></path>
+</svg>
+<div style="position: absolute; bottom: 8px; left: 0; right: 0; font-family: Caveat, cursive; font-size: 22px; color: #5C554B">fig. 1: the Helix Fossil</div>
+</div>
+
+<div style="font-family: Caveat, cursive; font-size: 26px; color: #B03A2E">404 — this page fell out of the notebook</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 44px; line-height: 1.15">Confess your sins to the Helix Fossil.</h1>
+
+<sc-if value="{{notConfessed}}" hint-placeholder-val="{{ true }}">
+<form aria-label="Confession" style="width: 100%; box-sizing: border-box; padding: 24px 28px; background: #FFFDF7; background-image: repeating-linear-gradient(transparent 0 35px, #D9E2EC 35px 36px); box-shadow: 0 3px 10px rgba(42,37,32,.10); transform: rotate(-0.6deg); display: flex; flex-direction: column; gap: 10px; text-align: left">
+<label for="n4-confession" style="font-family: Caveat, cursive; font-size: 26px; font-weight: 700; color: #B03A2E">Dear Helix Fossil,</label>
+<textarea id="n4-confession" rows="3" placeholder="I typed the URL by hand…" style="width: 100%; box-sizing: border-box; padding: 6px 2px; border: 0; background: transparent; color: #24507A; font-family: Caveat, cursive; font-size: 24px; line-height: 36px; resize: vertical"></textarea>
+<button type="button" onClick="{{confess}}" style="align-self: flex-end; min-height: 48px; padding: 0 22px; border: 2px solid #2A2520; background: #FFFFFF; color: #2A2520; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 3px 3px 0 #2A2520">Confess</button>
+</form>
+</sc-if>
+
+<sc-if value="{{confessed}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 16px 0">
+<div class="n4-stamp" style="padding: 12px 22px; border: 3px solid #B03A2E; color: #B03A2E; font-family: 'Bree Serif', serif; font-size: 26px; letter-spacing: 0.1em">FORGIVEN</div>
+<p style="margin: 0; font-size: 18px">The Helix Fossil has forgiven you.</p>
+<a href="Notebook-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border: 2px solid #2A2520; background: #FFFFFF; color: #2A2520; text-decoration: none; font-weight: 600; box-shadow: 3px 3px 0 #2A2520">Back to the first page</a>
+</div>
+</sc-if>
+
+<a href="Notebook-Mid.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-family: Caveat, cursive; font-size: 22px">or skip the confession and go home →</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":960}}'>
+class Component extends DCLogic {
+fossil() {
+const cx = 100, cy = 100, maxR = 84, turns = 3.2, T = turns * 2 * Math.PI;
+const b = Math.log(maxR / 2) / T;
+const r = (t) => 2 * Math.exp(b * t);
+const pt = (t, rr) => (cx + rr * Math.cos(t)).toFixed(1) + ' ' + (cy + rr * Math.sin(t)).toFixed(1);
+let spiral = '';
+for (let t = 0; t <= T; t += 0.1) spiral += (spiral ? ' L' : 'M') + pt(t, r(t));
+let ribs = '';
+for (let t = 2 * Math.PI + 0.3; t <= T; t += 0.42) ribs += ' M' + pt(t, r(t - 2 * Math.PI)) + ' L' + pt(t, r(t));
+return { spiral: spiral, ribs: ribs.trim() };
+}
+renderVals() {
+const s = this.state || {};
+const f = this.fossil();
+return {
+spiral: f.spiral,
+ribs: f.ribs,
+confessed: !!s.confessed,
+notConfessed: !s.confessed,
+confess: () => this.setState({ confessed: true })
+};
+}
+}
+</script>
+</body>
+</html>

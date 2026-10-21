@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>D4 · Koi Pond</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF4F1}
+a{color:#12312E}a:hover{color:#B8461A}
+@keyframes d4swimA{0%{transform:translate(-120px,40px) rotate(8deg)}50%{transform:translate(520px,10px) rotate(-6deg)}100%{transform:translate(1200px,60px) rotate(6deg)}}
+@keyframes d4swimB{0%{transform:translate(1200px,150px) scaleX(-1) rotate(-6deg)}100%{transform:translate(-160px,110px) scaleX(-1) rotate(4deg)}}
+@keyframes d4ripple{0%{transform:scale(.2);opacity:.6}100%{transform:scale(2.4);opacity:0}}
+.d4-a{animation:d4swimA 26s linear infinite}
+.d4-b{animation:d4swimB 34s linear infinite}
+.d4-r{animation:d4ripple 6s ease-out infinite}
+.d4-r2{animation:d4ripple 6s ease-out 3s infinite}
+.d4-card{transition:transform .25s ease,box-shadow .25s ease}
+.d4-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(18,49,46,.12)}
+@media (prefers-reduced-motion:reduce){.d4-a,.d4-b,.d4-r,.d4-r2{animation:none}.d4-card{transition:none}}
+</style>
+</helmet>
+<div style="font-family: 'DM Sans', system-ui, sans-serif; color: #12312E; background: #EEF4F1; min-height: 100%">
+
+<div aria-hidden="true" style="position: relative; height: 240px; overflow: hidden; background: linear-gradient(180deg, #CFE3DD 0%, #EEF4F1 100%)">
+<div class="d4-r" style="position: absolute; left: 18%; top: 70px; width: 120px; height: 120px; border-radius: 50%; border: 1.5px solid #8DB7AC"></div>
+<div class="d4-r2" style="position: absolute; left: 68%; top: 40px; width: 120px; height: 120px; border-radius: 50%; border: 1.5px solid #8DB7AC"></div>
+<svg class="d4-a" width="96" height="40" viewBox="0 0 96 40" style="position: absolute; left: 0; top: 0"><path d="M10 20 C 26 4, 60 4, 74 20 C 60 36, 26 36, 10 20 Z" fill="#E0612B"></path><path d="M74 20 L94 6 L88 20 L94 34 Z" fill="#E0612B"></path><ellipse cx="40" cy="16" rx="10" ry="6" fill="#FFFFFF"></ellipse><circle cx="18" cy="17" r="2" fill="#12312E"></circle></svg>
+<svg class="d4-b" width="80" height="34" viewBox="0 0 96 40" style="position: absolute; left: 0; top: 0"><path d="M10 20 C 26 4, 60 4, 74 20 C 60 36, 26 36, 10 20 Z" fill="#FFFFFF"></path><path d="M74 20 L94 6 L88 20 L94 34 Z" fill="#FFFFFF"></path><ellipse cx="46" cy="20" rx="12" ry="7" fill="#E0612B"></ellipse><circle cx="18" cy="17" r="2" fill="#12312E"></circle></svg>
+</div>
+
+<div style="max-width: 1040px; margin: -72px auto 0; padding: 0 24px 56px; position: relative; display: flex; flex-wrap: wrap; gap: 48px">
+
+<div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 22px">
+<div style="width: 128px; height: 128px; border-radius: 50%; background: #FFFFFF; border: 4px solid #FFFFFF; box-shadow: 0 6px 20px rgba(18,49,46,.15); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4A6662">[ HEADSHOT ]</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 46px; line-height: 1.08">Griffin Brodman</h1>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #2E4C48">Engineering leader in Buffalo. I like startups, scaling them, and fixing whatever crops up along the way.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button type="button" style="min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: #12312E; color: #FFFFFF; font: inherit; font-weight: 700; cursor: pointer">Email me</button>
+<a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">LinkedIn</a>
+<a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">GitHub</a>
+<a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">Mentoring</a>
+<a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; text-decoration: none; font-weight: 500">Instagram</a>
+</div>
+</div>
+
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 88px">
+<section class="d4-card" style="padding: 28px; border-radius: 20px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; color: #B8461A">NOW</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55">Leading <strong>Core</strong> at Apollo.io: Rep Experience, Controls, Deliverability, Warm Outbound. Coaching engineering managers on MentorCruise.</p>
+</section>
+<section class="d4-card" style="padding: 28px; border-radius: 20px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; color: #B8461A">BEFORE</h2>
+<div style="display: flex; flex-direction: column; font-size: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0"><span><strong>Apollo.io</strong> · EM → Eng Lead</span><span style="color: #4A6662">2021–</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid #DCE8E4"><span><strong>Barracuda FX</strong> · Sr. EM</span><span style="color: #4A6662">2021</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid #DCE8E4"><span><strong>Broadway Technology</strong> · Engineer → Sr. EM</span><span style="color: #4A6662">2016–21</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid #DCE8E4"><span><strong>Riot Games</strong> · Intern</span><span style="color: #4A6662">2015</span></div>
+</div>
+</section>
+<section class="d4-card" style="padding: 28px; border-radius: 20px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; color: #B8461A">AT THE PAINTING DESK</h2>
+<p style="margin: 0; font-size: 18px">Thousand Sons. <a href="#">See them on Instagram ↗</a></p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<div style="flex: 1 1 120px; aspect-ratio: 1 / 1; border-radius: 14px; background: #DCE8E4; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4A6662">[ MINI ]</div>
+<div style="flex: 1 1 120px; aspect-ratio: 1 / 1; border-radius: 14px; background: #DCE8E4; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4A6662">[ MINI ]</div>
+<div style="flex: 1 1 120px; aspect-ratio: 1 / 1; border-radius: 14px; background: #DCE8E4; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4A6662">[ MINI ]</div>
+</div>
+</section>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>D1 · Arcane</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&amp;family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1A2B}
+a{color:#EDE6D6}a:hover{color:#E2BE6A}
+@keyframes d1spin{to{transform:rotate(360deg)}}
+@keyframes d1glow{0%,100%{opacity:.55}50%{opacity:1}}
+.d1-ring{animation:d1spin 60s linear infinite}
+.d1-eye{animation:d1glow 5s ease-in-out infinite}
+.d1-row{transition:padding-left .25s ease,color .25s ease}
+.d1-row:hover{padding-left:12px}
+@media (prefers-reduced-motion:reduce){.d1-ring,.d1-eye{animation:none}.d1-row{transition:none}}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #EDE6D6; background: radial-gradient(ellipse at 20% 0%, #18304F 0%, #0E1A2B 60%); min-height: 100%">
+<div style="max-width: 1040px; margin: 0 auto; padding: 96px 24px 56px; display: flex; flex-wrap: wrap; gap: 72px">
+
+<div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 28px">
+<div style="position: relative; width: 168px; height: 168px">
+<svg class="d1-ring" viewBox="0 0 168 168" width="168" height="168" aria-hidden="true" style="position: absolute; inset: 0">
+<circle cx="84" cy="84" r="80" fill="none" stroke="#C9A24B" stroke-width="1"></circle>
+<circle cx="84" cy="84" r="72" fill="none" stroke="#C9A24B" stroke-width="1" stroke-dasharray="2 6"></circle>
+<path d="M84 4 L88 14 L80 14 Z M84 164 L88 154 L80 154 Z M4 84 L14 80 L14 88 Z M164 84 L154 80 L154 88 Z" fill="#C9A24B"></path>
+</svg>
+<div style="position: absolute; inset: 20px; border-radius: 50%; background: #16263D; border: 1px solid #3A4E6B; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.1em; color: #A9B4C4">[ HEADSHOT ]</div>
+</div>
+<h1 style="margin: 0; font-family: 'Bree Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; color: #E2BE6A">Griffin Brodman</h1>
+<p style="margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 24px; line-height: 1.4; font-style: italic; color: #EDE6D6">Engineering leader. I like startups, scaling them, and fixing whatever crops up along the way.</p>
+<div style="display: flex; flex-direction: column; border-top: 1px solid #3A4E6B">
+<button type="button" class="d1-row" style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 0; border: 0; border-bottom: 1px solid #3A4E6B; background: transparent; color: #EDE6D6; font: inherit; font-size: 16px; font-weight: 500; cursor: pointer; text-align: left">Email me <span aria-hidden="true" style="color: #C9A24B">✦</span></button>
+<a href="#" class="d1-row" style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; border-bottom: 1px solid #3A4E6B; text-decoration: none; font-weight: 500">LinkedIn <span aria-hidden="true" style="color: #C9A24B">↗</span></a>
+<a href="#" class="d1-row" style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; border-bottom: 1px solid #3A4E6B; text-decoration: none; font-weight: 500">GitHub <span aria-hidden="true" style="color: #C9A24B">↗</span></a>
+<a href="#" class="d1-row" style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; border-bottom: 1px solid #3A4E6B; text-decoration: none; font-weight: 500">Mentoring <span aria-hidden="true" style="color: #C9A24B">↗</span></a>
+<a href="#" class="d1-row" style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; border-bottom: 1px solid #3A4E6B; text-decoration: none; font-weight: 500">Instagram <span aria-hidden="true" style="color: #C9A24B">↗</span></a>
+</div>
+</div>
+
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 56px; padding-top: 24px">
+<section style="display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.32em; color: #C9A24B">NOW</h2>
+<p style="margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 26px; line-height: 1.4">Leading <span style="color: #E2BE6A">Core</span> at Apollo.io: Rep Experience, Controls, Deliverability and Warm Outbound. Coaching engineering managers on the side.</p>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.32em; color: #C9A24B">BEFORE</h2>
+<div style="display: flex; flex-direction: column; font-size: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 0; border-top: 1px solid #3A4E6B"><span>Apollo.io <span style="color: #A9B4C4">· EM → Eng Lead</span></span><span style="color: #A9B4C4">2021–</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 0; border-top: 1px solid #3A4E6B"><span>Barracuda FX <span style="color: #A9B4C4">· Sr. Engineering Manager</span></span><span style="color: #A9B4C4">2021</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 0; border-top: 1px solid #3A4E6B"><span>Broadway Technology <span style="color: #A9B4C4">· Engineer → Sr. EM</span></span><span style="color: #A9B4C4">2016–21</span></div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 0; border-top: 1px solid #3A4E6B; border-bottom: 1px solid #3A4E6B"><span>Riot Games <span style="color: #A9B4C4">· Intern</span></span><span style="color: #A9B4C4">2015</span></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.32em; color: #C9A24B">THE PAINTING DESK</h2>
+<p style="margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 22px; line-height: 1.4">Currently painting the Thousand Sons. All is dust.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div class="d1-eye" style="flex: 1 1 140px; aspect-ratio: 3 / 4; border: 1px solid #C9A24B; background: #16263D; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.1em; color: #A9B4C4">[ MINI ]</div>
+<div style="flex: 1 1 140px; aspect-ratio: 3 / 4; border: 1px solid #3A4E6B; background: #16263D; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.1em; color: #A9B4C4">[ MINI ]</div>
+<div style="flex: 1 1 140px; aspect-ratio: 3 / 4; border: 1px solid #3A4E6B; background: #16263D; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.1em; color: #A9B4C4">[ MINI ]</div>
+</div>
+<a href="#" style="font-size: 15px; color: #E2BE6A">More on Instagram ↗</a>
+</section>
+
+<footer style="padding-top: 24px; border-top: 1px solid #3A4E6B; font-size: 13px; letter-spacing: 0.2em; color: #A9B4C4">BUFFALO · NEW YORK</footer>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
