@@ -110,6 +110,7 @@
 .cn-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; font: inherit; font-size: 14px; color: var(--ink); background: var(--parch); border: 1px solid var(--edge); cursor: pointer; }
 .cn-chip .trophy-px { margin: -4px 0; }
 .cn-chip.on { background: #fbf1d6; border-color: var(--brass0); box-shadow: 0 0 0 2px var(--brass); }
+@media (max-width: 600px), (pointer: coarse) { .cn-chip { min-height: 40px; } }
 
 /* ---------- speeches ---------- */
 .sp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }

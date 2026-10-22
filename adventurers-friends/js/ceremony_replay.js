@@ -169,20 +169,27 @@
     const cv = canvas(W, H);
     cv.className = "ceremony-canvas";
     cv.setAttribute("role", "img");
-    const st = { i: 0, at: null, playing: true, beat: -1, cast: null, calm: false };
+    // the envelope keeps its own clock (lt from its start, ct for the cast's idle frames), stepped from the stage's ticks and held while paused:
+    // the stage's t counts from page load and jumps when it is redrawn out of turn, so it can't say where an envelope is
+    const st = { i: 0, lt: 0, ct: 0, last: null, playing: true, beat: -1, cast: null };
     const set = (i) => {
-      st.i = (i + list.length) % list.length; st.at = null; st.beat = -1;
+      st.i = (i + list.length) % list.length; st.lt = 0; st.beat = -1;
       const env = list[st.i];
       st.cast = castOf(env, standings);
       st.spots = places(st.cast.walkers.length + st.cast.crowd.length);
       cv.setAttribute("aria-label", `${env.name}: ${env.kind === "party" ? (App.parties[env.winner] || {}).name : (App.heroes[env.winner] || {}).name}`);
     };
     set(0);
-    const localT = (t) => { if (Anim.reduced) return ALOFT + 1; if (st.at == null) st.at = t; return t - st.at; };
+    const tickTo = (t) => {
+      const dt = st.last == null ? 0 : clamp(t - st.last, 0, 0.25);
+      st.last = t;
+      if (st.playing && !Anim.reduced) { st.lt += dt; st.ct += dt; }
+    };
     const acts = rm.acts.slice();
-    acts.push({ z: 50, draw(ctx, t) {
-      const lt = localT(t), env = list[st.i];
-      if (!Anim.reduced && st.playing && lt > DUR) { if (st.i < list.length - 1 || o.loop) { set(st.i + 1); st.at = t; if (o.onEnvelope) o.onEnvelope(st.i); } }
+    acts.push({ z: 50, draw(ctx, now) {
+      tickTo(now);
+      if (!Anim.reduced && st.playing && st.lt > DUR && (st.i < list.length - 1 || o.loop)) { set(st.i + 1); if (o.onEnvelope) o.onEnvelope(st.i); }
+      const lt = Anim.reduced ? ALOFT + 1 : st.lt, t = st.ct, env = list[st.i];
       const beat = lt < CALL ? 0 : lt < GIVE - 1.2 ? 1 : lt < ALOFT ? 2 : 3;
       if (beat !== st.beat) { const from = st.beat; st.beat = beat; if (o.onBeat) o.onBeat(st.i, beat, from); }
       // the crowd on the floor, the presenter at the lectern, the walkers on their way up
@@ -238,8 +245,8 @@
     } });
     for (let x = S0 + 4; x <= S1; x += 32) acts.push(footlight(x, FACE - 1, seed + x));
     // pixel leaves and gold flakes over the stage once the trophy is up
-    acts.push({ z: 9e4, front: true, draw(ctx, t) {
-      const lt = Anim.reduced ? ALOFT + 1 : st.at == null ? 0 : t - st.at;
+    acts.push({ z: 9e4, front: true, draw(ctx) {
+      const lt = Anim.reduced ? ALOFT + 1 : st.lt;
       if (lt < ALOFT) return;
       const age = lt - ALOFT;
       for (let i = 0; i < 30; i++) {
@@ -253,7 +260,7 @@
     return {
       cv, list,
       get i() { return st.i; },
-      show(i) { set(i); if (cv.anim) cv.anim.draw(cv.anim.still); },
+      show(i) { set(i); if (cv.anim) cv.anim.draw(st.last == null ? cv.anim.still : st.last); },
       play(on) { st.playing = !!on; },
       get playing() { return st.playing; },
     };

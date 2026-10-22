@@ -311,9 +311,10 @@
       onEnvelope: (i) => caption(i, 0),
     });
     if (!st) return null;
-    fin.ceremony.forEach((env, i) => chips.appendChild(el("button", { class: "cn-chip", type: "button", title: `${env.name}: ${envWinner(env)}`, onclick: () => { st.show(i); caption(i, calm() ? 3 : 0); } },
+    fin.ceremony.forEach((env, i) => chips.appendChild(el("button", { class: "cn-chip", type: "button", title: `${env.name}: ${envWinner(env)}`, onclick: () => { st.play(true); syncPlay(); st.show(i); } },
       Trophies.canvas(env.award, 1), el("span", null, env.name))));
-    playBtn.onclick = () => { st.play(!st.playing); playBtn.textContent = st.playing ? "❚❚ Pause" : "▶ Play"; };
+    const syncPlay = () => { playBtn.textContent = st.playing ? "❚❚ Pause" : "▶ Play"; };
+    playBtn.onclick = () => { st.play(!st.playing); syncPlay(); };
     caption(0, calm() ? 3 : 0);
     return panel("Ceremony Night", el("p", { class: "small muted" }, `The envelopes, opened on the stage in ${A.nodeName(townOf(s, fin))}: the small trophies first, then the Party and the Hero of the Season. Tap an envelope to see it again.`),
       el("figure", { class: "cn" }, st.cv, el("figcaption", null, cap0, lines)),
@@ -375,10 +376,10 @@
     return panel("The Heroes' Choice",
       el("div", { class: "vote" }, el("div", { class: "vote-box" }, ballotBox(3), el("div", { class: "tiny dim" }, `${plural(v.voters, "ballot")} cast`)),
         el("div", { class: "vote-body" },
-          el("p", { class: "small muted" }, "Every hero casts one ballot for the hero they think had the best season. Friends vote for friends; some vote for themselves."),
+          el("p", { class: "small muted" }, "Every hero names three: 3 points for the best season they saw, 2 for the next, 1 for the third. Friends vote for friends; some put themselves first."),
           el("div", { class: "vote-top" }, top.map((x, i) => el("a", { class: "vote-pick" + (i === 0 ? " first" : ""), href: `#/hero/${x.hero}` }, A.heroPortrait(heroes[x.hero], i === 0 ? 3 : 2),
-            el("b", null, heroes[x.hero].name), el("span", { class: "tiny" }, plural(x.votes, "vote"))))),
-          top.length > 1 && top[0].votes === top[1].votes ? el("p", { class: "tiny dim" }, `A tie on ${plural(top[0].votes, "vote")}: it goes to whoever finished higher in the table.`) : null,
+            el("b", null, heroes[x.hero].name), el("span", { class: "tiny" }, `${plural(x.points, "point")}${x.firsts ? ` · ${plural(x.firsts, "first place")}` : ""}`)))),
+          top.length > 1 && top[0].points === top[1].points ? el("p", { class: "tiny dim" }, `A tie on ${plural(top[0].points, "point")}: ${top[0].firsts !== top[1].firsts ? "more first places takes it" : "it goes to whoever finished higher in the table"}.`) : null,
           gossip.length ? el("ul", { class: "vote-gossip small" }, gossip) : null)));
   }
   function yearbookPanel(s, fin) {
@@ -709,8 +710,8 @@
       t ? el("section", { class: "ys-sec ys-toast" }, el("h4", null, t.kind === "roast" ? "The roast" : "The toast"),
         el("blockquote", { class: "small" }, A.richText(t.line, [t.by, t.hero].filter(Boolean))),
         el("div", { class: "tiny dim" }, "— ", t.by && heroes[t.by] ? A.heroLink(t.by) : t.by_name)) : null,
-      voteLine(b) || b.votes ? el("section", { class: "ys-sec ys-vote" }, el("h4", null, "The Heroes' Choice"),
-        el("p", { class: "small" }, voteLine(b), b.votes ? [" ", el("b", null, plural(b.votes, "vote")), " came their way."] : null)) : null,
+      voteLine(b) || b.points ? el("section", { class: "ys-sec ys-vote" }, el("h4", null, "The Heroes' Choice"),
+        el("p", { class: "small" }, voteLine(b), b.points ? [" ", el("b", null, plural(b.points, "point")), " came their way."] : null)) : null,
       (b.stats || []).length ? el("section", { class: "ys-sec" }, el("h4", null, "Against the league"), (b.stats || []).slice(0, 3).map(statRow)) : null,
       tn && tn.then && tn.now ? el("section", { class: "ys-sec ys-tn" }, el("h4", null, "Then and now"),
         el("div", { class: "tn-pics" }, snapPortrait(id, tn.then, 2, true), el("span", { class: "tn-arrow", "aria-hidden": "true" }, "▸"), snapPortrait(id, tn.now, 2)),
