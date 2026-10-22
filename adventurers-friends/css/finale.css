@@ -188,7 +188,7 @@
 .trailer h4 { margin-top: 14px; }
 .tr-bosses { display: flex; flex-wrap: wrap; gap: 12px; }
 .tr-boss { display: flex; flex-direction: column; align-items: center; text-align: center; width: 150px; gap: 2px; }
-.tr-boss canvas { filter: brightness(0); margin-bottom: 4px; }
+.tr-boss canvas { margin-bottom: 4px; }
 .tr-list { list-style: none; padding: 0; margin: 0; }
 .tr-list li { padding: 3px 0; border-top: 1px dashed rgba(200, 150, 62, 0.35); }
 .tr-grudge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
