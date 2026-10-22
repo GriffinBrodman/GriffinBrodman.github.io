@@ -725,12 +725,19 @@
     for (const j of spec.joiners || []) v[j.id] = j.voice;
     return v;
   }
-  // the words of a book song or a hero's own song, by id
+  // the words of a book song, a tavern ballad or a hero's own song, by id
   function words(sg) {
     if (!sg) return null;
     const S = (root.LD && LD.static && LD.static.music) || {}, L = (root.LD && LD.league) || {};
     if (sg.src === "book") { const s = (S.songbook || []).find((x) => x.id === sg.id); return s ? { title: s.title, lines: s.lines, chorus: s.chorus, resp: s.resp || null } : null; }
     if (sg.src === "hero") { const s = (L.hero_songs || []).find((x) => x.id === sg.id); return s && s.lines ? { title: s.title, lines: s.lines, chorus: s.chorus || [0, 1] } : null; }
+    if (sg.src === "ballad") {
+      const s = (L.songs || []).find((x) => x.id === sg.id), lines = s && s.lyrics;
+      if (!lines || !lines.length) return null;
+      // a ballad's chorus is the pair of lines it comes back to
+      const i = lines.findIndex((x, k) => lines.indexOf(x, k + 1) > k);
+      return { title: s.title, lines, chorus: i >= 0 && i + 1 < lines.length ? [i, i + 1] : [0, 1] };
+    }
     return null;
   }
 

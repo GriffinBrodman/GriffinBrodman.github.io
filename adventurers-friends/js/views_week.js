@@ -64,7 +64,9 @@
     const sec = el("section", { class: "panel parch week" },
       el("div", { class: "week-mast" }, el("div", { class: "week-title" }, "The Week"),
         el("div", { class: "sub" }, el("span", null, `Season ${d.season} · Week ${d.week}`), el("span", null, `Days ${d.day_from}–${d.day_to}`))));
-    if (d.column) sec.appendChild(columnBlock(d));
+    // opts.sealed: the season's last week, before the reader has opened the envelopes; the column names the winners
+    if (d.column && !opts.sealed) sec.appendChild(columnBlock(d));
+    else if (d.column) sec.appendChild(el("p", { class: "small muted week-sealed" }, "The columnist's piece on the season's last week is sealed with the envelopes. ", el("a", { href: `#/finale/${d.season}` }, "Open them at the ceremony ›")));
     const hw = heroes[d.hero_of_week], pw = parties[d.party_of_week];
     const note = (t) => el("p", { class: "tiny dim week-note" }, t);
     if (hw || pw) sec.appendChild(el("div", { class: "grid2 even week-awards" },
@@ -76,7 +78,7 @@
     const market = el("div", { class: "week-market" }, el("h4", null, "Market report"),
       d.market_hot.length ? el("p", { class: "small" }, el("b", null, "Hot: "), goods(d.market_hot, "green")) : null,
       d.market_cold.length ? el("p", { class: "small" }, el("b", null, "Glutted: "), goods(d.market_cold, "red")) : null);
-    const ranks = opts.rankings ? (d.rankings || []).filter((r) => heroes[r.hero]) : [];
+    const ranks = opts.rankings && !opts.sealed ? (d.rankings || []).filter((r) => heroes[r.hero]) : [];
     if (ranks.length) {
       const t = el("table");
       for (const r of ranks) t.appendChild(el("tr", null, el("td", { class: "dim" }, r.rank), el("td", null, moveMark(r, d.week)),

@@ -506,9 +506,9 @@
       if (!(window.Deaths && Deaths.draw(ctx, { ref: id, boss: true }, 0, cx, ground, -1, { calm: true }))) {
         // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
         ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
-        ctx.translate(px + (g.w >> 1), Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
+        ctx.translate(cx, Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
       }
-      if (A) actors.push(A.smoke({ x: px + g.w / 2, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
+      if (A) actors.push(A.smoke({ x: cx, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
     } else if (["fight", "ambush", "boss"].includes(e.kind) && (e.foes || []).length) {
       e.foes.slice(0, 3).forEach((mid, i) => {
         const m = S.monsters[mid];

@@ -2,7 +2,7 @@
 (function () {
   const A = App;
   const { L, el, heroes } = A;
-  const { artifactsPanel, panel, runnerUp, treasuresPanel } = Views;
+  const { cursesPanel, panel, runnerUp, treasuresPanel } = Views;
 
   A.route(/^\/history$/, (v) => {
     v.appendChild(el("h1", null, "History"));
@@ -39,7 +39,7 @@
     return p;
   }
   function treasures() {
-    const t = treasuresPanel(), a = artifactsPanel();
+    const t = treasuresPanel(), a = cursesPanel();
     const box = el("div", { id: "hist-treasures" });
     if (t.tagName === "SPAN" && a.tagName === "SPAN") box.appendChild(panel("Treasures of the age", el("p", { class: "empty" }, "Nothing magic has turned up yet. Finds from deep floors, bosses and odd deals are listed here, with what became of them.")));
     else box.append(t, a);

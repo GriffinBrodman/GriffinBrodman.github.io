@@ -205,7 +205,22 @@
       return i > 0 ? Object.assign({}, e, { text: e.text.slice(i) }) : e;
     };
   }
+  // until a reader has opened a season's envelopes, its last day's paper doesn't name the winners: the ceremony does
+  const SEALED_KINDS = ["top_party", "season_end", "award", "podium", "race_end"];
+  const sealedSeason = (e) => e && e.kind === "season_end" && window.Finale && !Finale.seen(e.season) && (L.seasons || []).some((s) => s.season === e.season && s.finale);
+  // the same holds for the rest of that day's paper: the standings, the week's column and the diaries all give the winner away
+  const sealedOn = (day) => window.Finale && (L.seasons || []).find((s) => s.finale && s.end_day === day && !Finale.seen(s.season));
+  function sealedLead(parch, lead) {
+    parch.appendChild(el("div", { class: "lead sealed" }, Finale.waxSeal(2),
+      el("h1", null, "The ceremony is tonight"),
+      el("p", { class: "muted" }, `Season ${lead.season} is over. The envelopes are sealed: the final table, the Party of the Season and the Hero of the Season are read out at the ceremony, along with a trophy or an honour for nearly everyone.`),
+      el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
+        L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null)));
+  }
   function leadAndSecond(parch, lead, second, today, roundup) {
+    if (sealedOn(today)) second = second.filter((e) => !SEALED_KINDS.includes(e.kind));
+    if (sealedSeason(lead)) { sealedLead(parch, lead); lead = null; }
+    else if (lead && sealedOn(today) && SEALED_KINDS.includes(lead.kind)) lead = null;
     if (lead) {
       const scene = A.vignette(lead, 240, 72, "scene");
       const hl = (L.llm_lead || {})[lead.id] || headline(lead);
@@ -289,14 +304,15 @@
         el("div", { class: "sub" }, el("span", null, issueLabel(x)), el("span", null, L.meta.name), el("span", null, "Back issue")),
         weekStrip(day, !!iss.week),
         issueNav(day)));
-      const { elsewhere, lead, second, roundup, main, small } = crierDay(day, iss.events);
+      const cd = crierDay(day, iss.events), { elsewhere, lead, second, roundup } = cd, keep = (e) => !sealedOn(day) || !SEALED_KINDS.includes(e.kind);
+      const main = cd.main.filter(keep), small = cd.small.filter(keep);
       leadAndSecond(parch, lead, second, day, roundup);
       v.appendChild(parch);
       const p = panel(`That day · ${issueLabel(x)}`);
       p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day.", mark: true }));
       smallerHappenings(p, small);
       v.appendChild(p);
-      if (iss.week) v.appendChild(Views.theWeek(iss.week, { rankings: true }));
+      if (iss.week) v.appendChild(Views.theWeek(iss.week, { rankings: true, sealed: !!sealedOn(day) }));
       if (elsewhere.length) v.appendChild(panel("Elsewhere in the realm", el("ul", { class: "diary" }, elsewhere.slice(0, 5).map((e) => el("li", null, A.storyLine(e))))));
     });
   });
@@ -351,21 +367,25 @@
     }
 
     const today = lastDay();
-    const { elsewhere, lead, second, roundup, main, small } = crierDay(today, L.events);
+    const day = crierDay(today, L.events), { elsewhere, lead, second, roundup } = day;
+    const hush = sealedOn(today) ? (e) => !SEALED_KINDS.includes(e.kind) : () => true;
+    const main = day.main.filter(hush), small = day.small.filter(hush);
     leadAndSecond(parch, lead, second, today, roundup);
     // the week's column runs all week; on the week's last day it heads The Week instead
-    const wk = L.week && L.week.season === meta.season ? L.week : null;
-    if (wk && wk.done && wk.day_to === meta.season_day) v.insertBefore(Views.theWeek(wk), parch.nextSibling);
-    else if (wk && wk.column) parch.appendChild(Views.columnBlock(wk));
+    const wk = L.week && L.week.season === meta.season ? L.week : null, sealed = sealedOn(today);
+    if (wk && wk.done && wk.day_to === meta.season_day) v.insertBefore(Views.theWeek(wk, { sealed: !!sealed }), parch.nextSibling);
+    else if (wk && wk.column && !sealed) parch.appendChild(Views.columnBlock(wk));
 
     const lastSeason = (L.seasons || [])[L.seasons.length - 1];
-    if (lastSeason && (meta.phase === "offseason" || lastSeason.end_day >= meta.day - 1)) v.appendChild(finalePanel(lastSeason));
+    if (lastSeason && (meta.phase === "offseason" || lastSeason.end_day >= meta.day - 1)) v.appendChild(window.Finale && lastSeason.finale && !Finale.seen(lastSeason.season) ? sealedFinalePanel(lastSeason) : finalePanel(lastSeason));
+    const odds = meta.phase === "season" && L.crier_odds && window.Finale ? Finale.oddsBoard(L.crier_odds, { live: true }) : null;
+    if (odds) v.insertBefore(odds, parch.nextSibling);
     if (!mineFirst.length && skippedPick()) v.appendChild(el("section", { class: "panel follow tight" },
       el("div", { class: "row wrap between" }, el("span", null, "Tip: open your hero's page and press ", el("b", null, "★ This is mine"), " to pin them here every time you check in."),
         el("a", { class: "btn small", href: "#/roster" }, "Find your hero"))));
 
-    v.appendChild(el("div", { class: "grid2 even" }, tablePanel(), partiesPanel()));
-    const lifetime = lifetimePanel();
+    if (!sealed) v.appendChild(el("div", { class: "grid2 even" }, tablePanel(), partiesPanel()));
+    const lifetime = sealed ? null : lifetimePanel();
     if (lifetime) v.appendChild(lifetime);
     const grid = el("div", { class: "grid2" });
     const left = el("div");
@@ -375,7 +395,7 @@
 
     const p = panel(`Since yesterday · Day ${L.meta.season_day}`);
     p.appendChild(A.feed(main, { noDay: true, empty: "A quiet day.", mark: true }));
-    const snips = (L.snippets || []).filter((x) => heroes[x.hero]);
+    const snips = sealed ? [] : (L.snippets || []).filter((x) => heroes[x.hero]);
     if (main.length < 5 && snips.length) {
       p.appendChild(el("h4", { style: { marginTop: "10px" } }, "Around the league"));
       p.appendChild(el("ul", { class: "diary" }, snips.slice(0, 6 - Math.min(4, main.length)).map((x) => el("li", null, x.text.startsWith(heroes[x.hero].name) ? A.storyLine(x, endDot(x.text)) : [A.heroLink(x.hero), " ", A.storyLine(x, endDot(x.text))]))));
@@ -417,7 +437,7 @@
       case "pvp": return `Blood between heroes near ${A.nodeName(e.loc, true)}`;
       case "robbery": return `Highway robbery!`;
       case "season_start": return e.text.split(":")[0];
-      case "season_end": return (e.heroes || []).length ? `${h0} is Hero of the Season` : `Season over`;
+      case "season_end": return sealedSeason(e) ? "The ceremony is tonight" : (e.heroes || []).length ? `${h0} is Hero of the Season` : `Season over`;
       case "brawl": return `Tavern brawl`;
       case "funeral": return `Farewell, ${h0}`;
       case "trait": return `${h0} is not the same hero`;
@@ -482,6 +502,12 @@
     return panel("All seasons", el("p", { class: "small muted" }, `Renown added up across ${plural(n, "season")}${L.meta.phase === "season" ? ", this one still counting" : ""}. ♛ marks a season won.`),
       el("div", { class: "scrollx" }, top), more,
       ps.length ? [el("h4", { style: { marginTop: "10px" } }, "Parties"), el("div", { class: "scrollx" }, table(ps, "Party", (r) => parties[r.party] ? A.partyLink(r.party) : el("span", null, r.name), (r) => r.active !== false))] : null);
+  }
+  function sealedFinalePanel(s) {
+    return el("section", { class: "panel theme-banner" }, Finale.waxSeal(2),
+      el("div", { style: { flex: 1 } }, el("h2", null, `Season ${s.season}: the envelopes are sealed`),
+        el("p", { class: "small muted" }, "Every award, the final table and the Hero of the Season, opened one at a time at the ceremony. Until then the standings and the week's column stay in the envelopes too.")),
+      el("a", { class: "btn primary", href: `#/finale/${s.season}` }, "🏆 Enter the ceremony"));
   }
   function finalePanel(s) {
     const p = el("section", { class: "panel theme-banner" });
@@ -713,6 +739,11 @@
     return A.load(`hero/${id}`).then((h) => { v.innerHTML = ""; heroPage(v, h, tab || "diary", day ? +day : null); }, lost);
   });
 
+  // a link to the hero's Your Season card for every season they finished in the table
+  function seasonCards(h) {
+    return (L.seasons || []).filter((s) => s.finale && (s.standings || []).some((r) => r.hero === h.id))
+      .map((s) => el("a", { class: "btn small", href: `#/finale/${s.season}/${h.id}`, title: `${A.poss(h.name)} season ${s.season}, on one card` }, `🏆 Season ${s.season} card`));
+  }
   function heroPage(page, h, tab, day) {
     const v = el("div", { class: `heropage path-${basePath(h.cls)}` });
     page.appendChild(v);
@@ -750,8 +781,10 @@
               return [i ? " · " : "", k === "a steady hand" ? [tip(part, "Renown for careful heroes. Cautious heroes skip the risky fights that pay out the most fame, so instead they earn a little renown for every clean fight they win and every job they finish properly: the more cautious the hero, the more. Bold heroes earn none of it.", "A steady hand"), guideQ("a-steady-hand", "a steady hand")] : part];
             })) : null) : null,
           h.injuries.length ? el("div", { class: "red" }, "Hurt: " + h.injuries.join(", ")) : null) : null,
-        el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn))));
+        el("div", { class: "row wrap", style: { marginTop: "10px" } }, followBtn, shareBtn, seasonCards(h)))));
     v.appendChild(head);
+    const cab = window.Trophies ? Trophies.cabinet(h.cabinet) : null;
+    if (cab) v.appendChild(cab);
     // the header is only who and how they are; the day (today, hour by hour, tonight) heads the Diary, the rest of who they are heads Character
     const cal = dayCalendar(h);
     let hourByHour = null, daySec = null;
@@ -1862,6 +1895,8 @@
         goalLine(p.goal), ...(p.vows || []).map((v) => vowLine(v))),
       el("button", { class: "btn", onclick: () => A.copy(`${p.name}: ${p.members.map((m) => (heroes[m] || {}).name).join(", ")}\n${A.shareUrl("#/party/" + p.id)}`) }, "Share")));
     v.appendChild(head);
+    const cab = window.Trophies ? Trophies.cabinet(p.cabinet, { title: "The crew's trophy cabinet" }) : null;
+    if (cab) v.appendChild(cab);
     // every boss the crew brought down, one trophy each, with a link to watch the kill while the fight is still kept
     const tro = trophyShelf(p.trophies);
     if (tro) v.appendChild(tro);
@@ -2052,7 +2087,7 @@
         const w = Music.words(s), folk = s.src === "folk";
         list.appendChild(el("div", { class: "row small" }, w || folk ? songBtn(s, w, lead, "rep:" + h.id + ":" + s.id) : el("span"),
           el("div", { style: { flex: 1 } }, `“${s.title}”`, s.by && s.by !== h.id && heroes[s.by] ? el("span", { class: "dim" }, " by ", A.heroLink(s.by)) : null,
-            el("span", { class: "tiny dim" }, ` · ${folk ? "folk tune, " : ""}${s.tone}`), m.anthem && m.anthem.id === s.id ? el("span", { class: "tiny gold" }, " · ★ anthem") : null),
+            el("span", { class: "tiny dim" }, ` · ${folk ? "folk tune, " : s.src === "ballad" ? "tavern ballad, " : ""}${s.tone}`), m.anthem && m.anthem.id === s.id ? el("span", { class: "tiny gold" }, " · ★ anthem") : null),
           el("span", { class: "tiny " + (s.n ? "" : "dim") }, s.n ? `sung ${sungTimes(s.n)}` : "knows it")));
       }
       p.append(el("h4", null, "Knows by heart"), el("p", { class: "tiny dim" }, "Picked up at home, at other fires and in tavern rooms; the most recently sung first."), list);
@@ -2067,7 +2102,7 @@
   }
 
   // Round the fire: heroes' own written songs and crews' anthems, chosen by the sim (league/music.py fire_songs); never a folk tune,
-  // and no songbook song unless a crew made it its anthem
+  // and no songbook song or tavern ballad unless a crew made it its anthem
   const TONE = { tender: "tender", funny: "funny", dark: "dark", rowdy: "rowdy", sad: "sad", heroic: "heroic", odd: "odd" };
   function fireSongs() {
     if (!window.Music) return null;
@@ -2280,19 +2315,17 @@
           el("ul", null, before.map((e) => el("li", null, el("b", null, `Day ${A.seasonOf(e.day)[1]}. `), A.storyLine(e)))), el("p", { class: "small" }, el("a", { href: "#/event" }, "Its route, countdown and story ▸"))) : null));
   }
 
-  // ================= ARTIFACTS =================
-  const arts = () => L.artifacts || [];
-  const MOOD_WORD = { proud: "proud", sulky: "sulking", content: "content", bloodthirsty: "bloodthirsty", bored: "bored" };
-  function artifactCard(a, full) {
+  // ================= CURSES =================
+  // a cursed thing is shown once it has revealed itself; named relics live in the kit (treasuresPanel)
+  const curses = () => (L.curses || []).filter((c) => c.revealed);
+  function curseCard(a) {
     const owner = a.owner && heroes[a.owner];
-    const where = a.destroyed ? "destroyed" : owner ? ["carried by ", A.heroLink(owner.id)] : a.pawned_in ? `in a ${A.nodeName(a.pawned_in)} pawnshop` : a.lost_at ? `lost in ${A.nodeName(a.lost_at, true)}` : "unclaimed";
-    const stats = Object.entries(a.stats).map(([k, v]) => `+${v} ${k}`).join(", ");
-    const curse = a.cursed && a.revealed;
-    const card = el("div", { class: "artifact" + (curse ? " cursed" : "") },
-      el("div", { class: "art-name" }, (curse ? "☠ " : "✦ ") + a.name),
-      el("div", { class: "tiny dim" }, curse ? `Cursed. ${a.desc}.` : `${stats} · ${MOOD_WORD[a.mood] || a.mood}${a.kills >= 1 ? ` · ${plural(Math.round(a.kills), "kill")}` : ""}`),
+    const where = a.destroyed ? "destroyed" : owner ? ["carried by ", A.heroLink(owner.id)] : a.lost_at ? `lost in ${A.nodeName(a.lost_at, true)}` : "unclaimed";
+    const card = el("div", { class: "artifact cursed" },
+      el("div", { class: "art-name" }, "☠ " + a.name),
+      el("div", { class: "tiny dim" }, `Cursed. ${a.desc}.`),
       el("div", { class: "small" }, where, a.owners.length > 1 ? el("span", { class: "dim" }, ` · ${plural(a.owners.length, "owner")}`) : null));
-    if (full && a.history.length) card.appendChild(el("ol", { class: "timeline small" }, a.history.slice().reverse().slice(0, 8).map((x) =>
+    if (a.history.length) card.appendChild(el("ol", { class: "timeline small" }, a.history.slice().reverse().slice(0, 8).map((x) =>
       el("li", null, el("span", { class: "when" }, `S${x.season} · Day ${x.sday || "?"}`), el("div", null, A.storyText(cap(x.text) + "."))))));
     return card;
   }
@@ -2311,11 +2344,11 @@
     }
     return p;
   }
-  function artifactsPanel() {
-    const list = arts().filter((a) => !a.cursed || a.revealed);
+  function cursesPanel() {
+    const list = curses();
     if (!list.length) return el("span");
-    const p = panel("Legendary artifacts");
-    for (const a of list) p.appendChild(artifactCard(a, true));
+    const p = panel("Cursed things");
+    for (const a of list) p.appendChild(curseCard(a));
     return p;
   }
 
@@ -2339,8 +2372,8 @@
     if ((h.habits || []).length || h.hobby) box.appendChild(panel("Where the money goes", el("p", null,
       (h.habits || []).map((x) => HAB[x]).filter(Boolean).join("; ") || "nothing unusual",
       h.hobby ? `. Hobby: ${h.hobby}${h.hobby_spent ? ` (${h.hobby_spent} silver so far)` : ""}.` : ".")));
-    const a = arts().find((x) => x.owner === h.id && (!x.cursed || x.revealed));
-    if (a) box.appendChild(panel("Carrying", artifactCard(a, true)));
+    const a = curses().find((x) => x.owner === h.id);
+    if (a) box.appendChild(panel("Carrying", curseCard(a)));
     const c = (L.cults || {})[h.id];
     if (c && !c.ended) box.appendChild(panel("Has a cult", el("p", null, `${cap(c.name)}: ${plural(c.members, "member")}, with a shrine in ${A.nodeName(c.town, true)}.`), c.demand ? el("p", { class: "small" }, `Current demand: ${c.demand}.`) : null));
     return box;
@@ -2425,7 +2458,7 @@
     const an = L.annals;
     if (!an) { v.appendChild(panel("The Annals", el("p", { class: "empty" }, `The age isn't over yet. The books close after season ${(S.config && S.config.league_seasons) || 3}.`))); return; }
     v.appendChild(el("section", { class: "finale-hero" }, el("div", { class: "finale-kicker" }, "The end of an age"), el("h1", null, "The Annals of the League"),
-      el("p", null, `${plural(an.seasons, "season")} · ${plural(an.days, "day")} · ${an.fallen.length} fallen · ${plural(an.artifacts.length, "artifact")} still in the world`)));
+      el("p", null, `${plural(an.seasons, "season")} · ${plural(an.days, "day")} · ${an.fallen.length} fallen · ${plural((an.treasures || []).length, "treasure")} still in the world`)));
     if (an.story) v.appendChild(panel("The story of the age", ...an.story.split(/\n\s*\n/).map((t) => el("p", { class: "epilogue" }, t))));
     const top = an.legends[0] && heroes[an.legends[0].hero];
     if (top) v.appendChild(el("section", { class: "panel laurel" }, el("div", { class: "finale-kicker" }, "Greatest of the age"),
@@ -2538,7 +2571,7 @@
   }
 
   // shared with the route files (views_*.js) loaded after this one
-  window.Views = { fishPlaque, artifactsPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline, hyperSprite,
+  window.Views = { fishPlaque, cursesPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline, hyperSprite,
     legendsPanel, moveMark, panel, partyCard, pendingPanel, rivalryPanel, runnerUp, sortedHeroes, stablesBlock,
     tellOnce, tip, townLedger, treasuresPanel };
 })();
