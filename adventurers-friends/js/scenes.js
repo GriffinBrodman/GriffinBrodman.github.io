@@ -498,12 +498,12 @@
       for (let i = 0; i < 7; i++) { const q = rng(seed + i * 13); pts.push([lx + 2 + Math.floor(q() * 24), ly + Math.floor(q() * 30)]); }
       if (A) actors.push(A.twinkle({ pts, col: "#fff4c8", arm: "#e8b84a", seed, z: 9e4, front: true }));
     } else if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
-      const id = S.dungeons[e.loc].boss, m = S.monsters[id];
+      const id = S.dungeons[e.loc].boss, m = Art.withLook(Object.assign({}, S.monsters[id], { boss: true }), e.boss_look);
       const g = Art.monsterGrid(m, 0);
       // the boss lies as its own death leaves it (deaths.js, the replay's last frame), facing the heroes who felled it
       // a big body lying down is wider than it stood: it lies past the last of the crew, not on top of them
       const cx = Math.min(W - g.w * 0.6, Math.max(px + (g.w >> 1), startX + hs.length * 30 + g.w * 0.75));
-      if (!(window.Deaths && Deaths.draw(ctx, { ref: id, boss: true }, 0, cx, ground, -1, { calm: true }))) {
+      if (!(window.Deaths && Deaths.draw(ctx, { ref: id, boss: true, look: e.boss_look }, 0, cx, ground, -1, { calm: true }))) {
         // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
         ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
         ctx.translate(cx, Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
@@ -513,7 +513,7 @@
       e.foes.slice(0, 3).forEach((mid, i) => {
         const m = S.monsters[mid];
         if (!m) return;
-        const mm = Object.assign({}, m, { boss: e.kind === "boss" && i === 0 });
+        const mm = e.kind === "boss" && i === 0 ? Art.withLook(Object.assign({}, m, { boss: true }), e.boss_look) : Object.assign({}, m, { boss: false });
         const g = Art.monsterGrid(mm, 0).flipX();
         const mx = Math.round(W * 0.62) + i * 26, my = ground - g.h + (i % 2) * 3;
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(mx + 3, ground - 1, g.w - 6, 2);

@@ -482,7 +482,7 @@
       el("p", null, isLast ? "Every hero rests up at home or wherever the season left them, and crews regroup. Bosses that fell have successors waiting." : "The league moved on. It always does."),
       (s.joining || []).length && isLast ? el("p", { class: "small" }, el("b", null, "Joining: "), s.joining.join(", ")) : null,
       el("p", null, el("a", { class: "btn", href: "#/history" }, "All seasons →")));
-    const bosses = (t.bosses || []).map((b) => el("div", { class: "tr-boss" }, App.S.monsters[b.monster] ? A.monsterSprite(b.monster, 3) : null,
+    const bosses = (t.bosses || []).map((b) => el("div", { class: "tr-boss" }, App.S.monsters[b.monster] ? A.monsterSprite(b.monster, 3, false, b) : null,
       el("b", null, b.next), el("span", { class: "tiny" }, `in place of ${b.was}`), el("span", { class: "tiny dim" }, b.place)));
     const business = [];
     for (const r of t.races || []) business.push(el("li", null, A.storyText(`Nobody brought down ${r.boss} in ${r.place}. The race is still open.`)));

@@ -351,7 +351,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
     if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroes[u.ref], frame, A.heroLook(heroes[u.ref]));
     if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name, coat: look.coat }, frame);
     const m = S.monsters[u.ref];
-    if (m) return Art.monsterGrid(Object.assign({}, m, { boss: u.boss }), frame);
+    if (m) return Art.monsterGrid(Art.withLook(Object.assign({}, m, { boss: u.boss }), look), frame);
     return Art.graveGrid();
   }
 

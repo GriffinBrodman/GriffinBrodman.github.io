@@ -138,10 +138,10 @@
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
       const st = L.dungeons[id] || {};
       const here = L.heroes.filter((h) => h.alive && h.loc === id && !h.travel).length;
-      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)),
+      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1, false, st.boss_look)),
         el("td", null, el("a", { href: `#/dungeon/${id}` }, d.name), here ? el("div", { class: "tiny dim" }, `${plural(here, "hero")} below now`) : null),
         el("td", { class: "num" }, d.level), el("td", { class: "num dg-opt" }, d.floors),
-        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", { class: "dg-opt" }, dangerWord(st.danger)),
+        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${st.boss_name || d.boss_name} (slain)` : st.boss_name || d.boss_name), el("td", { class: "dg-opt" }, dangerWord(st.danger)),
         el("td", null, st.explored_word || "untouched (0%)"), el("td", { class: "num" }, st.visits || 0)));
     }
     return panel("Every dungeon", el("div", { class: "scrollx" }, dt));
@@ -268,7 +268,7 @@
         el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));
       const mappers = L.heroes.filter((x) => (x.maps || []).some((m) => m.dungeon === id && m.pct >= 30));
       if (mappers.length) p.appendChild(el("p", { class: "small dim" }, "Holding maps of it: ", mappers.map((x, i) => [i ? ", " : "", A.heroLink(x.id)])));
-      const bossRow = el("div", { class: "row" }, A.monsterSprite(d.boss, 2, true), el("div", null, el("b", null, d.boss_name),
+      const bossRow = el("div", { class: "row" }, A.monsterSprite(d.boss, 2, true, st.boss_look), el("div", null, el("b", null, st.boss_name || d.boss_name),
         el("div", { class: st.boss_alive === false ? "green small" : "red small" }, st.boss_alive === false ? "Slain. Something new will move in." : "Lurking in the deepest chamber.")));
       p.appendChild(bossRow);
       for (const k of (st.boss_kills || []).slice(-3)) p.appendChild(el("p", { class: "small" }, `Slain by ${k.by} (season ${k.season})`));

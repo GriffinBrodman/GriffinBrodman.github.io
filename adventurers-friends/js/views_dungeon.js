@@ -236,7 +236,7 @@
     const B = D.boss || {}, kill = (B.kills || []).slice(-1)[0];
     const lairFloor = (D.floors.find((f) => f.rooms.some((r) => r.lair)) || {}).floor;
     const lairWalked = D.floors.some((f) => f.rooms.some((r) => r.lair && r.state));
-    const bossArt = sd.boss ? A.monsterSprite(sd.boss, 2, B.alive !== false) : null;
+    const bossArt = sd.boss ? A.monsterSprite(sd.boss, 2, B.alive !== false, B) : null;
     if (bossArt && B.alive === false) bossArt.classList.add("dg-slain-art");
     let bossLine;
     if (B.alive === false && kill) bossLine = [el("span", { class: "dg-stamp" }, "SLAIN"), " by ", crewLink(kill.crew, kill.by), ` ${A.when(kill.day, "on")}.`];
@@ -439,7 +439,7 @@
     };
     if (caption) caption.innerHTML = "";
     const sd = S.dungeons[D.id] || {};
-    const rec = Object.assign({}, rm, { theme: D.theme, pace: d.pace, crew: crewHeroes, did: D.id, boss: { mon: sd.boss, name: D.boss && D.boss.name } });
+    const rec = Object.assign({}, rm, { theme: D.theme, pace: d.pace, crew: crewHeroes, did: D.id, boss: Object.assign({ mon: sd.boss }, D.boss && { name: D.boss.name, role: D.boss.role, gen: D.boss.gen }, d.boss) });
     return A.need(["delve_scenes", "delve_fx"]).then(() => {
       stage.appendChild(DelveScenes.player(rec, { onEvent: named, onRestart: () => { loot.innerHTML = ""; if (caption) caption.innerHTML = ""; }, ownClick: true, label: cap(rm.name) }));
       return DelveScenes.length(rec);

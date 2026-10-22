@@ -395,7 +395,7 @@
     rime_wight: { head: "ice_crown", outfit: "plate_dark", weapon: "sword", tier: 2, aura: "ice", scars: ["pale"], hair: "#d8e8f0", style: 1 },
   };
 
-  function drawMonster(body, pal, frame, boss, pose) {
+  function drawMonster(body, pal, frame, boss, pose, look) {
     const p = MPAL[pal] || MPAL.grey;
     const E = p[2];
     let g;
@@ -406,9 +406,9 @@
       weapon: opts.weapon || "sword", weaponTier: opts.tier || 1, armorTier: 1, frame: f, pose,
     });
     switch (body) {
-      case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p, pose);
+      case "goblin_big": return Beasts.draw("warchief", pal, f, boss, p, pose, look);
       case "human": {
-        if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p, pose);
+        if (boss && pal === "necromancer") return Beasts.draw("lich", pal, f, false, p, pose, look);
         const map = { bandit: ["hood", "leather", "sword"], bandit_archer: ["hood", "leather", "bow"], bandit_captain: ["tricorn", "fancy", "sword"],
           necromancer: ["skull_hood", "robe_dark", "staff"] };
         if (HUMANS[pal]) {
@@ -421,7 +421,7 @@
         g = humanoid(p[0], p[1], { style: 0, head, outfit, weapon, face: pal === "bandit_captain" ? 2 : 1, aura: pal === "necromancer" ? "death" : null, off: pal === "necromancer" ? "skull" : "none", tier: pal === "bandit_captain" ? 3 : 1 });
         break;
       }
-      case "hag": if (boss) return Beasts.draw("crone", pal, f, false, p, pose); g = humanoid(p[0], p[1], { style: 1, hair: "#d8d8d0", head: "none", outfit: "robe_dark", weapon: "staff", aura: "nature", scars: ["pale"] }); break;
+      case "hag": if (boss) return Beasts.draw("crone", pal, f, false, p, pose, look); g = humanoid(p[0], p[1], { style: 1, hair: "#d8d8d0", head: "none", outfit: "robe_dark", weapon: "staff", aura: "nature", scars: ["pale"] }); break;
       case "siren": g = humanoid("#a8d8d0", "#3a8a9a", { style: 1, hair: "#2a6a8a", outfit: "fancy", weapon: "lute" }); break;
       case "skeleton": case "zombie": {
         const isS = body === "skeleton";
@@ -431,7 +431,7 @@
         if (isS) for (let y = 15; y < 24; y += 2) g.hline(9, 16, y, "#5a5040");
         break;
       }
-      default: return Beasts.draw(body, pal, f, boss, p, pose);
+      default: return Beasts.draw(body, pal, f, boss, p, pose, look);
     }
     return g;
   }
@@ -1119,9 +1119,14 @@
       weapon: h.weapon, weaponTier: h.weapon_tier || 1, armorTier: h.armor_tier || h.weapon_tier || 1, kit: h.kit || null }));
   }
   function heroCanvas(h, scale, frame, cls) { return heroGrid(h, frame, cls).toCanvas(scale); }
-  function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : ""), () => drawMonster(m.body, m.pal, frame, m.boss)); }
+  // a successor boss (m.role, m.gen: league/plan_steps.py boss_look) is drawn as its own variant (beasts.js ROLES)
+  const lookOf = (m) => (m.role ? { role: m.role, gen: m.gen } : null);
+  const lookKey = (m) => (m.role ? "|" + m.role + (m.gen || "") : "");
+  function monsterGrid(m, frame) { return cached("m:" + m.body + m.pal + (frame || 0) + (m.boss ? "b" : "") + lookKey(m), () => drawMonster(m.body, m.pal, frame, m.boss, null, lookOf(m))); }
+  // the boss as it stands in a record that may name its generation (a fight unit's look, a dungeon's boss, a trailer or trophy entry)
+  function withLook(m, src) { return m && src && src.role ? Object.assign({}, m, { role: src.role, gen: src.gen }) : m; }
   // a monster in a death pose (see Beasts.draw): the grid carries pad (its standing sprite sits at (pad, pad)) and stand [w, h]
-  function monsterPose(m, pose) { return cached("mp:" + m.body + m.pal + (m.boss ? "b" : "") + JSON.stringify(pose), () => drawMonster(m.body, m.pal, 0, m.boss, pose)); }
+  function monsterPose(m, pose) { return cached("mp:" + m.body + m.pal + (m.boss ? "b" : "") + lookKey(m) + JSON.stringify(pose), () => drawMonster(m.body, m.pal, 0, m.boss, pose, lookOf(m))); }
   function petGrid(pet, frame) { return cached("p:" + pet.kind + pet.name + (pet.coat || "") + (frame || 0), () => drawPet(pet.kind, pet.name, frame, pet.coat)); }
   function bannerGrid(b, big) { return cached("b:" + (big ? "L" : "S") + JSON.stringify(b), () => drawBanner(b, big)); }
   // the champion's medallion: a lit gold pixel ring with laurel sprays and a ribbon
@@ -1206,6 +1211,8 @@
     if (TROPHY_ART[m.body]) return TROPHY_ART[m.body]();
     const src = monsterGrid(m, 0);
     let r = TROPHY_HEAD[m.body];
+    // a successor drawn bigger or smaller than the original cuts its head out of the same place, scaled
+    if (r && m.role) { const base = monsterGrid(Object.assign({}, m, { role: null }), 0), k = src.w / base.w; r = r.map((v) => Math.round(v * k)); }
     if (!r) {
       const h = Math.min(src.h, 26);
       let sx = 0, n = 0;
@@ -1273,10 +1280,10 @@
     }
     return g;
   }
-  function trophyGrid(m) { return cached("t:" + m.body + m.pal + m.name, () => drawTrophy(m)); }
+  function trophyGrid(m) { return cached("t:" + m.body + m.pal + m.name + lookKey(m), () => drawTrophy(m)); }
   function graveGrid() { return cached("grave", () => drawGrave()); }
   function dummyGrid() { return cached("dummy", drawDummy); }
   function classEmblem(path) { return cached("c:" + path, () => drawClassEmblem(path)); }
 
-  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroPose, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, trophyGrid, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
+  window.Art = { Grid, ramp, mix, hash, rng, heroGrid, heroSeated, heroPose, heroLying, heroAside, heroCanvas, monsterGrid, monsterPose, withLook, trophyGrid, MPAL, petGrid, PET_COATS, bannerGrid, classEmblem, itemGrid, gearIcon, laurelGrid, graveGrid, dummyGrid, OUTLINE, AURA };
 })();

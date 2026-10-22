@@ -1697,7 +1697,7 @@
   function trophyMount(t) {
     const m = t.monster && S.monsters[t.monster];
     if (!m || !window.Art) return el("span", { class: "trophy-icon", "aria-hidden": "true" }, "🏆");
-    const cv = Art.trophyGrid(m).toCanvas(2);
+    const cv = Art.trophyGrid(Art.withLook(m, t)).toCanvas(2);
     cv.className = "trophy-mount";
     cv.setAttribute("aria-hidden", "true");
     return cv;

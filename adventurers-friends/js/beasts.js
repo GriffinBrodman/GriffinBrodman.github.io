@@ -185,6 +185,8 @@
       limb(P, [[19, 18 + dy], [19.4, 21], [19.4, 23]], 3.4, 2.8, "n"); P.ell(20.2, 24.2, 3.4, 1.4, "n", { s: 0.1 });
       for (const x of [5.5, 7, 8.5, 18.6, 20.2, 21.8]) P.px(x, 25, TOOTH);
     }
+    deco(P, c, "body", { x: 12.6, y: 13.6 + dy, rx: 8, ry: 5, neck: [18.8, 13.6 + dy, 2.8] }, f);
+    deco(P, c, "feet", { x0: 3, x1: 24, y: 25 });
     P.layer = 4;
     P.ell(23.2, 9 + dy, 4.8, 4.2, "n", { fn: fur });
     P.ell(21.2, 4.6 + dy, 1.9, 1.9, "n"); P.ell(21.4, 4.9 + dy, 1, 1, "bd", { k: 0.4 });
@@ -194,6 +196,7 @@
     P.px(28, 12 + dy, TOOTH);
     look(P, 23.2, 7.6 + dy, E, true, q);
     P.px(22, 6.4 + dy, "ad", -0.2); P.px(23, 6.4 + dy, "ad", -0.2);
+    deco(P, c, "head", { x: 23.6, top: 4.8 + dy, w: 3, eyes: [[23.2, 7.6 + dy]], back: 20.4, drop: 6 }, f);
   }
 
   // posed: lift (body up), drop (body down onto the floor), splay (feet out), squash, head (the head sags), curl[i] per leg pair
@@ -229,12 +232,15 @@
     P.layer = 3;
     for (const [x, y] of [[6, 4.8], [9, 4.6], [7.4, 8.4], [10.4, 7.4]]) P.px(x, y + fb + by + sq * 0.6, abd, 0);
     ln(P, 7, 5.6 + by, 7.6, 9.4 + by, "b", 0.2);
+    deco(P, c, "body", { x: 7.4, y: 6.4 + fb + by + sq * 0.6, rx: 4.4, ry: 3.4, neck: [12.2, 8.4 + by, 1.4] }, f);
+    deco(P, c, "feet", { x0: 1, x1: 22, y: 14.6 });
     draw(legs, "n", 0, 3, 0.5);
     P.layer = 4;
     P.ell(17, 8 + hy, 2, 2, "n", { s: 0.1 });
     P.px(17, 6.5 + hy, E); P.px(18, 7 + hy, E); P.px(16, 6.4 + hy, E); P.px(18.6, 8.4 + hy, E);
     if (!q || !q.eyes || q.eyes < 0.5) P.px(16.4, 7.2 + hy, "#ffffff");
     P.poly([[17.4, 9.4 + hy], [18.4, 9.4 + hy], [18, 11.6 + hy]], "horn", 0.2);
+    deco(P, c, "head", { x: 16.4, top: 5.8 + hy, w: 2.2, eyes: [[17, 6.5 + hy], [16, 6.4 + hy]], back: 13.6, drop: 3.4 }, f);
   }
 
   function bat(P, c, f) {
@@ -338,11 +344,24 @@
         P.rect(14.6, 5 + dy, 11, 1, "iron", (x) => 0.2 - (x - 15) * 0.05);
         P.px(17, 3 + dy, "rust", 0); P.px(22, 4 + dy, "rust", -0.1);
       }
+      deco(P, c, "body", { x: 12, y: 17 + dy, rx: 6, ry: 6, neck: [16.6, 12.8 + dy, 3.4] }, f);
+      deco(P, c, "feet", { x0: 4, x1: 24, y: 35 });
+      deco(P, c, "head", { x: 20, top: 3.6 + dy, w: 4, eyes: [[20.4, 7.8 + dy], [23, 7.8 + dy]], back: 15.8, drop: 6, crowned: ice }, f);
     }
-    if (ice && !(q && q.crown === false)) {
+    const style = c.v ? c.v.crown : "worn";
+    if (ice && !(q && q.crown === false) && style !== "none") {
       P.layer = 6;
-      P.rect(15.4, 2.4 + dy, 10, 1, "b", 0.4);
-      for (const [x, h] of [[16, 3], [19, 5], [22, 4], [24.4, 2.6]]) P.poly([[x - 0.8, 3.4 + dy], [x + 0.2, 3.4 - h + dy], [x + 1.4, 3.4 + dy]], "b", 0.5);
+      if (style === "small") {
+        P.rect(17.4, 2.8 + dy, 6, 1, "b", 0.4);
+        for (const [x, h] of [[18, 1.6], [20.2, 2.8], [22.4, 1.6]]) P.poly([[x - 0.7, 3.4 + dy], [x + 0.2, 3.4 - h + dy], [x + 1.1, 3.4 + dy]], "b", 0.5);
+      } else if (style === "stolen") {
+        // too big for this head and pushed back on it, one spike snapped off short
+        tinyCrown(P, 19.4, 3.6 + dy, 6.2, -0.24, [[-5, 3], [-2, 5.4], [1, 1.2], [4, 4.2]], "vgem", "b");
+      } else {
+        const spikes = style === "dented" ? [[16, 3], [19, 1.6], [24.4, 2.6]] : [[16, 3], [19, 5], [22, 4], [24.4, 2.6]];
+        P.rect(15.4, 2.4 + dy, 10, 1, "b", 0.4);
+        for (const [x, h] of spikes) P.poly([[x - 0.8, 3.4 + dy], [x + 0.2, 3.4 - h + dy], [x + 1.4, 3.4 + dy]], "b", 0.5);
+      }
     }
   }
 
@@ -411,6 +430,8 @@
       for (const [lx, k, d] of [[0.31, fb, -0.07], [0.34, fb, -0.07], [0.37, fb, -0.07], [0.61, ff, 0.11], [0.64, ff, 0.11], [0.67, ff, 0.11]]) P.px(x(lx + (q ? d * k : 0)), H - 1, "horn", 0.2);
     };
     if (q) { flat(P, legsNear); P.ell(x(0.38), y(0.7), 4 * sc, 3.7 * sc, "n"); } else legsNear();
+    deco(P, c, "body", { x: bx + 1 * sc, y: by - 0.6 * sc, rx: brx * 0.7, ry: bry * 0.75, neck: [neck[3][0], neck[3][1] + 0.6 * sc, 1.8 * sc] }, f);
+    deco(P, c, "feet", { x0: Math.round(x(0.26)), x1: Math.round(x(0.72)), y: H - 1 });
     P.layer = 4;
     P.ell(hx, hy, 3.7 * sc, 2.9 * sc, "n");
     P.ell(hx + 3.3 * sc, hy + 0.9 * sc, 3 * sc, 1.7 * sc, "n");
@@ -424,6 +445,7 @@
     else { P.px(hx + 1.2 * sc, hy - 0.8 * sc, E); P.px(hx + 2.2 * sc, hy - 0.8 * sc, INK); P.px(hx + 1.2 * sc, hy - 1.8 * sc, "#ffffff"); }
     P.rect(hx - 0.2 * sc, hy - 1.6 * sc, 3.4 * sc, 1, "ad", -0.4);
     if (big && f && !q) { P.px(hx + 7.2 * sc, hy + 1.4 * sc, "#ffd84a"); P.px(hx + 7.8 * sc, hy + 2 * sc, "#ff8a2a"); }
+    deco(P, c, "head", { x: hx + 0.8 * sc, top: hy - 2.6 * sc, w: 2 * sc, eyes: [[hx + 1.2 * sc, hy - 0.8 * sc]], back: hx - 2.6 * sc, drop: 4 * sc }, f);
   }
 
   function chest(P, c, f) {
@@ -439,6 +461,8 @@
     P.px(1, 18, "ad", -0.2); P.px(22, 18, "ad", -0.2);
     P.ell(12, 13, 2.1, 2.4, "b", { s: 0.1 });
     P.px(12, 13, INK); P.px(12, 14, INK);
+    deco(P, c, "body", { x: 16.6, y: 13, rx: 4, ry: 2.6, neck: [12, 10.6, 5] }, f);
+    deco(P, c, "feet", { x0: 2, x1: 21, y: 18 });
     P.layer = 3;
     P.ell(12, ly - 0.5, 10.5, 4.4, "a", { fn: (x, y, s) => (y > ly + 0.5 ? false : s) });
     P.rect(2, ly - 3, 20, 1, "ad", 0);
@@ -451,6 +475,7 @@
     P.px(7, ly - 1.5, E); P.px(8, ly - 1.5, INK); P.px(7, ly - 2.5, "#ffffff");
     P.px(15, ly - 1.5, E); P.px(16, ly - 1.5, INK); P.px(15, ly - 2.5, "#ffffff");
     P.rect(6, ly - 3, 4, 1, "ad", -0.5); P.rect(14, ly - 3, 4, 1, "ad", -0.5);
+    deco(P, c, "head", { x: 12, top: ly - 4.6, w: 4.6, eyes: [[7, ly - 1.5], [15, ly - 1.5]], back: 4, drop: 4 }, f);
   }
 
   function wraith(P, c, f) {
@@ -484,9 +509,19 @@
       for (const ex of [15.2, 19]) P.ell(ex, 10, 1.3, 1.3, "void", { k: 0 });
       if (!(q && q.eyes > 0.5)) { P.px(15, 10, E); P.px(19, 10, E); }
       P.px(17, 12, "void");
-      P.rect(12.5, 4, 9, 2, "gold", 0.2);
-      for (const x of [13, 15, 17, 19, 21]) { P.px(x, 3, "gold", 0.4); if (x % 4 === 1) P.px(x, 2, "gold", 0.6); }
-      P.px(17, 4, E);
+      const style = c.v ? c.v.crown : "worn";
+      if (style === "small") {
+        P.rect(14, 4.6, 6, 1, "gold", 0.2);
+        for (const x of [14, 17, 19.6]) P.px(x, 3.6, "gold", 0.4);
+        P.px(17, 2.6, "gold", 0.6); P.px(17, 4.6, "vgem");
+      } else if (style === "stolen") {
+        tinyCrown(P, 16.4, 5.4, 5.4, -0.26, [[-4, 2.4], [-1.4, 3.6], [1.2, 1], [3.8, 3]], "vgem", "gold");
+      } else if (style !== "none") {
+        P.rect(12.5, 4, 9, 2, "gold", 0.2);
+        for (const x of [13, 15, 17, 19, 21]) { if (style === "dented" && x === 17) continue; P.px(x, 3, "gold", 0.4); if (x % 4 === 1) P.px(x, 2, "gold", 0.6); }
+        P.px(17, 4, E);
+      }
+      deco(P, c, "head", { x: 17, top: 3.4, w: 4.4, eyes: [[15, 10], [19, 10]], back: 12.8, drop: 8, crowned: true }, f);
     };
     if (part === "skull") return skull();
     P.layer = 1;
@@ -501,6 +536,8 @@
     P.ell(6, 23.5, 1.4, 1.4, "a", { s: 0.2 });
     for (const dx of [-1, 0, 1]) ln(P, 28 + dx, 26, 28 + dx * 1.5, 28.5, "a", -0.1);
     P.ell(5.5, 4.2, 2.6, 2.4, "a", { s: 0.2 }); P.px(4, 4, "void"); P.px(6, 4, "void"); P.rect(4, 6, 3, 1, "void", 0);
+    deco(P, c, "body", { x: 21, y: 27, rx: 4, ry: 5, neck: [17, 15.6, 3.6] }, f);
+    deco(P, c, "feet", { x0: 8, x1: 28, y: 40 });
     if (part !== "body") skull();
     P.layer = 3;
     for (const [x, y] of [[5, 1 - f], [4, 0], [6, -1 + f], [5, -1]]) P.px(x, y + 1, E);
@@ -516,6 +553,7 @@
       P.poly([[14, 10.5], [28, 9], [23, 4], [27, -1], [19, 3]], "bd", (x) => 0.2 - (x - 14) * 0.05);
       P.ell(21, 9.8, 8.2, 1.6, "bd", { s: -0.1 });
       P.rect(18, 7, 6, 1, "gold", 0.1);
+      deco(P, c, "head", { x: 21.4, top: 7, w: 3.4, back: 15.4, drop: 9 }, f);
     };
     const pot = () => {
       P.layer = 5;
@@ -542,6 +580,9 @@
     P.ell(23, 14, 3.8, 4, "a", { s: 0.05 });
     P.poly([[25.5, 13], [29.6, 15.8], [26, 16.4]], "a", 0.2);
     P.px(28, 14, "ad"); P.px(23, 13, E); P.px(24, 13, INK); P.px(25, 17, INK); P.px(26, 17, TOOTH);
+    deco(P, c, "body", { x: 13.4, y: 22, rx: 5, ry: 4.6, neck: [19.6, 18.4, 3] }, f);
+    deco(P, c, "feet", { x0: 15, x1: 28, y: 35 });
+    deco(P, c, "head", { x: 23, w: 3, eyes: [[23, 13]] }, f);
     if (part === "body") return;
     hat();
     pot();
@@ -710,6 +751,8 @@
     P.ell(22, 12, 12.4, 10.4, "a", { k: 0.95 });
     P.ell(17, 5.6, 6, 3.2, "b", { s: -0.1, k: 0.5, fn: (x, y, s) => (((x * 3 + y * 5) % 4 === 0) ? s - 0.25 : s) });
     for (const [x, y, r] of [[27, 6, 1.4], [30, 10, 1.1], [14, 9, 1], [25, 3.6, 0.9], [31, 14, 1]]) P.ell(x, y, r, r, "ad", { k: 0.5 });
+    deco(P, c, "body", { x: 24, y: 8.4, rx: 7, ry: 4.4, neck: [22, 19.2, 7] }, f);
+    deco(P, c, "feet", { x0: 3, x1: 41, y: 37 });
     P.layer = 3;
     [[9, -1], [18, -1], [26, 1], [35, 1]].forEach(([bx, s]) => tent(bx + (s < 0 ? 0 : 0), s, true));
     P.layer = 4;
@@ -729,6 +772,7 @@
       P.px(ex - 0.2, 12.4, "#ffffff");
       P.rect(ex - 3, 10, 6, 1, "ad", -0.5);
     }
+    deco(P, c, "head", { x: 22, top: 2, w: 6, eyes: [[17.4, 13.6], [27.8, 13.6]], back: 12, drop: 7 }, f);
   }
 
   // posed: kneel (0 to 1, onto the rear knee), head (the head's own roll on the neck), eyes; part "banner" / "cleaver" / "crown" paints only that piece, without lists pieces
@@ -752,7 +796,7 @@
     P.px(9, 2, "void"); P.px(11, 2, "void"); P.rect(9, 4, 3, 1, "horn", -0.3);
     };
     if (has("banner")) { if (q) flat(P, banner); else banner(); }
-    if (q && q.part && q.part !== "body") { if (q.part === "cleaver") flat(P, () => cleaver(P, d)); if (q.part === "crown") crown(P, d); P.bend = null; return; }
+    if (q && q.part && q.part !== "body") { if (q.part === "cleaver") flat(P, () => cleaver(P, d)); if (q.part === "crown") crown(P, d, c); P.bend = null; return; }
     P.layer = 3;
     const legs = () => {
       for (const [sx, s] of [[20, -1], [30, 1]]) {
@@ -789,6 +833,8 @@
     ln(P, 17, 24 + d, 33, 35 + d, "cloth", -0.05, 1);
     P.px(25, 29.6 + d, "iron", 0.3); P.px(29, 32.4 + d, "iron", 0.3);
     for (const x of [18, 31]) { P.px(x, 37 + d, "horn", 0.3); P.px(x, 38 + d, "horn", 0); P.px(x, 39 + d, "horn", -0.3); }
+    deco(P, c, "body", { x: 26, y: 31.4 + d, rx: 6, ry: 3.4, neck: [25, 29.6 + d, 4.6] }, f);
+    deco(P, c, "feet", { x0: 14, x1: 37, y: 48 });
     P.layer = 7;
     limb(P, [[16.4, 25 + d], [13.8, 28.4 + d], [11.6, 31 + d]], 3, 2.4, "arm", 0.05);
     P.rect(11.4, 27.6 + d, 4, 2, "cloth", 0.1); P.px(12, 28 + d, "iron", 0.5); P.px(14, 28 + d, "iron", 0.5);
@@ -822,7 +868,7 @@
     P.px(35, 12.6 + d, "gold", 0.5); P.px(35, 13.6 + d, "gold", 0);
     P.ell(25, 14.4 + d, 7, 5.8, "a", { s: 0.1 });
     P.ell(25, 18.4 + d, 6.8, 3, "a", { s: -0.08, k: 0.7 });
-    if (has("crown")) crown(P, d);
+    if (has("crown")) crown(P, d, c);
     P.layer = 12;
     ln(P, 20, 12 + d, 23.6, 13.4 + d, "ad", -0.7); ln(P, 30, 12 + d, 26.4, 13.4 + d, "ad", -0.7);
     if (q && q.eyes > 0.5) { P.rect(21.6, 14 + d, 2, 1, INK); P.rect(26.4, 14 + d, 2, 1, INK); }
@@ -833,6 +879,7 @@
     P.rect(21.6, 19 + d, 7, 1, "void", 0);
     P.px(21, 18 + d, TOOTH); P.px(21, 17 + d, TOOTH); P.px(29, 18 + d, TOOTH); P.px(29, 17 + d, TOOTH);
     P.px(23.4, 19 + d, TOOTH); P.px(26.6, 19 + d, TOOTH);
+    deco(P, c, "head", { x: 25, top: 8.6 + d, w: 6, eyes: [[22, 14 + d], [27, 14 + d]], back: 18.6, drop: 8, crowned: true }, f);
     P.tf = tf0;
     P.bend = null;
   }
@@ -848,10 +895,21 @@
     for (const [x, y] of [[bx + 3, by + 7], [bx + 4, by + 8], [bx + 2, by + 9], [bx + 6, by + 4]]) P.px(x, y, "rust", 0.1);
     P.erase(Math.floor(bx + 10.2), Math.floor(by + 5.4));
   }
-  function crown(P, d) {
+  // a successor's crown (c.v.crown): small for the Heir, the old one too big and knocked askew for the Usurper, a spike gone for the Last Champion
+  function crown(P, d, c) {
+    const style = c && c.v ? c.v.crown : "worn";
+    if (style === "none") return;
     P.layer = 12;
+    if (style === "small") {
+      P.rect(21, 9.4 + d, 8, 1.4, "gold", (x) => 0.35 - (x - 21) * 0.06);
+      for (const [x, h] of [[21.6, 1.4], [25, 2.8], [28.4, 1.4]]) P.poly([[x - 0.9, 9.6 + d], [x + 0.1, 9.6 - h + d], [x + 1, 9.6 + d]], "gold", 0.35 - (x - 21) * 0.04);
+      P.px(25, 9.6 + d, "vgem", 0.4);
+      return;
+    }
+    if (style === "stolen") { tinyCrown(P, 24, 10.2 + d, 7.6, -0.2, [[-6, 2.6], [-3, 4.6], [0, 1.4], [3, 4.2], [6, 2.8]], "vgem", "gold"); return; }
     P.rect(18.6, 8.6 + d, 13, 2, "gold", (x) => 0.35 - (x - 18) * 0.05);
-    for (const [x, h] of [[19, 2.4], [22, 4.2], [25, 5.6], [28, 3.6], [31, 2.6]]) P.poly([[x - 1.1, 8.8 + d], [x + 0.2 - (x === 28 ? 1 : 0), 8.8 - h + d], [x + 1.2, 8.8 + d]], "gold", 0.3 - (x - 19) * 0.04);
+    const spikes = style === "dented" ? [[19, 2.4], [22, 4.2], [25, 1.8], [31, 2.6]] : [[19, 2.4], [22, 4.2], [25, 5.6], [28, 3.6], [31, 2.6]];
+    for (const [x, h] of spikes) P.poly([[x - 1.1, 8.8 + d], [x + 0.2 - (x === 28 ? 1 : 0), 8.8 - h + d], [x + 1.2, 8.8 + d]], "gold", 0.3 - (x - 19) * 0.04);
     P.px(25, 9.4 + d, "b", 0.6); P.px(21, 9.4 + d, "void"); P.px(29, 9.4 + d, "void");
   }
 
@@ -1633,29 +1691,220 @@
     P.ell(21.4, 10.2 - sw * 2.8, 1.8, 1.7, "a", { s: 0.3, k: 0.6 });
   }
 
+  // ---------- successors: a dead boss's heir (league/plan_steps.py SUCCESSORS, exported as role and gen) ----------
+  // the same creature in its role's own colours, wearing its role's marks; each boss body calls deco() at its head, body and feet
+  // with where those are this frame and pose, so the marks ride along through every death pose and falling part
+  const { hsv, toHsv } = window.Paint;
+  const towardH = (h, t, a) => { let d = t - h; if (d > 0.5) d -= 1; if (d < -0.5) d += 1; return h + Math.sign(d) * Math.min(Math.abs(d), a); };
+  function adj(hex, o) {
+    let [h, s, v] = toHsv(hex);
+    if (o.to != null) h = towardH(h, o.to, o.by);
+    h += o.dh || 0;
+    return hsv(h, c01(s * (o.s == null ? 1 : o.s) + (o.ds || 0)), c01(v * (o.v == null ? 1 : o.v) + (o.dv || 0)));
+  }
+  const lumH = (h) => { const n = parseInt(h.slice(1), 16); return (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255; };
+  // a whole-body remap keeps each material's lightness and so its read: pale for the Ghost, nearly black for the Shadow
+  const ghostly = (hex) => mix(mix("#6a7e98", "#eef6ff", Math.pow(lumH(hex), 0.65)), hex, 0.1);
+  const shadowy = (hex) => mix(mix("#120e1c", "#7e6ea4", Math.pow(lumH(hex), 0.85)), hex, 0.12);
+  // body/acc: the creature's own two colours turned; eye: its eyes; mats: fixed materials worn differently and the marks' own; k: size
+  const ROLES = {
+    "Avenger": { body: { to: 0.99, by: 0.1, v: 0.68, s: 1.1 }, acc: { to: 0.99, by: 0.16, v: 0.62, s: 1.15 }, eye: "#ff4a2a",
+      mats: { cloth: "#4e1a20", gold: "#a8743a", vpaint: "#d8342a", vscar: "#e8b8a0" }, k: 1.04 },
+    "Usurper": { body: { dh: 0.14, s: 0.95, v: 0.9 }, acc: { dh: 0.14, s: 0.95 }, eye: "#d8f04a",
+      mats: { gold: "#c8902a", vgold: "#d89a32", vsash: "#6a2a8a", vgem: "#e8303a" } },
+    "Heir": { body: { dh: -0.03, s: 0.82, v: 1.14, dv: 0.04 }, acc: { s: 0.85, v: 1.12, dv: 0.04 }, eye: "#5ad0ff",
+      mats: { vgold: "#f0c850", vgem: "#4ab0ff", vsash: "#5a8ad8" }, k: 0.86 },
+    "Widow": { body: { s: 0.3, v: 0.4, to: 0.78, by: 0.1 }, acc: { s: 0.25, v: 0.62, to: 0.78, by: 0.2 }, eye: "#ff5a7a",
+      mats: { cloth: "#2a2230", gold: "#b8b8c8", vveil: "#2e2838", vsilk: "#e8e4f0", vpaint: "#d8283a" } },
+    "Shadow": { all: shadowy, eye: "#d08aff", mats: { vsmoke: "#2a2238" }, k: 1.04 },
+    "Last Champion": { body: { to: 0.08, by: 0.04, s: 0.5, v: 0.84 }, acc: { to: 0.08, by: 0.06, s: 0.55, v: 0.8 }, eye: "#ffb84a",
+      mats: { gold: "#8a6a3a", steel: "#7a7c84", cloth: "#5a4a3a", vscar: "#e8c8b0", vwrap: "#e8dcc4", vpaint: "#a82a2a", vtooth: "#f0e6cc" } },
+    "Spawn": { body: { to: 0.28, by: 0.34, s: 1.1, v: 1.08 }, acc: { to: 0.22, by: 0.2, v: 1.05 }, eye: "#ffe84a",
+      mats: { vshell: "#f2ead2", vspot: "#d8f0a0", vslime: "#8ad84a" }, k: 0.8 },
+    "Ghost": { all: ghostly, eye: "#5af0ff", mats: { vwisp: "#dff4ff", iron: "#7a8a9a" }, room: 4 },
+    "Second Coming": { body: { s: 1.3, v: 1.1, dv: 0.03 }, acc: { s: 1.3, v: 1.12 }, eye: "#fff2a0",
+      mats: { gold: "#ffcc3a", vhalo: "#ffd84a", vrune: "#ffe070" }, k: 1.14, room: 4 },
+  };
+  const CROWN_OF = { "Usurper": "stolen", "Heir": "small", "Spawn": "none", "Last Champion": "dented" };
+  const VMATS = { vpaint: "#c8342a", vscar: "#e8c8b0", vgold: "#e8b84a", vgem: "#e8303a", vveil: "#2e2838", vsilk: "#e8e4f0", vsmoke: "#2a2238", vwrap: "#e8dcc4",
+    vtooth: "#f0e6cc", vshell: "#f2ead2", vspot: "#d8f0a0", vslime: "#8ad84a", vwisp: "#dff4ff", vhalo: "#ffd84a", vrune: "#ffe070", vsash: "#8a2a3a" };
+  function variant(v, palette) {
+    const R = v && ROLES[v.role];
+    if (!R) return null;
+    // a role comes round again only after all nine have: the second Avenger of a lair is a shade off the first
+    const cyc = Math.floor(Math.max(0, (v.gen || 2) - 2) / 9) * 0.07;
+    const turn = (o) => (h) => adj(h, Object.assign({}, o, { dh: (o.dh || 0) + cyc }));
+    const body = R.all || turn(R.body), acc = R.all || turn(R.acc || R.body);
+    return { role: v.role, gen: v.gen || 2, R, k: R.k || 1, crown: CROWN_OF[v.role] || "worn", pal: [body(palette[0]), acc(palette[1]), R.eye] };
+  }
+  function varMats(m, V) {
+    const out = {};
+    for (const [k, r] of Object.entries(m)) out[k] = V.R.all ? ramp(V.R.all(r[2])) : r;
+    for (const [k, hex] of Object.entries(Object.assign({}, VMATS, V.R.mats || {}))) out[k] = ramp(V.R.all && !k.startsWith("v") ? V.R.all(hex) : hex);
+    return out;
+  }
+  // a little crown on its base centre (x, y), tipped by a (radians); spikes [dx, height], a gem in the band
+  function tinyCrown(P, x, y, w, a, spikes, gem, mat) {
+    const c = Math.cos(a), s = Math.sin(a), at = (dx, dy) => [x + dx * c - dy * s, y + dx * s + dy * c];
+    P.poly([at(-w, 0), at(w, 0), at(w, -1.4), at(-w, -1.4)], mat, (px) => 0.35 - (px - x + w) * 0.06);
+    for (const [dx, h] of spikes) P.poly([at(dx - 0.9, -1), at(dx, -1 - h), at(dx + 0.9, -1)], mat, 0.4 - (dx + w) * 0.05);
+    if (gem) { const [gx, gy] = at(0, -0.8); P.px(gx - 0.5, gy - 0.5, gem, 0.3); }
+  }
+  // light is plotted after the render with no outline round it (a halo, a ghost's wisps): it glows rather than sits
+  function light(P, c, x, y, col) { const [X, Y] = P.T(x, y); (c.lights || (c.lights = [])).push([Math.floor(X), Math.floor(Y), col]); }
+  function halo(P, c, x, y, rx, ry) {
+    const n = Math.ceil((rx + ry) * (P.s || 1) * 5);
+    for (let i = 0; i < n; i++) {
+      const t = (Math.PI * 2 * i) / n, k = Math.sin(t);
+      light(P, c, x + Math.cos(t) * rx, y + k * ry, k < -0.35 ? "#fff6c8" : k > 0.35 ? "#d8962a" : "#ffd04a");
+    }
+  }
+  // head: x, top (where a crown sits), w (half its width), eyes [[x, y]], back (the nape, for a veil), crowned (the body draws its own crown)
+  const HEAD = {
+    "Avenger": (P, a) => {
+      for (const [ex, ey] of a.eyes.slice(0, 2)) {
+        ln(P, ex - 0.6, ey + 1.2, ex - 1.4, ey + 3, "vpaint", 0.2); ln(P, ex + 0.8, ey + 1.2, ex, ey + 3, "vpaint", 0.1);
+        P.px(ex - 1, ey - 1.2, "vpaint", 0.3); P.px(ex, ey - 1.4, "vpaint", 0.3);
+      }
+    },
+    "Usurper": (P, a) => { if (!a.crowned && a.top != null) tinyCrown(P, a.x - a.w * 0.15, a.top + 0.4, Math.max(2.2, a.w * 0.85), -0.32, [[-a.w * 0.6, 2.2], [0, 1.1], [a.w * 0.6, 2.6]], "vgem", "vgold"); },
+    "Heir": (P, a) => { if (!a.crowned && a.top != null) tinyCrown(P, a.x, a.top + 0.3, Math.max(1.6, a.w * 0.55), 0, [[-a.w * 0.45, 1], [0, 1.8], [a.w * 0.45, 1]], "vgem", "vgold"); },
+    "Widow": (P, a) => {
+      if (a.top == null) return;
+      const t = a.top, x0 = a.back, x1 = a.x + a.w * 0.7, drop = a.drop || 6;
+      P.poly([[x1, t - 0.6], [x0 - 0.6, t - 0.4], [x0 - 2.2, t + drop], [x0 - 0.4, t + drop + 1.4], [x0 + 1.4, t + drop * 0.55], [x0 + (x1 - x0) * 0.5, t + 1.4]], "vveil",
+        (px, py) => ((px + py) & 1 ? -0.55 : 0.15) - (py - t) * 0.04);
+      P.px(x1 - 0.4, t - 0.2, "vsilk", 0.5); P.px(x1 - 1.2, t - 1, "vpaint", 0.2);
+    },
+    "Shadow": (P, a, c) => {
+      for (const [ex, ey] of a.eyes.slice(0, 2)) {
+        P.px(ex, ey, c.E); P.px(ex + 1, ey, mix(c.E, "#ffffff", 0.5));
+        P.px(ex - 1, ey, mix(c.E, "#2a2238", 0.45)); P.px(ex - 2, ey - 0.4, mix(c.E, "#2a2238", 0.7)); P.px(ex - 3, ey - 0.9, mix(c.E, "#2a2238", 0.85));
+      }
+    },
+    "Last Champion": (P, a) => {
+      if (a.top != null && !a.crowned) {
+        const t = a.top + 0.6;
+        ln(P, a.x - a.w * 0.9, t + 1.6, a.x + a.w * 0.6, t - 0.4, "vwrap", (k) => 0.4 - k * 0.5);
+        ln(P, a.x - a.w * 0.9, t + 2.6, a.x + a.w * 0.6, t + 0.6, "vwrap", (k) => 0.1 - k * 0.5);
+        P.px(a.x - a.w * 0.1, t + 0.9, "vpaint", 0.1);
+      }
+      if (a.eyes.length) { const [ex, ey] = a.eyes[0]; ln(P, ex + 1.4, ey - 2.2, ex + 0.4, ey + 2.6, "vscar", 0.3); }
+    },
+    "Spawn": (P, a) => {
+      if (a.top == null) return;
+      const w = Math.max(2, a.w * 0.8), t = a.top + 0.6;
+      P.ell(a.x, t, w, 2, "vshell", { s: 0.2, fn: (px, py, s) => (py > t - ((px & 1) ? 0.2 : 1) ? false : s) });
+      P.px(a.x - w * 0.3, t - 1.6, "vspot", -0.6);
+    },
+    "Ghost": (P, a, c, f) => {
+      for (const [ex, ey] of a.eyes.slice(0, 2)) { P.px(ex, ey, c.E); P.px(ex - 1, ey, mix(c.E, "#dff4ff", 0.5)); }
+      if (a.top == null) return;
+      const sw = f ? 1 : 0;
+      const W = ["#eef8ff", "#c8e4f4", "#9ac4dc"];
+      for (const [dx, dy, o] of [[-0.4, -1.2, 0], [-1.2 + sw, -2.4, 0], [-0.4 + sw, -3.6, 1], [-1.4, -4.8, 2]]) light(P, c, a.x - a.w * 0.4 + dx, a.top + dy, W[o]);
+      for (const [dx, dy, o] of [[0.6, -1, 0], [1.4 - sw, -2.2, 1], [0.8 - sw, -3.2, 2]]) light(P, c, a.x + a.w * 0.5 + dx, a.top + dy, W[o]);
+    },
+    "Second Coming": (P, a, c) => {
+      const rx = Math.max(2.6, a.w * 0.85);
+      if (a.top != null) halo(P, c, a.x, a.top - (a.crowned ? 5 : 3), rx, Math.max(1, rx * 0.32));
+      for (const [ex, ey] of a.eyes.slice(0, 2)) { P.px(ex, ey, "#ffffff"); P.px(ex + 1, ey, c.E); }
+    },
+  };
+  // body: x, y (the flank's middle), rx, ry, neck [x, y, half width]
+  const BODY = {
+    "Avenger": (P, b) => { for (let i = 0; i < 3; i++) ln(P, b.x - b.rx * 0.35 + i * 1.6, b.y - b.ry * 0.55, b.x - b.rx * 0.05 + i * 1.6, b.y + b.ry * 0.35, "vscar", 0.35 - i * 0.1); },
+    "Usurper": (P, b) => {
+      const [nx, ny, nw] = b.neck;
+      ln(P, nx - nw, ny - 0.4, nx + nw * 0.4, ny + 1.6, "vsash", (k) => 0.3 - k * 0.5);
+      ln(P, nx - nw * 0.4, ny + 0.4, nx + nw, ny - 0.6, "vsash", (k) => 0.1 - k * 0.4);
+      P.px(nx + nw * 0.1, ny + 0.5, "vgold", 0.5); P.px(nx + nw * 0.1, ny + 1.5, "vgold", 0);
+    },
+    "Heir": (P, b) => { const [nx, ny] = b.neck; P.px(nx - 1, ny, "vsash", 0.4); P.px(nx + 1, ny, "vsash", 0.1); P.px(nx, ny + 0.6, "vsash", -0.2); P.px(nx - 1.4, ny + 1.4, "vsash", -0.3); P.px(nx + 1.4, ny + 1.4, "vsash", -0.4); },
+    "Widow": (P, b) => {
+      for (const [dx, dy] of [[-1, -1.5], [0, -1.5], [1, -1.5], [0, -0.5], [0, 0.5], [-1, 1.5], [0, 1.5], [1, 1.5]]) P.px(b.x + dx, b.y + dy, "vpaint", dy < 0 ? 0.3 : 0);
+      const [nx, ny, nw] = b.neck;
+      for (let i = 0; i <= 8; i++) { const t = i / 8; P.px(nx - nw + t * nw * 2, ny + Math.sin(t * Math.PI) * 1.6, "vsilk", 0.3); }
+    },
+    "Shadow": (P, b, c, f) => {
+      for (const [dx, dy, r] of [[-0.5, -1.6, 1.3], [-0.2, -3.6 - f * 0.6, 1], [0.25, -2.4, 0.9], [-0.75, -4.4 + f * 0.4, 0.7]])
+        P.ell(b.x + dx * b.rx, b.y - b.ry + dy, r, r, "vsmoke", { s: 0.1, k: 0.5 });
+    },
+    "Last Champion": (P, b) => {
+      const [nx, ny, nw] = b.neck;
+      for (let i = 0; i <= 10; i++) { const t = i / 10; P.px(nx - nw + t * nw * 2, ny + Math.sin(t * Math.PI) * 1.8, "cloth", -0.2); }
+      for (const t of [0.25, 0.5, 0.75]) { const x = nx - nw + t * nw * 2, y = ny + Math.sin(t * Math.PI) * 1.8; P.px(x, y + 1, "vtooth", 0.4); P.px(x, y + 2, "vtooth", -0.1); }
+      const ax = b.x + b.rx * 0.15, ay = b.y - b.ry * 0.2;
+      ln(P, ax, ay, ax - 3.4, ay - 3.4, "wood", 0.2); P.px(ax - 3.8, ay - 4.2, "vpaint", 0.3); P.px(ax - 4.4, ay - 3.4, "vpaint", 0);
+    },
+    "Spawn": (P, b) => { for (const [dx, dy] of [[-0.4, -0.3], [0.1, -0.55], [0.3, 0.1], [-0.15, 0.35]]) P.px(b.x + dx * b.rx, b.y + dy * b.ry, "vspot", 0.2); },
+    "Ghost": (P, b) => {
+      const [nx, ny] = b.neck;
+      for (let i = 0; i < 5; i++) P.px(nx - 0.5 - i * 0.7, ny + 1 + i * 1.1, "iron", i % 2 ? -0.3 : 0.4);
+      P.px(nx - 4, ny + 6.2, "iron", 0.4); P.px(nx - 3.2, ny + 6.6, "iron", -0.2);
+    },
+    "Second Coming": (P, b) => {
+      const x = b.x - b.rx * 0.3, y = b.y - b.ry * 0.2;
+      for (const [dx, dy] of [[0, 0], [1, 1], [2, 0], [3, 1], [4, 0], [2, -1], [2, 2]]) P.px(x + dx, y + dy, "vrune", 0.4);
+    },
+  };
+  // feet (standing only): x0, x1, y
+  const FEET = {
+    "Shadow": (P, a) => { for (let x = a.x0; x <= a.x1; x++) if ((x + Math.floor(a.y)) % 3 !== 0) P.px(x, a.y + 0.4, "vsmoke", -0.2 + ((x * 7) % 5) * 0.12); },
+    "Spawn": (P, a) => {
+      for (const [x, s] of [[a.x0 + 1, 1], [a.x1 - 2, -1]]) P.poly([[x - 1.4, a.y + 0.6], [x + 1.6, a.y + 0.6], [x + 1.2, a.y - 1], [x + 0.4 * s, a.y - 0.2], [x - 0.6, a.y - 1.2]], "vshell", 0.2);
+    },
+    "Ghost": (P, a, c) => { c.fade = a.y; },
+  };
+  // a head without top paints only the face; one without eyes (a falling hat) only what sits on top; shut eyes take no marks
+  function deco(P, c, slot, a, f) {
+    const V = c.v;
+    if (!V || (slot === "feet" && c.q)) return;
+    const fn = (slot === "head" ? HEAD : slot === "body" ? BODY : FEET)[V.role];
+    if (!fn) return;
+    if (slot === "head") a = Object.assign({ x: 0, w: 2, back: 0 }, a, { eyes: c.q && c.q.eyes > 0.5 ? [] : a.eyes || [] });
+    const l = P.layer;
+    P.layer = l + 1;
+    fn(P, a, c, f || 0);
+    P.layer = l;
+  }
+  const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  // the Ghost thins out toward the floor, every other pixel and then most of them gone, so the floor shows through
+  function fadeOut(g, P, y) {
+    const Y = Math.round(P.T(0, y)[1]), span = Math.max(3, Math.round(4 * (P.s || 1)));
+    for (let yy = Math.max(0, Y - span); yy < g.h; yy++) for (let x = 0; x < g.w; x++) {
+      const t = (yy - (Y - span)) / (span * 2);
+      if (g.px[yy * g.w + x] && BAYER4[(yy & 3) * 4 + (x & 3)] / 16 < t) g.px[yy * g.w + x] = null;
+    }
+  }
+
   const DRAW = { rat, wolf, boar, bear, bat, slime, chest, wraith, crab, wisp, elemental, serpent, kraken, lich, crone, warchief,
     shroom, stump, bugbear, ettercap, rats, wolfrider, batswarm, jelly, wyvern, croaker, strider, peatman, candle, hermit, wrack, imp, snowman };
 
   // pose (deaths): the same body painted in another pose on a canvas padded by pad on every side, the standing sprite's place
   // at (pad, pad); tilt turns the whole figure about pivot (fractions of the standing sprite) and is painted natively at that angle
-  function draw(body, pal, frame, boss, palette, pose) {
+  function draw(body, pal, frame, boss, palette, pose, look) {
     const f = frame || 0, size = SIZES[body] || SIZES.blob;
-    const k = (boss && !NATIVE_BOSS.has(body) ? 1.35 : 1) * (BODYK[body] || 1);
+    const V = variant(look, palette);
+    const k = (boss && !NATIVE_BOSS.has(body) ? 1.35 : 1) * (BODYK[body] || 1) * (V ? V.k : 1);
     const w = body === "spider_big" ? 34 : size[0], h = body === "spider_big" ? 24 : size[1];
     const s = (body === "spider_big" ? 34 / 24 : 1) * k;
     const W = Math.round(w * k), H = Math.round(h * k);
-    const pad = pose ? Math.max(W, H) : 0;
-    const P = new Paint(W + pad * 2, H + pad * 2);
-    if (s !== 1 || pad) P.tf = { ox: pad, oy: pad, cx: 0, cy: 0, s };
+    // headroom over the creature for what floats above it (a halo, a ghost's wisps); the feet stay on the bottom row
+    const room = V && V.R.room ? Math.round(V.R.room * s) : 0;
+    const pad = pose ? Math.max(W, H + room) : 0;
+    const P = new Paint(W + pad * 2, H + room + pad * 2);
+    if (s !== 1 || pad || room) P.tf = { ox: pad, oy: pad + room, cx: 0, cy: 0, s };
+    if (room) { P.dw = W; P.dh = H; }
     if (pose) {
       P.dw = W; P.dh = H; P.eraseT = true; P.screenLight = true;
       const pv = pose.pivot || [0.5, 1];
-      if (pose.tilt) P.post = { a: pose.tilt, cx: pad + pv[0] * W, cy: pad + pv[1] * H, ox: pad + pv[0] * W, oy: pad + pv[1] * H };
+      if (pose.tilt) P.post = { a: pose.tilt, cx: pad + pv[0] * W, cy: pad + room + pv[1] * H, ox: pad + pv[0] * W, oy: pad + room + pv[1] * H };
     }
     P.s = s;
-    const p = palette;
-    const c = { E: p[2], p0: p[0], p1: p[1], p2: p[2], q: pose || null };
-    const m = mats(p);
+    const p = V ? V.pal : palette;
+    const c = { E: p[2], p0: p[0], p1: p[1], p2: p[2], q: pose || null, v: V };
+    const m = V ? varMats(mats(p), V) : mats(p);
     let outline = "#16121a";
     switch (body) {
       case "spider": case "spider_big": spider(P, c, f, body === "spider_big"); break;
@@ -1667,10 +1916,13 @@
       default: (DRAW[body] || blob)(P, c, f);
     }
     if (body === "wisp") outline = mix(p[0], "#10182a", 0.75);
+    if (V && V.R.all) for (let i = 0; i < P.mat.length; i++) { const x = P.mat[i]; if (x && x[0] === "#" && x !== c.E && x !== "#ffffff" && x !== INK) P.mat[i] = V.R.all(x); }
     const g = P.render(m, { outline });
-    if (pose) { g.pad = pad; g.stand = [W, H]; }
+    if (c.fade != null) fadeOut(g, P, c.fade);
+    for (const [x, y, col] of c.lights || []) if (x >= 0 && y >= 0 && x < g.w && y < g.h && !g.px[y * g.w + x]) g.px[y * g.w + x] = col;
+    if (pose) { g.pad = pad; g.stand = [W, H + room]; }
     return g;
   }
 
-  window.Beasts = { draw: (body, pal, frame, boss, palette, pose) => draw(body, pal, frame, boss, palette, pose) };
+  window.Beasts = { draw, ROLES: Object.keys(ROLES) };
 })();

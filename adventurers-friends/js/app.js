@@ -108,8 +108,9 @@
     cv.title = h.name;
     return cv;
   }
-  function monsterSprite(mid, scale, animate) {
-    const m = S.monsters[mid];
+  // look: a record naming the boss's generation (role, gen), so a successor is drawn as its own variant
+  function monsterSprite(mid, scale, animate, look) {
+    const m = Art.withLook(S.monsters[mid], look);
     return spriteCanvas((f) => Art.monsterGrid(m, f), scale || 2, "", animate);
   }
   function petSprite(pet, scale) { return spriteCanvas((f) => Art.petGrid(pet, f), scale || 3, "pet", true); }
