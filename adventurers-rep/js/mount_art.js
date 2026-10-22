@@ -14,6 +14,7 @@
   MountArt.cowGrid(frame)                          -> the road companion's milk cow at people scale (0/1 stand, 2 grazes)
   MountArt.stablePen(mounts, opts)                 -> a live 280x120 stables-yard canvas; mounts [{kind, colour, name}],
       opts.wagons [{kind, puller}], opts.w / opts.h / opts.seed; canvas.spots lists [{name, kind, x, y, w, h}] for labels
+  MountArt.penBase(W, H, ground, r)                -> the stables-yard backdrop alone (plank wall, stalls, rails, hay, trough), r an Art.rng
 */
 (function () {
   "use strict";
@@ -838,5 +839,5 @@
     return cv;
   }
 
-  window.MountArt = { COLOURS, WAGONS, mountGrid, cowGrid, mountSprite, wagonGrid, drawMount, drawWagon, stablePen };
+  window.MountArt = { COLOURS, WAGONS, mountGrid, cowGrid, mountSprite, wagonGrid, drawMount, drawWagon, stablePen, penBase };
 })();

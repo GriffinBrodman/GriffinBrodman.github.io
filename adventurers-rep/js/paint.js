@@ -437,6 +437,7 @@
     P.layer = 3;
     P.rect(cx - 3, 22, 6, 7, "skin", (x, y) => (y < 25 ? -0.7 : -0.25) - (x - cx) * 0.08);
     for (const side of [-1, 1]) {
+      if (c.turn && side > 0) continue;
       const ex = cx + side * (faceW + 0.4);
       if (c.pointy) P.poly([[ex - side * 1.2, 14.5], [ex + side * 3.8, 11.5], [ex + side * 0.8, 19.5], [ex - side * 1.2, 19]], "skin", side < 0 ? 0.1 : -0.35);
       else if (!HOODS.has(c.head)) P.ell(ex, 17, 1.6, 2.4, "skin", { s: side < 0 ? 0 : -0.3, k: 0.5 });
@@ -1527,13 +1528,13 @@
       if (mat === "plate") for (const [x, y] of [[9, 18], [18, 18], [10, 21], [17, 21]]) P.px(x, y, "metal", 0.9);
       if (mat === "chain") { P.rect(9, hem - 1, 10, 1, "metal", 0.6); }
       if (mat === "leather") for (const [x, y] of [[10, 19], [12, 21], [10, 23], [17, 19], [15, 21], [17, 23]]) if (P.matAt(x, y) === base) P.px(x, y, "omet", 0.7);
-      if (mat === "cloth") { P.rect(robe ? 7 : 9, hem, robe ? 14 : 10, 1, "shirt", 0.1); P.rect(6, 23, 2, 1, "shirt", 0.1); P.rect(20, 23, 2, 1, "shirt", -0.2); }
+      if (mat === "cloth") { P.rect(robe ? 7 : 9, hem, robe ? 14 : 10, 1, "shirt", 0.1); if (!c.noL) P.rect(6, 23, 2, 1, "shirt", 0.1); if (!c.noR) P.rect(20, 23, 2, 1, "shirt", -0.2); }
     }
     if (at >= 4) {
       for (let x = 9; x <= 18; x++) if (x < 12 || x > 15) P.px(x, 17, "gold", 0.3 - (x - 9) * 0.05);
       if (robe) P.rect(7, 32, 14, 1, "gold", 0.1); else P.rect(9, 25, 10, 1, "gold", 0);
       if (mat === "plate") { P.px(7, 17, "gold", 0.4); P.px(21, 17, "gold", 0); }
-      if (mat === "cloth") { P.rect(6, 23, 2, 1, "gold", 0.2); P.rect(20, 23, 2, 1, "gold", -0.1); }
+      if (mat === "cloth") { if (!c.noL) P.rect(6, 23, 2, 1, "gold", 0.2); if (!c.noR) P.rect(20, 23, 2, 1, "gold", -0.1); }
     }
     if (at === 5) {
       const rc = RUNE[mat];
@@ -1549,7 +1550,8 @@
       for (const sx of [8, 19.5]) P.ell(sx, 17.6 - (at >= 4 ? 0.3 : 0), r, r * 0.68, "metal", { s: sx < 14 ? 0.25 : -0.1 });
       if (at >= 4) { P.px(6, 17, "gold", 0.4); P.px(21, 17, "gold", 0); }
     }
-    if (at >= 2) { P.rect(5, 22, 1, 2, sleeve, 0.1); if (!c.both) P.rect(22, 22, 1, 2, sleeve, -0.35); if (at >= 4) { P.px(5, 23, "gold", 0.2); if (!c.both) P.px(22, 23, "gold", -0.1); } }
+    const keepR = !c.both && !c.noR;
+    if (at >= 2) { if (!c.noL) P.rect(5, 22, 1, 2, sleeve, 0.1); if (keepR) P.rect(22, 22, 1, 2, sleeve, -0.35); if (at >= 4) { if (!c.noL) P.px(5, 23, "gold", 0.2); if (keepR) P.px(22, 23, "gold", -0.1); } }
     if (at >= 3 && mat !== "plate") for (const [sx, sh] of c.both ? [[7, 0.3]] : [[7, 0.3], [20.5, -0.15]]) {
       P.ell(sx, 16.8, metal ? 2.4 : 2, 1.4, piece, { s: sh });
       if (at >= 4) P.px(sx < 14 ? 5 : 22, 17, edge, 0.2);
@@ -2089,10 +2091,14 @@
     // tilt turns it about pivot, painted natively at that angle
     const q = o.pose || null, pad = q ? 34 : 0, kn = q ? q.kneel || 0 : 0;
     const cl = o.clsLook || {}, c = setup(h, cl), P = new Paint(28 + pad * 2, BH + pad * 2), M = c.mats, outfit = c.outfit, K = c.k;
-    c.sprite = true; c.frame = o.frame || 0;
+    // o.turn: three-quarter to the right (flip the grid for left): the head a pixel forward, the face features two, the near ear hidden.
+    // o.arms {r, l}: [hx, hy] or [hx, hy, ex, ey, thickness] in sprite pixels, a bent arm reaching its hand there (the elbow found if not given);
+    // o.part "hands" keeps only those hands, to lay over whatever they hold; "reach" the forearms and hands, to lay over a table they lean on
+    const turn = o.turn ? 1 : 0, armR = o.arms && o.arms.r, armL = o.arms && o.arms.l;
+    c.sprite = true; c.frame = o.frame || 0; c.turn = turn; c.noR = !!armR; c.noL = !!armL;
     const base = BASE[outfit] || "hide";
     c.hglow = K.head && K.head.glow;
-    const HT = { ox: 14, oy: 9.6, cx: 20, cy: 15.5, s: 0.66 };
+    const HT = { ox: 14 + turn, oy: 9.6, cx: 20, cy: 15.5, s: 0.66 };
     let upper = null, lower = null;
     if (q) {
       const pv = q.pivot || [0.5, 1], cx = pv[0] * 28, cy = pv[1] * BH;
@@ -2166,17 +2172,18 @@
     const wf = K.w.family, wt = K.w.tier, both = TWO_GRIP(wf, wt);
     c.both = both;
     torsoPx.push(...track(P, () => {
-      P.rect(6, 17, 2, 7, sleeve, (x, y) => 0.35 - (y - 17) * 0.05 - (x - 6) * 0.25);
-      if (!both) P.rect(20, 17, 2, 7, sleeve, (x, y) => -0.15 - (y - 17) * 0.05 - (x - 20) * 0.25);
+      if (!armL) P.rect(6, 17, 2, 7, sleeve, (x, y) => 0.35 - (y - 17) * 0.05 - (x - 6) * 0.25);
+      if (!both && !armR) P.rect(20, 17, 2, 7, sleeve, (x, y) => -0.15 - (y - 17) * 0.05 - (x - 20) * 0.25);
       armorShape(P, c, sleeve);
-      if (outfit === "motley" && !both) for (let y = 17; y < 24; y++) for (const x of [20, 21, 22]) if (P.matAt(x, y) === sleeve) P.px(x, y, "shirt", -0.1 - (x - 20) * 0.2);
+      if (outfit === "motley" && !both && !armR) for (let y = 17; y < 24; y++) for (const x of [20, 21, 22]) if (P.matAt(x, y) === sleeve) P.px(x, y, "shirt", -0.1 - (x - 20) * 0.2);
     }));
     const gaunt = K.pocket && K.pocket.art === "gauntlet", gl = K.gloves, hand = gl ? "glv" : "skin", glovePx = [];
     const cuff = (x0, s0) => track(P, () => { P.rect(x0, 22, 2, 4, "glv", (x, y) => (y === 22 ? 0.55 : 0.15) + s0 - (x - x0) * 0.3); if (gl.tier >= 2) P.rect(x0, 22, 2, 1, "gold", 0.2 + s0); });
-    if (gl) glovePx.push(...cuff(6, 0));
+    if (armL) P.layer = 3;
+    else if (gl) glovePx.push(...cuff(6, 0));
     else if (gaunt) glows.push([track(P, () => { P.rect(6, 22, 2, 4, "pk", (x, y) => 0.4 - (x - 6) * 0.3 - (y - 22) * 0.1); P.rect(5, 21, 4, 2, "pk", (x, y) => (y === 21 ? 0.6 : 0) - (x - 5) * 0.15); }), K.pocket.glow]);
     else P.rect(6, 24, 2, 2, "skin", (x) => 0.2 - (x - 6) * 0.3);
-    if (both) P.layer = 3;
+    if (both || armR) P.layer = 3;
     else if (c.scars.includes("hook")) { P.px(21, 24, "#a8a8b0"); P.px(21, 25, "#c8c8d0"); P.px(20, 26, "#a8a8b0"); }
     else if (gl) glovePx.push(...cuff(20, -0.25));
     else P.rect(20, 24, 2, 2, "skin", (x) => -0.2 - (x - 20) * 0.3);
@@ -2188,6 +2195,7 @@
       if (K.neck.glow) jewels.push([K.neck.art === "brooch" ? [10, 18] : [13, 18], K.neck.glow]);
     }
     P.layer = 7;
+    if (turn) P.tf = { ox: 2, oy: 0, cx: 0, cy: 0, s: 1 };
     if (!c.full) {
       const hooded = c.head === "hood" || c.head === "skull_hood" || c.head === "beast_hood";
       const ec = c.head === "skull_hood" && c.ht >= 2 ? "#8af09a" : c.pale ? "#b8c8e8" : hooded ? mix(c.eye, "#e6dccf", 0.55) : mix(c.eye, "#100c10", 0.55);
@@ -2203,6 +2211,7 @@
       if (c.look.face === 1) for (const [x, y, s] of [[12, 13, 0], [15, 13, -0.3], [12, 14, -0.1], [13, 14, 0], [14, 14, -0.2], [15, 14, -0.35]]) P.px(x, y, "stub", s);
     } else { P.px(12, 10, c.glint || "#e6dccf"); P.px(15, 10, c.glint || "#e6dccf"); }
     if (FINE.has(c.mark)) { P.layer = 8; fineMark(P, c, "front"); }
+    P.tf = null;
     if (K.head && K.head.glow) glows.push([hpx.filter((i) => P.lay[i] === 7 && P.mat[i] !== "skin" && P.mat[i] !== "hair"), K.head.glow]);
     if (back === "quiver" || back === "backpack") glows.push([track(P, () => backTop(P, back, bt)), K.back.glow]);
     P.layer = 8;
@@ -2229,27 +2238,33 @@
     }
     if (o.seated) { P.layer = 10; saddleTop(P); }
     P.layer = 11;
+    const handPx = [], reachPx = [];
+    // the posed arm and hand get materials of their own, so the inner outline still parts them from a torso or face of the same cloth or skin
+    if (armL || armR) { M.parm = M[sleeve]; M.phand = M[hand]; }
+    for (const [arm, sx, side] of [[armL, 6.5, -1], [armR, 20.5, 1]]) if (arm) { const a = posedArm(P, arm, sx, side, "parm", "phand", gl); handPx.push(...a.hand); reachPx.push(...a.fore, ...a.hand); }
     (K.rings || []).forEach((rg, i) => {
+      if (i === 0 ? armL : armR) return;
       const x = i === 0 ? 7 : 19, band = rg.art === "band" ? "copper" : "gold", gem = rg.glow ? null : rg.gem, bx = i === 0 ? x : x + 1, gx = i === 0 ? x + 1 : x;
       P.px(bx, 24, band, 0.4); P.px(bx, 25, band, -0.3);
       if (rg.glow) jewels.push([[gx, 24], rg.glow, true]);
       else { P.px(gx, 24, gem || band, gem ? undefined : 0.7); P.px(gx, 25, gem ? mix(gem, "#16121a", 0.35) : band, gem ? undefined : 0.1); }
     });
+    if (o.part === "hands" || o.part === "reach") { const keep = new Set(o.part === "hands" ? handPx : reachPx); for (let i = 0; i < P.mat.length; i++) if (!keep.has(i)) P.mat[i] = null; }
     if (q && q.part === "weapon") { const keep = new Set(wpx); for (let i = 0; i < P.mat.length; i++) if (!keep.has(i)) P.mat[i] = null; }
     let g = P.render(M, { outline: o.legend ? "#5a3a08" : "#16121a", flat: FLAT });
-    const outline = o.legend ? "#5a3a08" : "#16121a";
+    const outline = o.legend ? "#5a3a08" : "#16121a", whole = !o.part;
     if (K.w.glow) glowUp(g, P, wpx, K.w.glow, o.frame, { outline });
-    if (K.aglow) glowUp(g, P, torsoPx, K.aglow, o.frame, { outline, amt: 0.6 });
-    for (const [px, gw] of glows) glowUp(g, P, px, gw, o.frame, { outline });
+    if (K.aglow && whole) glowUp(g, P, torsoPx, K.aglow, o.frame, { outline, amt: 0.6 });
+    if (whole) for (const [px, gw] of glows) glowUp(g, P, px, gw, o.frame, { outline });
     if (gl && gradeGlow(gl)) glowUp(g, P, glovePx.filter((i) => P.mat[i] === "glv"), gradeGlow(gl), o.frame, { outline });
     // jewellery is too small for a rim: a stone in the glow colour, with a highlight that blinks
-    for (const [[x, y], gl, half] of jewels) {
+    if (whole) for (const [[x, y], gl, half] of jewels) {
       for (let j = 0; j < 2; j++) for (let i = 0; i < (half ? 1 : 2); i++) g.set(x + i, y + j, j ? mix(gl, "#16121a", 0.3) : gl);
       g.set(x, y, mix(gl, "#ffffff", o.frame ? 0.3 : 0.65));
     }
     const aura = cl.aura || (o.legend ? "gold" : null);
     if (q) { g.pad = pad; g.stand = [28, BH]; return g; }
-    if (aura) {
+    if (aura && whole) {
       const ac = AURA[aura] || AURA.arcane, rr = rng(hash(aura) + (o.frame || 0) * 7919), edge = [];
       for (let y = 0; y < BH; y++) for (let x = 0; x < 28; x++) if (P.mat[y * 28 + x] === null && g.px[y * 28 + x]) edge.push([x, y]);
       for (let k = 0; k < (o.legend ? 5 : 3); k++) {
@@ -2260,6 +2275,28 @@
     }
     if (o.frame === 1) { const n = new Grid(28, BH); for (let y = 0; y < BH - 1; y++) for (let x = 0; x < 28; x++) n.px[(y + 1) * 28 + x] = g.px[y * 28 + x]; g = n; }
     return g;
+  }
+
+  // a bent arm from the shoulder at (sx, 17.5) to its hand: the elbow given, or found with the bend down and outward
+  function posedArm(P, arm, sx, side, sleeve, hand, gl) {
+    const sy = 17.5, [hx, hy] = arm, U = 4.4, L = 4.4;
+    let ex = arm[2], ey = arm[3];
+    if (ex == null) {
+      const dx = hx - sx, dy = hy - sy, n = Math.hypot(dx, dy) || 1e-6, d = Math.min(U + L - 0.05, Math.max(0.5, n)), a = (U * U - L * L + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, U * U - a * a));
+      const ux = dx / n, uy = dy / n, mx = sx + ux * a, my = sy + uy * a;
+      const c1 = [mx - uy * hh, my + ux * hh], c2 = [mx + uy * hh, my - ux * hh];
+      [ex, ey] = c1[1] + side * c1[0] >= c2[1] + side * c2[0] ? c1 : c2;
+    }
+    P.layer = 9;
+    const r = arm[4] || 0.95;
+    P.line(sx, sy, ex, ey, sleeve, side < 0 ? 0.3 : -0.1, r);
+    const fx = hx - (hx - ex) * 0.25, fy = hy - (hy - ey) * 0.25;
+    const fore = track(P, () => {
+      P.line(ex, ey, fx, fy, sleeve, side < 0 ? 0.25 : -0.15, r);
+      if (gl) P.line(fx + (ex - fx) * 0.35, fy + (ey - fy) * 0.35, fx, fy, "glv", 0.2, 0.9);
+    });
+    P.layer = 10;
+    return { fore, hand: track(P, () => P.rect(Math.round(hx - 1), Math.round(hy - 1), 2, 2, hand, (x, y) => 0.35 - (y - hy) * 0.2 - (x - hx) * 0.15 * side)) };
   }
 
   // on both knees: the thighs drop straight to knees on the floor and the shins and boots lie back behind them

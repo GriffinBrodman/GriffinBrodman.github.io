@@ -102,8 +102,29 @@
     o.connect(g); g.connect(dest || bus.music); o.start(t); o.stop(t + 0.32);
     noise(t, 0.08, vol * 0.4, "lowpass", 1800, dest || bus.music);
   }
+  // a short brass note for the ceremony's fanfares: two detuned saws through a lowpass that opens on the attack
+  function brass(midi, t, dur, vol, dest) {
+    const g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(2600, t + 0.05); lp.frequency.exponentialRampToValueAtTime(1300, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.setValueAtTime(vol * 0.8, t + dur * 0.7); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.08);
+    for (const det of [-6, 5]) { const o = ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = mtof(midi); o.detune.value = det; o.connect(lp); o.start(t); o.stop(t + dur + 0.12); }
+    lp.connect(g); g.connect(dest || bus.sfx);
+  }
+  function roll(t, len, vol) { for (let k = 0; k < len / 0.045; k++) noise(t + k * 0.045, 0.04, vol * (0.4 + (k * 0.045) / len * 0.6), "bandpass", 900, bus.sfx, 1.2); }
   // ---------- effects ----------
   const SFX = {
+    // the ceremony: a card turning over, an honour's fanfare, a tease's lighter sting, and the crown's full flourish
+    envelope: () => { const t = now(); noise(t, 0.09, 0.22, "bandpass", 2600, bus.sfx, 1.5); noise(t + 0.06, 0.05, 0.12, "highpass", 3800); },
+    fanfare: () => { const t = now(); [[67, 0, 0.12], [72, 0.13, 0.12], [76, 0.26, 0.12], [79, 0.39, 0.42]].forEach(([m, d, l]) => { brass(m, t + d, l, 0.16); brass(m - 12, t + d, l, 0.08); }); drum(t + 0.39, 0.3, bus.sfx); },
+    sting: () => { const t = now(); pluck(72, t, 0.4, bus.sfx); pluck(79, t + 0.1, 0.4, bus.sfx); brass(70, t + 0.24, 0.16, 0.12); bell(91, t + 0.42, 0.08, bus.sfx); },
+    crown: () => {
+      const t = now();
+      roll(t, 0.9, 0.18);
+      [[60, 0.95, 0.16], [64, 1.12, 0.16], [67, 1.29, 0.16], [72, 1.46, 0.3], [67, 1.8, 0.14], [72, 1.96, 0.9]].forEach(([m, d, l]) => { brass(m + 7, t + d, l, 0.15); brass(m, t + d, l, 0.1); brass(m - 12, t + d, l, 0.07); });
+      drum(t + 1.46, 0.45, bus.sfx); drum(t + 1.96, 0.55, bus.sfx);
+      [84, 88, 91, 96].forEach((m, i) => bell(m, t + 2.0 + i * 0.07, 0.07, bus.sfx));
+    },
     click: () => { const t = now(); noise(t, 0.04, 0.35, "bandpass", 1900, bus.sfx, 4); },
     page: () => { const t = now(); const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
       src.buffer = noiseBuf; f.type = "bandpass"; f.Q.value = 1.2; f.frequency.setValueAtTime(600, t); f.frequency.exponentialRampToValueAtTime(3200, t + 0.25);
