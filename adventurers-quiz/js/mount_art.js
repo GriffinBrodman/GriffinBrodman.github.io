@@ -14,6 +14,7 @@
   MountArt.cowGrid(frame)                          -> the road companion's milk cow at people scale (0/1 stand, 2 grazes)
   MountArt.stablePen(mounts, opts)                 -> a live 280x120 stables-yard canvas; mounts [{kind, colour, name}],
       opts.wagons [{kind, puller}], opts.w / opts.h / opts.seed; canvas.spots lists [{name, kind, x, y, w, h}] for labels
+  MountArt.penBase(W, H, ground, r)                -> the stables-yard backdrop alone (plank wall, stalls, rails, hay, trough), r an Art.rng
 */
 (function () {
   "use strict";
@@ -805,6 +806,22 @@
     px(6, ground + 1, "#2e1c10", 16, 6); px(7, ground + 2, "#5a7a8a", 14, 2); px(7, ground + 4, "#6a4426", 14, 2);
     return cv;
   }
+  // the yard after dark (a theme's dark sky): the boards and straw sunk into shadow, one lantern hung on the wall, and its light
+  // in two dithered steps, a halo on the planks and a pool on the straw; the animals stand in it as they are
+  function lampLit(cv, ground) {
+    const W = cv.width, H = cv.height, ctx = cv.getContext("2d"), im = ctx.getImageData(0, 0, W, H), d = im.data, lx = Math.round(W / 2), ly = 18;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4, wall = ((x - lx) / 34) ** 2 + ((y - ly) / 16) ** 2, floor = ((x - lx) / 110) ** 2 + ((y - ground - 18) / 26) ** 2;
+      const ring = y < ground ? (wall < 0.5 ? 2 : wall < 1 ? 1 : 0) : floor < 0.45 ? 2 : floor < 1 ? 1 : 0;
+      const step = ring && (x + y) % 2 === 0 ? ring : Math.max(0, ring - 1), k = [0.42, 0.62, 0.8][step];
+      d[i] = Math.min(255, d[i] * k + step * 14); d[i + 1] = Math.min(255, d[i + 1] * k * 0.94 + step * 8); d[i + 2] = d[i + 2] * k * (step ? 0.8 : 1.15);
+    }
+    ctx.putImageData(im, 0, 0);
+    const px = (x, y, c, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w || 1, h || 1); };
+    px(lx - 4, ly - 8, "#1e140c", 9, 1); px(lx, ly - 7, "#1e140c", 1, 2);
+    px(lx - 2, ly - 5, "#1e140c", 5, 7); px(lx - 1, ly - 4, "#ffd27a", 3, 5); px(lx - 1, ly - 4, "#fff2c8", 1, 2); px(lx + 1, ly, "#e8a040", 1, 1);
+    px(lx - 3, ly + 2, "#1e140c", 7, 1);
+  }
   function stablePen(mounts, opts) {
     opts = opts || {};
     const items = (mounts || []).map((m) => ({ name: m.name, kind: m.kind, colour: m.colour, cv: mountGrid(m.kind, m.colour, 0) }))
@@ -815,6 +832,7 @@
     const W = Math.max(opts.w || 280, Math.max(...widths) + 40);
     const r = rng(hash(String(opts.seed || "pen")));
     const base = penBase(W, H, ground, r), spots = [], actors = [];
+    if (opts.night) lampLit(base, ground);
     rows.forEach((row, k) => {
       const feet = k ? H - 8 : ground + 30, total = row.reduce((s, it) => s + it.cv.width, 0) + (row.length - 1) * 6;
       let x = Math.max(28, Math.round((W - total) / 2)) + (k ? 6 : -6);
@@ -838,5 +856,5 @@
     return cv;
   }
 
-  window.MountArt = { COLOURS, WAGONS, mountGrid, cowGrid, mountSprite, wagonGrid, drawMount, drawWagon, stablePen };
+  window.MountArt = { COLOURS, WAGONS, mountGrid, cowGrid, mountSprite, wagonGrid, drawMount, drawWagon, stablePen, penBase };
 })();

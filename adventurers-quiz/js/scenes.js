@@ -37,7 +37,7 @@
     goblin: null, beast: null,
   };
 
-  function interior(kind, W, H, r, info) {
+  function interior(kind, W, H, r, info, place) {
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
@@ -58,47 +58,42 @@
       info.window = [wx, 8, 16, 12];
       return cv;
     }
-    for (let x = 0; x < W; x += 6) { F(x, 0, 6, floor, r() < 0.5 ? "#6e4628" : "#644024"); F(x, 0, 1, floor, "#42281a"); }
-    for (let y = 10; y < floor; y += 14) F(0, y, W, 1, "#4a2e1c");
-    for (let y = floor; y < H; y += 3) { F(0, y, W, 3, (y / 3) % 2 ? "#8e5c34" : "#83542f"); F(0, y, W, 1, "#a06c40"); }
-    for (let x = 0; x < W; x += 17) F(x + ((x / 17) % 2) * 8, floor, 1, H - floor, "#5a3820");
-    const wx = Math.floor(W * 0.08);
-    F(wx, 6, 22, 16, "#3a2414"); F(wx + 2, 8, 18, 12, "#8ac4ec"); F(wx + 2, 16, 18, 4, "#6aa83a"); F(wx + 10, 8, 2, 12, "#3a2414"); F(wx + 2, 13, 18, 1, "#3a2414");
-    const sx = Math.floor(W * 0.55);
-    for (const y of [8, 18]) {
-      F(sx, y + 6, 70, 2, "#3a2414");
-      for (let k = 0; k < 9; k++) { const c = ["#5a8a3a", "#8a3a2a", "#c8a040", "#3a5a8a"][k % 4]; F(sx + 3 + k * 7, y + 1, 3, 5, c); F(sx + 4 + k * 7, y, 1, 1, c); F(sx + 3 + k * 7, y + 1, 1, 2, "#f0e0c0"); }
-    }
-    const by = floor - 12;
-    F(sx - 6, by, W - sx + 6, 13, "#4a2c18"); F(sx - 6, by, W - sx + 6, 3, "#7a4a28"); F(sx - 6, by, W - sx + 6, 1, "#a8703c");
-    for (let x = sx; x < W; x += 12) F(x, by + 4, 1, 9, "#3a2214");
-    for (const [bx, s] of [[W * 0.42, 1], [W * 0.47, 0]]) { F(bx, floor - 10 + s * 2, 9, 10, "#3a2214"); F(bx + 1, floor - 9 + s * 2, 7, 8, "#8a5a30"); F(bx + 1, floor - 7 + s * 2, 7, 1, "#5a5a62"); F(bx + 1, floor - 3 + s * 2, 7, 1, "#5a5a62"); }
-    const lx = Math.floor(W * 0.3);
-    info.lamp = [lx, 9];
-    F(lx, 0, 1, 7, "#2a1a10"); F(lx - 2, 7, 5, 5, "#2a1a10"); F(lx - 1, 8, 3, 3, "#ffd86a");
-    const g = ctx.createRadialGradient(lx, 10, 0, lx, 10, 40);
-    g.addColorStop(0, "rgba(255,200,110,0.35)"); g.addColorStop(1, "rgba(255,200,110,0)");
-    ctx.fillStyle = g; ctx.fillRect(lx - 40, 0, 80, 50);
-    const tx = Math.floor(W * 0.62);
-    F(tx, H - 9, 34, 3, "#3a2214"); F(tx, H - 9, 34, 1, "#a8703c"); F(tx + 3, H - 6, 2, 6, "#3a2214"); F(tx + 29, H - 6, 2, 6, "#3a2214");
-    F(tx + 8, H - 12, 3, 3, "#c8c0b0"); F(tx + 20, H - 12, 3, 3, "#c8a040");
+    if (window.TavernFlat) TavernFlat.paint(cv, Object.assign(info, { town: place && place.town, wx: place && place.wx }), r);
     return cv;
   }
 
-  function paint(kind, W, H, seed, place) {
-    const info = { kind, W, H, horizon: Math.round(H * 0.62), torches: [], tips: [], tombs: [], houses: [], pools: [] };
+  function paint(kind, W, H, seed, place, night) {
+    const info = { kind, W, H, horizon: Math.round(H * 0.62), torches: [], tips: [], tombs: [], houses: [], pools: [], night: !!night, blood: night === "blood" };
     const cv = paintInto(kind, W, H, seed, place, info);
     cv.info = info;
     return cv;
   }
+  // ---------- after dark (a theme's dark sky): the sky is painted as night, and the land is drawn on a layer of its own and relit by the moon,
+  // colour by colour (the road scenes' moonlight: cool, low and greyed), then lit windows go in
+  const NIGHT_SKY = ["#121a28", "#1c2438", "#2a3450"], NIGHT_EMBER = ["#120a10", "#2a1418", "#5a2420"];
+  const moonCache = new Map();
+  function moonlit(r, g, b) {
+    const k = (r << 16) | (g << 8) | b;
+    let v = moonCache.get(k);
+    if (v) return v;
+    const l = r * 0.3 + g * 0.55 + b * 0.15, d = 0.82;
+    v = [(l + (r - l) * 0.55) * 104 / 255 * d, (l + (g - l) * 0.55) * 124 / 255 * d, (l + (b - l) * 0.55) * 178 / 255 * d].map((x) => Math.min(255, Math.round(x)));
+    moonCache.set(k, v);
+    return v;
+  }
+  function relight(layer) {
+    const c = layer.getContext("2d"), im = c.getImageData(0, 0, layer.width, layer.height), d = im.data;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = moonlit(d[i], d[i + 1], d[i + 2]); d[i] = v[0]; d[i + 1] = v[1]; d[i + 2] = v[2]; }
+    c.putImageData(im, 0, 0);
+  }
   function paintInto(kind, W, H, seed, place, info) {
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
-    const ctx = cv.getContext("2d");
+    let ctx = cv.getContext("2d");
     const r = rng(seed || 7);
     const P = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
     const F = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-    if (kind === "tavern" || kind === "jail") return interior(kind, W, H, r, info);
+    if (kind === "tavern" || kind === "jail") return interior(kind, W, H, r, info, place);
     const cave = CAVE[kind];
     const horizon = Math.round(H * 0.62);
     if (cave) {
@@ -158,30 +153,54 @@
       return cv;
     }
     const bk = { goblin: "plains", beast: "forest", town: "plains", swamp: "marsh" }[kind] || kind;
-    const sky = SKY[bk] || SKY.plains, n = noise2(seed || 3);
+    const night = info.night, sky = night ? (bk === "volcanic" ? NIGHT_EMBER : NIGHT_SKY) : SKY[bk] || SKY.plains, n = noise2(seed || 3);
     for (let y = 0; y < horizon; y++) {
       const t = y / horizon;
       F(0, y, W, 1, t < 0.55 ? mix(sky[0], sky[1], t / 0.55) : mix(sky[1], sky[2], (t - 0.55) / 0.45));
     }
-    for (let i = 0; i < Math.max(2, W / 70); i++) {
-      const cx = Math.floor(r() * W), cy = Math.floor(4 + r() * horizon * 0.35), cw = 10 + Math.floor(r() * 16);
-      for (let k = 0; k < 4; k++) {
-        const bx = cx + Math.floor((k - 1.5) * cw * 0.3), bw = Math.floor(cw * (k === 1 || k === 2 ? 0.7 : 0.45)), bh = k === 1 || k === 2 ? 5 : 3;
-        F(bx - bw / 2, cy - bh + 4, bw, bh, bk === "volcanic" ? "#6a4a4a" : "#ffffff");
+    if (night) {
+      // the stars gather loosely in a few drifts rather than an even scatter, and keep clear of the moon's glow
+      const rs = rng((seed || 7) + 31), mx = Math.round(W * 0.84), my = 9;
+      const drifts = [0, 1, 2].map(() => [rs() * W, rs() * horizon * 0.6]);
+      for (let i = 0; i < W * horizon / 60; i++) {
+        let x = Math.floor(rs() * W), y = Math.floor(rs() * horizon * 0.75);
+        if (rs() < 0.55) { const d = drifts[i % 3]; x = Math.round(d[0] + (rs() - 0.5) * W * 0.28); y = Math.round(d[1] + (rs() - 0.5) * horizon * 0.3); }
+        if (y < 0 || y >= horizon * 0.8 || (x - mx) ** 2 + (y - my) ** 2 < 110) continue;
+        P(x, y, rs() < 0.3 ? "#e8ecff" : "#8a96c0");
       }
-      F(cx - cw * 0.55, cy + 4, cw * 1.1, 2, bk === "volcanic" ? "#4a3434" : mix(sky[1], "#8aa8d8", 0.5));
+      // the moon, high on the right, with a ring of dithered light about it
+      // (red in a blood-moon week)
+      const M = info.blood ? ["#e8705a", "#c8402a", "#8a1c12", "#b0281c"] : ["#fff8e0", "#f0e8c8", "#c8c0a0", "#8a96c0"];
+      for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) { const d = x * x + y * y; if (d > 20 && d <= 42 && (x + y) % 2 === 0) P(mx + x, my + y, mix(sky[0], M[3], 0.35)); }
+      for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) { const d = x * x + y * y; if (d <= 18) P(mx + x, my + y, d > 9 && x + y > 1 ? M[2] : x + y < -3 ? M[0] : M[1]); }
+      info.moon = [mx, my];
     }
-    const farC = bk === "volcanic" ? ["#5a3a3a", "#4a2e30"] : bk === "snow" ? ["#b8c8e8", "#98aad6"] : ["#a8b2dc", "#8e98c8"];
+    // clouds: a few round puffs on a flatter base, lit along their lumpy tops (by the moon at night) and shaded underneath
+    const CL = bk === "volcanic" ? ["#8a6a66", "#6a4a4a", "#4a3434"] : night ? ["#8a96b8", "#3a4660", "#2a3448"] : ["#ffffff", "#f2f6fc", mix(sky[1], "#8aa8d8", 0.5)];
+    for (let i = 0; i < Math.max(2, W / 70); i++) {
+      const cx = Math.floor(r() * W), cy = Math.floor(4 + r() * horizon * 0.35), cw = 10 + Math.floor(r() * 16), rc = rng((seed || 3) * 7 + i * 131 + 17);
+      const puffs = [], base = cy + 5;
+      for (let k = 0, n = 3 + Math.floor(rc() * 3); k < n; k++) { const t = k / (n - 1), rr = cw * (t > 0.2 && t < 0.8 ? 0.22 : 0.15) + 1 + rc() * 1.4; puffs.push([cx + (t - 0.5) * cw * 0.7, base - rr * 0.55 - rc(), rr]); }
+      const inC = (x, y) => y <= base && puffs.some(([px, py, pr]) => (x + 0.5 - px) ** 2 + (y + 0.5 - py) ** 2 <= pr * pr);
+      for (let y = Math.floor(base - 9); y <= base; y++) for (let x = Math.floor(cx - cw * 0.5 - 6); x <= cx + cw * 0.5 + 6; x++) {
+        if (!inC(x, y)) continue;
+        P(x, y, !inC(x, y - 1) ? CL[0] : y >= base - 1 ? CL[2] : CL[1]);
+      }
+    }
+    const farC = night ? (bk === "volcanic" ? ["#2a1a1e", "#22161a"] : ["#2a3a48", "#24323e"]) : bk === "volcanic" ? ["#5a3a3a", "#4a2e30"] : bk === "snow" ? ["#b8c8e8", "#98aad6"] : ["#a8b2dc", "#8e98c8"];
     for (let x = 0; x < W; x++) {
       const hgt = Math.floor(fbm(n, x / 34, 1) * (bk === "snow" || bk === "hills" ? 34 : 22)) + 4;
       F(x, horizon - hgt, 1, hgt, (x >> 2) % 5 === 0 ? farC[1] : farC[0]);
-      if ((bk === "snow" || bk === "hills") && hgt > 24) F(x, horizon - hgt, 1, Math.min(4, hgt - 24), "#f4f8ff");
+      if ((bk === "snow" || bk === "hills") && hgt > 24) F(x, horizon - hgt, 1, Math.min(4, hgt - 24), night ? "#4a5874" : "#f4f8ff");
     }
     if (bk === "coast") {
-      F(0, horizon - 10, W, 10, "#3f94d8");
-      for (let x = 0; x < W; x++) if (r() < 0.25) P(x, horizon - 9 + Math.floor(r() * 8), "#7cc8f0");
+      F(0, horizon - 10, W, 10, night ? "#1e3450" : "#3f94d8");
+      for (let x = 0; x < W; x++) if (r() < 0.25) P(x, horizon - 9 + Math.floor(r() * 8), night ? (Math.abs(x - W * 0.84) < 12 ? "#c8c0a0" : "#4a6a98") : "#7cc8f0");
     }
-    if (bk === "volcanic") for (let k = 0; k < 3; k++) { const vx = Math.floor(r() * W); for (let y = 0; y < horizon - 10; y += 3) F(vx + Math.round(Math.sin(y / 6) * 3), y, 4, 3, mix("#8a7a7a", "#4a2a30", y / horizon)); }
+    if (bk === "volcanic") for (let k = 0; k < 3; k++) { const vx = Math.floor(r() * W); for (let y = 0; y < horizon - 10; y += 3) F(vx + Math.round(Math.sin(y / 6) * 3), y, 4, 3, mix(night ? "#4a3a3e" : "#8a7a7a", "#4a2a30", y / horizon)); }
+    // after dark the land is drawn on its own layer, to be relit by the moon before it goes down over the sky
+    const land = night ? document.createElement("canvas") : null;
+    if (land) { land.width = W; land.height = H; ctx = land.getContext("2d"); }
     const SG = Isle.SURF[bk === "town" ? "plains" : bk] || Isle.SURF.plains;
     const midC = bk === "snow" ? ["#c4d2ee", "#dce6f6"] : bk === "volcanic" ? ["#4a3436", "#5a4044"] : bk === "marsh" ? ["#5a7a44", "#6a8a4c"] : ["#4a9a3a", "#5aac40"];
     const ridge = [];
@@ -218,7 +237,17 @@
     if (kind === "marsh" || kind === "swamp") for (let i = 0; i < W / 6; i++) { const x = Math.floor(r() * W); F(x, horizon + Math.floor(r() * 6), 1, 4, "#a8b45a"); }
     if (kind === "volcanic") for (let x = 0; x < W; x++) if (r() < 0.05) F(x, horizon + Math.floor(r() * (H - horizon)), 2, 1, "#ff7a2a");
     extras(ctx, kind, place, info, seed);
-    if (kind === "snow") for (let i = 0; i < W / 4; i++) P(Math.floor(r() * W), Math.floor(r() * H), "#ffffff");
+    if (land) {
+      relight(land);
+      ctx = cv.getContext("2d");
+      ctx.drawImage(land, 0, 0);
+      // every house has a lamp lit: a warm window, a door left ajar, a little light spilt on the ground
+      for (const [hx, hy, w] of info.houses) {
+        P(hx + w - 4, hy - 3, "#ffd27a"); P(hx + w - 4, hy - 2, "#e8a040"); P(hx + 2, hy - 2, "#c8783a");
+        ctx.fillStyle = "rgba(255,210,122,0.22)"; for (let x = -2; x <= 2; x++) if ((x + hy) % 2 === 0) ctx.fillRect(hx + w - 4 + x, hy, 1, 1);
+      }
+    }
+    if (kind === "snow") for (let i = 0; i < W / 4; i++) P(Math.floor(r() * W), Math.floor(r() * H), night ? "#c8d0e8" : "#ffffff");
     return cv;
   }
 
@@ -294,9 +323,12 @@
   // the small lives of a place: what moves, where, keyed off the painting's recorded layout and the place itself
   // ground-dwelling actors; in a fight the fighters own the ground, so these stay far back on the horizon (small because distant)
   const GROUND = new Set(["villager", "wagon", "quad", "rabbit", "crab", "cat", "skeleton", "butterfly"]);
+  const DAYLIFE = new Set(["bird", "butterfly", "eagle", "gull", "shade"]);
   function ambient(info, place, seed, vig, battle) {
-    const A0 = window.Anim;
-    if (!A0) return [];
+    const A00 = window.Anim;
+    if (!A00) return [];
+    // after dark the birds, butterflies and cloud shadows are gone; the fireflies, smoke and townsfolk stay out
+    const A0 = !info.night ? A00 : new Proxy(A00, { get(t, k) { return DAYLIFE.has(k) ? () => null : t[k]; } });
     const A = !battle ? A0 : new Proxy(A0, { get(t, k) {
       const f = t[k];
       if (!GROUND.has(k)) return f;
@@ -307,15 +339,11 @@
     const d = place && place.d, add = (x) => { if (x) out.push(x); };
     const n = (k) => (vig ? Math.ceil(k / 2) : k);
 
-    if (kind === "tavern" || kind === "jail") {
-      if (info.lamp) {
-        add(A.glow({ x: info.lamp[0], y: info.lamp[1] + 1, r: 34, rgb: "255,200,110", a: 0.1, amp: 0.12, seed: s() }));
-        add(A.torch({ x: info.lamp[0] - 1, y: info.lamp[1] + 2, r: 8, seed: s(), cols: ["#ffb84a", "#ffd86a", "#ffe88a", "#fff8d0"] }));
-      }
-      const wnd = info.window || [Math.floor(W * 0.08) + 2, 8, 18, 12];
+    if (kind === "tavern") return window.TavernFlat ? TavernFlat.actors(info, A, s) : out;
+    if (kind === "jail") {
+      const wnd = info.window;
       add(A.fireflies({ x: wnd[0] + 2, y: wnd[1] + wnd[3], w: wnd[2] + 10, h: 18, n: 5, glow: false, col: "#e8d8a8", seed: s() }));
-      if (kind === "tavern") add(A.cat({ x: W * 0.84, y: H - 3, range: 10, seed: s() }));
-      if (kind === "jail") add(A.quad({ kind: "rat", x0: W * 0.1, x1: W * 0.5, y: H - 3, seed: s() }));
+      add(A.quad({ kind: "rat", x0: W * 0.1, x1: W * 0.5, y: H - 3, seed: s() }));
       return out;
     }
 
@@ -479,11 +507,15 @@
     const indoors = S.towns[e.loc] && TAVERN_KINDS.has(e.kind) ? "tavern" : S.towns[e.loc] && e.kind === "crime" ? "jail" : null;
     const place = indoors ? null : placeAt(e.loc);
     const ground = Math.round(H * 0.62) + 14;
+    // a story from this season while a theme keeps the sky dark (the Long Night) happened after dark
+    const meta = (App.L && App.L.meta) || {}, night = !indoors && meta.sky === "night" && (e.season == null || e.season === meta.season);
+    const wonder = App.L && App.L.wonder, blood = night && wonder && wonder.kind === "blood_moon" && wonder.region === "*" && e.day >= meta.day - 1;
     // a dungeon is framed from its own map header, cut so its way in stands just behind the heroes
-    const TS = window.TownScenes, hdr = !indoors && S.dungeons[e.loc] && TS && TS.frame && TS.DUNGEONS.includes(e.loc) ? TS.frame(e.loc, W, H, { y0: (TS.FOOT[e.loc] || 70) - (ground - 9) }) : null;
-    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, place);
-    const info = hdr ? { kind, W, H, horizon: ground - 14, bk: S.dungeons[e.loc].biome } : bg.info;
-    if (e.wx && !indoors) weatherOverlay(bg.getContext("2d"), W, H, e.wx, seed);
+    const TS = window.TownScenes, hdr = !indoors && S.dungeons[e.loc] && TS && TS.frame && TS.DUNGEONS.includes(e.loc) ? TS.frame(e.loc, W, H, { y0: (TS.FOOT[e.loc] || 70) - (ground - 9), night }) : null;
+    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, indoors ? { town: e.loc, wx: e.wx } : place, blood ? "blood" : night);
+    const info = hdr ? { kind, W, H, horizon: ground - 14, bk: S.dungeons[e.loc].biome, night } : bg.info;
+    const open = night && !CAVE[info.kind];
+    if (e.wx && !indoors) weatherOverlay(bg.getContext("2d"), W, H, e.wx, seed, night);
     // heroes, foes and props sit on their own layer so the place's ambient life can pass behind them
     const over = document.createElement("canvas");
     over.width = W; over.height = H;
@@ -504,6 +536,9 @@
     const dead = new Set();
     if (e.kind === "death") dead.add(hs[0] && hs[0].id);
     const startX = Math.round(W * 0.18);
+    // after dark a lantern on a post stands at the heroes' left: a pool of its light on the ground, and its warm edge on whoever faces it
+    if (open && hs.length) lantern(ctx, startX - 10, ground);
+    const lit = (g, i) => (open && i < 2 ? rim(g, i ? "#7a4a2a" : "#b8703a") : g);
     hs.forEach((h, i) => {
       const lk = App.heroLook(h), g = Art.heroGrid(h, 0, lk);
       const x = startX + i * 30, y = ground - g.h;
@@ -511,8 +546,13 @@
         drawGrave(ctx, x + 6, ground - 16);
         return;
       }
-      sprite(g, Art.heroGrid(h, 1, lk), x, y, i);
+      sprite(lit(g, i), lit(Art.heroGrid(h, 1, lk), i), x, y, i);
     });
+    // a wild surge leaves the air about the crew fizzing: a few mint and pink motes drifting up past them, kept below the sky
+    if (e.kind === "surge" && hs.length) {
+      const m = motes(startX - 6, startX + hs.length * 30 + 6, Math.max(Math.round(H * 0.3), ground - 46), ground - 2, seed);
+      if (A) actors.push(m); else m.draw(ctx, 0);
+    }
     const px = Math.round(W * 0.66);
     const prop = (grid, sx, sy) => ctx.drawImage(grid.toCanvas(1), sx, sy);
     const lg = e.kind === "legend" && e.legend && App.legendFigure ? App.legendFigure(e.legend) : null;
@@ -525,22 +565,34 @@
       for (let i = 0; i < 7; i++) { const q = rng(seed + i * 13); pts.push([lx + 2 + Math.floor(q() * 24), ly + Math.floor(q() * 30)]); }
       if (A) actors.push(A.twinkle({ pts, col: "#fff4c8", arm: "#e8b84a", seed, z: 9e4, front: true }));
     } else if (["boss_kill", "boss"].includes(e.kind) && S.dungeons[e.loc]) {
-      const m = S.monsters[S.dungeons[e.loc].boss];
+      const id = S.dungeons[e.loc].boss, m = Art.withLook(Object.assign({}, S.monsters[id], { boss: true }), e.boss_look);
       const g = Art.monsterGrid(m, 0);
-      // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
-      ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
-      ctx.translate(px + (g.w >> 1), Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
-      if (A) actors.push(A.smoke({ x: px + g.w / 2, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
+      // the boss lies as its own death leaves it (deaths.js, the replay's last frame), facing the heroes who felled it
+      // a big body lying down is wider than it stood: it lies past the last of the crew, not on top of them
+      const cx = Math.min(W - g.w * 0.6, Math.max(px + (g.w >> 1), startX + hs.length * 30 + g.w * 0.75));
+      if (!(window.Deaths && Deaths.draw(ctx, { ref: id, boss: true, look: e.boss_look }, 0, cx, ground, -1, { calm: true }))) {
+        // a quarter turn exactly, about a whole pixel: any other angle resamples the sprite off its grid
+        ctx.save(); ctx.globalAlpha = 0.9; ctx.imageSmoothingEnabled = false;
+        ctx.translate(cx, Math.min(ground - 6, H - 2 - (g.w >> 1))); ctx.rotate(Math.PI / 2); ctx.drawImage(g.toCanvas(1), -(g.w >> 1), -(g.h >> 1)); ctx.restore();
+      }
+      if (A) actors.push(A.smoke({ x: cx, y: ground - 8, n: 4, rise: 16, life: 4, col: "#b8b0a8", seed: seed + 1 }));
     } else if (["fight", "ambush", "boss"].includes(e.kind) && (e.foes || []).length) {
       e.foes.slice(0, 3).forEach((mid, i) => {
         const m = S.monsters[mid];
         if (!m) return;
-        const mm = Object.assign({}, m, { boss: e.kind === "boss" && i === 0 });
+        const mm = e.kind === "boss" && i === 0 ? Art.withLook(Object.assign({}, m, { boss: true }), e.boss_look) : Object.assign({}, m, { boss: false });
         const g = Art.monsterGrid(mm, 0).flipX();
         const mx = Math.round(W * 0.62) + i * 26, my = ground - g.h + (i % 2) * 3;
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(mx + 3, ground - 1, g.w - 6, 2);
         sprite(g, Art.monsterGrid(mm, 1).flipX(), mx, my, i + 5);
       });
+    } else if (e.kind === "mount" && hs[0] && hs[0].mount && window.MountArt) {
+      // the horse the story is about stands beside its rider
+      const m = hs[0].mount, g0 = MountArt.mountGrid(m.kind, m.colour, 0, true), g1 = MountArt.mountGrid(m.kind, m.colour, 1, true);
+      const mx = startX + 30, my = ground - g0.height;
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(mx + 4, ground - 1, g0.width - 8, 2);
+      if (A) actors.push(A.flip({ a: g0, b: g1, x: mx, y: my, z: 5e3, rate: 0.8, seed: 9, front: true }));
+      else ctx.drawImage(g0, mx, my);
     } else if (e.kind === "party_formed" || e.kind === "party_join") {
       const p = App.parties[(e.parties || [])[0]];
       if (p) prop(Art.bannerGrid(p.banner), px, ground - 20);
@@ -570,18 +622,19 @@
     }
     if (A && !indoors && (e.wx === "rain" || e.wx === "storm")) actors.push(A.rain({ W, H, n: Math.round(W * (e.wx === "storm" ? 0.35 : 0.2)), storm: e.wx === "storm", seed }));
     if (A && !indoors && e.wx === "snow" && info.bk !== "snow") actors.push(A.snow({ W, H, n: Math.round(W / 5), seed }));
-    if (A && !indoors && e.wx === "fog") actors.push(A.mist({ W, y: Math.round(H * 0.3), h: Math.round(H * 0.5), rgb: "235,235,240", a: 0.3, speed: 2, front: true, z: 9e4, seed }));
+    // the fog drifts behind the figures, so it never washes out the heroes the story is about
+    if (A && !indoors && e.wx === "fog") actors.push(A.mist({ W, y: Math.round(H * 0.3), h: Math.round(H * 0.5), rgb: open ? "120,134,170" : "235,235,240", a: 0.3, speed: 2, z: 4e3, seed }));
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     if (A) A.stage(cv, bg, actors, { over });
     else { const c = cv.getContext("2d"); c.drawImage(bg, 0, 0); c.drawImage(over, 0, 0); }
     return cv;
   }
-  function weatherOverlay(ctx, W, H, wx, seed) {
+  function weatherOverlay(ctx, W, H, wx, seed, night) {
     const r = rng(seed + 5);
     if (wx === "rain" || wx === "storm") {
       ctx.fillStyle = "rgba(40,50,80,0.25)"; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "rgba(200,220,255,0.7)";
+      ctx.fillStyle = night ? "rgba(140,160,200,0.6)" : "rgba(200,220,255,0.7)";
       for (let i = 0; i < W * (wx === "storm" ? 0.9 : 0.5); i++) { const x = Math.floor(r() * W), y = Math.floor(r() * H); ctx.fillRect(x, y, 1, 3); }
       if (wx === "storm") { ctx.fillStyle = "#fff8c0"; let x = Math.floor(W * (0.2 + r() * 0.6)); for (let y = 0; y < H * 0.5; y += 2) { x += Math.floor(r() * 3) - 1; ctx.fillRect(x, y, 1, 2); } }
     } else if (wx === "snow") {
@@ -589,12 +642,47 @@
       ctx.fillStyle = "#ffffff";
       for (let i = 0; i < W * 0.6; i++) ctx.fillRect(Math.floor(r() * W), Math.floor(r() * H), 1, 1);
     } else if (wx === "fog") {
-      for (let y = 0; y < H; y += 2) { ctx.fillStyle = `rgba(230,230,235,${0.25 + 0.2 * Math.sin(y / 7)})`; ctx.fillRect(0, y, W, 2); }
+      for (let y = 0; y < H; y += 2) { ctx.fillStyle = `rgba(${night ? "110,124,160" : "230,230,235"},${0.25 + 0.2 * Math.sin(y / 7)})`; ctx.fillRect(0, y, W, 2); }
     } else if (wx === "heat") {
       ctx.fillStyle = "rgba(255,170,60,0.15)"; ctx.fillRect(0, 0, W, H);
     }
   }
   function drawGrave(ctx, x, y) { ctx.drawImage(Art.graveGrid().toCanvas(1), x, y); }
+  // a lamp post: its light as two dithered steps (a pool on the ground and a halo round the lamp), never a soft gradient
+  function lantern(ctx, x, ground) {
+    const F = (px, py, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(px, py, w, h); }, top = ground - 22;
+    for (let y = -6; y <= 6; y++) for (let dx = -26; dx <= 26; dx++) {
+      const d = (dx / 26) ** 2 + (y / 4) ** 2;
+      if (d <= 1 && (dx + y) % 2 === 0) F(x + dx, ground + y - 1, 1, 1, d < 0.4 ? "rgba(255,210,122,0.32)" : "rgba(255,210,122,0.16)");
+    }
+    for (let y = -7; y <= 7; y++) for (let dx = -7; dx <= 7; dx++) {
+      const d = dx * dx + y * y;
+      if (d > 6 && d <= 49 && (dx + y) % 2 === 0) F(x + dx, top + 2 + y, 1, 1, d <= 20 ? "rgba(255,214,130,0.4)" : "rgba(255,214,130,0.18)");
+    }
+    F(x, top + 5, 2, ground - top - 5, "#2a1c14"); F(x, top + 5, 1, ground - top - 5, "#4a3424"); F(x - 2, ground - 1, 6, 1, "#2a1c14");
+    F(x - 2, top, 6, 1, "#2a1c14"); F(x - 1, top + 1, 4, 4, "#2a1c14"); F(x, top + 2, 2, 2, "#ffd27a"); F(x, top + 2, 1, 1, "#fff2c8"); F(x - 1, top + 5, 4, 1, "#2a1c14");
+  }
+  function motes(x0, x1, top, bot, seed) {
+    const r = rng(seed + 71), ps = [];
+    for (let i = 0; i < 10; i++) ps.push({ x: x0 + r() * (x1 - x0), y: top + r() * (bot - top), sp: 3 + r() * 4, ph: r() * 6.3, col: i % 2 ? "#ffb8e4" : "#a8ffe0", dk: i % 2 ? "#b0408a" : "#1e8a6a" });
+    return { z: 9e4, front: true, draw(ctx, t) {
+      for (const p of ps) {
+        const span = bot - top, y = Math.round(top + ((p.y - top - t * p.sp) % span + span) % span), x = Math.round(p.x + Math.sin(t * 1.3 + p.ph) * 2);
+        // a spark: a bright core in a cross of its own deeper colour, which pulses down to the core and a trailing pixel
+        ctx.fillStyle = p.dk;
+        if (Math.sin(t * 2.1 + p.ph * 3) > -0.2) { ctx.fillRect(x - 1, y, 1, 1); ctx.fillRect(x + 1, y, 1, 1); ctx.fillRect(x, y - 1, 1, 1); ctx.fillRect(x, y + 1, 1, 1); }
+        else ctx.fillRect(x, y + 1, 1, 1);
+        ctx.fillStyle = p.col; ctx.fillRect(x, y, 1, 1);
+      }
+    } };
+  }
+  // a figure's outline on the side facing a lamp, warmed by it: the one pixel of light that parts dark kit from the night behind it
+  function rim(g, col) {
+    const out = new Art.Grid(g.w, g.h);
+    out.px = g.px.slice();
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (g.get(x, y) && !g.get(x - 1, y)) out.set(x, y, col);
+    return out;
+  }
   function drawHeart(ctx, x, y, c) {
     const pts = [[1, 0], [2, 0], [4, 0], [5, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [2, 4], [3, 4], [4, 4], [3, 5]];
     ctx.fillStyle = "#1a1220";

@@ -1,4 +1,4 @@
-/* Shared by the dungeon maps: a fast pixel surface, the 3x5 and Pixelify pixel letters, each hero's pixel hand, crew inks, and the floor plan carved into cells from the exported room layout. */
+/* Shared by the dungeon maps: a fast pixel surface, the 3x5 and Pixelify pixel letters, each hero's hand (a handwriting font each; ?hand=pixel or ?hand=clear for the pixel hand), crew inks, and the floor plan carved into cells from the exported room layout. */
 (function () {
   "use strict";
 
@@ -80,7 +80,7 @@
     width(s, k) { k = k || 1; let w = 0; for (const ch of String(s)) w += (ch === " " ? 3 : 4) * k; return Math.max(0, w - k); },
   };
   // the site's Pixelify bitmap (from food_art.js): [width, rows of bits], cap top at row 2, descenders below
-  const PF = {" ":[2,[]],"!":[1,[0,0,1,1,1,1,1,0,1]],"\"":[3,[0,0,5,5]],"#":[6,[0,0,18,18,63,18,18,63,18]],"$":[5,[0,4,14,17,1,14,16,17,14,4]],"%":[8,[0,0,66,39,18,8,68,226,65]],"&":[6,[0,0,14,17,10,4,10,17,46]],"'":[1,[0,0,1,1]],"(":[3,[4,4,2,2,1,1,2,2,4,4]],")":[3,[1,1,2,2,4,4,2,2,1,1]],"*":[1,[0,0,1,1]],"+":[5,[0,0,4,4,31,4,4]],",":[1,[0,0,0,0,0,0,0,1,1]],"-":[3,[0,0,0,0,0,7]],".":[1,[0,0,0,0,0,0,0,1]],"/":[4,[0,0,8,4,4,2,2,1,1]],"0":[5,[0,0,14,17,17,17,17,17,14]],"1":[3,[0,0,2,5,4,4,4,4,4]],"2":[5,[0,0,14,17,16,14,1,17,14]],"3":[5,[0,0,14,17,16,14,16,17,14]],"4":[5,[0,0,24,20,18,17,31,16,16]],"5":[5,[0,0,31,1,15,16,16,17,14]],"6":[5,[0,0,14,17,1,15,17,17,14]],"7":[5,[0,0,14,17,16,16,16,16,16]],"8":[5,[0,0,14,17,17,14,17,17,14]],"9":[5,[0,0,14,17,17,30,16,17,14]],":":[1,[0,0,0,0,0,1,0,1]],";":[1,[0,0,0,0,0,1,0,1,1]],"<":[5,[0,16,8,4,2,1,2,4,8,16]],"=":[4,[0,0,0,0,15,15,15]],">":[5,[0,1,2,4,8,16,8,4,2,1]],"?":[5,[0,0,14,17,17,12,4,0,4]],"@":[5,[0,0,0,15,23,9,7]],"A":[5,[0,0,4,10,17,17,31,17,17]],"B":[5,[0,0,14,17,17,13,17,17,14]],"C":[5,[0,0,14,17,17,1,17,17,14]],"D":[5,[0,0,7,9,17,17,17,9,7]],"E":[5,[0,0,14,17,1,7,1,17,14]],"F":[5,[0,0,15,17,1,7,1,1,1]],"G":[5,[0,0,14,17,17,5,25,17,14]],"H":[5,[0,0,17,17,21,31,17,17,17]],"I":[3,[0,0,7,2,2,2,2,2,7]],"J":[5,[0,0,14,16,16,16,17,17,14]],"K":[5,[0,0,18,9,5,3,5,9,17]],"L":[5,[0,0,1,1,1,1,1,17,14]],"M":[7,[0,0,34,85,85,73,73,73,65]],"N":[5,[0,0,17,19,21,21,21,25,17]],"O":[5,[0,0,14,17,17,17,17,17,14]],"P":[5,[0,0,14,17,17,17,15,1,1]],"Q":[5,[0,0,14,17,17,17,17,17,14,4,8]],"R":[5,[0,0,14,17,17,17,15,5,9]],"S":[5,[0,0,14,17,1,14,16,17,14]],"T":[5,[0,0,14,21,4,4,4,4,4]],"U":[5,[0,0,17,17,17,17,17,17,14]],"V":[5,[0,0,17,17,17,17,10,10,4]],"W":[7,[0,0,65,73,73,73,85,85,34]],"X":[5,[0,0,17,10,10,4,10,10,17]],"Y":[5,[0,0,17,17,10,4,4,4,4]],"Z":[5,[0,0,15,17,16,14,1,17,30]],"[":[3,[0,6,1,1,1,1,1,1,6]],"\\":[4,[0,0,1,1,2,2,4,4,8]],"]":[3,[0,3,4,4,4,4,4,4,3]],"^":[1,[0,0,1]],"_":[3,[0,0,0,0,0,0,0,7]],"`":[1,[0,1]],"a":[6,[0,0,0,0,14,17,17,17,46]],"b":[5,[0,0,1,1,15,17,17,17,14]],"c":[5,[0,0,0,0,14,17,1,17,14]],"d":[5,[0,0,16,16,30,17,17,17,14]],"e":[5,[0,0,0,0,14,17,7,17,14]],"f":[5,[0,0,14,17,1,7,1,1,1]],"g":[5,[0,0,0,0,14,17,17,30,16,17,14]],"h":[5,[0,0,1,1,13,19,17,17,17]],"i":[1,[0,0,1,0,1,1,1,1,1]],"j":[4,[0,0,0,0,8,8,8,9,6]],"k":[5,[0,0,1,1,17,13,3,13,17]],"l":[1,[0,0,1,1,1,1,1,1,1]],"m":[7,[0,0,0,0,55,73,73,73,73]],"n":[5,[0,0,0,0,15,17,17,17,17]],"o":[5,[0,0,0,0,14,17,17,17,14]],"p":[5,[0,0,0,0,14,17,17,17,15,1,1]],"q":[5,[0,0,0,0,14,17,17,17,30,16,16]],"r":[5,[0,0,0,0,14,17,1,1,1]],"s":[5,[0,0,0,0,30,1,14,16,15]],"t":[6,[0,0,2,2,31,2,2,34,28]],"u":[5,[0,0,0,0,17,17,17,17,14]],"v":[5,[0,0,0,0,17,17,10,10,4]],"w":[7,[0,0,0,0,73,73,73,73,55]],"x":[5,[0,0,0,0,17,10,4,10,17]],"y":[5,[0,0,0,0,17,17,17,30,16,17,14]],"z":[5,[0,0,0,0,31,8,4,2,31]],"{":[4,[0,4,10,2,2,1,2,2,10,4]],"|":[1,[0,0,1,1,1,1,1,1,1]],"}":[4,[0,2,5,4,4,8,4,4,5,2]],"~":[3,[0,0,0,0,0,7]]};
+  const PF = {" ":[2,[]],"!":[1,[0,0,1,1,1,1,1,0,1]],"\"":[3,[0,0,5,5]],"#":[6,[0,0,18,18,63,18,18,63,18]],"$":[5,[0,4,14,17,1,14,16,17,14,4]],"%":[8,[0,0,66,39,18,8,68,226,65]],"&":[6,[0,0,14,17,10,4,10,17,46]],"'":[1,[0,0,1,1]],"(":[3,[4,2,1,1,1,1,1,1,2,4]],")":[3,[1,2,4,4,4,4,4,4,2,1]],"*":[1,[0,0,1,1]],"+":[5,[0,0,4,4,31,4,4]],",":[1,[0,0,0,0,0,0,0,1,1]],"-":[3,[0,0,0,0,0,7]],".":[1,[0,0,0,0,0,0,0,1]],"/":[4,[0,0,8,4,4,2,2,1,1]],"0":[5,[0,0,14,17,17,17,17,17,14]],"1":[3,[0,0,2,5,4,4,4,4,4]],"2":[5,[0,0,14,17,16,14,1,17,14]],"3":[5,[0,0,14,17,16,14,16,17,14]],"4":[5,[0,0,24,20,18,17,31,16,16]],"5":[5,[0,0,31,1,15,16,16,17,14]],"6":[5,[0,0,14,17,1,15,17,17,14]],"7":[5,[0,0,14,17,16,16,16,16,16]],"8":[5,[0,0,14,17,17,14,17,17,14]],"9":[5,[0,0,14,17,17,30,16,17,14]],":":[1,[0,0,0,0,0,1,0,1]],";":[1,[0,0,0,0,0,1,0,1,1]],"<":[5,[0,16,8,4,2,1,2,4,8,16]],"=":[4,[0,0,0,0,15,15,15]],">":[5,[0,1,2,4,8,16,8,4,2,1]],"?":[5,[0,0,14,17,17,12,4,0,4]],"@":[5,[0,0,0,15,23,9,7]],"A":[5,[0,0,4,10,17,17,31,17,17]],"B":[5,[0,0,14,17,17,13,17,17,14]],"C":[5,[0,0,14,17,17,1,17,17,14]],"D":[5,[0,0,7,9,17,17,17,9,7]],"E":[5,[0,0,14,17,1,7,1,17,14]],"F":[5,[0,0,15,17,1,7,1,1,1]],"G":[5,[0,0,14,17,17,5,25,17,14]],"H":[5,[0,0,17,17,21,31,17,17,17]],"I":[3,[0,0,7,2,2,2,2,2,7]],"J":[5,[0,0,14,16,16,16,17,17,14]],"K":[5,[0,0,18,9,5,3,5,9,17]],"L":[5,[0,0,1,1,1,1,1,17,14]],"M":[7,[0,0,34,85,85,73,73,73,65]],"N":[5,[0,0,17,19,21,21,21,25,17]],"O":[5,[0,0,14,17,17,17,17,17,14]],"P":[5,[0,0,14,17,17,17,15,1,1]],"Q":[5,[0,0,14,17,17,17,17,17,14,4,8]],"R":[5,[0,0,14,17,17,17,15,5,9]],"S":[5,[0,0,14,17,1,14,16,17,14]],"T":[5,[0,0,14,21,4,4,4,4,4]],"U":[5,[0,0,17,17,17,17,17,17,14]],"V":[5,[0,0,17,17,17,17,10,10,4]],"W":[7,[0,0,65,73,73,73,85,85,34]],"X":[5,[0,0,17,10,10,4,10,10,17]],"Y":[5,[0,0,17,17,10,4,4,4,4]],"Z":[5,[0,0,15,17,16,14,1,17,30]],"[":[3,[0,6,1,1,1,1,1,1,6]],"\\":[4,[0,0,1,1,2,2,4,4,8]],"]":[3,[0,3,4,4,4,4,4,4,3]],"^":[1,[0,0,1]],"_":[3,[0,0,0,0,0,0,0,7]],"`":[1,[0,1]],"a":[6,[0,0,0,0,14,17,17,17,46]],"b":[5,[0,0,1,1,15,17,17,17,14]],"c":[5,[0,0,0,0,14,17,1,17,14]],"d":[5,[0,0,16,16,30,17,17,17,14]],"e":[5,[0,0,0,0,14,17,7,17,14]],"f":[5,[0,0,14,17,1,7,1,1,1]],"g":[5,[0,0,0,0,14,17,17,30,16,17,14]],"h":[5,[0,0,1,1,13,19,17,17,17]],"i":[1,[0,0,1,0,1,1,1,1,1]],"j":[4,[0,0,0,0,8,8,8,9,6]],"k":[5,[0,0,1,1,17,13,3,13,17]],"l":[1,[0,0,1,1,1,1,1,1,1]],"m":[7,[0,0,0,0,55,73,73,73,73]],"n":[5,[0,0,0,0,15,17,17,17,17]],"o":[5,[0,0,0,0,14,17,17,17,14]],"p":[5,[0,0,0,0,14,17,17,17,15,1,1]],"q":[5,[0,0,0,0,14,17,17,17,30,16,16]],"r":[5,[0,0,0,0,14,17,1,1,1]],"s":[5,[0,0,0,0,30,1,14,16,15]],"t":[6,[0,0,2,2,31,2,2,34,28]],"u":[5,[0,0,0,0,17,17,17,17,14]],"v":[5,[0,0,0,0,17,17,10,10,4]],"w":[7,[0,0,0,0,73,73,73,73,55]],"x":[5,[0,0,0,0,17,10,4,10,17]],"y":[5,[0,0,0,0,17,17,17,30,16,17,14]],"z":[5,[0,0,0,0,31,8,4,2,31]],"{":[4,[0,4,10,2,2,1,2,2,10,4]],"|":[1,[0,0,1,1,1,1,1,1,1]],"}":[4,[0,2,5,4,4,8,4,4,5,2]],"~":[3,[0,0,0,0,0,7]]};
   const glyph = (ch) => PF[ch] || PF[ch.normalize("NFD")[0]] || PF["?"];
   const FontP = {
     text(px, s, x, y, c, o) {
@@ -110,8 +110,16 @@
     flourish: { font: "P", col: "#2a4a2a", flourish: true, word: "a flourishing hand" },
     map: { font: "P", col: "#2e2116" },
   };
+  // each hand is written in its handwriting font; ?hand=pixel shows the old pixel hand, ?hand=clear the pixel hand straightened and spaced
+  const HAND_MODE = (() => { try { const m = new URLSearchParams(location.search).get("hand"); return m === "pixel" || m === "clear" ? m : "font"; } catch (e) { return "font"; } })();
+  if (HAND_MODE === "clear") for (const [k, H] of Object.entries(HANDS)) {
+    if (k === "map") continue;
+    Object.assign(H, { caps: false, jit: 0, tilt: 0, slant: 0, sp: 1, grain: H.grain ? 0.06 : 0, lead: 3 });
+    if (H.font === "3") Object.assign(H, { font: "P", k: 1, bold: true, col: "#2a2320" });
+    if (k === "cramped") H.col = "#55504a";
+  }
   const hand = (h) => (typeof h === "string" ? HANDS[h] || HANDS.neat : h);
-  const lineH = (H) => (H.font === "3" ? 6 * (H.k || 1) + 1 : 10);
+  const lineH = (H) => (H.font === "3" ? 6 * (H.k || 1) + 1 : 10) + (H.lead || 0);
   const capH = (H) => (H.font === "3" ? 5 * (H.k || 1) : 7);
   const prep = (H, s) => (H.caps ? String(s).toUpperCase() : String(s));
   function charW(H, ch, first) {
@@ -148,15 +156,70 @@
     }
     return cx - x;
   }
-  function wrap(h, text, maxW) {
+  function wrap(h, text, maxW, wf) {
     const words = String(text).split(/\s+/).filter(Boolean), out = [];
     let cur = "";
     for (const wd of words) {
       const t = cur ? cur + " " + wd : wd;
-      if (cur && width(h, t) > maxW) { out.push(cur); cur = wd; } else cur = t;
+      if (cur && (wf || width)(h, t) > maxW) { out.push(cur); cur = wd; } else cur = t;
     }
     if (cur) out.push(cur);
     return out;
+  }
+
+  // ---------- the handwriting fonts: one font and ink per hand; size in sheet pixels, set per font so the small-bodied ones read as large as the rest ----------
+  const FONTS = {
+    big: { fam: "Permanent Marker", size: 8.5, lh: 1.3, base: 0.9, caps: true, col: "#2a2320" },
+    jagged: { fam: "Covered By Your Grace", size: 10.5, lh: 1.15, base: 0.85, caps: true, col: "#7a2e16" },
+    neat: { fam: "Indie Flower", size: 9.5, lh: 1.25, base: 0.9, col: "#4a2a16" },
+    upright: { fam: "Patrick Hand", size: 10, lh: 1.1, base: 0.85, col: "#1e1a16" },
+    scrawl: { fam: "Kalam", size: 9.5, lh: 1.3, base: 0.95, col: "#5e2430" },
+    looping: { fam: "Caveat", wt: 500, size: 12, lh: 1.05, base: 0.8, col: "#22324e" },
+    block: { fam: "Gochi Hand", size: 9.5, lh: 1.15, base: 0.85, caps: true, col: "#2a2a2e" },
+    cramped: { fam: "Just Another Hand", size: 13.5, lh: 0.9, base: 0.8, col: "#4f4a44" },
+    flourish: { fam: "Dancing Script", wt: 500, size: 11, lh: 1.2, base: 0.85, col: "#2a4a2a" },
+  };
+  const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Covered+By+Your+Grace&family=Indie+Flower&family=Patrick+Hand&family=Kalam"
+    + "&family=Caveat:wght@500&family=Gochi+Hand&family=Just+Another+Hand&family=Dancing+Script:wght@500&display=swap";
+  const FALLBACK = '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive';
+  const fontSpec = (h) => FONTS[h] || FONTS.neat;
+  const fontCss = (h, px) => { const F = fontSpec(h); return `${F.wt || 400} ${px}px "${F.fam}", ${FALLBACK}`; };
+  let fontsP = null;
+  // resolves once the fonts are in, or failed (offline, file:// with no network), or after a few seconds; the fallback is a system cursive
+  function fontsReady() {
+    if (HAND_MODE !== "font") return Promise.resolve();
+    if (fontsP) return fontsP;
+    const sheet = new Promise((res) => {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = FONTS_CSS;
+      l.onload = res; l.onerror = res;
+      document.head.appendChild(l);
+    });
+    const faces = () => (document.fonts && document.fonts.load ? Promise.all(Object.keys(FONTS).map((h) => document.fonts.load(fontCss(h, 20), "Ag").catch(() => null))) : null);
+    fontsP = Promise.race([sheet.then(faces), new Promise((res) => setTimeout(res, 2500))]).then(() => undefined);
+    return fontsP;
+  }
+  let mctx = null;
+  const noteText = (h, s) => (HAND_MODE === "font" ? (fontSpec(h).caps ? String(s).toUpperCase() : String(s)) : String(s));
+  function noteWidth(h, s) {
+    if (HAND_MODE !== "font") return width(h, s);
+    mctx = mctx || document.createElement("canvas").getContext("2d");
+    mctx.font = fontCss(h, fontSpec(h).size * 4);
+    return Math.ceil(mctx.measureText(noteText(h, s)).width / 4);
+  }
+  const noteLineH = (h) => (HAND_MODE === "font" ? Math.round(fontSpec(h).size * fontSpec(h).lh) : lineH(hand(h)));
+  const noteWrap = (h, text, maxW) => wrap(h, text, maxW, noteWidth);
+  // one line in a font on a canvas drawn K times the sheet's scale; y is the line's top, and each line leans a hair its own way
+  function fontLine(ctx, K, h, s, x, y, o) {
+    const F = fontSpec(h);
+    ctx.save();
+    ctx.font = fontCss(h, F.size * K);
+    ctx.fillStyle = (o && o.col) || F.col;
+    ctx.textBaseline = "alphabetic";
+    ctx.translate(x * K, (y + F.size * F.base) * K);
+    ctx.rotate((h2((o && o.seed) || 0, 5, 17) - 0.5) * 0.025);
+    ctx.fillText(noteText(h, s), 0, 0);
+    ctx.restore();
   }
   function line(px, x0, y0, x1, y1, col, dash) {
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
@@ -223,37 +286,34 @@
   }
 
   // ---------- the floor carved into cells ----------
-  // every room gets a slot in a coarse grid from its exported place; inside the slot a room of its own size, then passages are
-  // routed cell by cell round other rooms, so the inked sheet, the cutaway and the replay's token all walk the same plan
-  const PX = 7, PY = 5, MARGIN = 2;
+  // every room sits where the exported plan put it (league/floorplan.py: a box, and a cave's own cells), then passages are routed cell
+  // by cell round other rooms, so the inked sheet and the replay's token walk the same plan
+  const MARGIN = 3;
   const planCache = new Map();
   const key = (n) => String(n);
   function carve(did, floor) {
-    const ck = did + ":" + floor.floor + ":" + floor.rooms.map((r) => r.n + "@" + r.xy).join(",");
+    const ck = did + ":" + floor.floor + ":" + floor.rooms.map((r) => r.n + "@" + r.box).join(",");
     if (planCache.has(ck)) return planCache.get(ck);
-    const once = new Set(), rooms = floor.rooms.filter((r) => r.xy && !once.has(key(r.n)) && once.add(key(r.n)));
-    const xs = [...new Set(rooms.map((r) => r.xy[0]))].sort((a, b) => a - b), ys = [...new Set(rooms.map((r) => r.xy[1]))].sort((a, b) => a - b);
-    const W = xs.length * PX + MARGIN * 2 - 1, H = ys.length * PY + MARGIN * 2 - 1;
+    const once = new Set(), rooms = floor.rooms.filter((r) => r.box && !once.has(key(r.n)) && once.add(key(r.n)));
+    const W = Math.max(1, ...rooms.map((r) => r.box[0] + r.box[2])) + MARGIN * 2, H = Math.max(1, ...rooms.map((r) => r.box[1] + r.box[3])) + MARGIN * 2;
     const own = new Int16Array(W * H), I = (x, y) => y * W + x;
     const out = rooms.map((r, i) => {
       const v = hashStr(did + ":" + floor.floor + ":" + r.n);
-      const small = r.side || r.kind === "secret";
-      let w = r.lair ? 6 : small ? 3 + (v % 2) : 4 + (v % 3), h = r.lair ? 4 : small ? 2 + ((v >>> 3) % 2) : 3 + ((v >>> 3) % 2);
-      if (!small && !r.lair && w === 6 && h === 4) h = 3;
-      const sx = MARGIN + xs.indexOf(r.xy[0]) * PX, sy = MARGIN + ys.indexOf(r.xy[1]) * PY;
-      const ox = (v >>> 5) % (PX - w), oy = (v >>> 9) % (PY - h);
-      const x0 = sx + ox, y0 = sy + oy, cells = [];
-      // a few burrow shapes: square, L, cross, T, a bitten corner
-      const shape = r.lair ? 2 : w >= 4 && h >= 3 ? (v >>> 12) % 6 : 0, half = Math.ceil(w / 2);
-      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
-        const i0 = x - x0, j0 = y - y0, L = i0 === 0, R = i0 === w - 1, T = j0 === 0, B = j0 === h - 1;
-        if (shape === 1 && T && i0 >= half) continue;
-        if (shape === 2 && (L || R) && (T || B)) continue;
-        if (shape === 3 && B && (i0 < 1 || i0 >= w - 1)) continue;
-        if (shape === 4 && B && R) continue;
-        if (shape === 5 && T && L) continue;
-        own[I(x, y)] = i + 1;
-        cells.push([x, y]);
+      const [bx, by, w, h] = r.box, x0 = bx + MARGIN, y0 = by + MARGIN, cells = [];
+      if (r.cells) for (const [x, y] of r.cells) { own[I(x + MARGIN, y + MARGIN)] = i + 1; cells.push([x + MARGIN, y + MARGIN]); }
+      else {
+        // a few shapes for a built room: square, L, cut corners, T, a bitten corner
+        const shape = r.lair ? 2 : w >= 4 && h >= 3 ? (v >>> 12) % 6 : 0, half = Math.ceil(w / 2);
+        for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+          const i0 = x - x0, j0 = y - y0, L = i0 === 0, R = i0 === w - 1, T = j0 === 0, B = j0 === h - 1;
+          if (shape === 1 && T && i0 >= half) continue;
+          if (shape === 2 && (L || R) && (T || B)) continue;
+          if (shape === 3 && B && (i0 < 1 || i0 >= w - 1)) continue;
+          if (shape === 4 && B && R) continue;
+          if (shape === 5 && T && L) continue;
+          own[I(x, y)] = i + 1;
+          cells.push([x, y]);
+        }
       }
       return { r, i, n: key(r.n), x0, y0, w, h, cells, cx: x0 + w / 2, cy: y0 + h / 2, secret: r.kind === "secret" };
     });
@@ -275,6 +335,26 @@
     if (planCache.size > 40) planCache.clear();
     planCache.set(ck, plan);
     return plan;
+  }
+  // what the sheet shows of a floor: every walked room inked (1), every room one passage from a walked room pencilled (2), nothing else;
+  // a floor nobody has walked shows its way in and the rooms off it, once the way down to it is known
+  function visible(D, floor, plan, inked) {
+    const cls = new Map();
+    for (const b of plan.rooms) if (inked.has(b.n)) cls.set(b.n, 1);
+    if (!cls.size) {
+      const prev = (D.floors || []).find((f) => f.floor === floor.floor - 1);
+      const door = plan.byN[key((floor.rooms[0] || {}).n)];
+      if (door && (floor.floor === 1 || (prev && prev.rooms.some((r) => r.stair && r.state)))) {
+        cls.set(door.n, 2);
+        for (const c of plan.corrs) if (c.a === door.n || c.b === door.n) cls.set(c.a === door.n ? c.b : c.a, 2);
+      }
+      return cls;
+    }
+    for (const c of plan.corrs) {
+      if (cls.get(c.a) === 1 && !cls.has(c.b)) cls.set(c.b, 2);
+      else if (cls.get(c.b) === 1 && !cls.has(c.a)) cls.set(c.a, 2);
+    }
+    return cls;
   }
   function labelCell(plan, b) {
     // the room's top-left-most whole cell, so numbers sit where the eye starts reading the room
@@ -326,5 +406,6 @@
   }
 
   window.DungeonPen = { rgb, hex, mix, lum, h2, vnoise, hashStr, ramp, surface, Font3, FontP, HANDS, hand, width, write, wrap, lineH, capH, line, arrow, tick, ring,
-    crewInk, crewBanner, crewShort, bust, carve, known, key, PX, PY };
+    handMode: HAND_MODE, FONTS, fontSpec, fontCss, fontsReady, noteText, noteWidth, noteLineH, noteWrap, fontLine,
+    crewInk, crewBanner, crewShort, bust, carve, visible, known, key };
 })();

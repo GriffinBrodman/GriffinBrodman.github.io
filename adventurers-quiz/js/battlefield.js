@@ -474,6 +474,79 @@
     vignette(k, "#0a1418", 0.3);
   }
 
+  // the Drowned Chapel (The Drowned Isle Rises): a nave a century under the sea, sea-light through the lancets, the bell-rope hanging
+  // in the middle of it, the pews broken and black with wet, and the sea still standing over the front of the floor
+  function marrow_chapel(k, s) {
+    const { F, P } = k, ctx = k.ctx;
+    const ST = ["#8e9c90", "#84928a", "#7a8880", "#a4b0a2"], MORT = "#5c6a62", TIDE = 68;
+    F(0, 0, W, HZ, ST[1]);
+    for (let y = 0, row = 0; y < HZ; y += 5, row++) {
+      F(0, y, W, 1, MORT);
+      for (let x = (row % 2) * 6 - 6; x < W; x += 12) { F(x, y + 1, 1, 4, MORT); F(x + 1, y + 1, 10, 4, k.pick(ST.slice(0, 3))); F(x + 1, y + 1, 10, 1, ST[3]); }
+    }
+    // below the old waterline the stone is stained green and weeded; above it, only salt
+    for (let y = TIDE; y < HZ; y++) { ctx.globalAlpha = 0.28 + (y - TIDE) / (HZ - TIDE) * 0.3; F(0, y, W, 1, "#3e6a56"); }
+    ctx.globalAlpha = 1;
+    F(0, TIDE - 1, W, 1, "#c8d4c4"); F(0, TIDE, W, 1, "#56786a");
+    for (let i = 0; i < 70; i++) { const x = k.ri(0, W - 1), l = k.ri(2, 9); for (let j = 0; j < l; j++) P(x + (j > l / 2 ? 1 : 0), TIDE + 1 + j, j % 3 ? "#2e5a3e" : "#4e7e46"); }
+    for (let i = 0; i < 40; i++) { const x = k.ri(0, W - 2), y = k.ri(TIDE + 2, HZ - 2); P(x, y, "#e8e4d4"); P(x + 1, y, "#b8b4a4"); }
+    // three lancet windows with the sea's green light in them, and the light coming down through the nave
+    const lancet = (cx, top, w, h) => {
+      for (let y = 0; y < h; y++) { const hw = y < w ? R(Math.sqrt(Math.max(0, w * w - (w - y) * (w - y))) / 2) : w >> 1; F(cx - hw - 2, top + y, hw * 2 + 4, 1, "#5a665e"); F(cx - hw, top + y, hw * 2, 1, y < h * 0.4 ? "#b8e8e0" : y < h * 0.75 ? "#82c4c4" : "#5aa0a8"); }
+      F(cx, top + 3, 1, h - 3, "#4a5a52"); F(cx - (w >> 1), top + R(h * 0.55), w, 1, "#4a5a52");
+      F(cx - (w >> 1) - 3, top + h, w + 6, 2, "#a4b0a2");
+    };
+    for (const cx of [62, W >> 1, W - 62]) lancet(cx, 28, 18, 54);
+    const shafts = { draw(c, t) { c.globalAlpha = 0.06 + 0.02 * Math.sin(t * 0.7); for (const cx of [62, W >> 1, W - 62]) for (let y = 84; y < H; y += 2) { const sp = 9 + (y - 84) * 0.22; rect(c, R(cx - sp + (y - 84) * 0.35), y, R(sp * 2), 2, "#c8f0e8"); } c.globalAlpha = 1; } };
+    k.add(shafts);
+    // the floor: the nave's flagstones, wet through
+    paving(k, HZ, H, ["#56625e", "#4e5a58", "#485452", "#5e6a62"], "#2e3a3a", 61);
+    F(0, HZ, W, 2, "#26302e");
+    // broken pews, black with the wet, either side of the aisle and at the edges of the floor
+    const pew = (x, base, w, broke) => {
+      const D = "#3a2a1c", L = "#5a4430", K = "#22180f";
+      // the back: a solid board with a lit top rail (a broken one snapped off part-way, its end ragged), on an upright at each end
+      const bw = broke ? R(w * 0.55) : w;
+      F(x, base - 14, 2, 14, D); F(x + w - 2, base - 7, 2, 7, D);
+      F(x, base - 13, bw, 4, D); F(x, base - 14, bw, 1, L);
+      if (broke) for (let i = 0; i < 3; i++) F(x + bw + i, base - 13 + i, 1, 3 - i, D);
+      else F(x + w - 2, base - 14, 2, 7, D);
+      // the seat: three rows deep, its front edge catching the light, a shadow under it
+      F(x - 1, base - 7, w + 2, 3, D); F(x - 1, base - 7, w + 2, 1, L); F(x, base - 4, w, 1, K);
+    };
+    pew(8, GY(100), 30, false); pew(W - 40, GY(100), 30, true); pew(2, GY(126), 24, true); pew(W - 28, GY(128), 26, false);
+    pew(96, HZ + 9, 34, true); pew(W - 132, HZ + 9, 34, false);
+    // the bell-rope, down from the tower through a hole in the vault, swaying a little, its sally faded red and white; it hangs in the
+    // bay right of the middle lancet, so the fight's title card in the middle of the frame stays clear of it
+    const ROPE_X = (W >> 1) + 98;
+    const rope = { keep: true, draw(c, t) {
+      const x0 = ROPE_X, sway = Math.sin(t * 0.9) * 1.6;
+      for (let y = 0; y < HZ + 2; y++) { const x = R(x0 + sway * (y / (HZ + 2)) ** 1.5); rect(c, x, y, 1, 1, y % 3 ? "#8a6a3a" : "#6a4e2a"); rect(c, x + 1, y, 1, 1, "#4a3420"); }
+      const sx = R(x0 + sway);
+      for (let j = 0; j < 7; j++) rect(c, sx - 1, HZ - 12 + j, 3, 1, j % 2 ? "#e8dcc0" : "#a83a32");
+    } };
+    k.add(rope);
+    F(ROPE_X - 5, 0, 11, 3, "#2e3a34");
+    // the sea still stands over the front of the floor: a sheet of green water, the windows in it, and slow rings
+    const WY = GY(104), edge = (x) => WY + R(Math.sin(x * 0.13) * 1.2 + Math.sin(x * 0.041 + 1) * 2);
+    for (let x = 0; x < W; x++) for (let y = edge(x); y < H; y++) { ctx.globalAlpha = Math.min(0.6, 0.32 + (y - WY) * 0.01); F(x, y, 1, 1, "#3a6a74"); }
+    ctx.globalAlpha = 1;
+    for (let x = 0; x < W; x++) { P(x, edge(x), (x >> 2) % 3 ? "#9ad0d8" : "#d8f4f4"); if ((x >> 3) % 4 === 0) P(x, edge(x) + 1, "#6aa8b4"); }
+    for (const cx of [62, W >> 1, W - 62]) for (let y = WY + 4; y < H; y += 3) { ctx.globalAlpha = 0.25; F(cx - 6 + R(Math.sin(y) * 2), y, 12, 1, "#b8e8e0"); }
+    ctx.globalAlpha = 1;
+    const rings = { draw(c, t) {
+      for (let i = 0; i < 7; i++) {
+        const ph = frac(t * 0.22 + i * 0.37), x = 30 + ((i * 113) % (W - 60)), y = WY + 8 + ((i * 41) % (H - WY - 14)), r = R(2 + ph * 9);
+        c.globalAlpha = 0.5 * (1 - ph);
+        rect(c, x - r, y, r * 2 + 1, 1, "#9ad0d8"); rect(c, x - r + 2, y - 1, r * 2 - 3, 1, "#9ad0d8"); rect(c, x - r + 2, y + 1, r * 2 - 3, 1, "#6aa8b4");
+      }
+      c.globalAlpha = 1;
+    } };
+    k.add(rings);
+    for (let i = 0; i < 18; i++) { const x = k.ri(0, W - 4), y = k.ri(WY + 2, H - 2); if (inField(x, y)) continue; F(x, y, k.ri(2, 4), 1, "#2e5a3e"); }
+    vignette(k, "#0a1a1c", 0.35);
+  }
+
   function emberdeep(k, s) {
     const { F, P } = k;
     cave(k, { wall: ["#564240", "#4c3a36", "#42322e"], shadow: "#120808", floor: ["#5a4642", "#52403c", "#4a3a36"], tex: ["#64504a", "#3e302c"], seed: 48 });
@@ -602,13 +675,13 @@
     k.add({ draw(c, t) { for (let i = -3; i <= 3; i++) { const h = Math.max(1, R((7 - Math.abs(i) * 1.6) * (0.75 + 0.25 * Math.sin(t * 9 + i * 2)))); for (let j = 0; j < h; j++) rect(c, fx + i, fy - 1 - j, 1, 1, j > h * 0.6 ? "#c8401e" : j > h * 0.3 ? "#f07a2a" : "#ffd27a"); } } });
   }
 
-  const PLACES = { kingsroad, greenwood, bleakmarsh, redcrag, whitepeak, saltcliffs, goblin_camp, wolf_den, collapsed_mine, cragtooth_warren, ashveil_crypts, thornmere_ruins, frostspire, sunken_vault, emberdeep };
+  const PLACES = { kingsroad, greenwood, bleakmarsh, redcrag, whitepeak, saltcliffs, goblin_camp, wolf_den, collapsed_mine, cragtooth_warren, ashveil_crypts, thornmere_ruins, frostspire, sunken_vault, emberdeep, marrow_chapel };
   const BIOME = { plains: kingsroad, forest: greenwood, marsh: bleakmarsh, hills: redcrag, snow: whitepeak, coast: saltcliffs, volcanic: emberdeep };
   const THEME_PAINT = { goblin: goblin_camp, beast: wolf_den, cave: collapsed_mine, undead: ashveil_crypts, swamp: thornmere_ruins, ice: frostspire, sea: sunken_vault, fire: emberdeep };
   // the floor's own colours, so decals and shadows can be tinted to sit on it
   const FLOORS = { kingsroad: "#b4a688", greenwood: "#6e9648", bleakmarsh: "#5a6046", redcrag: "#ac7652", whitepeak: "#d8e2ee", saltcliffs: "#c6b896",
     goblin_camp: "#90784e", wolf_den: "#5a4a36", collapsed_mine: "#625c54", cragtooth_warren: "#9a764e", ashveil_crypts: "#666860", thornmere_ruins: "#3e5852",
-    frostspire: "#bcd8ec", sunken_vault: "#787666", emberdeep: "#4a3a36", town: "#b0a690" };
+    frostspire: "#bcd8ec", sunken_vault: "#787666", emberdeep: "#4a3a36", marrow_chapel: "#5a7a78", town: "#b0a690" };
 
   // what the stored fight says about where it happened: the place id, the context (road, camp, raid...) and pvp
   function setting(f) {

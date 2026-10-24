@@ -1054,6 +1054,25 @@
   }
 
   function room(t, cast, seed, onVisible) {
+    const { kind, st, bg, props, lights, anims, views, fire, amb, crewBeds, bedRects, inBed, hostAt, NU, NV, WH } = roomParts(t, cast, seed);
+    const S = T();
+    const host = t.host && t.host.lines && Object.assign({}, t.host, { at: hostAt || [W / 2, 20], beast: kind === "stables" ? (t.host.mount || {}).kind || "horse" : null });
+    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46], [-56, 40]]).filter(([u, v]) => !bedRects.some(([a, b, c, d]) => u > a && u < c && v > b && v < d)));
+    const inside = S.inRoom(st, NU, NV, WH), shine = S.lighting(W, H, (x, y) => inside(x, y) && !views.some((v) => v && v.glass(x, y)));
+    return gather({ talks: t.talk, kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
+      rest: crewBeds.length ? (h, i) => crewBeds[i] || null : null,
+      under(ctx, now, flick, still) {
+        for (const v of views) if (v) v.draw(ctx, now, still);
+        if (fire) S.flames(ctx, st, now, fire[0], fire[1], flick, 1, true);
+      },
+      over(ctx, now, flick, still) {
+        for (const a of anims) a(ctx, now, flick, still);
+        for (const l of lights) if (l.fire || l.flame) l.k = l.base * (l.fire ? 0.7 + flick * 0.35 : 0.88 + flick * 0.15);
+        shine(ctx, now, lights, amb);
+      } });
+  }
+  // the room itself, without its people: the hero page's night here and a town day's waking (town_day_sets.js) share it
+  function roomParts(t, cast, seed) {
     const NU = 11, NV = 9, WH = 50, st = T().stage(W, H, 92, 58);
     const r = Art.rng(Art.hash(seed + "room" + t.room));
     const kind = t.setting === "stable" ? "stables" : t.room;
@@ -1348,20 +1367,7 @@
       while (foot > 0 && !aside.px.slice(foot * aside.w, (foot + 1) * aside.w).some((c) => c)) foot--;
       props.push({ key: au + av + (az ? 1 : 0), draw: (ctx) => { if (!st.bed.awake) ctx.drawImage(cv, Math.round(x - aside.w / 2), Math.round(y) - foot); } });
     }
-    const host = t.host && t.host.lines && Object.assign({}, t.host, { at: hostAt || [W / 2, 20], beast: kind === "stables" ? (t.host.mount || {}).kind || "horse" : null });
-    const spots = (inBed ? [inBed] : []).concat(fromScreen(0, 0, [[26, 44], [-18, 48], [4, 62], [46, 56], [-38, 46], [-56, 40]]).filter(([u, v]) => !bedRects.some(([a, b, c, d]) => u > a && u < c && v > b && v < d)));
-    const inside = S.inRoom(st, NU, NV, WH), shine = S.lighting(W, H, (x, y) => inside(x, y) && !views.some((v) => v && v.glass(x, y)));
-    return gather({ talks: t.talk, kind: kind === "stables" ? "stable" : "room", st, bg, props, cast, seed, center: kind === "stables" ? [5.2, 5.2] : [5.6, 5.4], spots, pred: notOrder, host, onVisible,
-      rest: crewBeds.length ? (h, i) => crewBeds[i] || null : null,
-      under(ctx, now, flick, still) {
-        for (const v of views) if (v) v.draw(ctx, now, still);
-        if (fire) S.flames(ctx, st, now, fire[0], fire[1], flick, 1, true);
-      },
-      over(ctx, now, flick, still) {
-        for (const a of anims) a(ctx, now, flick, still);
-        for (const l of lights) if (l.fire || l.flame) l.k = l.base * (l.fire ? 0.7 + flick * 0.35 : 0.88 + flick * 0.15);
-        shine(ctx, now, lights, amb);
-      } });
+    return { kind, st, bg, props, lights, anims, views, fire, amb, crewBeds, bedRects, inBed, hostAt, NU, NV, WH, r, W, H };
   }
 
   // ---------- the page piece ----------
@@ -1396,5 +1402,5 @@
   }
   function listNames(ns) { return ns.length < 2 ? ns.join("") : ns.slice(0, -1).join(", ") + " and " + ns[ns.length - 1]; }
 
-  window.Night = { scene };
+  window.Night = { scene, roomParts };
 })();

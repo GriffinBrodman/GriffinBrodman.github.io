@@ -1,12 +1,12 @@
-/* The dungeon page (#/dungeon/<id>[/<floor>[/<room>]]): the floors as an isometric stack, each floor's inked map with the heroes' margin notes, room cards, and a day's delve replayed on the map. */
+/* The dungeon page (#/dungeon/<id>[/<floor>[/<room>]], and #/map/<dungeon>): the island in Dungeons mode on top, then floor tabs, each floor's inked map with the heroes' margin notes, a room's card on a tap (its story, notes and vignette), and a day's delve replayed on the map. */
 (function () {
   "use strict";
   const A = App;
   const { L, S, el, cap, heroes, parties } = A;
   const { panel } = Views;
 
-  // ---------- the maps live in dungeon_pen.js, dungeon_map_ink.js and dungeon_map_iso.js ----------
-  const Pen = window.DungeonPen, Ink = window.DungeonInk, Iso = window.DungeonIso;
+  // ---------- the maps live in dungeon_pen.js and dungeon_map_ink.js ----------
+  const Pen = window.DungeonPen, Ink = window.DungeonInk;
   window.DungeonMap = {
     layout: (D, floor, o) => Ink.layout(D, floor, o), inkedState: (D, floor, before) => Pen.known(D, floor, before), lootSprite: (l) => lootSprite(l),
   };
@@ -174,9 +174,17 @@
   }
 
   // ---------- the page ----------
-  A.route(/^\/dungeon\/(\w+)(?:\/(\w+))?(?:\/(\w+))?$/, (v, id, fl, rn) => A.load(`dungeon/${id}`).then((D) => page(v, D, fl, rn), () => {
-    v.appendChild(panel("No map of this place", el("p", null, "Nobody has drawn this dungeon yet. ", el("a", { href: `#/map/${id}` }, "Back to the map."))));
-  }));
+  // one page per dungeon: the island in Dungeons mode on top (views_map.js), the dungeon below, every dungeon at the foot
+  A.route(/^\/dungeon\/(\w+)(?:\/(\w+))?(?:\/(\w+))?$/, (v, id, fl, rn) => {
+    if (window.MapModes && MapModes.realm) MapModes.realm(v);
+    const body = el("div");
+    v.appendChild(body);
+    const foot = () => { if (window.MapModes && MapModes.dungeonsTable) v.appendChild(MapModes.dungeonsTable()); };
+    return A.load(`dungeon/${id}`).then((D) => { page(body, D, fl, rn); foot(); }, () => {
+      body.appendChild(panel("No map of this place", el("p", null, "Nobody has drawn this dungeon yet.")));
+      foot();
+    });
+  });
 
   function page(v, D, fl, rn) {
     const sd = S.dungeons[D.id] || {};
@@ -186,41 +194,22 @@
     const sheet = el("section", { class: "panel dg-sheet" });
     const days = daysPanel(D, ui);
     v.append(head, sheet, days);
-    ui.redrawNav = () => { const n = head.querySelector(".dg-iso-one, .dg-iso-wrap"); if (n) n.replaceWith(isoStack(D, ui.floor, pick)); };
     function pick(f) {
       stopRun(ui);
       ui.floor = f; ui.sel = null;
       try { history.replaceState(null, "", `#/dungeon/${D.id}/${f}`); } catch (e) { /* the address bar just won't follow */ }
-      ui.redrawNav();
       drawSheet(sheet, D, ui);
-      sheet.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" });
     }
     ui.pick = pick;
-    head.querySelector(".dg-nav").appendChild(isoStack(D, ui.floor, pick));
-    drawSheet(sheet, D, ui);
-    if (rn) requestAnimationFrame(() => { const m = sheet.querySelector(".dg-mapbox"); if (m) m.scrollIntoView({ block: "center" }); });
+    const go = () => {
+      drawSheet(sheet, D, ui);
+      if (rn) requestAnimationFrame(() => { const m = sheet.querySelector(".dg-card:not([hidden])") || sheet.querySelector(".dg-mapbox"); if (m) m.scrollIntoView({ block: "center" }); });
+    };
+    // a font must be in before the sheet measures and writes its notes
+    if (Pen.handMode === "font") Pen.fontsReady().then(go); else go();
   }
-  // the floor stack: one canvas, a button over each floor for the keyboard and screen readers
-  function isoStack(D, sel, onPick) {
-    // on a phone the whole stack at 1x leaves the tags unreadable: one floor at a time at 2x, with tabs to change floor
-    const phone = narrowQ.matches && D.floors.length > 1;
-    const shown = phone ? Object.assign({}, D, { floors: D.floors.filter((f) => f.floor === sel) }) : D;
-    const crews = (D.inside || []).map((x) => { const f = shown.floors.find((q) => q.floor === x.floor); return f ? { crew: x.crew, floor: x.floor, n: crewRoom(D, x.crew, f) } : null; }).filter(Boolean);
-    const St = Iso.stack(shown, sel, crews), scale = phone || narrowQ.matches ? (phone ? 2 : 1) : St.H > 760 ? 1.5 : 2;
-    const cv = St.canvas;
-    cv.className = "dg-iso";
-    cv.setAttribute("role", "img");
-    cv.setAttribute("aria-label", `The floors of ${D.name}, top to bottom`);
-    const wrap = el("div", { class: "dg-iso-wrap", style: { "--isow": Math.round(St.W * scale) + "px" } }, cv);
-    St.boxes.forEach((b) => {
-      const style = { left: (b.x0 / St.W) * 100 + "%", top: (b.y0 / St.H) * 100 + "%", width: ((b.x1 - b.x0) / St.W) * 100 + "%", height: ((b.y1 - b.y0) * 0.82 / St.H) * 100 + "%" };
-      wrap.appendChild(el("button", { type: "button", class: "dg-iso-hit" + (b.f === sel ? " on" : ""), style, "aria-label": `Floor ${b.f}: ${b.walked} of ${b.total} rooms walked`, onclick: () => onPick(b.f) }));
-    });
-    if (!phone) return wrap;
-    const tabs = el("div", { class: "dg-tabs dg-iso-tabs" }, D.floors.map((f) => el("button", { type: "button", class: "dg-tab" + (f.floor === sel ? " on" : ""), onclick: () => onPick(f.floor) },
-      `Floor ${f.floor}`, el("span", { class: "tiny dim" }, ` ${f.walked}/${f.total}`))));
-    return el("div", { class: "dg-iso-one" }, tabs, wrap);
-  }
+  // the one-time shift (export: shifted) reset every lair; new tenants since then say it themselves
+  const shiftedOnly = (D) => !!D.shifted && !(D.tenant && D.tenant.day && D.tenant.day >= D.shifted);
   function lastFloorWalked(D) {
     let best = null;
     for (const f of D.floors) for (const r of f.rooms) if (r.state && (!best || r.state.d > best.d)) best = { d: r.state.d, f: f.floor };
@@ -230,29 +219,32 @@
   function headPanel(D, sd, ui) {
     const p = el("section", { class: "panel dg-head" });
     const info = el("div", { class: "dg-info" });
-    const nav = el("div", { class: "dg-nav" });
-    p.append(el("div", { class: "dg-head-grid" }, nav, info));
-    if (window.TownScenes) { try { const bd = TownScenes.header(D.id, 560, 150); bd.classList.add("dg-header-art"); info.appendChild(bd); } catch (e) { /* the picture is optional */ } }
+    p.append(info);
+    if (window.TownScenes) { try { const bd = TownScenes.header(D.id, 560, 150, { night: L.meta.sky === "night" }); bd.classList.add("dg-header-art"); info.appendChild(bd); } catch (e) { /* the picture is optional */ } }
     info.append(el("h1", { class: "dg-name" }, D.name),
-      el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")} · `, el("a", { href: `#/map/${D.id}` }, "on the map")));
+      el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")}`));
     if (D.desc) info.appendChild(el("p", { class: "small" }, D.desc));
+    const ev = window.MapModes && MapModes.eventLine ? MapModes.eventLine(D.id) : null;
+    if (ev) info.appendChild(ev);
+    const q = () => (window.Views && Views.helpLink ? Views.helpLink("explored", "explored") : null);
     const pct = Math.round(D.explored || 0);
     // a reset lair has nothing mapped yet: say so in words rather than draw an empty bar
-    if (D.tenant && D.tenant.day && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, "New tenants: not yet explored.")));
-    else info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `Explored: ${pct}% of its rooms`), el("div", { class: "bar" }, el("i", { style: { width: pct + "%" } }))));
+    if (shiftedOnly(D) && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `The tunnels shifted ${A.when(D.shifted, "on")}: the new rooms are not yet explored.`, q())));
+    else if (D.tenant && D.tenant.day && !pct) info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, "New tenants: not yet explored.", q())));
+    else info.appendChild(el("div", { class: "small dg-explored" }, el("span", null, `Explored: ${pct}% of its rooms`, q()), el("div", { class: "bar" }, el("i", { style: { width: pct + "%" } }))));
     if (D.tenant && D.tenant.day) info.appendChild(el("p", { class: "tiny dim dg-tenant" }, `New tenants moved in ${A.when(D.tenant.day, "on")}; the old maps are gone.`));
     const B = D.boss || {}, kill = (B.kills || []).slice(-1)[0];
     const lairFloor = (D.floors.find((f) => f.rooms.some((r) => r.lair)) || {}).floor;
     const lairWalked = D.floors.some((f) => f.rooms.some((r) => r.lair && r.state));
-    const bossArt = sd.boss ? A.monsterSprite(sd.boss, 2, B.alive !== false) : null;
+    const bossArt = sd.boss ? A.monsterSprite(sd.boss, 2, B.alive !== false, B) : null;
     if (bossArt && B.alive === false) bossArt.classList.add("dg-slain-art");
     let bossLine;
     if (B.alive === false && kill) bossLine = [el("span", { class: "dg-stamp" }, "SLAIN"), " by ", crewLink(kill.crew, kill.by), ` ${A.when(kill.day, "on")}.`];
-    else if (lairWalked) bossLine = [el("span", { class: "red" }, "Alive"), `, in its lair on floor ${lairFloor}.`];
+    else if (lairWalked) bossLine = [el("span", { class: "red" }, "Alive"), `, in its lair on ${A.floorWords(lairFloor, D.id)}.`];
     else if (B.rumoured) {
       const R = B.rumour_why || {};
       const why = R.by ? ` (${R.by} ${R.how} ${A.when(R.day, "on")})` : R.how ? ` (${R.how})` : "";
-      bossLine = [el("span", { class: "dg-pencil" }, "Rumoured"), ` to wait somewhere below${lairFloor ? `, floor ${lairFloor} by the talk` : ""}${why}.`];
+      bossLine = [el("span", { class: "dg-pencil" }, "Rumoured"), ` to wait somewhere below${lairFloor ? `, on ${A.floorWords(lairFloor, D.id)} by the talk` : ""}${why}.`];
     }
     else bossLine = [el("span", { class: "dg-pencil" }, "Unseen"), ". Nobody has heard where it waits."];
     const older = (B.kills || []).filter((k) => k !== kill || B.alive !== false);
@@ -269,7 +261,7 @@
     const gen = (D.tenant || {}).gen || 1, spoils = (D.spoils || []).slice().reverse();
     const row = (s, isOld) => el("li", { class: [s.tier || "", isOld ? "old" : ""].join(" ").trim(), title: s.what ? cap(s.what) : "" }, lootSprite(s),
       el("span", { class: `dg-spoils-name${s.tier === "unique" ? " dg-unique" : ""}` }, s.name),
-      el("span", { class: "dg-spoils-who" }, heroes[s.hero] ? el("a", { href: `#/hero/${s.hero}` }, s.who) : s.who, `, floor ${s.floor}`, STATE_SAY(s)),
+      el("span", { class: "dg-spoils-who" }, heroes[s.hero] ? el("a", { href: `#/hero/${s.hero}` }, s.who) : s.who, `, on ${A.floorWords(s.floor, D.id)}`, STATE_SAY(s)),
       el("span", { class: "dg-spoils-day" }, A.when(s.day)));
     // where it is today: worn says nothing, a carried unique is kept for later, anything else carried is for sale
     function STATE_SAY(s) { return s.state === "carried" ? (s.tier === "unique" ? ", kept, not yet worn" : ", stashed to sell") : s.state === "gone" && s.tier !== "unique" ? ", since sold" : ""; }
@@ -287,7 +279,20 @@
         old.shown.length ? [el("b", null, "From earlier tenants:"), el("ul", { class: "dg-spoils-list" }, old.shown.map((s) => row(s, true))), more(old.more)] : null));
     }
     const ins = D.inside || [];
-    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", ins.map((x, i) => [i ? ", " : "", el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label), ` on floor ${x.floor}`]), "."]
+    // tonight: each crew below, the room it sleeps in and who keeps the watch; crews sharing a room are told together
+    const groups = [];
+    for (const x of ins) {
+      const g = x.room != null && groups.find((g) => g[0].floor === x.floor && g[0].room === x.room);
+      if (g) g.push(x); else groups.push([x]);
+    }
+    const watch = (xs) => xs.map((x) => x.camp && x.camp.watch).filter(Boolean);
+    const said = (xs) => {
+      const x = xs[0], room = x.camp && x.camp.room, w = watch(xs);
+      return [xs.map((y, i) => [i ? (i === xs.length - 1 ? " and " : ", ") : "", el("span", { class: "dg-swatch", style: { background: crewInk(y.crew) } }), crewLink(y.crew, y.label)]),
+        xs.length > 1 ? ` are sharing ${room || "one room"}` : room ? ` camped in ${room}` : "", ` on ${A.floorWords(x.floor, D.id)}`, x.room != null ? ` (room ${x.room})` : "",
+        w.length ? `, ${w.join(" and ")} on watch` : ""];
+    };
+    info.appendChild(el("p", { class: "small dg-inside" }, ins.length ? ["Below tonight: ", groups.map((xs, i) => [i ? "; " : "", said(xs)]), "."]
       : "Nobody is below tonight."));
     void ui;
     return p;
@@ -302,13 +307,15 @@
     const G = Ink.layout(D, floor, { wide });
     const st = replay ? replay.state : Pen.known(D, floor);
     st.rumour = !!(D.boss && D.boss.rumoured);
-    if (!replay) st.crews = (D.inside || []).filter((x) => x.floor === floor.floor).map((x) => ({ crew: x.crew, n: crewRoom(D, x.crew, floor) })).filter((x) => x.n != null);
-    const tabs = el("div", { class: "dg-tabs" }, D.floors.map((f) => el("button", { type: "button", class: "dg-tab" + (f.floor === floor.floor ? " on" : ""), onclick: () => ui.pick(f.floor) }, `Floor ${f.floor}`)));
-    sheet.append(el("h2", null, `${D.name}, floor ${floor.floor}`), tabs,
-      el("p", { class: "tiny dim dg-sub" }, walkedOf(floor)[0] ? `${walkedOf(floor)[0]} of ${walkedOf(floor)[1]} rooms walked. Inked as the crews come home; pencil marks the doors nobody has opened.` : D.tenant && D.tenant.day ? `Nobody has walked this floor since the new tenants moved in ${A.when(D.tenant.day, "on")}. The old maps went with the old tenants.` : "Nobody has walked this floor yet. It is still the mapmaker's guess."));
+    if (!replay) st.crews = (D.inside || []).filter((x) => x.floor === floor.floor).map((x) => ({ crew: x.crew, n: x.room != null ? x.room : crewRoom(D, x.crew, floor) })).filter((x) => x.n != null);
+    const depth = (n) => { const w = Ink.depthWord(n, D.floors.length); return w ? ` · ${w}` : ""; };
+    const tabs = el("div", { class: "dg-tabs", role: "tablist" }, D.floors.map((f) => { const [w, t] = walkedOf(f); return el("button", { type: "button", role: "tab", "aria-selected": String(f.floor === floor.floor), class: "dg-tab" + (f.floor === floor.floor ? " on" : ""), onclick: () => ui.pick(f.floor) },
+      el("b", null, `Floor ${f.floor}`, el("span", { class: "dg-tab-d" }, depth(f.floor))), el("span", { class: "dg-tab-n" }, `${w} of ${t} walked`)); }));
+    sheet.append(el("h2", null, `${D.name}, floor ${floor.floor}${depth(floor.floor)}`), el("div", { class: "dg-floorbar" }, tabs, depthStack(D, floor.floor, ui)),
+      el("p", { class: "tiny dim dg-sub" }, walkedOf(floor)[0] ? `${walkedOf(floor)[0]} of ${walkedOf(floor)[1]} rooms walked. Inked as the crews come home; pencil marks the rooms a door away that nobody has opened.` : shiftedOnly(D) ? `The tunnels shifted ${A.when(D.shifted, "on")}, and nobody has walked the new rooms yet. The old maps went in the fire.` : D.tenant && D.tenant.day ? `Nobody has walked this floor since the new tenants moved in ${A.when(D.tenant.day, "on")}. The old maps went with the old tenants.` : floor.floor > 1 && !(D.floors.find((f) => f.floor === floor.floor - 1) || { rooms: [] }).rooms.some((r) => r.stair && r.state) ? "Nobody has found the way down to this floor yet." : "Nobody has walked this floor yet. The way in and the doors off it are pencilled in."));
     const seen = new Set(), notes = (D.notes || []).filter((n) => n.floor === floor.floor && (!replay || n.day < replay.before) && G.byN[key(n.room)] && !seen.has(n.hero + n.room + n.text) && seen.add(n.hero + n.room + n.text)).sort((a, b) => a.day - b.day);
     // the sheet carries the newest notes whose rooms are inked; the rest wait in the list below
-    const onSheet = () => { const txt = new Set(); return notes.slice().reverse().filter((n) => n.text.length <= 90 && !txt.has(n.text) && txt.add(n.text)).sort((a, b) => st.inked.has(key(b.room)) - st.inked.has(key(a.room))).slice(0, 10); };
+    const onSheet = () => { const txt = new Set(); return notes.slice().reverse().filter((n) => n.text.length <= 90 && st.inked.has(key(n.room)) && !txt.has(n.text) && txt.add(n.text)).slice(0, 10); };
     const cv = el("canvas", { class: "dg-map" + (wide ? " wide" : ""), role: "img", "aria-label": `Map of floor ${floor.floor}` });
     let placed = Ink.draw(cv, G, D, st, onSheet());
     if (wide) cv.style.width = G.W * 2 + "px";
@@ -322,7 +329,7 @@
     const perRoom = {};
     notes.forEach((n, i) => {
       list.appendChild(noteSlip(n, i + 1, i));
-      if (drawn.has(n)) return;
+      if (drawn.has(n) || G.shown.get(key(n.room)) !== 1) return;
       const b = G.byN[key(n.room)], k = perRoom[key(n.room)] = (perRoom[key(n.room)] || 0) + 1;
       const pin = el("button", { type: "button", class: "dg-pin", style: pos(b.x0 + b.w + 1 + (k - 1) * 6, b.y0 + b.h + (k - 1) * 4), title: `${n.name}'s note`, "aria-label": `Note ${i + 1}, by ${n.name}` }, String(i + 1));
       pin.addEventListener("click", (ev) => { ev.stopPropagation(); showNote(card, n, i + 1); for (const x of list.querySelectorAll(".dg-note")) x.classList.toggle("on", x.dataset.i === String(i)); });
@@ -334,18 +341,24 @@
       ui.sel = key(b.r.n);
       Object.assign(ring.style, pos(b.cx, b.cy), { width: ((b.w + 8) / G.W) * 100 + "%", height: ((b.h + 8) / G.H) * 100 + "%" });
       ring.hidden = false;
-      showRoom(card, D, floor, b.r, st);
+      showRoom(card, D, floor, b.r, st, notes);
       if (scroll) card.scrollIntoView({ block: "nearest", behavior: reduced() ? "auto" : "smooth" });
     };
-    cv.addEventListener("click", (ev) => {
-      if (ui.run) return;
+    // a tap anywhere on a drawn room opens its card, even mid-replay; rooms the sheet doesn't show can't be hit
+    const hitRoom = (ev) => {
       const r = cv.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * G.W, y = ((ev.clientY - r.top) / r.height) * G.H;
-      // a fingertip is about 14 screen pixels, however small the sheet is drawn; the nearest room within that wins
-      const tol = Math.max(3, (14 * G.W) / r.width);
-      const gap = (q) => Math.hypot(Math.max(q.x0 - x, 0, x - (q.x0 + q.w)), Math.max(q.y0 - y, 0, y - (q.y0 + q.h)));
-      const b = G.rooms.filter((q) => gap(q) <= tol).sort((p, q) => gap(p) - gap(q))[0];
-      if (b) select(b, true);
+      const tol = Math.max(2, (10 * G.W) / r.width);
+      const gap = (q) => Math.min(...q.b.cells.map(([cx0, cy0]) => { const [X, Y] = G.cellPx(cx0, cy0); return Math.hypot(Math.max(X - x, 0, x - (X + G.CELL)), Math.max(Y - y, 0, y - (Y + G.CELL))); }));
+      return G.rooms.filter((q) => G.shown.has(q.n)).map((q) => [gap(q), q]).filter(([g]) => g <= tol).sort((p, q) => p[0] - q[0]).map(([, q]) => q)[0];
+    };
+    cv.addEventListener("click", (ev) => {
+      const b = hitRoom(ev);
+      if (!b) return;
+      if (ui.run) { stopRun(ui); drawSheet(sheet, D, Object.assign(ui, { sel: key(b.r.n) })); const c = sheet.querySelector(".dg-card"); if (c) c.scrollIntoView({ block: "nearest" }); return; }
+      select(b, true);
+      try { history.replaceState(null, "", `#/dungeon/${D.id}/${floor.floor}/${b.r.n}`); } catch (e) { /* the address bar just won't follow */ }
     });
+    cv.addEventListener("mousemove", (ev) => { cv.style.cursor = hitRoom(ev) ? "pointer" : "default"; });
     const status = el("div", { class: "dg-status", hidden: true });
     const hint = notes.length ? (wide ? "Tap a room for its story. Every hero's note is below, in their own hand." : "Tap a room for its story, or a numbered pin for a hero's note.") : D.tenant && D.tenant.day ? "Tap a room for its story. The old notes went with the old maps when the new tenants moved in." : "Tap a room for its story.";
     sheet.append(el("div", { class: "dg-mapcol" + (wide ? " wide" : ""), style: wide ? { maxWidth: G.W * 2 + 22 + "px" } : null }, box, status, el("p", { class: "tiny dim dg-hint" }, hint), card));
@@ -356,8 +369,29 @@
       narrowQ.addEventListener("change", () => { if (!ui.run && sheet.isConnected) drawSheet(sheet, D, ui); });
     }
     if (replay) return self;
-    if (ui.sel && G.byN[ui.sel]) select(G.byN[ui.sel], false);
+    if (ui.sel && G.byN[ui.sel] && G.shown.has(ui.sel)) select(G.byN[ui.sel], false);
     return self;
+  }
+  // the floors side-on, stacked going down from the daylight: which floor this sheet is, where each crew is tonight, where the boss waits
+  function depthStack(D, on, ui) {
+    if (D.floors.length < 2) return null;
+    const B = D.boss || {}, lairFloor = (D.floors.find((f) => f.rooms.some((r) => r.lair)) || {}).floor;
+    const lairWalked = D.floors.some((f) => f.rooms.some((r) => r.lair && r.state));
+    const bossName = String(B.name || "the boss").replace(/^the\s+/i, "");
+    const boss = B.alive === false ? el("span", { class: "dg-depth-boss slain" }, `${bossName}, slain`)
+      : lairWalked ? el("span", { class: "dg-depth-boss" }, `${bossName}'s lair`)
+      : B.rumoured ? el("span", { class: "dg-depth-boss rumour" }, `${bossName}? (rumoured)`) : null;
+    const rows = D.floors.map((f, i) => {
+      const here = (D.inside || []).filter((x) => x.floor === f.floor);
+      return el("button", { type: "button", class: "dg-depth-row" + (f.floor === on ? " on" : ""), style: { "--d": i / Math.max(1, D.floors.length - 1) }, onclick: () => ui.pick(f.floor),
+        "aria-label": `Floor ${f.floor}, ${Ink.depthWord(f.floor, D.floors.length)}` },
+        el("span", { class: "dg-depth-n" }, `${f.floor}`),
+        el("span", { class: "dg-depth-w" }, Ink.depthWord(f.floor, D.floors.length)),
+        el("span", { class: "dg-depth-who" }, here.map((x) => el("span", { class: "dg-depth-crew" }, el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), Ink.clean(Pen.crewShort(x.crew)))),
+          f.floor === lairFloor ? boss : null));
+    });
+    return el("div", { class: "dg-depth", role: "group", "aria-label": "The floors, top to bottom" },
+      el("div", { class: "dg-depth-sky" }, el("span", null, "daylight"), el("span", { class: "dg-depth-arrow" }, "floors count down ↓")), ...rows);
   }
   // where a crew below tonight stands: the last room it walked on that floor
   function crewRoom(D, crew, floor) {
@@ -369,12 +403,10 @@
     const mine = floor.rooms.filter((r) => r.state && r.state.crew === crew).sort((a, b) => b.state.d - a.state.d)[0];
     return mine ? mine.n : floor.rooms[0].n;
   }
-  // a note card: the writer's bust, who they are and how they write, then the note itself in their pixel hand
+  // a note card: the writer's bust, who they are and how they write, then the note itself in their hand
   function noteSlip(n, num, i) {
     const who = heroes[n.hero], H = Pen.HANDS[n.hand] || Pen.HANDS.neat;
     const slip = Ink.slip(n, 150);
-    slip.className = "dg-hand";
-    slip.style.width = slip.width * 2 + "px";
     let face = null;
     if (who) { try { face = Ink.bustCanvas(who, 16); face.className = "dg-bust"; face.style.width = face.width * 2 + "px"; } catch (e) { /* a face is optional */ } }
     return el("div", { class: "dg-note", "data-i": String(i), style: { "--tilt": ((hashStr(n.text) % 5) - 2) * 0.4 + "deg" } },
@@ -390,48 +422,86 @@
     card.append(el("button", { type: "button", class: "dg-x", "aria-label": "Close", onclick: () => (card.hidden = true) }, "×"),
       el("div", { class: "tiny dim" }, `Note ${num}`), noteSlip(n, num, -1));
   }
-  function latestStory(D, floor, n) {
-    for (let i = (D.days || []).length - 1; i >= 0; i--) {
-      const d = D.days[i];
-      const rm = d.rooms.find((x) => x.floor === floor && key(x.n) === key(n));
-      if (rm) return { d, rm };
-    }
-    return null;
+  // every day a crew walked this room, newest first: the day, the crew and the room's record (story, finds, beats for the vignette)
+  function roomDays(D, floor, n) {
+    const out = [];
+    for (const d of (D.days || []).slice().sort((a, b) => b.day - a.day)) for (const rm of d.rooms) if (rm.floor === floor && key(rm.n) === key(n)) out.push({ d, rm });
+    return out;
   }
-  function showRoom(card, D, floor, r, st) {
+  // a room's vignette on its own (delve_scenes.js + delve_fx.js, fetched on first use), each find named as it flies out
+  // the story under it is told line by line as each beat plays (the whole story at once if the scene can't play)
+  function roomScene(D, d, rm, stage, loot, caption) {
+    const crewHeroes = (d.heroes || []).map((x) => heroes[x]).filter(Boolean);
+    const named = (e) => {
+      if (e.item) loot.appendChild(el("span", { class: "dg-chip " + e.item.tier }, e.item.name));
+      else if (e.coin) loot.appendChild(el("span", { class: "dg-chip" }, `${e.coin} silver`));
+      else if (e.say && caption) { for (const x of caption.querySelectorAll(".now")) x.classList.remove("now"); caption.append(el("span", { class: "dg-say now" }, A.storyText(e.say)), " "); }
+    };
+    if (caption) caption.innerHTML = "";
+    const sd = S.dungeons[D.id] || {};
+    const rec = Object.assign({}, rm, { theme: D.theme, pace: d.pace, crew: crewHeroes, did: D.id, boss: Object.assign({ mon: sd.boss }, D.boss && { name: D.boss.name, role: D.boss.role, gen: D.boss.gen }, d.boss) });
+    return A.need(["delve_scenes", "delve_fx"]).then(() => {
+      stage.appendChild(DelveScenes.player(rec, { onEvent: named, onRestart: () => { loot.innerHTML = ""; if (caption) caption.innerHTML = ""; }, ownClick: true, label: cap(rm.name) }));
+      return DelveScenes.length(rec);
+    }).catch(() => {
+      stage.appendChild(vignette(D, rm, crewHeroes));
+      if (caption) caption.append(A.storyText(rm.story || ""));
+      for (const l of rm.loot || []) named({ item: l });
+      if (rm.silver) named({ coin: rm.silver });
+      return 0;
+    });
+  }
+  const RESULT_SAY = { cleared: "cleared it", passed: "got through", "driven back": "were driven back", open: "left it open" };
+  function showRoom(card, D, floor, r, st, notes) {
     card.hidden = false;
     card.innerHTML = "";
     card.className = "dg-card";
-    const walked = st.inked.has(key(r.n));
-    const icon = iconGrid(r.lair ? "lair" : r.kind).toCanvas(3);
-    icon.className = "dg-card-ico";
     card.appendChild(el("button", { type: "button", class: "dg-x", "aria-label": "Close", onclick: () => (card.hidden = true) }, "×"));
-    if (!walked) {
-      card.append(el("div", { class: "dg-card-head" }, icon, el("div", null, el("b", null, r.lair ? `The lair of ${D.boss.name}` : "An unmapped room"),
-        el("div", { class: "tiny dim" }, r.lair ? "Rumoured. Nobody has walked in and come back to ink it." : "Pencilled in from next door. Nobody has walked it yet."))));
+    const sleeping = (D.inside || []).filter((x) => x.floor === floor.floor && x.room != null && key(x.room) === key(r.n));
+    const tonight = sleeping.length ? el("p", { class: "small dg-tonight" }, "Tonight: ", sleeping.map((x, i) => [i ? (i === sleeping.length - 1 ? " and " : ", ") : "",
+      el("span", { class: "dg-swatch", style: { background: crewInk(x.crew) } }), crewLink(x.crew, x.label)]), sleeping.length > 1 ? " are camped here" : " is camped here",
+      sleeping.some((x) => x.camp && x.camp.watch) ? ` (${sleeping.filter((x) => x.camp && x.camp.watch).map((x) => x.camp.watch).join(" and ")} on watch)` : "", ".") : null;
+    if (!st.inked.has(key(r.n))) {
+      card.append(el("div", { class: "dg-card-head" }, el("div", null, el("b", null, "Not yet explored"))));
+      if (tonight) card.appendChild(tonight);
       return;
     }
-    const s = r.state;
+    const s = r.state || st.inked.get(key(r.n)) || {};
+    const icon = iconGrid(r.lair ? "lair" : r.kind).toCanvas(3);
+    icon.className = "dg-card-ico";
     card.append(el("div", { class: "dg-card-head" }, icon, el("div", null, el("b", null, cap(r.name)),
-      el("div", { class: "tiny dim" }, [KIND[r.kind] || cap(r.kind), r.side ? "off the main way" : null, `floor ${floor.floor}`].filter(Boolean).join(" · ")))));
+      el("div", { class: "tiny dim" }, [KIND[r.kind] || cap(r.kind), r.side ? "off the main way" : null, `floor ${floor.floor}`, `room ${r.n}`].filter(Boolean).join(" · ")))));
     if (r.desc) card.appendChild(el("p", { class: "small" }, r.desc));
-    card.appendChild(el("p", { class: "small" }, el("span", { class: "dg-swatch", style: { background: crewInk(s.crew) } }), s.s === "passed" ? "Passed through by " : "Cleared by ", crewLink(s.crew, s.by), ` ${A.when(s.d, "on")}.`,
+    if (tonight) card.appendChild(tonight);
+    if (s.crew || s.by) card.appendChild(el("p", { class: "small" }, el("span", { class: "dg-swatch", style: { background: crewInk(s.crew) } }), s.s === "passed" ? "Passed through by " : "Cleared by ", crewLink(s.crew, s.by), s.d != null ? ` ${A.when(s.d, "on")}.` : ".",
       s.s === "wander" ? " Something has wandered back in since." : null,
       r.trap ? el("span", { class: "red" }, ` Trap: ${r.trap}${st.sprung.has(key(r.n)) ? ", sprung" : ""}.`) : null));
-    const ls = latestStory(D, floor.floor, r.n);
-    if (ls) {
-      const fight = ls.rm.fight && A.storyLink({ fight: ls.rm.fight });
-      card.appendChild(el("blockquote", { class: "dg-story" }, el("div", { class: "tiny dim" }, `${A.when(ls.d.day)} · ${ls.d.label}`), el("p", { class: "small" }, A.storyText(ls.rm.story)),
-        ls.rm.loot.length || ls.rm.silver ? el("div", { class: "dg-card-loot" }, ls.rm.loot.map((l) => el("span", { class: "dg-chip " + l.tier }, l.name)), ls.rm.silver ? el("span", { class: "dg-chip" }, `${ls.rm.silver} silver`) : null) : null,
+    const days = roomDays(D, floor.floor, r.n);
+    for (const { d, rm } of days) {
+      const fight = rm.fight && A.storyLink({ fight: rm.fight });
+      const stage = el("div", { class: "dg-card-stage" }), loot = el("div", { class: "dg-inset-loot" });
+      const btn = el("button", { type: "button", class: "watch dg-watch" }, "▸ watch");
+      const story = el("p", { class: "small dg-told" }, A.storyText(rm.story || ""));
+      btn.addEventListener("click", () => { btn.disabled = true; stage.innerHTML = ""; loot.innerHTML = ""; roomScene(D, d, rm, stage, loot, story).then(() => { btn.disabled = false; btn.textContent = "↻ again"; }); });
+      card.appendChild(el("blockquote", { class: "dg-story" },
+        el("div", { class: "tiny dim dg-story-head" }, el("span", null, `${A.when(d.day)} · ${d.label}${RESULT_SAY[rm.result] && rm.result !== "cleared" ? ` · ${RESULT_SAY[rm.result]}` : ""}`), btn),
+        stage, loot, story,
+        rm.loot && rm.loot.length || rm.silver ? el("div", { class: "dg-card-loot" }, (rm.loot || []).map((l) => el("span", { class: "dg-chip " + l.tier }, l.name)), rm.silver ? el("span", { class: "dg-chip" }, `${rm.silver} silver`) : null) : null,
         fight ? el("div", null, fight) : null));
     }
+    if (!days.length) card.appendChild(el("p", { class: "tiny dim" }, "The crews' log no longer reaches back to the day this room was walked."));
+    const mine = (notes || []).filter((n) => key(n.room) === key(r.n));
+    if (mine.length) card.append(el("div", { class: "tiny dim dg-card-notes-h" }, mine.length > 1 ? "Notes about this room" : "A note about this room"), ...mine.map((n) => noteSlip(n, (notes || []).indexOf(n) + 1, -1)));
   }
 
   // ---------- the days below, each one watchable on the map ----------
   function daysPanel(D, ui) {
     const p = panel("Days below");
     const list = (D.days || []).slice().sort((a, b) => b.day - a.day);
-    if (!list.length) { p.appendChild(el("p", { class: "small dim" }, "No crew has gone down yet.")); return p; }
+    if (!list.length) {
+      p.appendChild(el("p", { class: "small dim" }, shiftedOnly(D) ? `No crew has gone down since the tunnels shifted ${A.when(D.shifted, "on")}${((D.boss || {}).kills || []).length || (D.spoils || []).length ? "; the days below before that went with the old rooms" : ""}.` : "No crew has gone down yet."));
+      return p;
+    }
     const ul = el("ul", { class: "dg-days" });
     const PACE_SAY = { push: "pressing on", steady: "at a steady pace", cautious: "carefully" };
     // the day's best moment: a find, a wild or famous room, a fight, else the longest story
@@ -444,7 +514,7 @@
     };
     const row = (d) => {
       const floors = [...new Set(d.rooms.map((r) => r.floor))];
-      return el("li", null, el("b", null, A.when(d.day)), ": ", crewLink(d.crew, d.label), `, ${A.plural(d.rooms.length, "room")}`, floors.length > 1 ? ` on floors ${floors.join(" and ")}` : ` on floor ${floors[0] || d.floor}`, `, ${PACE_SAY[d.pace] || d.pace} `,
+      return el("li", null, el("b", null, A.when(d.day)), ": ", crewLink(d.crew, d.label), `, ${A.plural(d.rooms.length, "room")}`, floors.length > 1 ? ` on the ${floors.sort((a, b) => a - b).map(A.floorOrd).join(" and ")} floors` : ` on ${A.floorWords(floors[0] || d.floor, D.id)}`, `, ${PACE_SAY[d.pace] || d.pace} `,
         el("button", { type: "button", class: "watch dg-watch", onclick: () => watch(D, ui, d) }, "▸ watch"), best(d));
     };
     list.slice(0, 8).forEach((d) => ul.appendChild(row(d)));
@@ -475,12 +545,10 @@
     // on a phone the map is far above the list; bring it into view before the banner starts walking
     if (sheet.getBoundingClientRect().top < 0 || sheet.getBoundingClientRect().top > window.innerHeight * 0.6) sheet.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
     const wait = (ms) => new Promise((res) => { const t = setTimeout(res, ms); run.wake = () => { clearTimeout(t); res(); }; });
-    const crewHeroes = (day.heroes || []).map((x) => heroes[x]).filter(Boolean);
     const nextDay = (D.days || []).some((d) => d.crew === day.crew && d.day === day.day + 1) || ((D.inside || []).some((x) => x.crew === day.crew) && !(D.days || []).some((d) => d.crew === day.crew && d.day > day.day));
     let S2 = null, token = null, at = null, atN = null;
     const open = (f) => {
       ui.floor = f;
-      ui.redrawNav();
       const fl = D.floors.find((x) => x.floor === f);
       S2 = drawSheet(sheet, D, ui, { before: day.day, state: Object.assign(Pen.known(D, fl, day.day), { crews: [] }) });
       token = el("div", { class: "dg-token" + (calm ? " calm" : "") }, crewToken(day.crew, 2));
@@ -548,7 +616,7 @@
       S2.status.innerHTML = "";
       S2.status.append(el("span", null, el("b", null, A.when(day.day)), ` · ${day.label} · ${nextDay ? "made camp below" : "walked out into the daylight"}.`),
         el("span", { class: "dg-ctl" }, el("button", { type: "button", class: "dg-btn", onclick: () => watch(D, ui, day) }, "↻ again"),
-          el("button", { type: "button", class: "dg-btn", onclick: () => { stopRun(ui); drawSheet(sheet, D, ui); ui.redrawNav(); } }, "today's map")));
+          el("button", { type: "button", class: "dg-btn", onclick: () => { stopRun(ui); drawSheet(sheet, D, ui); } }, "today's map")));
       ui.run = null;
     })();
 
@@ -557,28 +625,14 @@
       const story = rm.story || "";
       const stage = el("div", { class: "dg-vig-box" });
       const loot = el("div", { class: "dg-inset-loot" });
+      const caption = el("p", { class: "small dg-inset-story", "aria-live": "polite" });
       const fight = rm.fight && A.storyLink({ fight: rm.fight });
       const box = el("div", { class: "dg-inset" + (calm ? " calm" : ""), role: "dialog", "aria-label": cap(rm.name) },
         el("div", { class: "dg-inset-head" }, el("span", { class: "tiny" }, KIND[rm.kind] || cap(rm.kind)), el("b", null, cap(rm.name))),
-        stage, loot, el("p", { class: "small dg-inset-story" }, A.storyText(story)), fight ? el("div", { class: "tiny" }, fight) : null);
-      const named = (e) => {
-        if (e.item) loot.appendChild(el("span", { class: "dg-chip " + e.item.tier }, e.item.name));
-        else if (e.coin) loot.appendChild(el("span", { class: "dg-chip" }, `${e.coin} silver`));
-      };
+        stage, loot, caption, fight ? el("div", { class: "tiny" }, fight) : null);
       S2.box.appendChild(box);
       box.classList.add(b.cy / S2.G.H < 0.5 ? "low" : "high");
-      const sd = S.dungeons[D.id] || {};
-      const rec = Object.assign({}, rm, { theme: D.theme, pace: day.pace, crew: crewHeroes, did: D.id, boss: { mon: sd.boss, name: D.boss && D.boss.name } });
-      const ready = A.need(["delve_scenes", "delve_fx"]).then(() => {
-        const fig = DelveScenes.player(rec, { onEvent: named, onRestart: () => { loot.innerHTML = ""; }, ownClick: true, label: cap(rm.name) });
-        stage.appendChild(fig);
-        return DelveScenes.length(rec);
-      }).catch(() => {
-        stage.appendChild(vignette(D, rm, crewHeroes));
-        for (const l of rm.loot || []) named({ item: l });
-        if (rm.silver) named({ coin: rm.silver });
-        return 0;
-      });
+      const ready = roomScene(D, day, rm, stage, loot, caption);
       return new Promise((res) => {
         let done = false;
         const finish = () => { if (done) return; done = true; box.remove(); run.skip = null; res(); };
@@ -588,7 +642,7 @@
           const secs = await ready;
           if (done || run.stopped) return finish();
           const read = Math.min(5200, 1300 + story.length * 26) * (day.pace === "push" ? 0.85 : day.pace === "cautious" ? 1.1 : 1);
-          await wait(calm ? read : Math.max(read, secs * 1000 + 1400));
+          await wait(calm ? read : Math.max(read, secs * 1000 + 2200));
           finish();
         })();
       });

@@ -231,7 +231,37 @@
     return sprites.get(key);
   }
 
-  // ---------- floating instruments (no hands: each one plays itself), the crow, notes ----------
+  // a player holding their instrument in their own hands (MusicReplay's grip, as the tavern and road scenes hold them): the posed
+  // body at strum frame k, and the instrument with the hands laid over it, drawn once per frame state and lit like the body
+  const posed = new Map();
+  function heldCanvas(h, pose, inst, how, k, left, hands) {
+    const key = [h.id, pose, inst, how, k, left, hands].join(":");
+    if (!posed.has(key)) {
+      let c = null;
+      try {
+        const arms = MusicReplay.grip(inst, how, k);
+        if (arms) { const g = Art.heroPose(bare(h), 0, App.heroLook(h), { arms, seated: pose === "stand" ? null : 32, part: hands ? "hands" : null }); c = (left ? g.flipX() : g).toCanvas(1); }
+      } catch (e) { c = null; }
+      posed.set(key, c);
+    }
+    return posed.get(key);
+  }
+  const PAD = 16, inHand = new Map();
+  function handInst(s, k, left, t, hit, calm) {
+    const on = !calm && !!hit && hit.since < 0.14, sounding = !calm && !!hit && hit.since < hit.d;
+    const key = [s.id, s.pose, s.raw, s.how, k, left, on, sounding].join(":");
+    if (!inHand.has(key)) {
+      const c = canvas(28 + PAD * 2, 40 + PAD * 2), x = c.getContext("2d");
+      x.imageSmoothingEnabled = false;
+      MusicReplay.drawInst(x, s.raw, s.how, PAD + 14, PAD + 18, left ? -1 : 1, t, hit, calm, null, (kk) => heldCanvas(s.h, s.pose, s.raw, s.how, kk, left, true));
+      c.key = key;
+      if (inHand.size > 400) inHand.clear();
+      inHand.set(key, c);
+    }
+    return inHand.get(key);
+  }
+
+  // ---------- instruments for anyone with no hands to hold them (a pet, an old record), the crow, notes ----------
   const spr = (rows, pal) => Anim.sprite(rows, pal, "#160d07");
   const ART = {};
   const art = (name) => ART[name] || (ART[name] = spriteOf(MAKE[name]()));
@@ -413,8 +443,8 @@
   function castOf(rec) {
     const all = MusicReplay.castOf(rec), lead = all[0], joiners = all.filter((m) => m.how !== "lead" && m.how !== "listen").slice(0, 5);
     const listeners = all.filter((m) => m.how === "listen").slice(0, ANG.length - 1 - joiners.length);
-    return [{ id: lead.id, name: lead.name, pose: "stand", inst: instOf(lead.inst), how: "lead" }]
-      .concat(joiners.map((j) => ({ id: j.id, name: j.name, pose: "seat", inst: instOf(j.how === "inst" ? j.inst : null, j.how), how: j.how })))
+    return [{ id: lead.id, name: lead.name, pose: "stand", inst: instOf(lead.inst), raw: lead.inst || null, how: "lead" }]
+      .concat(joiners.map((j) => ({ id: j.id, name: j.name, pose: "seat", inst: instOf(j.how === "inst" ? j.inst : null, j.how), raw: j.how === "inst" ? j.inst || null : null, how: j.how })))
       .concat(listeners.map((m) => ({ id: m.id, name: m.name, pose: "seat", inst: null, how: "listen" })))
       .map((m, i) => Object.assign(m, { ang: ANG[i] }));
   }
@@ -491,12 +521,19 @@
         const bb = bbox(c), dx = FX - s.sx, dy = FY - 6 - (s.sy - (bb.y1 - bb.y0) / 2), l = Math.hypot(dx, dy) || 1;
         const k = clamp(1 - (Math.hypot(s.wx, s.wy) - 18) / (roughNow ? 70 : 84), 0.15, 1) * fl;
         const tint = s.on && !s.flicker ? s.col : null;
-        const sp = litCached(s.id + s.pose + left + frame, c, { dir: [dx / l, dy / l], behind: s.sy > FY && !s.pet, k: s.pet ? Math.max(k, 0.6) : k, pet: !!s.pet, tint });
+        // a clapper's hands are only up while they clap; everyone else holds their instrument all night
+        const hitNow = playing && !s.flicker ? hit(s.id, t) : null, holds = !s.pet && s.inst && (s.on || s.how !== "clap") && MusicReplay.grip(s.raw, s.how, 0);
+        const gk = holds ? MusicReplay.gripFrame(s.raw, s.how, tv, hitNow, calm) : 0, body = holds ? heldCanvas(s.h, s.pose, s.raw, s.how, gk, left, false) : null;
+        const lightOf = { dir: [dx / l, dy / l], behind: s.sy > FY && !s.pet, k: s.pet ? Math.max(k, 0.6) : k, pet: !!s.pet, tint };
+        const sp = litCached(s.id + s.pose + left + frame + (body ? "k" + gk : ""), body || c, lightOf);
         const bob = playing && !roughNow && !s.pet && !calm ? Math.round((Math.sin(t * Math.PI * 2 / (P.unit * 4) + s.i * 1.7) + 1) / 2) : 0;
         const x = Math.round(s.sx - (bb.x0 + bb.x1 + 1) / 2), y = Math.round(s.sy - bb.y1 - (s.pet ? 0 : 1)) - bob;
         blit(b, sp, x, y);
         s.box = { x, y, bb };
-        if (s.inst && (s.on || s.how !== "claps")) instrument(b, s.inst, x, y, bb, s.sx <= FX ? 1 : -1, tv, playing && !s.flicker ? hit(s.id, t) : null, k, calm);
+        if (body) {
+          const ic = handInst(s, gk, left, tv, hitNow, calm);
+          blit(b, litCached("inst" + ic.key, ic, Object.assign({}, lightOf, { tint: null })), x - PAD, y - PAD);
+        } else if (s.inst && (s.on || s.how !== "claps")) instrument(b, s.inst, x, y, bb, s.sx <= FX ? 1 : -1, tv, hitNow, k, calm);
       }
       if (!calm) embers(b, t, roughNow ? 0.7 : big ? 1.4 : 1, roughNow ? 8 : big ? 26 : 16);
       smoke(b, tv, roughNow);

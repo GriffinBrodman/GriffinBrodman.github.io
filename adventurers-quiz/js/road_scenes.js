@@ -13,7 +13,7 @@
   RoadScenes.dress(block)        -> the spec additions for a daybook stretch { stretch, biome, place_kind?, traveller?, line? }: each stretch
                                     kind its own roadside thing and band placing, the line's cart, signpost or milestone when it names one.
   RoadScenes.walker(grid, k)     -> the grid in walk-cycle step k (0-3): legs scissored, body bobbed.
-  RoadScenes.kit                 -> { Buf, blit, grade, C, mix, rng, hash, clamp, lerp, bay, hourOf, piece } for road_replay.js.
+  RoadScenes.kit                 -> { Buf, blit, grade, C, mix, rng, hash, clamp, lerp, bay, hourOf, piece, punch... } for road_replay.js and hunt_scenes.js.
   Everything is deterministic in (spec, t); nothing touches the DOM except strip().
 */
 (function (root) {
@@ -81,8 +81,12 @@
   // the light on the land: a tint toward a colour, a darkening, a loss of colour
   function lightAt(hr, weather) {
     let tint = [255, 255, 255], amt = 0, dark = 0, sat = 1;
-    if (isNight(hr)) { tint = [70, 92, 150]; amt = 0.5; dark = 0.52; sat = 0.55; }
+    // moonlight: cool and low, but the land, the road and the verge still read apart from the sky
+    const MOON = { tint: [96, 120, 178], amt: 0.5, dark: 0.24, sat: 0.55 };
+    if (isNight(hr)) { tint = MOON.tint; amt = MOON.amt; dark = MOON.dark; sat = MOON.sat; }
     else if (hr < 7.5) { const k = clamp((7.5 - hr) / 2.7, 0, 1); tint = [255, 196, 170]; amt = 0.3 * k; dark = 0.16 * k; }
+    // the last of the dusk eases from the sunset's light into the moon's, with no step darker than the night itself
+    else if (hr > 18.8) { const k = (hr - 18.8) / 1.7, k0 = (18.8 - 16.2) / 4.3; tint = mix([255, 168, 104], MOON.tint, k); amt = lerp(0.12 + 0.24 * k0, MOON.amt, k); dark = lerp(0.05 + 0.4 * k0 * k0, MOON.dark, k); sat = lerp(1 - 0.3 * k0, MOON.sat, k); }
     else if (hr > 16.2) { const k = clamp((hr - 16.2) / 4.3, 0, 1); tint = hr > 19 ? [130, 120, 160] : [255, 168, 104]; amt = 0.12 + 0.24 * k; dark = 0.05 + 0.4 * k * k; sat = 1 - 0.3 * k; }
     const W = { cloudy: [0.85, 0.06], rain: [0.68, 0.16], storm: [0.55, 0.3], fog: [0.62, 0.02], snow: [0.75, 0.0], heat: [1.05, 0] }[weather];
     if (W) { sat *= W[0]; dark += W[1]; }
@@ -140,14 +144,17 @@
     if (dungeon) { L.sat *= 0.7; L.dark = clamp(L.dark + 0.12, 0, 0.8); }
     const fogK = weather === "fog" ? 0.75 : weather === "snow" ? 0.25 : weather === "rain" || weather === "storm" ? 0.3 : weather === "heat" ? 0.2 : 0;
     const over = { cloudy: ["#9aa4ae", 0.55], rain: ["#7a8590", 0.72], storm: ["#3e4652", 0.84], fog: ["#c2c6c2", 0.8], snow: ["#c4cad4", 0.7], heat: ["#f0e0b0", 0.25] }[weather];
-    const skyC = over ? sky.map((c) => mix(c, isNight(hr) ? mix(over[0], "#0a0e1e", 0.8) : over[0], over[1] * (isNight(hr) ? 0.6 : 1))) : sky;
+    // how far into the dark the hour is: 0 by day, 1 at night, between through the last of the dusk and the first of the dawn
+    const nk = isNight(hr) ? 1 : hr > 18.8 ? (hr - 18.8) / 1.7 : hr > 4.8 && hr < 6 ? 1 - (hr - 4.8) / 1.2 : 0;
+    const skyC = over ? sky.map((c) => mix(c, mix(over[0], mix(over[0], "#0a0e1e", 0.8), nk), over[1] * (1 - 0.4 * nk))) : sky;
     const haze = skyC[2];
     const G = grader(L, haze, fogK);
-    // people on the road stay readable after dark: the same light, half the darkness and less haze
-    const Gf = grader(Object.assign({}, L, { dark: L.dark * 0.45, amt: L.amt * 0.7 }), haze, fogK * 0.5);
+    // people on the road stay readable after dark: the same light, half the darkness and less haze, and at night less of the
+    // moon's blue and grey, so a face keeps its skin tone and a tabard its colour
+    const Gf = grader(Object.assign({}, L, { dark: L.dark * 0.45, amt: L.amt * (0.7 - 0.25 * nk), sat: lerp(L.sat, Math.max(L.sat, 0.78), nk) }), haze, fogK * 0.5);
     const img = new Buf(w, h);
     const put = (x, y, c, depth, a) => { if (c) img.px(x, y, G(c, depth), a); };
-    const info = Object.assign({}, lay, { hr, weather, biome, theme, dungeon, light: L, night: isNight(hr), sky: skyC, haze, G, Gf, seed });
+    const info = Object.assign({}, lay, { hr, weather, biome, theme, dungeon, light: L, night: isNight(hr), nk, sky: skyC, haze, G, Gf, seed });
 
     // sky
     // flat bands, each boundary broken by a short staggered step: an ordered dither between bands read as a checkerboard at 4x
@@ -160,11 +167,13 @@
     const dayArc = clamp((hr - 5.6) / 13.2, 0, 1);
     const sunX = Math.round(lerp(w * 0.08, w * 0.92, dayArc)), sunY = Math.round(hz - 4 - Math.sin(dayArc * Math.PI) * (hz - 10));
     const heavy = weather === "rain" || weather === "storm" || weather === "fog" || weather === "snow";
-    if (info.night) {
+    // the first stars come out and the moon rises through the dusk, so an evening after sunset already reads as night falling
+    if (nk > 0.3) {
       if (weather !== "storm" && weather !== "fog") {
-        for (let i = 0; i < w * hz / 55; i++) { const x = Math.floor(r() * w), y = Math.floor(r() * (hz - 4)), b = r(); img.px(x, y, b > 0.8 ? "#f4ecd0" : "#8a96c0", heavy ? 0.4 : 1); }
-        const mx = Math.round(w * 0.78), my = Math.round(hz * 0.3);
-        disc(img, mx, my, 5, "#f0e8c8", "#c8c0a0", heavy ? 0.45 : 1, (x, y) => (x - mx + 2.5) ** 2 + (y - my - 1.5) ** 2 > 16);
+        const k = Math.min(1, (nk - 0.3) / 0.5);
+        for (let i = 0; i < w * hz / 55; i++) { const x = Math.floor(r() * w), y = Math.floor(r() * (hz - 4)), b = r(); if (y < hz * (0.45 + 0.4 * k)) img.px(x, y, b > 0.8 ? "#f4ecd0" : "#8a96c0", (heavy ? 0.4 : 1) * k); }
+        const mx = Math.round(w * 0.78), my = Math.round(lerp(hz * 0.62, hz * 0.3, k));
+        disc(img, mx, my, 5, "#f0e8c8", "#c8c0a0", heavy ? 0.5 : 1, (x, y) => (x - mx + 2.5) ** 2 + (y - my - 1.5) ** 2 > 16);
         info.moon = [mx, my];
       }
     } else if (!heavy) {
@@ -202,8 +211,8 @@
   function clouds(img, info, w, hz, weather, seed, sunX) {
     const thr = { clear: 0.66, heat: 0.74, cloudy: 0.46, rain: 0.38, storm: 0.34, snow: 0.4, fog: 0.9 }[weather] || 0.6;
     const dark = weather === "storm" ? 0.55 : weather === "rain" ? 0.35 : 0;
-    const base = info.night ? "#2a3250" : info.hr < 7.2 || info.hr > 17 ? "#f0b890" : "#f4f6f4";
-    const shadeC = info.night ? "#141a30" : info.hr < 7.2 || info.hr > 17 ? "#8a5a6a" : "#a8b4c4";
+    const nk = info.nk || 0, dusk = info.hr < 7.2 || info.hr > 17;
+    const base = mix(dusk ? "#f0b890" : "#f4f6f4", "#2a3250", nk), shadeC = mix(dusk ? "#8a5a6a" : "#a8b4c4", "#141a30", nk);
     for (let y = 2; y < hz - 3; y++) for (let x = 0; x < w; x++) {
       const n = fbm(x / 46, y / 11, seed + 77, 3) - (y / hz) * 0.12;
       if (n < thr) continue;
@@ -435,6 +444,18 @@
       let col = o.map ? o.map(c, i, j) : c;
       if (!col) continue;
       if (G && !(o.lit && o.lit(c))) col = G(col, depth);
+      // o.rim: the edge on the moon's side (the right of the frame) caught in its light, just inside the outline, which stays dark
+      if (o.rim) {
+        const d = flip ? -1 : 1, n1 = i + d, n2 = i + 2 * d, has = (k) => k >= 0 && k < g.w && !!g.px[j * g.w + k];
+        if (has(n1) && !has(n2)) col = mix(col, o.rim, 0.5);
+      }
+      // o.warm: a lamp's side (o.warm.side, -1 left or 1 right of the frame) catches its light on the outline and the pixel inside it
+      if (o.warm) {
+        const d = (flip ? -1 : 1) * o.warm.side, has = (k) => k >= 0 && k < g.w && !!g.px[j * g.w + k];
+        if (!has(i + d)) col = mix(col, o.warm.col, 0.7);
+        else if (!has(i + 2 * d)) col = mix(col, o.warm.col, 0.35);
+      }
+      if (o.mark && xx >= 0 && xx < img.w) o.mark[yy * img.w + xx] = 1;
       img.px(xx, yy, col, a);
     }
   }
@@ -612,6 +633,70 @@
       P.rect(1, 1, 12, 9, "sign", (x, y) => 0.25 - (y - 1) * 0.05 + (x % 5 === 0 ? -0.15 : 0));
       P.ell(7, 5.5, 2.8, 2.2, "hen", { s: 0.2 }); P.ell(9.5, 3.5, 1.4, 1.4, "hen", { s: 0.3 }); P.px(9, 2, "comb"); P.px(11, 4, "gold");
       P.px(5, 8, "gold"); P.px(8, 8, "gold");
+    });
+    else if (kind === "balcony") out = painted(64, 84, Object.assign({ awn: "#8a3a5a", rail: "#3a2a24", pot: "#a8583a", leaf: "#5a8a3a" }, PIECE_PAL), (P) => {
+      // a tall town house: plaster over a stone ground floor, a long window above opening onto a railed balcony, a hipped roof
+      P.layer = 1;
+      P.rect(4, 14, 56, 70, "plaster", (x, y) => 0.18 - (x - 4) * 0.005 + ((x * 3 + y * 7) % 17 === 0 ? -0.18 : 0));
+      P.rect(4, 58, 56, 26, "stone", (x, y) => 0.15 + ((Math.floor(y / 4) + Math.floor((x + (Math.floor(y / 4) % 2) * 3) / 6)) % 3 === 0 ? -0.25 : 0) + (y % 4 === 0 ? -0.2 : 0));
+      for (const x of [4, 58]) P.rect(x, 14, 2, 70, "beam", -0.1);
+      P.rect(4, 56, 56, 2, "beam", 0);
+      P.layer = 2;
+      P.poly([[0, 16], [12, 2], [52, 2], [64, 16]], "roof", (x, y) => 0.3 - y * 0.02 + (Math.round(y) % 3 === 0 ? -0.25 : 0) + (x > 40 ? -0.15 : 0));
+      P.rect(44, 0, 6, 6, "stone", (x) => (x > 47 ? -0.4 : 0.2));
+      P.rect(20, 18, 24, 18, L("lit", "glass"), (x, y) => (lit ? 0.3 - Math.abs(x - 32) * 0.03 : 0.25 - (y - 18) * 0.04)); P.rect(31, 18, 2, 18, "beam", 0); P.rect(18, 17, 28, 2, "beam", 0.1);
+      for (const [x, w] of [[16, 4], [44, 4]]) P.rect(x, 18, w, 18, "awn", (xx, yy) => 0.15 - (yy - 18) * 0.02 + (xx % 2 ? -0.15 : 0));
+      P.rect(12, 36, 40, 3, "stone", 0.3); P.rect(12, 39, 40, 2, "stoned", -0.2);
+      P.layer = 3;
+      P.rect(12, 28, 40, 1, "rail", 0.2);
+      for (let x = 12; x < 52; x += 3) P.rect(x, 29, 1, 7, "rail", 0);
+      for (const x of [14, 46]) { P.ell(x + 2, 26, 3, 2.5, "leaf", { s: 0.25 }); P.rect(x, 27, 4, 2, "pot", 0.1); }
+      P.layer = 2;
+      P.rect(10, 66, 10, 18, "door", (x) => (x === 15 ? -0.4 : 0.1)); P.px(18, 75, "gold", 0.4);
+      for (const x of [28, 44]) { P.rect(x, 64, 10, 9, L("lit", "glass"), lit ? 0.25 : 0.1); P.rect(x + 4, 64, 1, 9, "beam", 0); P.rect(x - 1, 73, 12, 1, "beam", 0.2); }
+    });
+    else if (kind === "stall") out = painted(54, 52, Object.assign({ awn: "#b8402c", awn2: "#efe6d4", goods: "#d8a838", cloth: "#3a6a8a" }, PIECE_PAL), (P) => {
+      // a market stall: striped awning on two poles, a counter of goods, a cart wheel peeking out behind
+      P.layer = 1;
+      for (const x of [3, 49]) P.rect(x, 6, 2, 46, "wood", (xx) => (xx === x ? 0.2 : -0.2));
+      P.layer = 2;
+      P.poly([[0, 4], [54, 4], [52, 14], [2, 14]], "awn", (x, y) => (Math.floor(x / 6) % 2 ? 0.05 - (y - 4) * 0.02 : null));
+      for (let x = 2; x < 52; x++) if (Math.floor(x / 6) % 2 === 0) for (let y = 4; y < 14; y++) P.px(x, y, "awn2", 0.2 - (y - 4) * 0.02);
+      for (let x = 2; x < 52; x += 6) P.ell(x + 3, 14, 3, 1.6, Math.floor(x / 6) % 2 ? "awn" : "awn2", { s: -0.1 });
+      P.layer = 3;
+      P.rect(0, 38, 54, 14, "wood", (x, y) => (y === 38 ? 0.4 : x % 9 === 0 ? -0.3 : 0.05));
+      P.rect(2, 36, 50, 3, "cloth", (x) => (x % 4 === 0 ? -0.2 : 0.15));
+      for (let k = 0; k < 8; k++) P.ell(6 + k * 6, 34, 2.4, 2, k % 3 === 0 ? "red" : k % 3 === 1 ? "goods" : "white", { s: 0.25 });
+    });
+    else if (kind === "lamppost") out = painted(16, 56, PIECE_PAL, (P) => {
+      P.rect(6, 10, 3, 46, "iron", (x) => (x === 6 ? 0.3 : -0.2)); P.rect(4, 54, 7, 2, "iron", 0);
+      P.rect(6, 8, 9, 2, "iron", 0.1); P.rect(12, 10, 1, 3, "iron", 0);
+      P.rect(10, 13, 5, 7, L("lit", "glass"), lit ? 0.35 : 0.1); P.rect(10, 12, 5, 1, "iron", 0.2); P.rect(10, 20, 5, 1, "iron", 0);
+    });
+    else if (kind === "tent") out = painted(104, 70, Object.assign({ canvas: "#efe2c8", stripe: "#b8402c", flag: "#d8a838" }, PIECE_PAL), (P) => {
+      // the big top: a striped canvas cone over a drum, its flap open on the ring, a pennant on the king pole
+      P.layer = 1;
+      P.rect(51, 0, 2, 12, "woodd", 0); P.poly([[53, 1], [62, 4], [53, 7]], "flag", 0.2);
+      P.poly([[52, 10], [100, 38], [4, 38]], "canvas", (x, y) => { const a = Math.atan2(x - 52, y - 10); return (Math.floor((a + 2) * 7) % 2 ? null : 0.15 - (y - 10) * 0.005); });
+      for (let y = 10; y < 38; y++) for (let x = 4; x < 100; x++) { const a = Math.atan2(x - 52, y - 10), inside = Math.abs(x - 52) <= (y - 10) * 48 / 28; if (inside && Math.floor((a + 2) * 7) % 2) P.px(x, y, "stripe", 0.1 - (x - 52) * 0.004); }
+      P.rect(6, 38, 92, 32, "canvas", (x, y) => (Math.floor((x - 6) / 8) % 2 ? null : 0.05 - (x - 52) * 0.003));
+      for (let x = 6; x < 98; x++) if (Math.floor((x - 6) / 8) % 2) for (let y = 38; y < 70; y++) P.px(x, y, "stripe", -0.05 - (x - 52) * 0.003);
+      for (let x = 4; x < 100; x += 8) P.ell(x + 4, 38, 4, 2, "stripe", { s: 0 });
+      P.layer = 2;
+      P.poly([[36, 70], [52, 42], [68, 70]], "door", (x) => -0.5 + Math.abs(x - 52) * 0.01);
+      P.poly([[30, 70], [52, 40], [40, 70]], "canvas", 0.3); P.poly([[64, 70], [52, 40], [74, 70]], "canvas", -0.1);
+    });
+    else if (kind === "stage") out = painted(96, 56, Object.assign({ curtain: "#8a2a34", curtain2: "#5a1a24", boards: "#a87a4a", gilt: "#d8a838" }, PIECE_PAL), (P) => {
+      // the players' fold-out stage: a wagon bed of boards, a painted proscenium, red curtains drawn back, footlights
+      P.layer = 1;
+      P.rect(6, 8, 84, 32, "slate", (x, y) => -0.4 + ((x + y) % 7 === 0 ? 0.1 : 0));
+      P.layer = 2;
+      for (const [x0, d] of [[6, 1], [90, -1]]) for (let y = 8; y < 40; y++) { const w = 10 + Math.round(Math.sin((y - 8) / 32 * Math.PI) * 8); for (let i = 0; i < w; i++) P.px(x0 + d * i - (d < 0 ? 1 : 0), y, (i % 4) < 2 ? "curtain" : "curtain2", 0.15 - i * 0.02); }
+      P.rect(2, 2, 92, 7, "curtain", (x, y) => (y === 8 ? -0.3 : 0.1 + (x % 8 < 4 ? 0.1 : -0.1)));
+      P.rect(0, 0, 96, 3, "gilt", 0.2); P.rect(0, 0, 3, 42, "gilt", 0.1); P.rect(93, 0, 3, 42, "gilt", -0.2);
+      P.rect(0, 40, 96, 4, "boards", 0.35); P.rect(2, 44, 92, 12, "wood", (x) => (x % 10 === 0 ? -0.4 : -0.05));
+      for (let x = 8; x < 92; x += 12) P.px(x, 41, "flame", 0.4);
+      for (const x of [6, 86]) P.rect(x, 50, 4, 6, "woodd", -0.2);
     });
     pieceCache.set(key, out);
     return out;
@@ -792,6 +877,31 @@
       for (let xx = x0 - 4; xx < x1 + 4; xx++) img.px(xx, rt - 6 + Math.round(Math.sin((xx - x0) / (x1 - x0) * Math.PI) * 3), G(PIECE_PAL.rope, 0.1));
       for (const xx of [x0 - 4, x1 + 3]) for (let y = 0; y < 12; y++) img.px(xx, rt - 7 + y, G("#5a3a22", 0.1));
       return Object.assign(A0, { river: [x0, x1], bell: [x0 - 7, rt - 31], rope: rt - 6, landing: [x0 - 2, x1 + 2] });
+    }
+    if (kind === "balcony") {
+      const g = pieceGrid("balcony", lit, 0), gx = x - 32, gy = rt - g.h + 3;
+      B(g, gx, gy, 0.12, lit ? warm : null);
+      return Object.assign(A0, { floor: [gx + 32, gy + 36], door: [gx + 15, rt], w: g.w, gy });
+    }
+    if (kind === "stall") {
+      const g = pieceGrid("stall", false, 0), gx = x - 27, gy = rt - g.h + 3;
+      B(g, gx, gy, 0.12);
+      return Object.assign(A0, { front: g, gx, gy, cut: gy + 32, counter: [x, gy + 34], behind: rt - 3 });
+    }
+    if (kind === "lamppost") {
+      const g = pieceGrid("lamppost", lit, 0), gx = x - 7, gy = rt - g.h + 2;
+      B(g, gx, gy, 0.1, lit ? warm : null);
+      return Object.assign(A0, { lamp: [gx + 12, gy + 16], base: [gx + 7, rt] });
+    }
+    if (kind === "tent") {
+      const g = pieceGrid("tent", false, 0), gx = x - 52, gy = rt - g.h + 4;
+      B(g, gx, gy, 0.25);
+      return Object.assign(A0, { flap: [x, rt], top: [x, gy] });
+    }
+    if (kind === "stage") {
+      const g = pieceGrid("stage", lit, 0), gx = x - 48, gy = rt - g.h + 6;
+      B(g, gx, gy, 0.15, lit ? warm : null);
+      return Object.assign(A0, { floor: [x, gy + 41], left: gx + 18, right: gx + 78 });
     }
     return A0;
   }
@@ -1065,6 +1175,6 @@
 
   root.RoadScenes = {
     W: W0, H: H0, scene, frame, compose, strip, walker, piece, hourOf, isNight, dress, BIOMES: Object.keys(BIOME).concat(["dungeon"]), THEMES: Object.keys(THEME_BIOME),
-    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc },
+    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc, punch },
   };
 })(typeof window !== "undefined" ? window : globalThis);

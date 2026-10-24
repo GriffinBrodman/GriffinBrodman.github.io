@@ -1516,12 +1516,44 @@
     if (kind === "camp_spot") return campClip(env, S, b);
     if (kind === "fear") return fearClip(env, S, Object.assign({}, b, { r: (b.r || []).map(([id, res]) => [id, res, "the dark"]) }));
     if (kind === "trap" || kind === "famous") return handleClip(env, S, Object.assign({}, b, { c: "disarm" }));
+    if (kind === "fight" || kind === "stair") return calmClip(env, S, b);
     const s0 = Object.assign({}, S), list = (b.r || []).map(([id, res]) => ({ i: idxOf(env, id), res })).filter((w) => w.i >= 0), w = list[0] || { i: 0, res: "pass" }, ok = w.res === "pass" || w.res === "partial";
     return { dur: 2.0, ev: [[0.6, "scrape", 0.6], [1.3, ok ? "chime" : "pop", ok ? 0.6 : 0.8]], draw(st, lt) {
       room(st, s0);
       const [fx, fy] = env.bg.A.focus, hm = D.home(env, w.i), u = seg(lt, 0, 0.5), p = u < 1 ? walkPose(st, lerp(hm.x, fx - 16, u), lerp(hm.y, Math.min(94, fy + 2), u), 7) : { x: fx - 16 + (lt < 1.3 ? Math.floor(st.T * 14) % 2 : 0), y: Math.min(94, fy + 2), frame: 0 };
       crew(st, s0, { [w.i]: p });
       if (lt > 1.3) { if (ok) sparkle(st, fx - 6, fy - 14, seg(lt, 1.3, 2.0)); else { puff(st, fx - 6, fy - 4, seg(lt, 1.3, 1.9)); mark(st, "?", p.x, p.y - tall(env, w.i) - 8, "#fff0c0"); } }
+    } };
+  }
+  // a fight room's own way past (calming the wolf, hearing the ghost out, a bribe): the one it picked walks up to what lives there,
+  // which is there to see; it settles and goes, or it lunges
+  const CALM_FOE = [[/wolf|hound|pup|whelp/, "wolf"], [/bear/, "cave_bear"], [/rat/, "giant_rat"], [/spider|web/, "giant_spider"], [/bat/, "giant_bat"],
+    [/widow|ghost|pale|weep|mourn|wraith/, "wraith"], [/bone|skelet|crypt/, "skeleton"], [/hag|witch/, "hag_mother"], [/troll/, "cave_troll"], [/kobold/, "kobold"], [/goblin|chief|camp/, "goblin"]];
+  const BEASTLY = new Set(["wolf", "dire_wolf", "frost_wolf", "cave_bear", "giant_rat", "giant_spider", "giant_bat", "boar", "salamander", "crab"]);
+  const THEME_FOE = { goblin: "goblin", beast: "wolf", cave: "kobold", undead: "skeleton", swamp: "bog_crawler", ice: "frost_wolf", sea: "drowned", fire: "salamander" };
+  function calmClip(env, S, b) {
+    const s0 = Object.assign({}, S), list = (b.r || []).map(([id, res]) => ({ i: idxOf(env, id), res })).filter((w) => w.i >= 0), w = list[0] || { i: 0, res: "pass" };
+    // a look before a fight that still happens: the foe stays put and the watcher keeps their distance
+    const ok = (w.res === "pass" || w.res === "partial") && !b.fightNext, watch = !!b.fightNext, nm = String(env.rec.name || "").toLowerCase();
+    const id = (env.rec.foes || [])[0] || (CALM_FOE.find(([re]) => re.test(nm)) || [])[1] || THEME_FOE[env.theme] || "wolf";
+    return { dur: 3.0, ev: [[0.3, "step", 0.5], [1.4, ok ? "chime" : "slam", ok ? 0.5 : 0.8]], draw(st, lt) {
+      room(st, s0);
+      const hm = D.home(env, w.i), fy = hm.y, fx = 140;
+      const gone = ok ? seg(lt, 1.6, 2.8) : 0, lunge = !ok && !watch ? Math.sin(seg(lt, 1.3, 1.7) * Math.PI) * -18 : 0;
+      st.mon(id, fx + gone * 40 + lunge, fy, { flip: !(ok && lt > 1.6), frame: (st.T * (ok && lt > 1.6 ? 6 : 2)) % 2 | 0, alpha: 1 - seg(gone, 0.5, 1) });
+      const u = seg(lt, 0, 0.9), tx = watch ? fx - 60 : fx - 34, kneel = lt > 0.9 && lt < (ok ? 2.4 : 1.4);
+      const knock = !ok && !watch ? ease(seg(lt, 1.45, 1.8)) * -14 : 0;
+      // back to the crew's line by the end, so the next beat starts where this one leaves off
+      const home = seg(lt, ok || watch ? 2.5 : 2.2, 3.0), ax = tx + (!ok && !watch ? -14 : 0);
+      const p = u < 1 ? walkPose(st, lerp(hm.x, tx, u), fy, 4) : home > 0 ? Object.assign(walkPose(st, lerp(ax, hm.x, home), fy, home < 1 ? 7 : 0, true), home >= 1 ? { flip: false, frame: 0, dy: 0 } : {}) : { x: tx + knock, y: fy, frame: 0, dy: kneel ? 3 : 0 };
+      const poses = {};
+      for (let q = 0; q < env.crew.length; q++) if (q !== w.i) { const h2 = D.home(env, q); poses[q] = { x: h2.x - 6, y: h2.y, frame: 0 }; }
+      poses[w.i] = p;
+      crew(st, s0, poses);
+      if (lt > 0.9 && lt < 1.5 && !watch) bubble(st, p.x + 4, R(p.y - tall(env, w.i) - 12), "...");
+      if (watch && lt > 0.9 && lt < 2.4) mark(st, "?", fx, fy - 30, "#fff0c0");
+      if (ok && lt > 1.6 && lt < 2.6) mark(st, BEASTLY.has(id) ? "zz" : "OK", fx + gone * 40, fy - 26, "#c8f0a0");
+      if (!ok && !watch && lt > 1.4 && lt < 2.2) mark(st, "!", p.x, p.y - tall(env, w.i) - 8, "#ff8060");
     } };
   }
   function stairExit(env, S) {
@@ -1571,6 +1603,8 @@
     const statics = (root.LD && root.LD.static) || {};
     env.boss = rec.boss && rec.boss.mon ? rec.boss.mon : ((statics.dungeons || {})[rec.did] || {}).boss || null;
     env.rec.bossName = (rec.boss && rec.boss.name) || ((statics.monsters || {})[env.boss] || {}).name;
+    // a successor rides in the sprite id (DelveScenes.monCanvas reads "id@role@gen"), so every lair beat draws its variant
+    if (env.boss && rec.boss && rec.boss.role) env.boss += `@${rec.boss.role}@${rec.boss.gen || 2}`;
     env.rec.foes = rec.foes || [];
     const P = { env, clips: [], events: [], len: 0 }, S = { dx: 0 };
     if (!env.bg.A.mural) env.bg.A = Object.assign({}, env.bg.A, { mural: [24, 14, 76, 34] });
@@ -1584,9 +1618,16 @@
     };
     add(intro(env, S));
     const beats = (rec.beats && rec.beats.length ? rec.beats : guessBeats(rec)).slice();
+    if (!env.rec.foes.length) { const fb = beats.find((x) => x.foes && x.foes.length); if (fb) env.rec.foes = fb.foes; }
+    // captions: each beat's own line as its clip starts (an older record without them spreads its story's sentences over the clips)
+    const says = [];
+    const told = beats.some((b) => b.t) || rec.enter;
+    if (told && rec.enter) says.push([0.05, rec.enter]);
     let scout = null;
     for (let k = 0; k < beats.length; k++) {
-      const b = beats[k], nx = beats[k + 1] || {};
+      const b = beats[k], nx = beats[k + 1] || {}, at = P.len;
+      const sayAt = says.length;
+      if (told && b.t) says.push([at + 0.05, b.t]);
       switch (b.s) {
         case "fear": add(fearClip(env, S, b)); break;
         case "trap_spot": add(spotClip(env, S, b)); break;
@@ -1610,13 +1651,23 @@
         case "fight": add(fightClip(env, S, b)); break;
         case "lair_scout": scout = b; add(lairScout(env, S, b)); break;
         case "lair_fight": add(bossClip(env, S, scout, b)); break;
-        case "custom": add(customClip(env, S, b)); break;
+        case "custom": add(customClip(env, S, Object.assign({}, b, { fightNext: beats.slice(k + 1).some((x) => x.s === "fight" || x.s === "lair_fight") }))); break;
         default: break;
       }
+      // a fight's line tells how it ended, so it waits for the end of the clash rather than giving the result away
+      if ((b.s === "fight" || b.s === "lair_fight") && says[sayAt] && P.len > at) says[sayAt][0] = Math.max(at + 0.05, P.len - 1.4);
     }
     if (rec.kind === "stair" && rec.result !== "driven back") add(stairExit(env, S));
     else if (rec.result === "driven back" && !beats.some((b) => b.s === "fight" || b.s === "lair_fight")) add(retreat(env, S));
     add(settle(env, S, 0.8));
+    if (!told && rec.story) {
+      const lines = String(rec.story).split(/(?<=[.!?])\s+(?=[A-Z"'])/).filter(Boolean), cl = P.clips.slice(1, -1);
+      lines.forEach((ln, i) => {
+        const c = i === 0 || !cl.length ? P.clips[0] : cl[Math.min(cl.length - 1, Math.floor(((i - 1) * cl.length) / Math.max(1, lines.length - 1)))];
+        says.push([c.t0 + 0.05 + (i === 0 ? 0 : 0.01 * i), ln]);
+      });
+    }
+    for (const [t, say] of says) P.events.push([t, "", 0, { say }]);
     P.events.sort((a, b) => a[0] - b[0]);
     return P;
   };

@@ -38,6 +38,13 @@
   const IRREGULAR = { hero: "heroes", party: "parties" };
   function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
   function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+  // as league/content/world_map.py floor_words: n counts from 1, and the last of several floors reads "the bottom floor" (of two) or "the deepest floor"
+  const FLOOR_ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  function floorOrd(n) { return FLOOR_ORD[n - 1] || `${n}th`; }
+  function floorWords(n, did, capital, deep = true) {
+    const t = ((S.dungeons || {})[did] || {}).floors || 0;
+    return `${capital ? "The" : "the"} ${deep && t > 1 && n >= t ? (t === 2 ? "bottom" : "deepest") : floorOrd(n)} floor`;
+  }
   // a crew's own exported possessive when there is one (party.poss), else as league/heroes.py poss: "The Mossy Cats'", "Brix's"
   function poss(s, pid) {
     const p = pid && parties[pid];
@@ -101,8 +108,9 @@
     cv.title = h.name;
     return cv;
   }
-  function monsterSprite(mid, scale, animate) {
-    const m = S.monsters[mid];
+  // look: a record naming the boss's generation (role, gen), so a successor is drawn as its own variant
+  function monsterSprite(mid, scale, animate, look) {
+    const m = Art.withLook(S.monsters[mid], look);
     return spriteCanvas((f) => Art.monsterGrid(m, f), scale || 2, "", animate);
   }
   function petSprite(pet, scale) { return spriteCanvas((f) => Art.petGrid(pet, f), scale || 3, "pet", true); }
@@ -145,6 +153,11 @@
     if (!h) return el("span", null, "someone");
     return el("a", { href: `#/hero/${id}`, class: opts && opts.cls }, h.name);
   }
+  // a hero's page opened on one day's hour by hour, while that day is kept in their daybook
+  function heroDayHref(id, day) {
+    const h = heroes[id];
+    return h && day && (day === L.meta.day || (h.daybook_days || []).includes(day)) ? `#/hero/${id}/diary/${day}` : `#/hero/${id}`;
+  }
   function partyLink(id) {
     const p = parties[id];
     return p ? el("a", { href: `#/party/${id}` }, p.name) : el("span", null, "a party");
@@ -171,7 +184,7 @@
 
   function nodeName(id, mid) {
     if (!id) return "";
-    const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || { name: id }).name;
+    const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || (S.layer_places || {})[id] || { name: id }).name;
     return mid && n.startsWith("The ") ? "the" + n.slice(3) : n;
   }
   function clsName(id) { return (S.classes[id] || { name: id }).name; }
@@ -253,8 +266,9 @@
   }
 
   // ---------- events ----------
+  // by the world day, never e.sday: a story written while a save was being upgraded carries the day before's season day (round 38)
   function dayLabel(e) {
-    return e.sday ? `S${e.season} · Day ${e.sday}` : when(e.day);
+    return when(e.day);
   }
   const SHARE_KINDS = new Set(["showdown", "pvp", "rescue", "boss_kill", "boss", "death", "evolve", "keystone", "legend", "vow_kept", "epithet", "race_won", "funeral"]);
   function shareBtn(text, hash, msg) {
@@ -282,7 +296,9 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     const jump = (movesOf[e.id] || []).filter((m) => heroes[m.hero] || parties[m.party]);
     const chips = jump.slice(0, 3).map((m) => el("span", { class: "jump", title: `${m.from ? ordinal(m.from) : "unranked"} to ${ordinal(m.to)}` },
       `${heroes[m.hero] ? heroes[m.hero].name : parties[m.party].name} +${m.gain}${m.to < m.from ? " ▲" + (m.from - m.to) : ""}`));
-    return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}` }, who,
+    const marks = opts.mark && (opts.mark instanceof Set ? opts.mark : mineSet());
+    const pinned = marks && (e.heroes || []).some((id) => marks.has(id));
+    return el("li", { class: `ev imp${e.imp}${ks ? " keystone" : ""}${pinned ? " pinned" : ""}` }, who,
       el("div", { class: "body" }, el("div", { class: "text" }, storyText(e.text), fightLink ? " " : "", fightLink),
         chips.length ? el("div", { class: "jumps" }, chips) : null,
         el("div", { class: "meta" }, tag ? el("span", { class: "ks-tag" }, tag) : null, tag && meta.length ? " · " : null, meta.map((x, i) => [i ? " · " : "", x]), share ? [" ", share] : null)));
@@ -299,9 +315,14 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   function feed(list, opts) {
     const ul = el("ul", { class: "feed" });
     let lastDay = null;
+    // a renown jump already rides as chips on the story that caused it, so in the same list it isn't told a second time
+    const ids = new Set(list.map((e) => e.id));
+    list = list.filter((e) => !(e.kind === "big_move" && e.cause && ids.has(e.cause) && (movesOf[e.cause] || []).length));
+    if (opts && opts.mark && !(opts.mark instanceof Set)) opts = Object.assign({}, opts, { mark: mineSet() });
     for (const e of list) {
       if (opts && opts.dayHeaders && e.day !== lastDay) {
-        ul.appendChild(el("li", { class: "daydiv" }, e.sday ? `Season ${e.season} · Day ${e.sday}` : when(e.day)));
+        const [s, d] = seasonOf(e.day);
+        ul.appendChild(el("li", { class: "daydiv" }, `Season ${s} · Day ${d}`));
         lastDay = e.day;
       }
       ul.appendChild(eventRow(e, Object.assign({ noDay: opts && opts.dayHeaders }, opts)));
@@ -337,8 +358,32 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
       document.head.appendChild(s);
     }))), Promise.resolve());
   }
+  // the heavy drawing and sound files load with the first page that uses them (eval #92), in this order: the place headers before the
+  // tavern and camp that stand in them, the tavern before the ballad stage
+  const PLACES = ["town_scenes", "wild_scenes", "isle_scenes"];
+  const STAGE = PLACES.concat(["mount_art", "tavern", "camp", "ballad"]);
+  const SONG = STAGE.concat(["music"]);
+  // a part of a page whose file isn't in yet: an empty slot now, swapped for the drawing once the file loads (nothing draws before it)
+  function later(names, make) {
+    const slot = document.createElement("span");
+    slot.className = "later";
+    need(names).then(() => { let out = null; try { out = make(); } catch (e) { console.error(e); } if (out) slot.replaceWith(out); else slot.remove(); },
+      (e) => { console.error(e); slot.remove(); });
+    return slot;
+  }
+  // a story vignette: a song is staged on the ballad stage, a dungeon framed from its own header; anything else draws now
+  function vignette(e, W, H, cls) {
+    const make = () => { const c = Scenes.vignette(e, W, H); if (cls) c.className = cls; return c; };
+    const names = e.kind === "song" && S.towns[e.loc] ? PLACES.concat(["tavern", "music", "ballad"])
+      : S.dungeons[e.loc] ? (["boss", "boss_kill"].includes(e.kind) ? PLACES.concat(["deaths"]) : PLACES) : e.kind === "mount" ? ["mount_art"] : null;
+    return names ? later(names, make) : make();
+  }
   // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
   const ROAD_ART = ["road_scenes", "road_art"];
+  // a town day's scenes: the sets, the acts and the player (and what they draw with), loaded with the first town day a page draws
+  const TOWN_ART = STAGE.concat(["road_scenes", "road_art", "scene_kits", "stage", "town_day_sets", "town_day_sets_b", "town_day_sets_c", "town_day_sets_e", "town_day_flat", "town_day_flat_sets", "town_day_flat_sets_b", "town_day_acts", "town_day_replay"]);
+  // a hunt day's acts on the wilds' own ground, with the game and the hunt's props
+  const HUNT_ART = ["road_scenes", "road_art", "scene_kits", "stage", "hunt_art", "hunt_scenes"];
   // the art and the road cast (data/road_cast.js: travellers' looks and the places) arrive together
   function roadArt(names) {
     return Promise.all([need(names || ROAD_ART), S.road ? null : load("road_cast").then((c) => { S.road = c; })]);
@@ -348,6 +393,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   function mine() {
     try { const v = JSON.parse(localStorage.getItem("al.mine") || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch (e) { return []; }
   }
+  function mineSet() { return new Set(mine()); }
   function setMine(ids) { try { localStorage.setItem("al.mine", JSON.stringify(ids)); } catch (e) { /* storage unavailable */ } }
   function toggleMine(id) {
     const m = mine();
@@ -403,8 +449,15 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // ---------- router ----------
   const routes = [];
   function route(re, fn) { routes.push([re, fn]); }
+  // a page that draws with lazily loaded files names them here, and is drawn once they are in
+  const NEEDS = [];
+  function needs(re, names) { NEEDS.push([re, names]); }
   // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
-  const LAZY = [[/^\/dungeon\//, ["js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/dungeon_map_iso.js", "js/views_dungeon.js"], ["css/dungeon.css"]]];
+  const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
+    [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
+    // the replay pages (replay.js) and everything their players stand on
+    [/^\/(fight|night|meal|catch|road|reading|table|day)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
+      "js/music.js", "js/replay.js"], []]];
   const lazyLoaded = new Set();
   function lazy(hash) {
     const hit = LAZY.find(([re]) => re.test(hash));
@@ -412,34 +465,45 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     lazyLoaded.add(hit);
     const v = window.AL_V ? `?v=${window.AL_V}` : "";
     for (const href of hit[2]) document.head.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: href + v }));
-    let left = hit[1].length;
-    for (const src of hit[1]) {
-      const s = document.createElement("script");
-      s.src = src + v;
-      // in order: later page files build on the earlier ones
-      s.async = false;
-      s.onload = () => { if (--left === 0) render(); };
-      s.onerror = () => { console.error("could not load " + src); };
-      document.body.appendChild(s);
-    }
+    // in order, and never twice: later page files build on the earlier ones, and a page may already have loaded some
+    need(hit[1].map((src) => src.replace(/^js\/|\.js$/g, ""))).then(render, (e) => console.error(e));
     return true;
+  }
+  // a deep page lights the tab it belongs under; a replay keeps the tab the reader came from
+  const TAB_OF = [[/^\/(hero|roster)(\/|$)/, "/roster"], [/^\/(party|parties)(\/|$)/, "/parties"], [/^\/(map|dungeon|places)(\/|$)/, "/map"],
+    [/^\/(days?|digest)(\/|$)/, "/"], [/^\/(finale|history)(\/|$)/, "/history"], [/^\/songs(\/|$)/, "/songs"], [/^\/guide(\/|$)/, "/guide"], [/^\/(event|world)(\/|$)/, "/world"],
+    [/^\/replays(\/|$)/, "/replays"]];
+  const REPLAY = /^\/((fight|night|meal|catch|road|reading|table)\/|day\/\w*[a-z]\w*\/\d+\/\d+$)/;
+  let navTab = "/";
+  function lightNav(hash) {
+    const links = [...document.querySelectorAll("#nav a")], has = (t) => links.some((a) => a.getAttribute("href") === "#" + t);
+    let tab;
+    if (REPLAY.test(hash)) tab = navTab;
+    else if (/^\/annals/.test(hash)) tab = has("/annals") ? "/annals" : "/history";
+    else {
+      const hit = TAB_OF.find(([re]) => re.test(hash));
+      tab = hit ? hit[1] : hash === "/" ? "/" : "/" + hash.split("/")[1];
+    }
+    if (!has(tab)) tab = REPLAY.test(hash) ? "/" : tab;
+    navTab = tab;
+    for (const a of links) a.classList.toggle("on", a.getAttribute("href") === "#" + tab);
+    const more = document.getElementById("nav-more");
+    if (more) more.classList.toggle("on", links.some((a) => a.classList.contains("on") && a.closest(".nav-more-list")));
   }
   function render() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const view = document.getElementById("view");
     if (window.Music) Music.stop();
     if (window.Sound) Sound.setPage(hash);
-    for (const a of document.querySelectorAll("#nav a")) {
-      const target = a.getAttribute("href").slice(1);
-      a.classList.toggle("on", target === "/" ? hash === "/" : hash.startsWith(target));
-    }
+    lightNav(hash);
     for (const [re, fn] of routes) {
       const m = hash.match(re);
       if (m) {
         view.innerHTML = "";
         animated.clear();
         try {
-          const out = fn(view, ...m.slice(1));
+          const want = NEEDS.filter(([re2]) => re2.test(hash)).flatMap(([, n]) => n);
+          const out = want.length ? need(want).then(() => fn(view, ...m.slice(1))) : fn(view, ...m.slice(1));
           if (out && out.catch) out.catch((err) => { view.appendChild(el("p", { class: "red" }, "Couldn't load that page: " + err.message)); });
         } catch (err) {
           console.error(err);
@@ -461,6 +525,10 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     }
     const meta = L.meta;
     document.title = meta.name;
+    // the season theme dresses the whole site (web/css/app.css keys a skin on these: the Long Night's lamplit parchment while its sky is dark)
+    const root = document.documentElement;
+    root.dataset.themeId = meta.phase === "season" && meta.theme ? meta.theme.id : "";
+    if (meta.sky) root.dataset.sky = meta.sky; else delete root.dataset.sky;
     document.getElementById("brand-name").textContent = meta.name;
     const icon = document.getElementById("brand-icon");
     const anyHero = L.heroes.find((h) => h.alive) || L.heroes[0];
@@ -468,7 +536,16 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     if (L.annals && !document.querySelector('#nav a[href="#/annals"]')) {
       const a = document.createElement("a");
       a.href = "#/annals"; a.textContent = "Annals"; a.className = "annals-link";
-      document.getElementById("nav").insertBefore(a, document.querySelector('#nav a[href="#/guide"]'));
+      const guide = document.querySelector('#nav a[href="#/guide"]');
+      guide.parentNode.insertBefore(a, guide);
+    }
+    // the phone nav is one row of five and a "More" menu (round 38); on a desktop the menu's links sit in the row
+    const more = document.getElementById("nav-more"), nav = document.getElementById("nav");
+    if (more) {
+      const shut = () => { nav.classList.remove("more-open"); more.setAttribute("aria-expanded", "false"); };
+      more.addEventListener("click", (e) => { e.stopPropagation(); const open = nav.classList.toggle("more-open"); more.setAttribute("aria-expanded", String(open)); });
+      document.addEventListener("click", (e) => { if (!more.contains(e.target)) shut(); });
+      window.addEventListener("hashchange", shut);
     }
     const clock = document.getElementById("clock");
     if (meta.phase === "preseason") clock.innerHTML = `<b>Preseason</b> · ${plural(L.pending.length, "hero")} signed up`;
@@ -483,7 +560,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
 
   window.App = {
     LD, L, S, heroes, parties, events, el, esc, plural, cap, heroSprite, heroPortrait, monsterSprite, petSprite, bannerSprite, itemSprite, heroLink, partyLink,
-    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, ROAD_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
-    animated, money, coins, tableLink, poss, placeHref,
+    nodeName, clsName, richText, storyText, storyLine, storyLink, storyHref, kept, eventRow, feed, load, need, needs, later, vignette, PLACES, STAGE, SONG, ROAD_ART, TOWN_ART, HUNT_ART, roadArt, mine, toggleMine, toast, copy, shareUrl, shareBtn, bar, heroCard, route, start, heroLook, legendFigure, spriteCanvas, when,
+    animated, money, coins, tableLink, poss, placeHref, floorWords, floorOrd, seasonOf, heroDayHref, mineSet,
   };
 })();

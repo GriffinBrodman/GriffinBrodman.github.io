@@ -1,6 +1,7 @@
 /* Talking text: lines float over a scene as outlined pixel text, revealed word by word with a voice blip per syllable,
    inline effects ({slam}WHAT{/}, {whisper}, {shake}, {wave}, {drawl}, {em}, {fast}, {beat}, {heart}, {!}, {?}, {note}),
-   and animals that answer in their own sounds. Scenes stage it through Tavern.talk; the sound itself is Sound.blip/critter. */
+   and animals that answer in their own sounds (or, in a line opening {talk}, in words with a voice preset of their own). Scenes stage it
+   through Tavern.talk; the sound itself is Sound.blip/critter. */
 (function () {
   "use strict";
   const pref = (k, d) => (window.Settings ? Settings.get(k) : d);
@@ -121,6 +122,25 @@
     return `${hit ? hit[1] : b.say} ${t}`;
   }
   function pat(a) { const b = beastOf(a); return b ? b.pat : "{heart}"; }
+  // a season the beasts can talk (The Year the Beasts Spoke): a line that opens with {talk} is said in words, in the animal's own voice preset,
+  // with its call first; the preset is shaded per animal by its name, as a hero's voice is by its id
+  const BEAST_VOICE = {
+    dog: { timbre: "buzzy", pitch: 62, rate: 1.14, formant: 1.0, jit: 0.7 }, cat: { timbre: "soft", pitch: 69, rate: 0.9, formant: 1.16, jit: 0.3, vib: 0.3 },
+    lizard: { timbre: "soft", pitch: 50, rate: 0.66, formant: 0.86, jit: 0.15 }, wolf: { timbre: "buzzy", pitch: 47, rate: 0.9, formant: 0.8, jit: 0.4 },
+    falcon: { timbre: "chirpy", pitch: 76, rate: 1.28, formant: 1.22, jit: 0.9 }, eagle: { timbre: "chirpy", pitch: 62, rate: 1.0, formant: 1.05, jit: 0.5 },
+    horse: { timbre: "buzzy", pitch: 46, rate: 0.95, formant: 0.82, jit: 0.5, vib: 0.2 }, donkey: { timbre: "buzzy", pitch: 57, rate: 1.0, formant: 0.9, jit: 1.2 },
+    ox: { timbre: "soft", pitch: 40, rate: 0.68, formant: 0.78, jit: 0.2 }, camel: { timbre: "buzzy", pitch: 50, rate: 0.82, formant: 0.86, jit: 0.5, vib: 0.5 },
+    unicorn: { timbre: "chirpy", pitch: 72, rate: 0.9, formant: 1.15, jit: 0.2, vib: 0.8 }, skeleton: { timbre: "buzzy", pitch: 44, rate: 0.85, formant: 0.75, jit: 1.6 },
+    kelpie: { timbre: "soft", pitch: 55, rate: 0.95, formant: 0.95, jit: 0.4, vib: 0.6 }, stag: { timbre: "soft", pitch: 51, rate: 0.82, formant: 0.88, jit: 0.2, vib: 0.3 },
+  };
+  BEAST_VOICE.pony = Object.assign({}, BEAST_VOICE.horse, { pitch: 55, rate: 1.1 });
+  BEAST_VOICE.courser = Object.assign({}, BEAST_VOICE.horse, { rate: 1.15 });
+  BEAST_VOICE.destrier = Object.assign({}, BEAST_VOICE.horse, { pitch: 42, rate: 0.85 });
+  const TALK_TAG = /^\s*\{talk\}/;
+  function beastVoice(a, b) {
+    const base = BEAST_VOICE[b.kind] || BEAST_VOICE.dog, r = rngOf(hash("beastvoice:" + (a.name || b.kind)));
+    return Object.assign({ vib: 0 }, base, { pitch: base.pitch + (r() - 0.5) * 5, rate: base.rate * (0.94 + r() * 0.12) });
+  }
 
   // ---------- pixel icons that pop inside a line ----------
   const ICON_ROWS = {
@@ -171,6 +191,7 @@
   function voice(w, p, i, n, v, beast, line) {
     if (!window.Sound || !Sound.talking || !w.parts) return;
     const fx = fxOf(w), instant = p.dur === 0;
+    if (line.kin && i === 0 && !fx.has("act")) Sound.critter(line.kin.call, { vol: 0.7, pitch: line.kin.pitch || 1 });
     if (beast) {
       if (fx.has("act")) return;
       const low = w.text.toLowerCase(), hit = beast.calls.find(([re]) => re.test(low));
@@ -282,9 +303,9 @@
         if (!text) { if (done) done(); return; }
         for (const l of lines.slice()) if (l.a === a) drop(l);
         while (lines.length >= 3) drop(lines[0]);
-        const beast = beastOf(a), v = voiceOf(a), fxOn = pref("effects", true);
+        const kin = beastOf(a), talks = !!kin && TALK_TAG.test(text), beast = talks ? null : kin, v = talks ? beastVoice(a, kin) : voiceOf(a), fxOn = pref("effects", true);
         const words = parse(beast ? beastLine(beast, text) : text, fxOn);
-        const node = el("div", "say" + (a.keeper ? " keeper" : "") + (beast ? " pet" : "") + (a.focus ? " focus" : ""));
+        const node = el("div", "say" + (a.keeper ? " keeper" : "") + (kin ? " pet" : "") + (talks ? " talks" : "") + (a.focus ? " focus" : ""));
         node.style.setProperty("--c", tint(a));
         const who = el("b", "say-who", a.name || "");
         const txt = el("span", "say-txt"), nodes = words.map(wordEl);
@@ -293,7 +314,7 @@
         box.append(node);
         const p = plan(words, v, beast), n = words.filter((w) => w.parts).length;
         const pinned = secs >= 999 || (secs == null && calm());
-        const l = { a, node, words, nodes, plan: p, v, beast, next: 0, t0: clock(), done: done || null, pitch: beast ? 0.85 + (hash(a.name || "") % 40) / 100 : 1,
+        const l = { a, node, words, nodes, plan: p, v, beast, kin: talks ? kin : null, next: 0, t0: clock(), done: done || null, pitch: beast ? 0.85 + (hash(a.name || "") % 40) / 100 : 1,
           bang: /!\s*$/.test(strip(text)), hold: pinned ? Infinity : Math.min(4.8, Math.max(1.8, 1.1 + n * 0.14)) };
         lines.push(l);
         T.place();
@@ -356,5 +377,5 @@
     return T;
   }
 
-  window.Speech = { layer, parse, strip, voiceOf, beastOf, pat, plan, BEASTS };
+  window.Speech = { layer, parse, strip, voiceOf, beastOf, pat, plan, BEASTS, BEAST_VOICE, beastVoice };
 })();

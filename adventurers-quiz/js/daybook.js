@@ -116,6 +116,13 @@
     // a squared milestone with a cap stone and its mileage cut in, never a rounded headstone
     milestone: [".aaaaaaaaaaa..", ".aSSSSSSSSSa..", ".aaaaaaaaaaa..", "..aSssssssAa..", "..aSqqqsssAa..", "..aSssqsssAa..", "..aSsqssssAa..",
       "..aSsqssssAa..", "..aSssssssAa..", "..aSqqqqqsAa..", "..aSsssqssAa..", "..aSssssssAa..", ".EeEeeEeEeEe.."],
+    // a town day's own stretches (league/town_day.py): the sun up over the bed, a steaming bowl, a mug by candlelight
+    wake: ["..........gg..", ".........gyyg.", "..........gg..", "W.............", "W.............", "Whhh..........", "Whhhrrrrrrrrrr", "WrrrrrrrrrrrrR",
+      "WRRRRRRRRRRRRR", "WWWWWWWWWWWWWW", "W............W"],
+    breakfast: ["...1...1......", "....1...1.....", "...1...1......", "..........s...", ".........s....", "..PPPPPPPPP...", ".PoooooooooP..", "PPPPPPPPPPPPP.",
+      ".PWWWWWWWWWP..", "..PWWWWWWWP...", "...PPPPPPP...."],
+    evening: ["..........y...", ".........yoy..", "..........o...", "..hh.hh...h...", ".hhhhhhh.hhh..", ".dWggggd.hhh..", ".dWggggdddhh..", ".dWggggd.dhh..",
+      ".dWggggdd.hh..", ".dWggggd..hh..", ".dGGGGGd.WWWW.", "..ddddd......."],
     traveller: [".....nnn....W.", "....nnfnn...W.", "....nfffn...W.", ".....fff....W.", "....nnnnn..fW.", "...nnnnnnnn.W.", "...nnnnnn...W.",
       "....nnnn....W.", "....nnnn....W.", "....n..n....W.", "....n..n....W.", "...dd..dd...w."],
   };
@@ -170,6 +177,39 @@
       for (let x = 2; x <= 10; x++) g.set(x, 7, PAL.W);
       g.set(13, 7, PAL.S); g.set(12, 7, PAL.s); g.set(11, 7, PAL.s); g.set(11, 6, PAL.s); g.set(11, 8, PAL.s); g.set(12, 6, PAL.S); g.set(12, 8, PAL.z);
       g.set(2, 6, PAL.r); g.set(3, 6, PAL.r); g.set(2, 8, PAL.R); g.set(3, 8, PAL.R);
+    },
+    // a hunt's hours each keep their own glyph: a trail of cloven prints for reading sign, an eye over the bracken for the stalk,
+    // a knife over a stretched hide for dressing the kill, a limping crutch for the way back
+    hunt_sign(g) {
+      const print = (x, y) => { for (const [dx, dy, c] of [[0, 0, "W"], [2, 0, "W"], [0, 1, "d"], [2, 1, "d"], [0, 2, "d"], [2, 2, "d"], [-1, 1, "n"], [3, 1, "n"], [-1, 2, "n"], [3, 2, "n"], [0, 3, "n"], [2, 3, "n"]]) g.set(x + dx, y + dy, PAL[c]); };
+      print(1, 10); print(5, 6); print(9, 2);
+      g.set(12, 0, PAL.W); g.set(13, 0, PAL.w);
+    },
+    hunt_stalk(g) {
+      for (let x = 1; x <= 12; x++) for (let y = 1; y <= 7; y++) {
+        const dx = (x - 6.5) / 5.6, dy = (y - 4) / 3.2, d = dx * dx + dy * dy;
+        if (d > 1) continue;
+        const r = Math.hypot(x - 6.5, (y - 4) * 1.1);
+        g.set(x, y, d > 0.72 ? PAL.q : r < 1.2 ? PAL.q : r < 2.4 ? (y < 4 ? PAL.e : PAL.E) : PAL.h);
+      }
+      g.set(6, 3, PAL.h);
+      for (let x = 0; x < 14; x++) { const hgt = 3 + ((x * 5) % 4); for (let k = 0; k < hgt; k++) g.set(x, 13 - k, k === hgt - 1 ? PAL.l : (x + k) % 2 ? PAL.e : PAL.E); }
+    },
+    hunt_dress(g) {
+      for (let y = 2; y <= 12; y++) for (let x = 1; x <= 11; x++) {
+        const dx = (x - 6) / 4.8, dy = (y - 7) / 4.6;
+        if (dx * dx + dy * dy <= 1) g.set(x, y, dx * dx + dy * dy < 0.35 ? PAL.P : y < 6 ? PAL.W : PAL.w);
+      }
+      for (const [x, y] of [[1, 2], [11, 2], [1, 12], [11, 12]]) g.set(x, y, PAL.w);
+      for (let i = 0; i < 6; i++) { g.set(7 + i, 7 - i, PAL.S); g.set(8 + i, 7 - i, PAL.s); }
+      g.set(6, 8, PAL.d); g.set(5, 9, PAL.d); g.set(4, 10, PAL.n); g.set(5, 10, PAL.d);
+    },
+    hunt_retreat(g) {
+      for (let y = 2; y <= 13; y++) g.set(6, y, PAL.W);
+      for (let y = 2; y <= 13; y++) g.set(7, y, PAL.w);
+      for (let x = 3; x <= 10; x++) { g.set(x, 1, PAL.W); g.set(x, 2, PAL.n); }
+      for (let x = 5; x <= 8; x++) g.set(x, 8, PAL.n);
+      for (let y = 4; y <= 6; y++) { g.set(10, y, PAL.h); g.set(11, y, PAL.h); g.set(12, y, PAL.r); }
     },
     fair(g) {
       g.vline(6, 0, 3, PAL.W); g.set(7, 0, PAL.r); g.set(8, 0, PAL.r); g.set(7, 1, PAL.r);
@@ -232,7 +272,7 @@
   }
   const ICONS = {}, NIGHT = {};
   for (const [k, rows] of Object.entries(ART)) ICONS[k] = make(rows);
-  for (const k of ["spar", "hunt", "fair", "auction"]) ICONS[k] = make(FN[k]);
+  for (const k of ["spar", "hunt", "fair", "auction", "hunt_sign", "hunt_stalk", "hunt_dress", "hunt_retreat"]) ICONS[k] = make(FN[k]);
   ICONS.song = ICONS.busk;
   const EXTRA = { compass: make(FN.compass), moon: make(FN.moon), sun: make(FN.sun) };
   const NIGHT_ICON = { inn: "bed", room: "key", stable: "hay", cell: "bars", dungeon: "torch", road: "bedroll" };
@@ -248,15 +288,17 @@
     infirmary: "Infirmary", bath: "Bathhouse", fishing: "Fishing", dice: "Dice", bakery: "Bakery", pet: "With the pet", mount: "With the mount",
     crew: "With the crew", meet: "A meeting", spar: "Sparring", odd_request: "Odd request", fair: "The fair", yeti: "Yeti!", auction: "Auction",
     event: "Town event", song: "Music", wander: "Wandering", carousing: "Carousing", hunt: "Hunting", delve: "Delving", camp: "Camp",
+    wake: "Waking up", breakfast: "Breakfast", evening: "The evening",
     halt: "Midday halt", road_event: "On the road", inn: "The inn", shrine: "A shrine", toll: "The toll", ferry: "The crossing", ford: "The ford", milestone: "A landmark", traveller: "A traveller",
   };
   const KINDS = { inn: "At the inn", camp: "At camp", stable: "In the stables", room: "A rented room", dungeon: "Below ground", cell: "In the cells", road: "By the roadside" };
   const CAT = {
     road: "road", arrive: "road", depart: "road", wander: "road", camp: "road",
     halt: "road", road_event: "road", inn: "road", shrine: "road", toll: "road", ferry: "road", ford: "road", milestone: "road", traveller: "road",
+    wake: "town", breakfast: "town", evening: "town",
     errands: "town", bakery: "town", bath: "town", dice: "town", fair: "town", auction: "town", event: "town", carousing: "town", meet: "town", odd_request: "town", busk: "town", song: "town",
     work: "craft", labour: "craft", forge: "craft", brew: "craft", study: "craft", forage: "craft", fishing: "craft", rest: "craft",
-    train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms",
+    train: "arms", trainer: "arms", spar: "arms", hunt: "arms", delve: "arms", yeti: "arms", hunt_sign: "arms", hunt_stalk: "arms", hunt_dress: "arms", hunt_retreat: "arms",
     service: "church", confession: "church", blessing: "church", poorhouse: "church", church_work: "church", infirmary: "church",
     graverob: "shady", pickpocket: "shady",
     pet: "kin", mount: "kin", crew: "kin",
@@ -306,19 +348,22 @@
     for (const [k, v] of SKY) if (t >= k) c = v;
     return c;
   }
-  let hillsUrl = null, starsUrl = null;
-  function hills() {
-    if (hillsUrl) return hillsUrl;
-    const g = new Grid(40, 7), far = "#a9b98a", near = "#8aa070";
+  const hillsUrl = {};
+  let starsUrl = null;
+  // night: the hills under a theme's dark sky, in the moon's colours
+  function hills(night) {
+    const key = night ? "night" : "day";
+    if (hillsUrl[key] !== undefined) return hillsUrl[key];
+    const g = new Grid(40, 7), far = night ? "#3a5a48" : "#a9b98a", near = night ? "#2e4a3c" : "#8aa070", tree = night ? "#22382c" : "#5f7a4c";
     for (let x = 0; x < 40; x++) {
       const a = Math.round(3 + 2 * Math.sin(x / 40 * Math.PI * 2) + Math.sin(x / 40 * Math.PI * 6) * 0.8);
       const b = Math.round(4.6 + 1.6 * Math.sin((x + 13) / 40 * Math.PI * 4));
       for (let y = a; y < 7; y++) g.set(x, y, far);
       for (let y = b; y < 7; y++) g.set(x, y, near);
     }
-    for (const x of [6, 7, 23, 31]) { g.set(x, 3, "#5f7a4c"); g.set(x, 4, "#5f7a4c"); }
-    try { hillsUrl = g.toCanvas(1).toDataURL(); } catch (e) { hillsUrl = ""; }
-    return hillsUrl;
+    for (const x of [6, 7, 23, 31]) { g.set(x, 3, tree); g.set(x, 4, tree); }
+    try { hillsUrl[key] = g.toCanvas(1).toDataURL(); } catch (e) { hillsUrl[key] = ""; }
+    return hillsUrl[key];
   }
   function stars() {
     if (starsUrl) return starsUrl;
@@ -335,11 +380,22 @@
   // names in a line link to their pages when the site is around it (a gallery page draws the daybook alone)
   const txt = (s) => (window.App && App.storyText ? App.storyText(s) : s);
   // the fights of a stretch of the day, each linked to its replay while it is kept
+  // a town stretch plays as its scene on its own page (#/day/hero/day/block) while its day's file is kept
+  // and an hour of a hunt plays as its act on the wild's strip, the same way
+  const hunting = (b) => b.act === "hunt" && !!b.stretch;
+  // each phase of a hunt has its own icon (the bow is the quarry, crossed blades when the quarry turned into a fight)
+  const HUNT_ICON = { sign: "hunt_sign", stalk: "hunt_stalk", quarry: "hunt", forage: "forage", dress: "hunt_dress", camp: "camp", walk: "wander", retreat: "hunt_retreat" };
+  const huntIcon = (b) => (b.fought ? "spar" : HUNT_ICON[b.stretch] || "hunt");
+  function townLink(b) {
+    if (!(b.scene || hunting(b)) || b.wday == null || !b.hero || !window.App) return null;
+    return [" ", h("a", { class: "watch", href: `#/day/${b.hero}/${b.wday}/${b.i}` }, "▶ watch")];
+  }
   function fightLinks(b) {
     const own = b.ref && window.App ? App.storyLink(b.ref) : null;
     const room = roomLink(b);
     if (own) return [" ", own, room];
     if (b.rec && kept("road", b.rec)) return [" ", h("a", { class: "watch", href: `#/road/${b.rec}` }, "▶ watch")];
+    if (b.scene || (hunting(b) && !b.fought)) return townLink(b) || [];
     if (room) return [room, ...fightIds(b)];
     return fightIds(b);
   }
@@ -358,7 +414,10 @@
     opts = opts || {};
     if (!db) return null;
     const ev = db.evening && (db.evening.kind || db.evening.line) ? db.evening : null;
-    const list = (db.blocks || []).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
+    // a day under a theme's dark sky (db.sky: the hours the sim drew it at) keeps the clock but paints the sky after dusk, with a moon
+    const lit = (t) => (db.sky ? Math.max(20, db.sky.from + (Math.min(24, Math.max(6, t)) - 6) / 18 * (db.sky.to - db.sky.from)) : t);
+    // each block knows its place in the day's file and its hero, so a town stretch can link its scene
+    const list = (db.blocks || []).map((b, i) => (b && (b.scene || hunting(b)) ? Object.assign({}, b, { i, wday: db.wday, hero: opts.hero }) : b)).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
     if (!list.length && !ev) return null;
     const id = "db" + ++uid;
     const start = Math.floor(Math.min(6, ...list.map((b) => b.from))), end = Math.ceil(Math.max(18, ...list.map((b) => b.to)));
@@ -372,7 +431,7 @@
       if (to <= from) return;
       cursor = to;
       // a town event and a happening on the road share the act; the road's gets the boot, not the fair's gold star
-      const act = b.stretch && b.act === "event" ? "road_event" : b.act, label = b.label || LABELS[act] || (act ? act.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Busy");
+      const act = b.stretch && b.act === "event" ? "road_event" : hunting(b) ? huntIcon(b) : b.act, label = b.label || LABELS[act] || (act ? act.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Busy");
       const parts = spanParts(from, to), when = parts.join("–"), mid = (from + to) / 2, tipId = `${id}-t${i}`;
       const say = b.line || label;
       const cap = h("li", { class: "db-cap" }, icon(act, 1), h("b", { class: "db-when" }, when),
@@ -383,7 +442,7 @@
       const li = h("li", {
         class: "db-b" + (right ? " db-r" : "") + (to - from <= 1 ? " db-short" : ""),
         "data-act": act || "", "data-cat": CAT[act] || "misc",
-        style: { gridColumn: `${Math.round((from - start) * 2) + 1} / ${Math.max(Math.round((from - start) * 2) + 2, Math.round((to - start) * 2) + 1)}`, "--h": String(to - from), "--sky": sky(mid) },
+        style: { gridColumn: `${Math.round((from - start) * 2) + 1} / ${Math.max(Math.round((from - start) * 2) + 2, Math.round((to - start) * 2) + 1)}`, "--h": String(to - from), "--sky": sky(lit(mid)) },
         onmouseenter: () => cap.classList.add("on"), onmouseleave: () => cap.classList.remove("on"),
       },
       h("div", { class: "db-gut", "aria-hidden": "true" }, h("span", { class: "db-gut-t" }, clock(from)), h("span", { class: "db-gut-to" }, "to " + clock(to)),
@@ -397,14 +456,26 @@
       h("span", { class: "db-tip", role: "tooltip", id: tipId }, h("b", null, label), h("i", null, ` ${when} · ${hours(to - from)}`), h("br"), say === label ? null : say));
       // a road stretch gets its still road strip behind the line when the road art is loaded (road_scenes.js)
       // and the town errands after a road day get the street at the town's edge, so the day's last tile isn't a bare box
-      const roadDay = roadOf || null, street = !b.stretch && roadDay && CAT[act] === "town" && from >= roadDay.to;
-      if ((b.stretch || street) && window.RoadScenes && RoadScenes.strip) {
+      const roadDay = roadOf || null, street = !b.stretch && !b.scene && roadDay && CAT[act] === "town" && from >= roadDay.to;
+      // an hour of a hunt acts out its own act on the wild's ground (hunt_scenes.js, loaded with the first hunt day)
+      if (hunting(b) && window.HuntScenes) {
+        let strip = null;
+        try { strip = HuntScenes.strip(b, { hero: (window.App && App.heroes || {})[opts.hero] || (opts.heroes || [])[0], band: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 }); } catch (e) { if (window.console) console.error(e); }
+        if (strip) li.append(strip);
+      } else if ((b.stretch || street) && window.RoadScenes && RoadScenes.strip) {
         const base = b.stretch ? b : { stretch: "town", biome: roadDay.biome, weather: roadDay.weather, line: b.line };
         const dressed = RoadScenes.dress ? RoadScenes.dress(Object.assign({}, base, { seed: db.day })) : {};
-        const strip = RoadScenes.strip(Object.assign({ biome: base.biome, hour: from, weather: base.weather, place_kind: b.place_kind, heroes: opts.heroes || [] }, dressed),
+        const strip = RoadScenes.strip(Object.assign({ biome: base.biome, hour: b.hour != null ? b.hour : from, weather: base.weather, place_kind: b.place_kind, heroes: opts.heroes || [] }, dressed),
           // the canvas grows with the stretch, so a long tile shows more road at the same pixel size rather than a bigger band
           { heroes: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 });
         if (strip) { strip.classList.add("road-strip"); li.append(strip); }
+      }
+      // a town stretch gets its scene along the tile's foot, the act looping on its set (town_day_replay.js, loaded with the first town day)
+      if (b.scene && window.TownDay && TownDay.strip) {
+        let strip = null;
+        // a scene that can't be drawn leaves the tile as it was, never the day
+        try { strip = TownDay.strip(b, { hero: (window.App && App.heroes || {})[opts.hero] || (opts.heroes || [])[0], heroes: window.App && App.heroes, w: Math.round(Math.max(160, Math.min(320, (to - from) * 110))), h: 64, phase: i * 0.7 }); } catch (e) { if (window.console) console.error(e); }
+        if (strip) { strip.classList.add("town-strip"); li.append(strip); }
       }
       rows.push(li);
     });
@@ -416,11 +487,11 @@
       if (major) ticks.append(h("span", { class: "db-rl" + (NAMES[t] ? " db-name" : "") + (t === start ? " db-first" : t === end ? " db-last" : ""), style: { left: pct(t) + "%" } }, NAMES[t] || clock(t)));
     }
     const stops = [];
-    for (let t = start; t < end; t++) stops.push(`${sky(t + 0.5)} ${pct(t)}% ${pct(t + 1)}%`);
+    for (let t = start; t < end; t++) stops.push(`${sky(lit(t + 0.5))} ${pct(t)}% ${pct(t + 1)}%`);
     const noon = pct(start <= 12 && end >= 12 ? 12 : (start + end) / 2);
-    const skyEl = h("div", { class: "db-sky", "aria-hidden": "true", style: { backgroundImage: `${hills() ? `url(${hills()}),` : ""} linear-gradient(90deg, ${stops.join(", ")})` } });
+    const skyEl = h("div", { class: "db-sky", "aria-hidden": "true", style: { backgroundImage: `${hills(!!db.sky) ? `url(${hills(!!db.sky)}),` : ""} linear-gradient(90deg, ${stops.join(", ")})` } });
     skyEl.innerHTML = `<svg class="db-arc" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0,40 Q${noon},-24 100,40" fill="none" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke"/></svg>`;
-    const sun = icon("sun", 2);
+    const sun = icon(db.sky ? "moon" : "sun", 2);
     sun.classList.add("db-sun");
     sun.style.left = noon + "%";
     skyEl.append(sun);

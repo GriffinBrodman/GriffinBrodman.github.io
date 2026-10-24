@@ -1,7 +1,7 @@
 /* The Guide page (#/guide). */
 (function () {
   const A = App;
-  const { S, el } = A;
+  const { L, S, el } = A;
   const { panel } = Views;
 
   const GUIDE = [
@@ -22,20 +22,23 @@
       ["Classes", "Everyone starts as a Warrior, Ranger or Mage. At level 9 a hero becomes the class their story points to: the skills they've learned count most, then what they do in fights, the work they take and what happens to them. At 18 they branch again, by who they've become since 9. The sign-up quiz shapes the first few skills and then fades. A class can be as popular as it likes; nobody is turned away. The first few heroes to reach level 21 become Legends; once those places are taken, the age has its Legends."],
       ["Mastery and hobbies", "A hero who already knows plenty sometimes spends a level getting better at a skill they use: it reads as honed, then mastered. Now and then they pick up a hobby instead, like cooking, card tricks or whittling. Hobbies are just for fun and never push them toward a class."],
       ["Scars", "Bad fights leave marks: a lost eye, a hook for a hand, burn scars. They change stats and appearance for good."],
+      ["XP and levels", "Heroes earn experience from fights (shared out among everyone who stood in them), dungeon floors walked, odd jobs, training, road happenings and goals reached. Every level takes more than the last, and every level brings a skill and a little more health. Level 9 brings a class, levels 10 and 20 a keystone, level 18 a second class, and the first few to reach 21 become Legends of the age.", "xp-and-levels"],
+      ["Pets", "A dog, a cat or a lizard can come from home with a hero, picked in the quiz. Beast-keepers who have no animal take one in on the road (a falcon, a wolf), and a hero with Beast Friend may keep a wolf or a drake they have just beaten. Pets go everywhere: they wander into camp songs, steal fish from the bank and get named at the fire. Most stay out of fights; a hero with a pet skill, or a beast-keeper class, has theirs fight alongside them. The Roster shows who travels with what.", "pets"],
       ["Death", "Heroes can die. The fallen get a funeral (if anyone pays for it) and a spot on the History page. Their bodies may be sold to a necromancer first."],
     ]],
     ["Parties", [
       ["Forming up", "Lonely heroes go looking for company in taverns, around campfires and on the road. Most heroes find a party in the first week or so."],
       ["Morale", "A party's mood, 0 to 100. Wins, silver and good company raise it. Losses, poverty, arguments and skimmed loot lower it. Low morale means members leave or the party breaks up."],
       ["Disposition", "A party's attitude to other parties: honorable, friendly, wary, territorial or predatory (other parties look like walking purses). It decides whether meetings on the road end in a shared fire or a robbery."],
-      ["Party awards", "Parties get their own season awards, a party of the week and power rankings, alongside the heroes'."],
+      ["Party awards", "Parties get their own season awards, standings and a party of the week, alongside the heroes'. Hero and party of the week are named in the Crier's The Week section on the last day of each week, with the Ledger, the market report and the week in numbers."],
       ["Party goal", "Every party, and every hero on their own, picks one goal a season: a boss to bring down, a purse to fill, places to see. The season's ceremony counts who got there; a goal that didn't happen just becomes part of the story."],
+      ["Bonds and grudges", "Every pair of heroes keeps a feeling about each other, from shared fires, rescues, wins, robberies, insults and lost games. Warm enough and they become friends, then best friends (and, where the league allows it, sweethearts); sour enough and they become rivals, then nemeses. A bond survives a rough patch, but a friendship left alone can drift. The Crier lists the headline pairs; each hero's People tab has the rest.", "bonds-and-grudges"],
       ["Vow", "A promise sworn after a big moment: to repay a rescue, to get even for a robbery, never to pay a toll. Kept vows make the Crier. Broken ones too."],
     ]],
     ["Skills, gear and fights", [
       ["Skills", "Every level brings a skill. At first the sign-up answers steer it; soon what the hero already knows pulls toward its neighbours, and what they've been doing nudges it: patch up friends and healing comes; sneak about and shadow tricks follow. Some skills are for fights, some are always on, and some are for the road (trading, singing, cooking, tracking)."],
       ["Schools", "Each skill belongs to a school. Heroes drift toward the schools they use, and their class changes follow. The schools: {schools}."],
-      ["Signature", "The fighting skill a hero has used most. It sits on their page, gold, and it's what the taverns know them for."],
+      ["Signature", "A hero's own class move once they have used it, otherwise the fighting move they have used most. It sits on their page, gold, and it's what the taverns know them for."],
       ["Keystones ✦", "At levels 10 and 20 every hero earns a keystone: a big, one-of-a-kind gift. Only one living hero holds each one. Some change how a hero always fights or lives; others spring at a moment (a killing blow, a friend falling). They stay for good. Tap a ✦ badge to read what it does."],
       ["Front row and back row", "Blades, axes, maces and daggers stand in front and take the hits. Bows, crossbows, staffs and wands fight from the back, where foes have a harder time reaching. Spears hold the front for fighters and the back for everyone else."],
       ["Gear", "Weapon and armour come in tiers, from battered to masterwork. The Kit shows what each piece adds: more power on every blow, more armour against every hit. Hats, cloaks and off-hands add a little protection or a knack. Plain rings and necklaces are worn for show."],
@@ -50,7 +53,12 @@
       ["Hunt", "A trip into the wilderness for pelts, herbs and bounties. Lower risk, lower reward."],
       ["Monsters", "Dungeons can be teeming, normal, recovering or thinned out. Clearing a dungeon thins it out for a while, and slain bosses are eventually replaced."],
       ["The economy", "Every town pays different prices. Heroes remember prices and swap tips, so some carry loot across the map to sell it better. The undertaker in Ashfen pays well for remains, no questions asked."],
+      ["Factions and legends", "Seven factions work the realm: the Order of the Dawn, the Gilded Scale, the Circle of Thorns, the Arcane Collegium and the Undertakers' Fellowship in the open, and two that never admit it. A hero's deeds raise or lower their standing with each (selling a body pleases the undertakers and appals the Dawn). High enough, and one may invite them in; members climb three ranks, shown under their name. Legends are famous figures who turn up rarely, when they feel like it, to buy a round, duel, teach or bless. The World page lists both.", "factions-and-legends"],
       ["Watch the fight", "Notable fights are kept as replays. Look for \"watch\" next to a story."],
+    ]],
+    ["The season", [
+      ["Season themes", "Each season has a theme that leans on the whole realm: some goods sell dearer, a dungeon or a road gets busier, ambushes come more often, the taverns get rowdier. The Crier names it on its masthead.{theme}", "season-themes"],
+      ["The great event", "Once a season, in its last ten days, something happens to the whole league: a megabeast wakes and walks from town to town, a plague spreads, a star falls into the wilds, or the Tournament of Crowns is called. A few days before, omens appear, and the hero who saw them first is owed a drink. A megabeast can be stood against (every stand wears it down) and slain for a weapon cut from its body, silver and a song. If nobody ends it, it fades with the season. Its page has the route, the countdown and the story so far.", "the-great-event"],
     ]],
     ["Money", [
       ["Copper, silver and gold", "10 copper make a silver, and 10 silver make a gold piece. A hero's purse is counted in silver, with a few copper in the pocket for pies, baths and tips; shopkeepers always give exact change."],
@@ -63,7 +71,7 @@
       ["Stop-loss", "Heroes bring a bankroll, not the purse: the money for beds and food stays put, and careful heroes hold back what they're saving for a horse or a house. Reckless ones may chase a bad night once."],
       ["Cheats", "Rogues and the dishonest sometimes cheat. A cheat who gets away with it wins double; a caught one forfeits double, is banned from that table for a week or two, and now and then spends a night in the cells. Dealers remember, and nickname their regulars."],
       ["Watch", "Every sitting is kept as a replay for a fortnight. \"Lost 30 silver at Pig Racing ▸ watch\" in a hero's day opens it, with every round listed underneath."],
-      ["Lady Luck's Ledger", "A weekly column on the Digest page about the town tables: the week's biggest win or loss, the longest run of losses at one table, any cheat caught (or an honest week), and a crew that sat down together. A sleepy week at the tables gets one line."],
+      ["Lady Luck's Ledger", "A noticeboard in the Crier's The Week section, on the last day of each week, about the town tables: the week's biggest win or loss, the longest run of losses at one table, any cheat caught (or an honest week), and a crew that sat down together. A sleepy week at the tables gets one line."],
       ["The fine dice", "Four fine dice sets (Gilt, Garnet, Ivory and Rime) are never sold. Each is won or given as a favour, once per league, during an hour at its own town's table; heroes who love dice are likelier to be the one."],
       ["Monsters who'd rather play", "Now and then a talking monster on the road offers a game instead of a fight, if the crew carries loot worth playing for. The crew's best player sits down: a loss hands over some of the carried loot (never silver, gear or sets), a win earns a curio the monster made."],
       ["Table keystones", "Poker Face, Gambler's Nerve, Read the Table and Gambit change how a hero plays at the tables (watched less and quicker to quit, never chasing, a touch sharper, a bold first bet), never the house's share. Each also does something in a fight."],
@@ -126,9 +134,50 @@
       `${t.game.rules} Dealt by ${t.game.dealer}.${t.game.edge ? ` The house keeps about ${Math.max(1, Math.round((2 * t.game.edge - 1) * 100))} in every 100 staked.` : ""}`]);
   }
   const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  // the short names other pages link with ("?" beside a label) for entries whose own titles are longer
+  const ALIAS = { "great-event": "the-great-event", event: "the-great-event", factions: "factions-and-legends", legends: "factions-and-legends", themes: "season-themes",
+    theme: "season-themes", xp: "xp-and-levels", levels: "xp-and-levels", bonds: "bonds-and-grudges", grudges: "bonds-and-grudges", keystone: "keystones", pet: "pets" };
+  const theme = () => {
+    const t = (L.meta || {}).theme;
+    if (!t || !t.name) return "";
+    const fx = Object.entries(t.price || {}).map(([g, m]) => `${((S.goods || {})[g] || { name: g.replace(/_/g, " ") }).name.toLowerCase()} at ×${m}`);
+    return ` This season it is ${t.name}: ${t.desc}${fx.length ? ` Prices: ${fx.join(", ")}.` : ""}${t.ambush ? " Ambushes are likelier on the roads." : ""}`;
+  };
+  const fill = (txt) => txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", ")).replace("{theme}", theme());
+  // a small "?" beside a label, into the Guide's entry for it; it works on a phone, where a hover title doesn't
+  Views.helpLink = (topic, what) => el("a", { class: "q-help", href: `#/guide/${topic}`, "data-topic": topic, "aria-label": `What is ${what || topic.replace(/-/g, " ")}? (the Guide)` }, "?");
+  const entry = (topic) => {
+    const want = ALIAS[topic] || topic;
+    for (const [, items] of GUIDE) for (const [k, txt, id] of items) if ((id || slug(k)) === want || slug(k) === want) return [k, fill(txt)];
+    return null;
+  };
+  // on a mouse, hovering the "?" shows the Guide's entry in place; a tap (phones) still opens the Guide
+  let pop = null;
+  const hide = () => { if (pop) { pop.remove(); pop = null; } };
+  const show = (a) => {
+    const e = entry(a.dataset.topic);
+    if (!e) return;
+    hide();
+    pop = el("div", { class: "q-pop", role: "tooltip" }, el("b", null, e[0]), el("p", null, e[1]), el("span", { class: "q-pop-more" }, "Click for the Guide ›"));
+    document.body.appendChild(pop);
+    const r = a.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    const top = r.bottom + 8 + h > window.innerHeight ? r.top - h - 8 : r.bottom + 8;
+    pop.style.left = `${left + window.scrollX}px`;
+    pop.style.top = `${top + window.scrollY}px`;
+  };
+  if (window.matchMedia && window.matchMedia("(hover: hover)").matches) {
+    document.addEventListener("mouseover", (ev) => { const a = ev.target.closest && ev.target.closest(".q-help"); if (a) show(a); });
+    document.addEventListener("mouseout", (ev) => { const a = ev.target.closest && ev.target.closest(".q-help"); if (a && !a.contains(ev.relatedTarget)) hide(); });
+    document.addEventListener("focusin", (ev) => { if (ev.target.classList && ev.target.classList.contains("q-help")) show(ev.target); });
+    document.addEventListener("focusout", hide);
+    window.addEventListener("hashchange", hide);
+  }
   A.route(/^\/guide(?:\/([\w-]+))?$/, (v, focus) => {
     v.appendChild(el("h1", null, "The Guide"));
-    v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page."));
+    v.appendChild(el("p", { class: "muted" }, "Everything you need to follow the league, in one page.",
+      focus && history.length > 1 ? [" ", el("a", { href: "#", onclick: (ev) => { ev.preventDefault(); history.back(); } }, "‹ Back to where you were")] : null));
+    let hit = null;
     const jump = (id) => (ev) => {
       const t = document.getElementById(`guide-${id}`);
       if (!t || location.hash !== `#/guide/${id}`) return;
@@ -141,13 +190,18 @@
     for (const [title, base] of GUIDE) {
       const dl = el("dl", { class: "kv guide" });
       const items = title === "The tables" ? base.slice(0, 2).concat(tableGames(), base.slice(2)) : base;
-      for (const [k, txt] of items) dl.append(el("dt", null, k), el("dd", null, txt.replace("{schools}", Object.values(S.schools || {}).flat().join(", "))));
+      for (const [k, txt, id] of items) {
+        const dt = el("dt", { id: `guide-${id || slug(k)}` }, k), dd = el("dd", null, fill(txt));
+        dl.append(dt, dd);
+        if (focus && [id, slug(k)].includes(ALIAS[focus] || focus)) hit = [dt, dd];
+      }
       const sec = panel(title, dl);
       sec.id = `guide-${slug(title)}`;
       g.appendChild(sec);
     }
     v.appendChild(g);
-    const target = focus && document.getElementById(`guide-${focus}`);
-    if (target) setTimeout(() => target.scrollIntoView({ block: "start" }), 0);
+    if (hit) for (const x of hit) x.classList.add("guide-hit");
+    const target = hit ? hit[0] : focus && document.getElementById(`guide-${ALIAS[focus] || focus}`);
+    if (target) setTimeout(() => target.scrollIntoView({ block: hit ? "center" : "start" }), 0);
   });
 })();

@@ -13,7 +13,7 @@
   // ---------- the players load with their first page (A.need); the words below each one still tell it if one can't ----------
   const KIT = {
     fight: ["battlefield", "deaths", "fight_fx", "fight_director"], meal: ["food_art", "food_dishes", "food_eat", "meal_replay", "meal_tavern"],
-    road: ["food_art", "road_scenes", "road_art", "road_replay"], reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
+    road: ["food_art", "road_scenes", "road_art", "scene_kits", "stage", "road_hints", "road_replay"], town: A.TOWN_ART, hunt: A.HUNT_ART, reading: ["tarot_replay"], catch: ["food_art", "fish_art", "fish_replay"], music: ["music_replay", "music_camp"], chess: ["chess_replay"], night: ["night_replay"], table: ["tables_replay"],
   };
   const kit = (k) => A.need(KIT[k]).catch((e) => { if (window.console) console.error(e); });
 
@@ -31,22 +31,27 @@
       class: "btn small spd" + (sp === 1 ? " on" : ""), type: "button", title: ctl.rate ? `Play at ${sp}× speed` : "A song keeps its own time", disabled: !ctl.rate,
       onclick: () => { ctl.rate(sp); speeds.forEach((b, k) => b.classList.toggle("on", BAR_SPEEDS[k] === sp)); },
     }, `${sp}×`));
-    const snd = btn("🔊", "Sound", "Sound on or off", (e) => { e.stopPropagation(); const t = document.querySelector(".snd-panel .btn"); if (t) t.click(); sync(); });
+    // while the browser still holds sound back, a tap on the bar's own button is the gesture that frees it, not a switch to off
+    const snd = btn("🔊", "Sound", "Sound on or off", (e) => { e.stopPropagation(); const wait = window.Sound && Sound.locked; const t = document.querySelector(".snd-panel .btn"); if (t && !wait) t.click(); setTimeout(sync, 60); });
+    // while sound waits for the page's first gesture a "Tap for sound" button joins the bar, beside the sound switch: over the stage it
+    // covered captions and the people acting them
+    const tap = el("button", { class: "snd-tap", type: "button", title: "Sound is waiting for a tap", hidden: true }, "♪ Tap for sound");
+    tap.onclick = (e) => { e.stopPropagation(); tap.hidden = true; };
     const box = el("div", { class: "controls replay-bar" }, play,
       btn("↺", "Restart", "Watch from the start", () => { ctl.restart(); sync(); }),
       btn("⏭", "Skip", "Skip to the end", () => { ctl.skip(); sync(); }),
-      el("span", { class: "spds", role: "group", "aria-label": "Speed" }, speeds), snd,
+      el("span", { class: "spds", role: "group", "aria-label": "Speed" }, speeds), snd, tap,
       o.share ? btn("⤴", "Share", "Copy this with a link", () => A.copy(o.share(), o.shared || "Copied with a link.")) : null);
     const plate = o.title ? el("div", { class: "replay-title", "aria-hidden": "true" }, el("small", null, o.title[0]), el("b", null, o.title[1]), o.title[2] ? el("small", null, o.title[2]) : null) : null;
     // a replay starts on its own before the page has had a gesture, and browsers keep sound locked till one comes: the tap is it,
     // and each player brings its sound in where the scene has got to (a song in time, the fire's bed for what is left of it)
-    const tap = el("button", { class: "snd-tap", type: "button", title: "Sound is waiting for a tap", hidden: true }, "♪ Tap for sound");
-    tap.onclick = (e) => { e.stopPropagation(); tap.hidden = true; };
     function sync() {
       const on = ctl.playing;
       set(play, on ? "❚❚" : "▶", on ? "Pause" : "Play");
+      const wait = !!(window.Sound && Sound.locked);
       set(snd, window.Sound && Sound.on ? "🔊" : "🔇", "Sound");
-      tap.hidden = !(window.Sound && Sound.locked);
+      snd.classList.toggle("snd-wait", wait);
+      tap.hidden = !wait;
       if (plate) plate.classList.toggle("gone", ctl.t > (o.titleUntil || 0));
     }
     sync();
@@ -58,7 +63,6 @@
       if (!document.hidden) sync();
     }, 250);
     box.plate = plate;
-    box.tap = tap;
     return box;
   }
   // a whole stage stays on a desktop screen below the header, however wide the page
@@ -72,7 +76,7 @@
     fig.insertBefore(bar, shot.nextSibling);
     const wrap = el("div", { class: "replay-shot" });
     fig.insertBefore(wrap, shot);
-    wrap.append(shot, bar.tap);
+    wrap.append(shot);
     if (bar.plate) wrap.append(bar.plate);
   }
   const lineup = (xs) => xs.reduce((acc, x, i) => acc.concat(i ? [i === xs.length - 1 ? " and " : ", ", x] : [x]), []);
@@ -81,9 +85,30 @@
   const fadedPage = (v, title, why) => v.appendChild(el("section", { class: "panel faded" }, el("h2", null, title), el("p", null, why),
     el("p", null, el("a", { class: "btn", href: "#/" }, "Back to the Crier"))));
 
+  // the way back from a replay, above and below it: the hero's day, that day's paper, the crew and the place, as far as the record knows them
+  function backBar(o) {
+    const L = A.L, who = [...new Set((o.heroes || []).filter((id) => heroes[id]))], pinned = A.mine();
+    const hid = who.find((id) => pinned.includes(id)) || who[0], day = o.day;
+    const place = o.place && (S.towns[o.place] || S.wilds[o.place] || S.dungeons[o.place]) ? o.place : null;
+    const party = o.party && A.parties[o.party] ? o.party : null;
+    const items = [hid ? el("a", { href: A.heroDayHref(hid, day) }, `‹ ${A.poss(heroes[hid].name)} day`) : null,
+      day ? el("a", { href: day === L.meta.day ? "#/" : `#/day/${day}` }, `Day ${A.seasonOf(day)[1]} paper`) : null,
+      party ? el("a", { href: `#/party/${party}` }, A.parties[party].name) : null,
+      place ? el("a", { href: A.placeHref(place) }, A.nodeName(place)) : null].filter(Boolean);
+    if (!items.length) return null;
+    return el("div", { class: "back-bar", role: "navigation", "aria-label": "Back from this replay" }, items.map((x, i) => [i ? el("span", { class: "sep", "aria-hidden": "true" }, "·") : null, x]));
+  }
+  function backBars(v, o) {
+    const top = backBar(o);
+    if (!top) return;
+    v.prepend(top);
+    v.appendChild(backBar(o));
+  }
+  const ids = (xs) => (xs || []).map((x) => (x && typeof x === "object" ? x.id : x)).filter(Boolean);
+
   // a fight with a traveller in the line brings the road art, so they are drawn as themselves
   const withTravellers = (f) => ((f.lineup || []).some((u) => u.kind === "traveller") && !window.RoadArt ? A.roadArt(["road_art"]).then(() => f, () => f) : f);
-  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => replayPage(v, f)).catch((err) => {
+  A.route(/^\/fight\/(\w+)$/, (v, id) => Promise.all([A.load(`fight/${id}`), kit("fight")]).then(([f]) => withTravellers(f)).then((f) => { replayPage(v, f); backBars(v, { heroes: f.heroes, day: f.day, party: (f.parties || [])[0], place: f.place }); }).catch((err) => {
     if (window.console && err && err.stack && !/load/i.test(String(err))) console.error(err);
     const art = Scenes.backdrop("plains", 200, 50, Art.hash(id));
     art.className = "faded-art";
@@ -105,6 +130,7 @@
       }
       if (g.text) p.appendChild(el("p", null, g.text));
       v.appendChild(p);
+      backBars(v, { heroes: [g.lead && g.lead.id, ...ids(g.joiners), ...ids(g.onlookers)], day: g.day, party: g.anthem && g.anthem.party });
       return;
     }
     const names = (g.players || []).map((x) => (x.goblin ? x.name : A.heroLink(x.id)));
@@ -118,6 +144,7 @@
     }
     if (g.text) p.appendChild(el("p", null, g.text));
     v.appendChild(p);
+    backBars(v, { heroes: [...ids((g.players || []).filter((x) => !x.goblin)), ...ids(g.onlookers)], day: g.day });
   }).catch(() => {
     // a night whose song a hero is still writing isn't faded, only unfinished: it appears once the song is written down (round 31)
     const pending = (((window.LD && LD.league) || {}).nights_pending || []).includes(id);
@@ -148,6 +175,7 @@
     if (g.text) p.appendChild(el("p", null, g.text));
     if (dish.desc) p.appendChild(el("p", { class: "small dim" }, dish.desc));
     v.appendChild(p);
+    backBars(v, { heroes: [g.cook, g.baker, ...ids(g.eaters)], day: g.day, place: g.town || g.place });
   }).catch(() => fadedPage(v, "That meal isn't on file", "The kitchen has no record of it.")));
 
   // a fishing session: the pixel player (FishReplay) draws it when loaded, otherwise it is told in words. Catch files are never deleted,
@@ -173,10 +201,12 @@
     else if (sp.desc) p.appendChild(el("p", { class: "small dim" }, sp.desc));
     p.appendChild(el("p", { class: "small" }, el("a", { href: "#/creel" }, "The Creel Book →")));
     v.appendChild(p);
+    backBars(v, { heroes: [g.hero, ...ids(g.crew)], day: g.day, place: g.place });
   }).catch(() => fadedPage(v, "That catch isn't on file", "The anglers' book has no record of it.")));
 
   // a stretch of road worth a vignette (league/roads.py records): a meeting, a place, a scene; RoadReplay dresses it, the words below still tell it
-  A.route(/^\/road\/(\w+)$/, (v, id) => A.load(`road/${id}`).then((g) => A.roadArt(KIT.road).then(() => g, () => g)).then((g) => {
+  A.route(/^\/road\/(\w+)$/, (v, id) => A.load(`road/${id}`).then((g) => A.roadArt(g.hunt ? KIT.hunt : KIT.road).then(() => g, () => g)).then((g) => {
+    if (g.hunt) return huntPage(v, g);
     const R = S.road || {}, place = (R.places || {})[g.place] || null, trav = (R.travellers || {})[g.traveller] || null;
     const ends = (g.road || "").split("~").filter(Boolean).map((n) => A.nodeName(n));
     const last = trav && g.arc_step && g.arc_step >= (g.arc_len || 99);
@@ -194,7 +224,62 @@
     // not "part 3 of 3": a reader may have seen only some of the steps, which other heroes took
     if (trav && g.arc_step) p.appendChild(el("p", { class: "small dim" }, g.arc_step >= (g.arc_len || 99) ? `The end of ${trav.name}'s story on the roads.` : g.arc_step === 1 ? `Where ${trav.name}'s story on the roads begins.` : `A chapter of ${trav.name}'s story on the roads.`));
     v.appendChild(p);
+    backBars(v, { heroes: [g.lead, ...(g.heroes || [])], day: g.day });
   }).catch(() => fadedPage(v, "That stretch of road isn't on file", "Nobody wrote that part of the road down.")));
+
+  // a hunt's moment worth a record (league/hunt.py, hunt: True): acted out on the wild's own ground by HuntScenes
+  function huntPage(v, g) {
+    const where = A.nodeName(g.wild || g.road), hr = g.hour != null ? g.hour : 12;
+    const p = el("section", { class: "panel" }, el("h2", null, `Hunting in ${where}`),
+      el("p", { class: "small muted" }, ...lineup((g.heroes || []).map((x) => A.heroLink(x))), ` in ${where}, ${A.when(g.day, "on")}.`));
+    if (window.HuntScenes) {
+      try { stage(p, HuntScenes.player(g, { heroes: A.heroes }), { title: [hr >= 16 ? "Evening" : hr >= 12.5 ? "Afternoon" : "Morning", `Hunting in ${where}`, ""], titleUntil: 1.0,
+        share: () => `${where}: ${g.line}
+${A.shareUrl("#/road/" + g.id)}`, shared: "The hunt and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (g.line) p.appendChild(el("p", null, A.storyText(g.line)));
+    v.appendChild(p);
+    backBars(v, { heroes: g.heroes, day: g.day, place: g.wild });
+  }
+
+  // an hour of a hero's town day (league/town_day.py), or of a hunt day (league/hunt.py): its scene played from the day's own file
+  // (export.save_daybook), the words below it
+  A.route(/^\/day\/(\w+)\/(\d+)\/(\d+)$/, (v, hid, wday, i) => A.load(`daybook/${hid}/${wday}`).then((db) => {
+    const b = (db.blocks || [])[+i];
+    return (b && b.act === "hunt" && b.stretch ? kit("hunt") : kit("town")).then(() => db);
+  }).then((db) => {
+    const b = (db.blocks || [])[+i];
+    if (b && b.act === "hunt" && b.stretch) return huntHour(v, hid, wday, i, b);
+    if (!b || !b.scene) throw new Error("no town hour " + i);
+    const hero = A.heroes[hid] || { id: hid }, at = A.nodeName(b.scene.town), span = window.Daybook ? `${Daybook.clock(b.from)} to ${Daybook.clock(b.to)}` : "";
+    const p = el("section", { class: "panel" }, el("h2", null, b.label || "An hour in town"),
+      el("p", { class: "small muted" }, A.heroLink(hid), ` in ${at}, ${span}, ${A.when(+wday, "on")}.`));
+    if (window.TownDay) {
+      try { stage(p, TownDay.player(b, { hero, heroes: A.heroes }), { title: [span, b.label || "", at], titleUntil: 1.0,
+        share: () => `${hero.name || ""}, ${b.label}: ${b.line}
+${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (b.line) p.appendChild(el("p", null, A.storyText(b.line), b.why ? el("span", { class: "dim" }, " " + b.why) : null));
+    v.appendChild(p);
+    backBars(v, { heroes: [hid], day: +wday, place: b.scene.town });
+  }).catch(() => fadedPage(v, "That hour isn't on file", "Only the days kept in the hero's daybook can be watched.")));
+
+  function huntHour(v, hid, wday, i, b) {
+    const hero = A.heroes[hid] || { id: hid }, party = hero.party && A.parties && A.parties[hero.party];
+    const band = [hero, ...((party && party.members) || []).filter((id) => id !== hid).map((id) => A.heroes[id]).filter(Boolean)];
+    const span = window.Daybook ? `${Daybook.clock(b.from)} to ${Daybook.clock(b.to)}` : "";
+    // the crew that day, from the hour itself (older days without it fall back to the party now)
+    const crew = (b.crew || []).filter((id) => id !== hid && A.heroes[id]).map((id) => A.heroLink(id));
+    const p = el("section", { class: "panel" }, el("h2", null, b.label || "Hunting"), el("p", { class: "small muted" }, A.heroLink(hid), crew.length ? [" with ", ...lineup(crew)] : b.crew ? " alone" : "", ` hunting, ${span}, ${A.when(+wday, "on")}.`));
+    if (window.HuntScenes) {
+      try { stage(p, HuntScenes.player(b, { hero, band, heroes: A.heroes }), { title: [span, b.label || "", ""], titleUntil: 1.0,
+        share: () => `${hero.name || ""}, ${b.label}: ${b.line}
+${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied." }); } catch (e) { if (window.console) console.error(e); }
+    }
+    if (b.line) p.appendChild(el("p", null, A.storyText(b.line)));
+    v.appendChild(p);
+    backBars(v, { heroes: [hid], day: +wday });
+  }
 
   // a tarot reading; the pixel player (TarotReplay) draws it when loaded, otherwise the spread is told in words.
   // It opens on the laid table under a title plate, before the deal
@@ -220,6 +305,7 @@
     })));
     if (g.text) p.appendChild(el("p", null, g.text));
     v.appendChild(p);
+    backBars(v, { heroes: [g.sitter.id, g.reader.kind === "hero" ? g.reader.id : null, ...ring], day: g.day, party: crewP && crewP.id, place: g.town });
   }).catch(() => fadedPage(v, "That reading has faded", "Only a fortnight of readings is kept, and the ones that came true.")));
 
   // a sitting at a town table; the pixel player (TablesReplay) draws it when loaded, otherwise the night is told in words
@@ -235,6 +321,7 @@
     }
     p.appendChild(el("ol", { class: "small" }, g.rounds.map((r) => el("li", null, roundWords(g.game, r)))));
     v.appendChild(p);
+    backBars(v, { heroes: [g.hero], day: g.day, place: g.town });
   }).catch(() => fadedPage(v, "That night at the tables has faded", "Only a fortnight of table nights is kept, and the ones that made the paper.")));
 
   // one round of a table sitting in words: what the pieces did, then what it paid
@@ -257,15 +344,23 @@
     return `${A.coins(r.stake)} staked${what ? `, ${what}` : ""}: ${paid}${s.again ? " (a second throw, by luck)" : ""}${r.caught ? "" : ""}.`;
   }
 
+  // the hero as the replay draws them: with the afterglow they had at this moment of the fight (u.glowNow), whatever they wear today
+  function heroOf(u) {
+    const h = heroes[u.ref];
+    if (!h || !h.look || u.glowNow === undefined || (h.look.afterglow || null) === (u.glowNow || null)) return h;
+    const look = Object.assign({}, h.look);
+    if (u.glowNow) look.afterglow = u.glowNow; else delete look.afterglow;
+    return Object.assign({}, h, { look });
+  }
   function unitGrid(u, frame) {
     if (u.kind === "traveller" && window.RoadArt) return RoadArt.fighter(u, frame);
     const look = u.look || {};
     // without the road art, a traveller who fights is drawn with the stat block's own sprite
     if (u.kind === "traveller" && look.monster && S.monsters[look.monster]) return Art.monsterGrid(S.monsters[look.monster], frame);
-    if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroes[u.ref], frame, A.heroLook(heroes[u.ref]));
+    if (u.kind === "hero" && heroes[u.ref]) return Art.heroGrid(heroOf(u), frame, A.heroLook(heroes[u.ref]));
     if (look.pet) return Art.petGrid({ kind: look.pet, name: u.name, coat: look.coat }, frame);
     const m = S.monsters[u.ref];
-    if (m) return Art.monsterGrid(Object.assign({}, m, { boss: u.boss }), frame);
+    if (m) return Art.monsterGrid(Art.withLook(Object.assign({}, m, { boss: u.boss }), look), frame);
     return Art.graveGrid();
   }
 
@@ -298,12 +393,12 @@
     return r;
   }
   function rider(u, frame) {
-    const key = `${u.ref}|${u.mount.kind}|${u.mount.colour}|${frame}`;
+    const key = `${u.ref}|${u.mount.kind}|${u.mount.colour}|${frame}|${u.glowNow || ""}`;
     if (riders.has(key)) return riders.get(key);
     const m = MountArt.mountGrid(u.mount.kind, u.mount.colour, frame, "rider");
     const { back, belly } = backOf(m, u.mount.kind + "|" + u.mount.colour), sx = Math.round(m.width * 0.37);
     // the boot's sole hangs just above the belly line: longer legs down a horse's deep barrel, shorter on a donkey
-    const sole = clamp(HIP + belly - back - 2, 33, 36), h = heroes[u.ref];
+    const sole = clamp(HIP + belly - back - 2, 33, 36), h = heroOf(u);
     const hero = (Art.heroSeated ? Art.heroSeated(h, frame, A.heroLook(h), sole) : unitGrid(u, frame)).toCanvas(1);
     const L = Math.max(0, 14 - sx), lift = Math.max(0, HIP - (back + 1));
     const cv = document.createElement("canvas");
@@ -405,7 +500,10 @@
       case "stealth": return `${n(e.a)} vanishes into the shadows.`;
       case "summon": return `${n(e.a)} calls in ${e.new ? e.new.name : "help"}.`;
       case "tick": return `${n(e.a)} suffers ${e.v} from ${e.st}.`;
-      case "stunned": return e.st === "cowering" ? `${n(e.a)} cowers and does nothing.` : `${n(e.a)} is ${e.st === "charm" ? "charmed" : "stunned"} and does nothing.`;
+      case "surge": return `WILD SURGE! ${e.say || `${n(e.a)}'s magic goes sideways: ${e.k}.`}`;
+      case "stunned": if (e.st === "goose") return `${n(e.a)} is a goose, and does nothing useful.`;
+        if (e.st === "swapped") return `${n(e.a)} is on the wrong side of the field and loses a turn finding the way back.`;
+        return e.st === "cowering" ? `${n(e.a)} cowers and does nothing.` : `${n(e.a)} is ${e.st === "charm" ? "charmed" : "stunned"} and does nothing.`;
       case "thorns": return `${n(e.t)} is hurt for ${e.v} by ${n(e.a)}'s spikes.`;
       case "down": return `${n(e.t)} goes down!`;
       case "rout": return vb(side(e.side), "breaks and runs!", "break and run!");
@@ -621,6 +719,11 @@
     };
     if (window.FightFX) FightFX.config({ flat: FLAT, scale: 1 });
     const P = FightDirector.plan(f, units, { S, heroes, pos, mounted: MOUNTED });
+    // afterglows as they stood that day: one from before the fight shows from the start, one this fight's own surge left shows from
+    // the moment it went off (unitGrid draws u.glowNow)
+    for (const q of units) if (q && q.kind === "hero" && heroes[q.ref]) { const g = heroes[q.ref].afterglow; q.glowBase = g && g.from < f.day ? g.id : null; q.glowNow = q.glowBase; }
+    f.log.forEach((e, k) => { if (e.fx === "surge" && e.g && units[e.g[0]]) Object.assign(units[e.g[0]], { glowAt: P.events[k], glowId: e.g[1] }); });
+    const glowAt = (t) => { for (const q of units) if (q && q.glowAt != null) q.glowNow = t >= q.glowAt ? q.glowId : q.glowBase; };
     const calm = (window.FightFX && FightFX.reduced && FightFX.reduced()) || (window.Settings ? Settings.reduced() : !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches));
 
     // every fighter gets a mark: numbers for the left side, letters for the right, the same on the stage and in the list
@@ -661,7 +764,6 @@
     const roster = el("div", { class: "fighters" }, sideList(0), sideList(1));
     const hlBox = el("section", { class: "panel highlights" }, el("h3", null, "Highlights"),
       el("dl", { class: "kv hl" }, hl.map(([k, x]) => [el("dt", null, k), el("dd", null, x)])));
-    box.append(ctrls.tap);
     v.appendChild(el("div", { class: "fight-stage" }, box, ctrls, roster));
     v.appendChild(hlBox);
     v.appendChild(el("details", { class: "panel blow" }, el("summary", null, el("h3", null, "Blow by blow")), logBox));
@@ -682,7 +784,7 @@
     // ("foot") and the mount alone ("mount"); `away` turns them to run for their own side's edge
     function sprite(u, frame, part, away) {
       part = u.mount ? part || "all" : "foot";
-      const key = `${u.i}:${frame}:${part}:${away ? 1 : 0}`;
+      const key = `${u.i}:${frame}:${part}:${away ? 1 : 0}:${u.glowNow || ""}`;
       if (!sprites.has(key)) {
         let img;
         if (part === "foot") { let g = unitGrid(u, frame); if ((u.side === 1) !== !!away) g = g.flipX(); img = g.toCanvas(1); }
@@ -909,6 +1011,7 @@
     }
     function draw(t) {
       frame = Math.floor(t / 0.42) % 2;
+      glowAt(t);
       const slot = slotAt(t), u = t - slot.t0, live = stateAt(t), { st } = live;
       viewSt = st;
       const acts = active(t), pose = posesAt(acts, t), V = view(t, slot, u);
@@ -1485,7 +1588,63 @@
       // the mark in brackets: a bare "A Gruk the Warchief" reads as an article, not as the key to the list below
       txt(`[${marks[q.i]}] ${q.name}`, x, y - 2 * B, 5, "#f6ebd0", "left", B);
     }
+    // a wild surge's cut-in: a deep-sea band with jagged edges in the surge's colour (odd: sea-glass, a help: mint, a hindrance: amber),
+    // motes of loose magic drifting through it, WILD SURGE over what the spell turned into
+    const SURGE_COL = { odd: "#6ad8e8", help: "#8af0b0", hinder: "#f0b05a" };
+    function surgeCutin(slot, u, B, K, X, Y) {
+      const cvw = cv.width, cvh = cv.height, b = slot.members[0].b, a = units[b.a], an = anchors[b.a] || { x: a.x, y: a.y, top: a.y - a.sh };
+      const col = SURGE_COL[b.e.kind] || SURGE_COL.odd;
+      const k = calm ? 1 : Math.min(ease(u / 0.16), ease((slot.pre - u) / 0.14));
+      const heroY = Y(an.top), heroX = X(an.x), above = heroY > cvh * 0.42;
+      const yc = above ? cvh * 0.3 : cvh * 0.72, hh = cvh * 0.22, teeth = 14, wob = calm ? 0 : Math.sin(u * 18) * B;
+      ctx.save();
+      ctx.globalAlpha = k;
+      const edge = (y0, dir) => { for (let i = 0; i <= teeth; i++) { const x = (cvw + 20) * i / teeth - 10; ctx.lineTo(x, y0 + dir * (i % 2 ? 5 : 0) * B + (i % 2 ? wob : -wob)); } };
+      ctx.beginPath(); ctx.moveTo(-10, yc - hh / 2); edge(yc - hh / 2, -1); ctx.lineTo(cvw + 10, yc + hh / 2);
+      for (let i = teeth; i >= 0; i--) { const x = (cvw + 20) * i / teeth - 10; ctx.lineTo(x, yc + hh / 2 + (i % 2 ? 5 : 0) * B + (i % 2 ? -wob : wob)); }
+      ctx.closePath();
+      ctx.fillStyle = "rgba(10,34,40,0.95)"; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 2 * B; ctx.stroke();
+      const img = bust(a), bs = Math.max(1, Math.floor((hh * 0.8) / img.height)), bw = img.width * bs, bh = img.height * bs;
+      const left = heroX > cvw / 2, bx = left ? cvw * 0.06 : cvw * 0.94 - bw, by = yc - bh / 2;
+      const r0 = left ? bx + bw + 6 * B : cvw * 0.06, r1 = left ? cvw * 0.94 : bx - 6 * B, tx = (r0 + r1) / 2;
+      const name = (b.e.k || "").toUpperCase();
+      // the name keeps to the band's middle third, so the header and the line under it never touch it on a small screen
+      let size = Math.min(15, 280 / Math.max(6, name.length), hh / B * 0.3);
+      ctx.font = `${R(size * B)}px ${FONT}`;
+      const tw = ctx.measureText(name).width;
+      if (tw > (r1 - r0) * 0.94) size = Math.max(6, size * (r1 - r0) * 0.94 / tw);
+      // on a phone the line under the name would be a few pixels tall: the log under the stage already carries it
+      const sub = (cv.clientWidth || cvw) >= 480;
+      const spell = b.e.spell && b.e.spell !== "Attack" ? b.e.spell : "a stray spark", line = trunc(b.e.say || `${a.name} · ${spell}`, 56);
+      const wide = (str, sz) => { ctx.font = `${R(sz * B)}px ${FONT}`; return ctx.measureText(str).width; };
+      const half = Math.max(wide("WILD SURGE!", 6), wide(name, size), sub ? wide(line, 5) : 0) / 2 + 4 * B;
+      // loose magic drifting through the band, kept off the words
+      const rnd = hashRng(b.ev[0] + 9), cols = [col, "#f6efd8", "#ffd65a", "#7cc0ec"];
+      const onText = (x, y, s) => x + 2 * s > tx - half && x - s < tx + half && y + 2 * s > yc - hh * 0.26 - 8 * B && y - s < yc + (sub ? hh * 0.36 + 3 * B : size * B * 0.6);
+      for (let n = 0; n < 36; n++) {
+        const x = (rnd() * cvw * 1.2 + (calm ? 0 : u * (60 + rnd() * 140) * B)) % (cvw + 20) - 10, y = yc - hh / 2 + rnd() * hh, s = (1 + Math.floor(rnd() * 2)) * B;
+        const al = 0.4 + 0.6 * rnd();
+        if (onText(x, y, s)) continue;
+        ctx.fillStyle = cols[n % cols.length]; ctx.globalAlpha = k * al;
+        ctx.fillRect(R(x), R(y), s, s);
+        if (n % 9 === 0) { ctx.fillRect(R(x - s), R(y), s, s); ctx.fillRect(R(x + s), R(y), s, s); ctx.fillRect(R(x), R(y - s), s, s); ctx.fillRect(R(x), R(y + s), s, s); }
+      }
+      ctx.globalAlpha = k;
+      ctx.fillStyle = col; ctx.fillRect(bx - 2 * B, by - 2 * B, bw + 4 * B, bh + 4 * B);
+      ctx.fillStyle = "#0a2228"; ctx.fillRect(bx, by, bw, bh);
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(img, bx, by, bw, bh);
+      txt("WILD SURGE!", tx, yc - hh * 0.26, 6, col, "center", B);
+      txt(name, tx + (calm ? 0 : Math.sin(u * 23) * 0.6 * B), yc + size * B * 0.35, size, "#f6efd8", "center", B);
+      if (sub) txt(line, tx, yc + hh * 0.36, 5, "#bfe8e0", "center", B);
+      ctx.restore();
+      // the caster stands in front of it, rimmed in the surge's colour
+      const img2 = sprite(a, 0), px = X(an.x) - img2.width * K / 2, py = Y(a.y) - img2.height * K, rim = flat(img2, col);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(rim, px + dx * K, py + dy * K, img2.width * K, img2.height * K);
+      ctx.drawImage(img2, px, py, img2.width * K, img2.height * K);
+    }
     function cutin(slot, u, B, K, X, Y) {
+      if (slot.members[0].b.e.fx === "surge") return surgeCutin(slot, u, B, K, X, Y);
       const cvw = cv.width, cvh = cv.height, b = slot.members[0].b, a = units[b.a], an = anchors[b.a] || { x: a.x, y: a.y, top: a.y - a.sh };
       const inK = calm ? 1 : ease(u / 0.16), outK = calm ? 1 : ease((slot.pre - u) / 0.14), k = Math.min(inK, outK);
       // the band goes where the hero isn't: above them when they stand low in the frame, and the bust at the far end

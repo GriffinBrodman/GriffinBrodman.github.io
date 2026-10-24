@@ -16,7 +16,7 @@
                     skeleton({x0,x1,y})  cat({x,y,range,col})  quad({x0,x1,y,kind:"deer"|"wolf"|"goat"|"rat"})
                     rabbit({x,y,range,col})  crab({x,y,range})  wagon({y,W,speed})  flag({x,y,h,c1,c2})
     sky:            bird({W,y,speed,col,flock})  gull({W,y})  eagle({x,y,r})  bat({W,y0,y1})  butterfly({x,y,w,h})
-    light and air:  torch({x,y,r})  glow({x,y,r,rgb,a,amp,speed})  smoke({x,y})  embers({x0,x1,y,n,rise})
+    light and air:  torch({x,y,r})  glow({x,y,r,rgb,a,amp,speed})  smoke({x,y,col,col2,n,rise,life,wind})  embers({x0,x1,y,n,rise})
                     fireflies({x,y,w,h,n,rgb,glow})  wisp({x,y,w,h})  snow({W,H,n,speed})  rain({W,H,n,storm})
                     mist({W,y,h,rgb,a,speed})  shade({W,y0,y1,speed})  (a cloud shadow sliding over the ground)
     water, caves:   waves({x0,x1,y,h,rgb})  bubbles({x,y,w,rgb,rise})  drip({x,y0,y1,rgb})  twinkle({pts,rgb})
@@ -342,7 +342,7 @@
         const x = o.x + Math.sin(a * 4 + phase * 6 + i) * 1.2 + a * a * (o.wind == null ? 5 : o.wind), y = o.y - a * rise;
         const sz = a < 0.25 ? 1 : 2;
         ctx.globalAlpha = Math.max(0, 0.75 * (1 - a));
-        dot(ctx, x, y, a < 0.45 ? col : "#b0acac", sz, sz);
+        dot(ctx, x, y, a < 0.45 ? col : o.col2 || "#b0acac", sz, sz);
       }
       ctx.globalAlpha = 1;
     } };

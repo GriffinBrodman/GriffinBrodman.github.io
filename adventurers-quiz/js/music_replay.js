@@ -33,7 +33,7 @@
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   }
 
-  // ---------- instruments: they float in front of the player and play themselves (no hands) ----------
+  // ---------- instruments, held in the players' own hands (Art.heroPose arms) ----------
   const WOOD = { b: "#c8823e", B: "#9a5a26", o: "#2a160a", n: "#5a3418", h: "#3a2010", s: "#f0d8a0" };
   const ROWS = {
     lute: [["...........xh", "..........xhx", ".........xnx.", "..xxxx..xnx..", ".xbbbbBxnx...", "xbbsbbbnx....", "xbboobbBx....", "xbboobbBx....", "xBbbbbBx.....", ".xBBBBx......", "..xxxx......."], WOOD],
@@ -77,32 +77,84 @@
       return { since: t - a[lo][0], d: a[lo][1], kind: a[lo][2] };
     };
   }
-  // one player's instrument at their chest: x, y the body's centre line and chest height, face the way they look
-  function drawInst(ctx, inst, how, x, y, face, t, hit, calm, tint) {
-    const on = hit && hit.since < 0.14, held = hit && hit.since < hit.d, ix = x + face * 9;
-    const bob = calm ? 0 : on ? 1 : 0;
-    const left = face < 0;
+  // how each instrument is held, facing right, from the body's centre line x and chest y (the sprite's (14, 18)): the sprite's
+  // cell `cell` lands on `at` (m: mirrored), and the hands go to r and l, one entry per strum frame (the last repeats)
+  const HOLD = {
+    lute: { m: true, cell: [3, 6], at: [4, 3], r: [[4, 2], [4, 4]], l: [[-3, -1]] },
+    fiddle: { cell: [1, 5], at: [7, 1], r: [[7, -3]], l: [[-2, 1], [-1, 1], [0, 1], [1, 1]] },
+    flute: { cell: [0, 1], at: [0, -5], r: [[6, -5]], l: [[1, -5]] },
+    drum: { cell: [4, 1], at: [3, 3], r: [[6, -2], [5, 1], [6, -2]], l: [[-1, -1], [-1, -1], [0, 1]] },
+    horn: { cell: [0, 4], at: [1, -5], r: [[5, -6], [5, -7]] },
+    bagpipes: { cell: [3, 4], at: [5, 2], r: [[4, 1], [3, 2]], l: [[1, 2]] },
+    pot: { cell: [4, 2], at: [1, 5], r: [[5, -1], [4, 2]], l: [[-2, 5]] },
+    clap: { r: [[3, -2], [1, -2]], l: [[-2, -2], [0, -2]] },
+  };
+  const holdOf = (inst, how) => HOLD[inst] || (how === "pot" || how === "clap" ? HOLD[how] : null);
+  // the strum frame at this moment: lute and pot down on a note, fiddle bow along the stroke, drum hits alternating hands
+  function gripFrame(inst, how, t, hit, calm) {
+    const on = !calm && hit && hit.since < 0.14;
+    if (inst === "fiddle") return calm || !hit ? 1 : R(clamp(hit.since / Math.max(0.15, hit.d), 0, 1) * 3);
+    if (inst === "drum") return on ? 1 + (Math.floor((t - hit.since) * 4.1) & 1) : 0;
+    if (inst === "horn") return !calm && hit && hit.since < hit.d ? 1 : 0;
+    return on ? 1 : 0;
+  }
+  // where the hands go at frame k, in sprite pixels facing right, for Art.heroPose's arms
+  function grip(inst, how, k) {
+    const g = holdOf(inst, how);
+    if (!g) return null;
+    const pick = (a) => (a ? a[Math.min(k, a.length - 1)] : null), r = pick(g.r), l = pick(g.l);
+    return { r: r && [14 + r[0], 18 + r[1]], l: l && [14 + l[0], 18 + l[1]] };
+  }
+  // a hero holding an instrument: the posed body and the hands alone (to lay over the instrument), at frame k, flipped for left
+  const heldCvs = new Map();
+  function held(h, inst, how, f) {
+    const cv = (k, left, part) => {
+      const key = (h.id || h.name) + ":" + inst + how + k + (left ? "L" : "") + part + (f || 0);
+      if (!heldCvs.has(key)) {
+        let c = null;
+        try { const arms = grip(inst, how, k); if (arms) { const g = Art.heroPose(bare(h), f || 0, App.heroLook(h), { arms, part: part ? "hands" : null }); c = (left ? g.flipX() : g).toCanvas(1); } } catch (e) { c = null; }
+        heldCvs.set(key, c);
+      }
+      return heldCvs.get(key);
+    };
+    return { body: (k, left) => cv(k, left, false), hands: (k, left) => cv(k, left, true) };
+  }
+  // the sprite `n` placed so its cell (c, r) lands on (px, py), mirrored if m
+  function putCell(ctx, cv, n, c, r, px, py, m) {
+    const rows = ROWS[n][0], cols = Math.max(...rows.map((s) => s.length)), cc = m ? cols - 1 - c : c;
+    put(ctx, cv, px - 1 - cc + ((cols + 2) >> 1), py + rows.length - 1 - r, m);
+  }
+  // one player's instrument in their hands: x, y the body's centre line and chest height, face the way they look; hands(k) the
+  // player's hands alone at frame k (held(...).hands), laid over the instrument so they hold it
+  function drawInst(ctx, inst, how, x, y, face, t, hit, calm, tint, hands) {
+    const on = !calm && hit && hit.since < 0.14, sounding = !calm && hit && hit.since < hit.d;
+    const g = holdOf(inst, how), k = gripFrame(inst, how, t, hit, calm), left = face < 0;
     const s = (n) => (tint ? tinted(spr(n), tint) : spr(n));
-    if (inst === "lute") { put(ctx, s("lute"), ix, y + 2 + bob, left); if (on && !calm) { dot(ctx, ix - face, y - 3, "#fff4dc"); dot(ctx, ix + face, y - 2, "#fff4dc", 0.6); } }
+    const P = (dx, dy) => [x + face * dx, y + dy];
+    const place = (n, dy) => { const [px, py] = P(g.at[0], g.at[1] + (dy || 0)); putCell(ctx, s(n), n, g.cell[0], g.cell[1], px, py, !!g.m !== left); };
+    const hand = (side) => { const a = g && g[side]; return a ? P(...a[Math.min(k, a.length - 1)]) : null; };
+    if (inst === "lute") { place("lute"); if (on) { const [px, py] = P(5, 0); dot(ctx, px, py, "#fff4dc"); dot(ctx, px + face * 2, py + 1, "#fff4dc", 0.6); } }
     else if (inst === "fiddle") {
-      put(ctx, s("fiddle"), ix, y + 1, left);
-      // the bow saws on its own across the strings, a stroke per note
-      const ph = calm ? 0.5 : hit ? clamp(hit.since / Math.max(0.15, hit.d), 0, 1) : 0.5, sx = (ph - 0.5) * 8;
-      bow(ctx, ix - 7 + sx, y - 9, ix + 5 + sx, y - 4);
+      place("fiddle");
+      // the bow in the far hand, drawn across the strings a stroke per note
+      const [bx, by] = hand("l");
+      bow(ctx, bx - face * 2, by + 1, bx + face * 12, by - 5);
     } else if (inst === "flute") {
-      put(ctx, s("flute"), x + face * 8, y - 5 + (calm ? 0 : held ? 0 : 1), left);
-      if (held && !calm) for (let k = 0; k < 2; k++) dot(ctx, x + face * (15 + k * 2 + frac(t * 3) * 2), y - 8 - k, "#e8f0ff", 0.6 - k * 0.2);
+      place("flute");
+      if (sounding) for (let j = 0; j < 2; j++) dot(ctx, ...P(13 + j * 2 + frac(t * 3) * 2, -7 - j), "#e8f0ff", 0.6 - j * 0.2);
     } else if (inst === "drum") {
-      put(ctx, s("drum"), ix, y + 9 + bob, left);
-      // a floating beater comes down on each hit
-      const by = on && !calm ? y + 1 : y - 3;
-      line(ctx, ix + face * 2, by, ix + face * 5, by - 4, "#e8d8b0");
-    } else if (inst === "horn") put(ctx, s("horn"), x + face * 9, y - 3 - (held && !calm ? 2 : 0), left);
-    else if (inst === "bagpipes") { const sq = on && !calm ? 1 : 0; put(ctx, s("bagpipes"), ix, y + 4 + sq, left); }
+      place("drum");
+      // a beater in each hand, its head on the skin when that hand strikes
+      for (const side of ["r", "l"]) { const [hx, hy] = hand(side), d = side === "r" ? -face : face; line(ctx, hx, hy + 1, hx + d * 2, hy + 3, "#e8d8b0"); dot(ctx, hx + d * 2, hy + 3, "#fff4dc"); }
+    } else if (inst === "horn") place("horn", sounding ? -1 : 0);
+    else if (inst === "bagpipes") place("bagpipes", on ? 1 : 0);
     else if (how === "pot") {
-      put(ctx, s("pot"), ix, y + 9, left);
-      put(ctx, spr("spoon"), ix + face * 2, on && !calm ? y + 3 : y - 1, left);
-    } else if (how === "clap" && on && !calm) { spark(ctx, ix, y - 4, "#ffe8a0", 2); spark(ctx, ix + face * 3, y - 9, "#e8f0ff", 1); }
+      place("pot");
+      const [hx, hy] = hand("r");
+      putCell(ctx, spr("spoon"), "spoon", 4, 4, hx, hy, left);
+    } else if (how === "clap" && on) { spark(ctx, ...P(1, -6), "#ffe8a0", 2); spark(ctx, ...P(4, -10), "#e8f0ff", 1); }
+    const hc = g && hands ? hands(k) : null;
+    if (hc) ctx.drawImage(hc, R(x) - 14, R(y) - 18);
   }
   const tintCache = new Map();
   function tinted(cv, col) {
@@ -152,9 +204,12 @@
       const h = heroOf(p.id, p.name), [x, y0] = iso(u, v), y = y0 - (raised ? 4 : 0), face = p.how === "lead" ? 1 : x < OX ? 1 : -1;
       const a = Tavern.actor(bare(h), 0, 0, {});
       const c = { a, x, y, key: u + v + (raised ? 0.01 : 0), role: "band", face, ph: h01(u, v), id: p.id, p };
+      // a player's arms go to the instrument: the figure is swapped for the pose of the moment's strum frame
+      const H = holdOf(p.inst || null, p.how) ? held(h, p.inst || null, p.how) : null, looks = {};
+      if (H) c.look = (k) => looks[k] || (looks[k] = Ballad.figure(Object.assign({}, a, { right: H.body(k, false) || a.right, left: H.body(k, true) || a.left }), 0, 0));
       c.extra = (ctx, t, pose, f) => {
         const fc = pose.face > 0 ? 1 : -1;
-        drawInst(ctx, p.inst || null, p.how, R(f.x + (pose.dx || 0)), R(f.y - 15 + (pose.dip || 0)), fc, t, joined(p, t) ? hit(p.id, t) : null, calm);
+        drawInst(ctx, p.inst || null, p.how, R(f.x + (pose.dx || 0)), R(f.y - 15 + (pose.dip || 0)), fc, t, joined(p, t) ? hit(p.id, t) : null, calm, null, H ? (k) => H.hands(k, fc < 0) : null);
       };
       cast.push(c);
       anchors[p.id] = [x - CX, y - (a.right.height || 34) - 1 - CY];
@@ -173,6 +228,7 @@
         p.dip = !calm && live && beatOn(t) ? 1 : 0;
         if (pl && pl.p.how === "lead" && t > endT + 0.4 && t < endT + 3) p.lift = calm ? 0 : frac((t - endT) / 0.9) < 0.15 ? 1 : 0;
         if (pl && pl.p.how === "over" && live) p.dx = f.face;
+        if (pl && pl.look) { const L = pl.look(gripFrame(pl.p.inst || null, pl.p.how, t, joined(pl.p, t) ? hit(pl.id, t) : null, calm)); f.img = L.img; f.shut = L.shut; }
         return;
       }
       if (f.role !== "local" && f.role !== "keeper") return;
@@ -359,7 +415,9 @@
     const cast = order.map((p, i) => {
       const h = heroOf(p.id, p.name), x = R(x0 + i * gap), left = x > W / 2 + 4;
       const g = Art.heroGrid(bare(h), 0, App.heroLook(h)), cv = (left ? g.flipX() : g).toCanvas(1), col = lift((h.look || {}).fav, 0.55);
-      return { p, h, x, left, col, dark: silhouette(cv, col, false), lit: silhouette(cv, col, true), fy: R(ridge(x)) + 1 };
+      const H = holdOf(p.inst || null, p.how) ? held(h, p.inst || null, p.how) : null, sil = {};
+      const posed = H ? (k, hands) => { const key = k + (hands ? "h" : ""); if (!(key in sil)) { const pc = hands ? H.hands(k, left) : H.body(k, left); sil[key] = pc ? silhouette(pc, col, true) : null; } return sil[key]; } : null;
+      return { p, h, x, left, col, dark: silhouette(cv, col, false), lit: silhouette(cv, col, true), posed, fy: R(ridge(x)) + 1 };
     });
     const pet = (rec.pets || [])[0], petOwner = pet && App.heroes && App.heroes[pet.owner];
     const petCast = petOwner && petOwner.pet ? (() => {
@@ -432,9 +490,9 @@
       for (const c of cast) {
         const on = lit(c, t) && t < endT + 2.5;
         if (on) pglow(ctx, c.x, c.fy - 16, 16, 14, c.col, calm ? 0.4 : 0.4 + 0.1 * Math.sin(t * 2.4 + c.x), 5);
-        const img = on ? c.lit : c.dark;
+        const k = gripFrame(c.p.inst || null, c.p.how, t, hit(c.p.id, t), calm), img = on ? (c.posed && c.posed(k)) || c.lit : c.dark;
         ctx.drawImage(img, c.x - (img.width >> 1), c.fy - img.height);
-        if (on) drawInst(ctx, c.p.inst || null, c.p.how, c.x, c.fy - 15, c.left ? -1 : 1, t, hit(c.p.id, t), calm, c.col);
+        if (on) drawInst(ctx, c.p.inst || null, c.p.how, c.x, c.fy - 15, c.left ? -1 : 1, t, hit(c.p.id, t), calm, c.col, c.posed ? (kk) => c.posed(kk, true) : null);
       }
       if (petCast) {
         const on = t > chorusT && t < endT + 2;
@@ -661,5 +719,5 @@
 
   // pure: a plan's length and cues, for the night gallery and tests
   function timeline(rec, part) { const P = Music.plan(Music.specFor(rec, Music.words(rec.song), part || "short")); return { len: P.len, cues: P.cues, lines: P.lines.length }; }
-  window.MusicReplay = { player, register, kindOf, timeline, strikes, castOf, SCENES, drawInst, GLYPH };
+  window.MusicReplay = { player, register, kindOf, timeline, strikes, castOf, SCENES, drawInst, grip, gripFrame, held, GLYPH };
 })();

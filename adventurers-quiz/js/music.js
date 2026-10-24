@@ -301,40 +301,208 @@
   }
 
   // ---------- the league's event ballads (the Songs page's bard) ----------
-  // the bard's tunes are kept note for note from before the ballads moved onto this engine, so a ballad the league already knows
-  // still goes the way it always went; one syllable per step, the line's last held, a lute arpeggio and a hat on the off-beats
-  const BALLAD = { glory: { scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 7, 9, 5], bpm: 112, root: 60 }, sad: { scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 8, 3, 10], bpm: 76, root: 57 },
-    shame: { scale: [0, 2, 4, 5, 7, 9, 10], prog: [0, 10, 5, 0], bpm: 132, root: 62 } };
+  // each ballad draws its own arrangement from its seed and its number in the league (key, tempo, metre, verse and chorus chords, accompaniment, lead instrument,
+  // melody shape), so two glory songs never share one backing; a song always plays the same way. One syllable per note, each line
+  // starts on the bar, and the chorus has its own chords and a higher hook in its own rhythm that comes back the same every time
+  const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], MIX = [0, 2, 4, 5, 7, 9, 10];
+  const BALLAD = {
+    glory: { roots: [60, 62, 57, 55, 58, 59], bpm: [100, 132], meters: ["4/4", "6/8", "3/4"], slow: false,
+      progs: [{ s: MAJ, v: [0, 4, 5, 3], c: [3, 0, 4, 0] }, { s: MAJ, v: [0, 3, 0, 4], c: [0, 4, 5, 3], lift: true }, { s: MAJ, v: [0, 5, 3, 4], c: [3, 4, 0, 0] },
+        { s: MAJ, v: [0, 0, 3, 4], c: [5, 3, 0, 4], lift: true }, { s: MIX, v: [0, 6, 3, 0], c: [3, 0, 6, 0] }, { s: MAJ, v: [0, 3, 4, 0], c: [5, 1, 4, 0] }],
+      pats: ["arp", "strum", "march", "oompah", "drone"], leads: ["horn", "fiddle", "flute", "bagpipes", "lute"], perc: ["hat", "drum", "clap", null] },
+    sad: { roots: [57, 55, 59, 56, 60, 58], bpm: [62, 84], meters: ["4/4", "3/4", "3/4"], slow: true,
+      progs: [{ s: MIN, v: [0, 5, 2, 6], c: [5, 6, 0, 0] }, { s: MIN, v: [0, 3, 0, 4], c: [2, 6, 3, 4] }, { s: MIN, v: [0, 6, 5, 6], c: [2, 6, 3, 0] },
+        { s: DOR, v: [0, 3, 0, 3], c: [6, 3, 0, 0] }, { s: MIN, v: [0, 3, 5, 4], c: [5, 2, 6, 0], lift: true }],
+      pats: ["arp", "drone", "strum", "arp"], leads: ["fiddle", "flute", "lute"], perc: [null, null, "drum"] },
+    shame: { roots: [62, 60, 57, 59, 61, 55], bpm: [118, 148], meters: ["4/4", "6/8", "6/8", "3/4"], slow: false,
+      progs: [{ s: MIX, v: [0, 6, 3, 0], c: [3, 0, 6, 0] }, { s: MAJ, v: [0, 4, 0, 4], c: [3, 0, 4, 0] }, { s: MIX, v: [0, 0, 6, 0], c: [3, 3, 0, 6] },
+        { s: MAJ, v: [0, 3, 4, 0], c: [0, 5, 3, 4], lift: true }, { s: DOR, v: [0, 3, 0, 3], c: [6, 6, 0, 0] }],
+      pats: ["oompah", "strum", "arp", "oompah"], leads: ["fiddle", "bagpipes", "flute", "lute", "horn"], perc: ["clap", "pot", "hat"] },
+  };
+  // rhythm cells in eighths; a lament takes the long ones, a brisk song the short ones
+  const CELLS = { "4/4": [[2], [1, 1], [3, 1], [1, 1, 2], [2, 2, 4]], "3/4": [[2], [4, 2], [3, 1, 2], [1, 1], [2, 1, 1]], "6/8": [[2, 1], [1, 1, 1], [3], [2, 1, 3]] };
+  const SHAPES = { rise: (x) => x, fall: (x) => 1 - x, arch: (x) => Math.sin(Math.PI * x), valley: (x) => 1 - Math.sin(Math.PI * x), wave: (x) => 0.5 + 0.5 * Math.sin(2 * Math.PI * x) };
+  const STEPS = [[1], [1, 1, 2], [1, 2, 3], [1, 2]];
   const BARD = { pitch: 60, timbre: "buzzy", formant: 1, vib: 0.5 };
+  function arrangement(song) {
+    const seed = song.seed || hash(song.id || song.title || "ballad"), r = rngOf(hash("ballad:" + seed)), pick = (a) => a[Math.floor(r() * a.length)];
+    // a lost raid ("The Night Thornwall Burned") is sung as a lament
+    const mood = song.mood === "raid_lost" ? "sad" : BALLAD[song.mood] ? song.mood : "glory", M = BALLAD[mood];
+    // a league's songs are numbered (s<day>_<n>), so the backing's big choices step through each list on irrational strides: songs
+    // that follow each other sound apart, where ten seeded draws would often land five on one choice
+    const no = /_(\d+)$/.exec(song.id || ""), turn = (a, k) => (no ? a[Math.floor((((+no[1] + 1) * [0.618034, 0.414214, 0.732051, 0.236068, 0.645751][k]) % 1) * a.length)] : pick(a));
+    const meter = turn(M.meters, 0), prog = turn(M.progs, 1), root = turn(M.roots, 4);
+    const bpm = Math.round((M.bpm[0] + r() * (M.bpm[1] - M.bpm[0])) * (meter === "6/8" ? 0.75 : 1));
+    const pat = turn(M.pats.filter((p) => p !== "march" || meter === "4/4"), 2), lead = turn(M.leads, 3), perc = pat === "march" ? null : pick(M.perc);
+    const cells = CELLS[meter].filter((c) => { const m = c.reduce((a, b) => a + b, 0) / c.length; return M.slow ? m >= 1.5 : m <= 2; });
+    const vCell = pick(cells), cCell = pick(cells.filter((c) => c !== vCell).concat(cells.length > 1 ? [] : [vCell]));
+    const vShape = pick(["rise", "fall", "arch", "valley", "wave"]), cShape = pick(["arch", "fall", "rise", "wave"].filter((s) => s !== vShape));
+    const vSteps = pick(STEPS), cSteps = pick(STEPS), vLo = pick([-1, 0, 1]), vSpan = pick([4, 5, 6, 7]), cUp = pick([2, 3, 4]), cSpan = pick([4, 5, 6]);
+    return { mood, meter, bpm, root, prog, pat, lead, perc, vCell, cCell, vShape, cShape, vSteps, cSteps, vLo, vSpan, cUp, cSpan, seed };
+  }
   function ballad(song) {
-    const mode = BALLAD[song.mood] || BALLAD.glory, r = rngOf(song.seed || 7), beat = 60 / mode.bpm;
-    const P = { len: 0, unit: beat / 2, bar: beat * 4, bpm: mode.bpm, notes: [], hits: [], chords: [], lines: [], cues: [], lead: "bard", skill: 0.85, inst: "lute" };
-    const motif = {}, stepLen = beat * (song.mood === "sad" ? 1 : 0.5);
-    let t = 0, deg = 2;
-    (song.lyrics || []).forEach((line, li) => {
-      // each chorus line keeps its own tune every time it comes back; a ballad that only repeats its title has one, as it always did
-      const syls = syllables(line), chorus = isChorus(song, line);
-      if (chorus && !motif[line]) motif[line] = syls.map(() => (deg = clamp(deg + [-1, 1, 1, 2, -2, 0][Math.floor(r() * 6)], 0, 9)));
-      const notes = chorus && motif[line] ? motif[line] : syls.map((_, i) => (i === syls.length - 1 ? [0, 2, 4][Math.floor(r() * 3)] : (deg = clamp(deg + [-1, 1, -1, 2, -2, 1, 0][Math.floor(r() * 7)], 0, 9))));
-      const L = { t0: t, t1: t, text: line, chorus, idx: li, words: [], along: [] };
-      syls.forEach((syl, si) => {
-        const d = notes[si] % 7, oct = Math.floor(notes[si] / 7) * 12, len = si === syls.length - 1 ? stepLen * 2 : stepLen;
-        P.notes.push({ t, d: Math.max(0.09, len * 0.85), m: mode.root + mode.scale[d] + oct, who: "bard", part: "voice", syl: syl.txt, line: li, si, vol: 0.24, cue: true, vib: len > 0.5 });
-        t += len;
+    const A = arrangement(song), S = A.prog.s, meter = A.meter, U = UNITS[meter], BU = BEAT_UNITS[meter], LB = meter === "4/4" ? 2 : 4;
+    const unit = meter === "6/8" ? 60 / A.bpm / 3 : 60 / A.bpm / 2, bar = U * unit, root = A.root;
+    const P = { len: 0, unit, bar, bpm: A.bpm, meter, notes: [], hits: [], chords: [], lines: [], cues: [], lead: "bard", skill: 0.85, inst: A.lead,
+      arr: { key: root, scale: S === MAJ ? "major" : S === MIN ? "minor" : S === DOR ? "dorian" : "mixolydian", meter, bpm: A.bpm, verse: A.prog.v, chorus: A.prog.c,
+        lift: !!A.prog.lift, pat: A.pat, lead: A.lead, perc: A.perc, cells: [A.vCell, A.cCell], shapes: [A.vShape, A.cShape] } };
+    let dMin = -7, dMax = 14;
+    while (degMidi({ scale: S }, root, dMin) < 53) dMin++;
+    while (degMidi({ scale: S }, root, dMax) > 76) dMax--;
+    let base = -3;
+    while (degMidi({ scale: S }, root, base) < 58) base++;
+    const lyrics = song.lyrics || [], isCh = lyrics.map((l) => isChorus(song, l));
+    const blocks = isCh.filter((c, i) => c && !isCh[i - 1]).length;
+
+    // a line's rhythm and notes against the chords of the bars it lands on (chordAt(bar) gives a scale-degree root)
+    function tune(n, cell, chordAt, lo, span, shape, steps, end, lr) {
+      const hold = BU, d = [];
+      for (let k = 0; k < n - 1; k++) d.push(cell[k % cell.length]);
+      let sum = d.reduce((a, b) => a + b, 0);
+      while (sum + hold > LB * U) {
+        let j = -1;
+        for (let k = d.length - 1; k >= 0; k--) if (d[k] > 1 && (j < 0 || d[k] > d[j])) j = k;
+        if (j < 0) break;
+        d[j]--; sum--;
+      }
+      const bars = sum + hold > LB * U ? Math.ceil((sum + hold) / U) : sum + hold + BU <= (LB / 2) * U ? LB / 2 : LB, tail = bars * U - sum;
+      d.push(tail >= hold + BU ? tail - BU : tail);
+      const chords = [];
+      for (let b = 0; b < bars; b++) chords.push(chordAt(b));
+      const degs = [], top = Math.min(dMax, lo + span), bot = Math.max(dMin, lo);
+      let pos = 0, deg = clamp(nearestChordTone(Math.round(bot + (top - bot) * SHAPES[shape](0)), chords[0]), dMin, dMax);
+      d.forEach((u, k) => {
+        const c = chords[Math.floor(pos / U)], strong = pos % BU === 0;
+        if (k === n - 1 && n > 1) {
+          // a question ends on the fifth or third, an answer comes home to the tonic
+          const want = end === "home" ? (Math.abs(deg - 7) < Math.abs(deg) ? 7 : 0) : nearestChordTone(lr() < 0.6 ? 4 : 2, c);
+          deg = clamp(want, dMin, dMax);
+        } else if (k > 0) {
+          const target = bot + (top - bot) * SHAPES[shape](k / Math.max(1, n - 1)), gap = target - deg;
+          const step = Math.abs(gap) < 0.8 ? [0, 1, -1][Math.floor(lr() * 3)] : Math.sign(gap) * Math.min(Math.ceil(Math.abs(gap)), steps[Math.floor(lr() * steps.length)]);
+          deg += step;
+          if (strong) deg = nearestChordTone(deg, c);
+          deg = clamp(deg, Math.max(dMin, bot - 1), Math.min(dMax, top + 1));
+        }
+        degs.push(deg);
+        pos += u;
       });
+      return { d, degs, chords, bars };
+    }
+    const vr = (li) => rngOf(hash(A.seed + ":v:" + li)), cr = (line) => rngOf(hash(A.seed + ":c:" + line));
+    const memo = {};
+    const chorusTune = (line, from) => memo[line] || (memo[line] = tune(Math.max(1, syllables(line).length), A.cCell, (b) => A.prog.c[(from + b) % 4],
+      base + A.vLo + Math.max(A.cUp, A.vSpan + A.cUp - A.cSpan), A.cSpan, A.cShape, A.cSteps, isCh[lyrics.lastIndexOf(line) + 1] ? "away" : "home", cr(line)));
+    const leadUp = A.lead === "flute" ? 12 : 0, accVol = A.mood === "sad" ? 0.8 : 1;
+    const midi = (dg, sh) => degMidi({ scale: S }, root, dg) + sh;
+    const chordMidi = (c, sh) => {
+      let r0 = degMidi({ scale: S }, root - 12, c) + sh;
+      while (r0 > root - 5) r0 -= 12;
+      while (r0 < root - 17) r0 += 12;
+      const tri = [c, c + 2, c + 4].map((x) => { let m = degMidi({ scale: S }, root, x) + sh; while (m > root + 7) m -= 12; while (m < root - 5) m += 12; return m; }).sort((a, b) => a - b);
+      return { bass: r0, fifth: r0 + degMidi({ scale: S }, 0, c + 4) - degMidi({ scale: S }, 0, c), tri };
+    };
+    const leadNote = (t, d, m, vol) => {
+      while (m + leadUp > 86) m -= 12;
+      if (A.lead === "lute") P.notes.push({ t, d, m, who: "bard", part: "inst", inst: "lute", vol: vol * 0.45 });
+      else P.notes.push({ t, d: d * 0.92, m: m + leadUp, who: "bard", part: "inst", inst: A.lead, vol });
+    };
+    // the band under a bar: one chord, the song's own pattern, and its percussion
+    function backing(t0, c, sh, last) {
+      const ch = chordMidi(c, sh), tri = ch.tri, bt = BU * unit, lute = (t, m, vol, d) => P.notes.push({ t, d: d || bt, m, who: "bard", part: "acc", inst: "lute", vol: vol * accVol });
+      const strum = (t, vol, d) => tri.forEach((m, k) => lute(t + k * 0.014, m, vol, d));
+      P.chords.push({ t: t0, d: bar, deg: c, m: tri.slice() });
+      const at = (u) => t0 + u * unit;
+      if (last) { lute(t0, ch.bass, 0.19, bar * 2); strum(t0 + 0.03, 0.07, bar * 2); if (A.lead === "bagpipes" || A.pat === "drone") P.notes.push({ t: t0, d: bar * 1.5, m: root - 12 + sh, who: "bard", part: "drone", inst: A.lead === "bagpipes" ? "bagpipes" : "fiddle", vol: 0.07 }); return; }
+      if (A.pat === "arp") {
+        const seq = U === 8 ? [ch.bass, tri[0], tri[1], tri[2], tri[0] + 12, tri[2], tri[1], tri[0]] : [ch.bass, tri[0], tri[1], tri[2], tri[1], tri[0]];
+        seq.forEach((m, u) => lute(at(u), m, u === 0 ? 0.19 : 0.085));
+      } else if (A.pat === "strum") {
+        lute(t0, ch.bass, 0.17);
+        const hitsU = { "4/4": [0, 2, 3, 4, 6], "3/4": [0, 2, 4], "6/8": [0, 2, 3, 5] }[meter];
+        hitsU.forEach((u) => strum(at(u), u % BU === 0 ? 0.075 : 0.045, bt * 0.9));
+      } else if (A.pat === "oompah") {
+        const oom = A.lead === "horn" ? (t, m) => P.notes.push({ t, d: bt * 0.6, m, who: "bard", part: "acc", inst: "horn", vol: 0.13 }) : (t, m) => lute(t, m, 0.2, bt * 0.8);
+        const seq = { "4/4": [[0, "b"], [2, "c"], [4, "f"], [6, "c"]], "3/4": [[0, "b"], [2, "c"], [4, "c"]], "6/8": [[0, "b"], [2, "c"], [3, "f"], [5, "c"]] }[meter];
+        for (const [u, k] of seq) k === "c" ? strum(at(u), 0.06, bt * 0.45) : oom(at(u), k === "b" ? ch.bass : ch.fifth);
+      } else if (A.pat === "drone") {
+        if (A.lead === "bagpipes") P.notes.push({ t: t0, d: bar, m: root - 12 + sh, who: "bard", part: "drone", inst: "bagpipes", vol: 0.08 });
+        else for (const m of [root - 12, root - 5]) P.notes.push({ t: t0, d: bar, m: m + sh, who: "bard", part: "drone", inst: "fiddle", vol: 0.035 });
+        lute(t0, ch.bass, 0.15, bar);
+        // the fiddle's line over the drone: the chord's upper notes, a half bar each
+        const half = Math.floor(U / BU / 2) * BU || BU;
+        for (let u = 0, k = 0; u < U; u += half, k++) P.notes.push({ t: at(u), d: half * unit * 0.95, m: tri[(k + 1) % 3] + 12, who: "bard", part: "acc", inst: "fiddle", vol: 0.05 });
+      } else if (A.pat === "march") {
+        lute(at(0), ch.bass, 0.19); lute(at(4), ch.fifth, 0.15); strum(at(2), 0.06, bt * 0.6); strum(at(6), 0.06, bt * 0.6);
+        for (const u of [0, 4]) P.hits.push({ t: at(u), kind: "drum", who: "bard", vol: u ? 0.24 : 0.32 });
+        for (const u of [2, 6, 7]) P.hits.push({ t: at(u), kind: "slap", who: "bard", vol: u === 7 ? 0.14 : 0.22 });
+      }
+      if (A.perc === "hat") for (let u = BU === 3 ? 2 : 1; u < U; u += BU) P.hits.push({ t: at(u), kind: "hat", who: "bard", vol: 0.08 });
+      else if (A.perc === "clap") for (const u of { "4/4": [2, 6], "3/4": [2, 4], "6/8": [3] }[meter]) P.hits.push({ t: at(u), kind: "clap", who: "bard", vol: 0.3 });
+      else if (A.perc === "pot") for (let u = BU === 3 ? 2 : 1; u < U; u += BU) P.hits.push({ t: at(u), kind: "pot", who: "bard", vol: 0.28 });
+      else if (A.perc === "drum") P.hits.push({ t: t0, kind: "drum", who: "bard", vol: A.mood === "sad" ? 0.16 : 0.26 });
+    }
+    // the lead instrument plays a tune's notes (the intro, an interlude, or doubling the chorus)
+    function playTune(tn, t0, sh, vol, maxBars) {
+      let pos = 0;
+      tn.d.forEach((u, k) => { if (pos < maxBars * U) leadNote(t0 + pos * unit, Math.min(u, maxBars * U - pos) * unit, midi(tn.degs[k], sh), vol); pos += u; });
+    }
+
+    let t = 0, vb = 0, cb = 0, block = 0, qa = 0, shift = 0;
+    const firstCh = lyrics.findIndex((l, i) => isCh[i]);
+    const hook = firstCh >= 0 ? chorusTune(lyrics[firstCh], 0) : tune(Math.max(1, syllables(lyrics[0] || "la").length), A.vCell, (b) => A.prog.v[b % 4], base + A.vLo, A.vSpan, A.vShape, A.vSteps, "home", vr(0));
+    const introBars = Math.min(hook.bars, bar < 2.4 ? LB : LB / 2);
+    for (let b = 0; b < introBars; b++) backing(t + b * bar, hook.chords[b % hook.chords.length], 0);
+    playTune(hook, t, 0, 0.15, introBars);
+    t += introBars * bar;
+    P.cues.push({ t: 0, kind: "start" });
+    lyrics.forEach((line, li) => {
+      const syls = syllables(line), chorus = isCh[li];
+      if (chorus && !isCh[li - 1]) { block++; cb = 0; if (A.prog.lift && blocks > 1 && block === blocks) shift = 2; }
+      const L = { t0: t, t1: t, text: line, chorus, idx: li, words: [], along: [] };
+      if (!syls.length) { P.lines.push(L); return; }
+      let tn;
+      if (chorus) tn = chorusTune(line, cb);
+      else {
+        const v0 = vb;
+        tn = tune(syls.length, A.vCell, (b) => A.prog.v[(v0 + b) % 4], base + A.vLo, A.vSpan, A.vShape, A.vSteps, li === lyrics.length - 1 || qa % 2 ? "home" : "away", vr(li));
+        qa++;
+      }
+      let pos = 0;
+      syls.forEach((syl, si) => {
+        const len = tn.d[si] * unit;
+        P.notes.push({ t: t + pos * unit, d: Math.max(0.09, len * 0.85), m: midi(tn.degs[si], shift), who: "bard", part: "voice", syl: syl.txt, line: li, si, vol: chorus ? 0.25 : 0.23, cue: true, vib: len > 0.5 });
+        pos += tn.d[si];
+      });
+      for (let b = 0; b < tn.bars; b++) backing(t + b * bar, tn.chords[b], shift);
+      if (chorus) playTune(tn, t, shift, 0.075, tn.bars);
+      else {
+        // a long held end gets an answering run from the lead instrument
+        const lastAt = pos - tn.d[syls.length - 1], free = tn.bars * U - lastAt - BU;
+        if (free >= 2 * BU) {
+          const ch = chordMidi(tn.chords[tn.bars - 1], shift).tri.map((m) => m + 12);
+          [ch[2], ch[1], ch[0]].slice(0, free >= 3 * BU ? 3 : 2).forEach((m, k) => leadNote(t + (lastAt + BU + k * BU) * unit, BU * unit, m, 0.1));
+        }
+      }
+      t += tn.bars * bar;
       L.t1 = t;
       P.lines.push(L);
-      t += beat;
+      if (chorus) cb += tn.bars; else vb += tn.bars;
+      // between a chorus and the next verse, the lead plays the hook's opening over the verse's last chords
+      if (chorus && li < lyrics.length - 1 && !isCh[li + 1]) {
+        const ib = meter === "4/4" ? 1 : 2;
+        for (let b = 0; b < ib; b++) backing(t + b * bar, A.prog.v[(4 - ib + b) % 4], shift);
+        playTune(hook, t, shift, 0.12, ib);
+        t += ib * bar;
+        vb = 0; qa = 0;
+      }
     });
-    const end = t + beat * 2;
-    for (let bt = 0, i = 0; bt < end; bt += beat, i++) {
-      const base = mode.root - 12 + mode.prog[Math.floor(i / 4) % mode.prog.length];
-      if (i % 4 === 0) P.notes.push({ t: bt, d: beat, m: base - 12, who: "bard", part: "acc", inst: "lute", vol: 0.5 / 2.6 });
-      P.notes.push({ t: bt + (song.mood === "shame" ? beat * 0.5 : 0), d: beat, m: base + [0, 4, 7, 12][i % 4] + (mode.scale[2] === 3 && i % 4 === 1 ? -1 : 0), who: "bard", part: "acc", inst: "lute", vol: 0.22 / 2.6 });
-      if (song.mood !== "sad" && i % 2 === 1) P.hits.push({ t: bt, kind: "hat", who: "bard", vol: 0.08 });
-    }
+    backing(t, 0, shift, true);
+    leadNote(t, bar * 1.2, midi(7, shift) - (midi(7, shift) > 74 ? 12 : 0), 0.12);
+    const end = t + bar * 1.5;
     P.notes.sort((a, b) => a.t - b.t);
-    P.cues.push({ t: 0, kind: "start" }, { t: end, kind: "end" });
+    P.hits.sort((a, b) => a.t - b.t);
+    P.cues.push({ t: end, kind: "end" });
     P.len = end;
     return P;
   }
@@ -557,12 +725,19 @@
     for (const j of spec.joiners || []) v[j.id] = j.voice;
     return v;
   }
-  // the words of a book song or a hero's own song, by id
+  // the words of a book song, a tavern ballad or a hero's own song, by id
   function words(sg) {
     if (!sg) return null;
     const S = (root.LD && LD.static && LD.static.music) || {}, L = (root.LD && LD.league) || {};
     if (sg.src === "book") { const s = (S.songbook || []).find((x) => x.id === sg.id); return s ? { title: s.title, lines: s.lines, chorus: s.chorus, resp: s.resp || null } : null; }
     if (sg.src === "hero") { const s = (L.hero_songs || []).find((x) => x.id === sg.id); return s && s.lines ? { title: s.title, lines: s.lines, chorus: s.chorus || [0, 1] } : null; }
+    if (sg.src === "ballad") {
+      const s = (L.songs || []).find((x) => x.id === sg.id), lines = s && s.lyrics;
+      if (!lines || !lines.length) return null;
+      // a ballad's chorus is the pair of lines it comes back to
+      const i = lines.findIndex((x, k) => lines.indexOf(x, k + 1) > k);
+      return { title: s.title, lines, chorus: i >= 0 && i + 1 < lines.length ? [i, i + 1] : [0, 1] };
+    }
     return null;
   }
 
@@ -571,5 +746,5 @@
     return perform(ballad(song), { voices: { bard: BARD }, onNote: (n) => onSyl && onSyl(n.line, n.si), done: onEnd });
   }
 
-  root.Music = { plan, ballad, playBallad, isChorus, BARD, perform, render, stop, specFor, voices, words, syllables, parseFolk, INSTS, MODES, get playing() { return !!current; } };
+  root.Music = { plan, ballad, arrangement, playBallad, isChorus, BARD, perform, render, stop, specFor, voices, words, syllables, parseFolk, INSTS, MODES, get playing() { return !!current; } };
 })(typeof window !== "undefined" ? window : globalThis);
