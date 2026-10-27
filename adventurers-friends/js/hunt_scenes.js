@@ -797,7 +797,7 @@
   function make(block, opts) {
     opts = opts || {};
     const a = actOf(block), w = opts.w || W, h = opts.h || H;
-    const hr = block.hour != null ? block.hour : block.from != null ? Math.min(18.4, (block.from + Math.min(block.to || block.from + 1, block.from + 2)) / 2) : 12;
+    const hr = block.light != null ? block.light : block.hour != null ? block.hour : block.from != null ? Math.min(18.4, (block.from + Math.min(block.to || block.from + 1, block.from + 2)) / 2) : 12;
     const biome = HA.WILD[block.biome] ? block.biome : "plains";
     // a line in the mist is played in it: a clear or cloudy hour that says mist is drawn as fog
     const weather = a.mist && (!block.weather || block.weather === "clear" || block.weather === "cloudy") ? "fog" : block.weather;

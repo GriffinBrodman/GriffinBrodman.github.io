@@ -385,6 +385,8 @@
     candle: ["#e0d4b0", "#8ae8b8", "#1a3a2a"], wrecker: ["#d0a080", "#2a3a4a", "#ffd84a"], hermit: ["#d8783a", "#f0b880", "#1a1220"],
     wrack: ["#5a6428", "#a89a4a", "#f0f0a0"], frost_imp: ["#4a90c8", "#eaf6ff", "#ffe04a"], snowman: ["#e8f0f8", "#b8c8d8", "#2a2a30"],
     rime_wight: ["#9ab8c8", "#2a3440", "#4af0ff"],
+    mudlurker: ["#6e5634", "#c4a676", "#f0d850"], acolyte: ["#a4bcb0", "#2a4446", "#7af0c8"], deacon: ["#9ab2a8", "#1c303a", "#7af0c8"],
+    prior: ["#90aaa2", "#1c3640", "#8affd8"], bell_warden: ["#88a49e", "#2a3a3e", "#9affe0"],
   };
   // the human foes of the wilds beyond the bandits: what each wears and carries
   const HUMANS = {
@@ -393,7 +395,58 @@
     smuggler: { head: "wide_hat", outfit: "cloak", weapon: "spear", face: 1, hair: "#3a2a1a" },
     wrecker: { head: "hood", outfit: "cloak", weapon: "daggers", off: "lantern", face: 0 },
     rime_wight: { head: "ice_crown", outfit: "plate_dark", weapon: "sword", tier: 2, aura: "ice", scars: ["pale"], hair: "#d8e8f0", style: 1 },
+    // the drowned of Marrow's chapel: sodden robes, weed and barnacles, the sea-glow in their eyes; each rank grander than the last
+    acolyte: { head: "hood", outfit: "robe", weapon: "none", off: "lantern", scars: ["pale"], hair: "#3a4a3a", drowned: 1 },
+    deacon: { head: "none", outfit: "vestments", weapon: "mace", scars: ["pale"], hair: "#4a5a44", style: 6, tier: 2, drowned: 2, bell: 1 },
+    prior: { head: "mitre", outfit: "vestments", weapon: "staff", off: "lantern", tier: 3, aura: "mana", scars: ["pale"], hair: "#c8d0c4", style: 1, drowned: 2, tint: "#2a5a62" },
+    bell_warden: { head: "crown", outfit: "plate_dark", weapon: "spear", tier: 3, aura: "death", scars: ["pale"], hair: "#3e5e3a", style: 6, drowned: 3, bell: 2, tint: "#3a7a64", tintK: 0.5 },
   };
+
+  // a hundred years under the sea: the sea-glow in the eyes, a tidemark on the hem, barnacles, weed hanging off the shoulders; bell 1 is
+  // the deacon's hand-bell in the off hand, bell 2 the Bell-Warden's great bell carried as a shield
+  function seaworn(g, E, o) {
+    const OL = "#16121a", WD = ["#2e4a2a", "#46683a", "#6a9a48"], fill = (x, y) => { const c = g.get(x, y); return c && c !== OL; };
+    for (let y = 9; y < 12; y++) for (let x = 10; x < 18; x++) if (g.get(x, y) === "#b8c8e8") { g.set(x, y, E); g.set(x, y - 1, mix(E, "#ffffff", 0.55)); }
+    // the prior's vestments and the warden's plate have taken the sea's colour
+    if (o.tint) for (let y = 16; y < g.h; y++) for (let x = 4; x < 22; x++) {
+      const c = fill(x, y) && g.get(x, y), n = c && c[0] === "#" ? parseInt(c.slice(1), 16) : -1;
+      if (n < 0) continue;
+      const r = n >> 16, gg = (n >> 8) & 255, b = n & 255, lum = (r * 3 + gg * 6 + b) / 2550, sat = Math.max(r, gg, b) - Math.min(r, gg, b);
+      if (sat < 40 && !(r > 200 && gg > 150 && b < 120)) g.set(x, y, mix(c, mix(o.tint, lum > 0.5 ? "#e8f0e0" : "#0e1a1c", Math.abs(lum - 0.5) * 1.1), o.tintK || 1));
+    }
+    for (let y = 26; y < g.h; y++) for (let x = 0; x < g.w; x++) if (fill(x, y) && x > 6 && x < 21) g.set(x, y, mix(g.get(x, y), "#3e5a46", 0.18 + (y - 26) * 0.05));
+    for (const [x, y] of [[9, 28], [15, 30], [12, 25], [17, 27], [10, 21]].slice(0, 2 + o.drowned)) if (fill(x, y) && fill(x + 1, y)) { g.set(x, y, "#f0ecdc"); g.set(x + 1, y, "#b8b4a2"); if (fill(x, y + 1)) g.set(x, y + 1, "#d8d4c4"); }
+    const strands = [[7, 17, 4], [20, 17, 5], [9, 5, 3], [18, 6, 4], [8, 18, 3], [19, 18, 4]].slice(0, 2 + o.drowned * 1);
+    for (const [x, y0, len] of strands) {
+      let y = y0;
+      while (y < g.h && !fill(x, y)) y++;
+      for (let j = 0; j < len && y + j < g.h; j++) if (g.get(x, y + j)) g.set(x, y + j, j === len - 1 ? WD[2] : WD[j % 2]);
+    }
+    const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < g.w && y < g.h) g.set(x, y, c); };
+    const B = ["#a8e0c8", "#5aa08a", "#3a7a68", "#24524a"], RIM = "#d8a838";
+    if (o.bell === 1) {
+      const bx = 22, by = 23, rows = [[0, 0], [1, 1], [2, 1], [3, 2], [4, 2]];
+      for (let j = 0; j < 2; j++) { put(bx - 1, by - 2 + j, OL); put(bx + 1, by - 2 + j, OL); put(bx, by - 2 + j, "#7a5232"); }
+      for (const [dy, hw] of rows) { put(bx - hw - 1, by + dy, OL); put(bx + hw + 1, by + dy, OL); for (let dx = -hw; dx <= hw; dx++) put(bx + dx, by + dy, dy === 4 ? RIM : dx === -hw ? B[0] : dx === hw ? B[2] : B[1]); }
+      for (let dx = -3; dx <= 3; dx++) put(bx + dx, by + 5, OL);
+      put(bx, by + 5, "#c8a040"); put(bx, by + 6, OL);
+    }
+    if (o.bell === 2) {
+      const bx = 21, top = 15, rows = [[0, 1], [1, 2], [2, 2], [3, 3], [4, 3], [5, 3], [6, 3], [7, 4], [8, 4], [9, 4], [10, 5]];
+      for (let dx = -1; dx <= 1; dx++) { put(bx + dx, top - 2, OL); } put(bx - 2, top - 1, OL); put(bx + 2, top - 1, OL); put(bx - 1, top - 1, RIM); put(bx, top - 1, "#f0d070"); put(bx + 1, top - 1, RIM);
+      for (const [dy, hw] of rows) { put(bx - hw - 1, top + dy, OL); put(bx + hw + 1, top + dy, OL); }
+      for (const [dy, hw] of rows) for (let dx = -hw; dx <= hw; dx++) {
+        const u = (dx + hw) / (2 * hw || 1);
+        put(bx + dx, top + dy, dy === 10 ? (u < 0.3 ? "#f0d070" : RIM) : u < 0.25 ? B[0] : u < 0.6 ? B[1] : u < 0.85 ? B[2] : B[3]);
+      }
+      for (let dx = -6; dx <= 6; dx++) put(bx + dx, top + 11, OL);
+      for (let dx = -3; dx <= 3; dx++) put(bx + dx, top + 11, dx === 0 ? "#c8a040" : "#14181a");
+      for (const [dx, dy] of [[-1, 4], [1, 5], [-2, 7], [0, 3]]) put(bx + dx, top + dy, B[3]);
+      put(bx - 2, top + 2, "#f0ecdc"); put(bx + 2, top + 6, "#f0ecdc"); put(bx + 3, top + 7, "#b8b4a2");
+      for (let j = 0; j < 4; j++) put(bx + 4 - (j >> 1), top + 1 + j, j === 3 ? WD[2] : WD[1]);
+      put(bx, top + 4, E); put(bx, top + 5, mix(E, "#ffffff", 0.4));
+    }
+  }
 
   function drawMonster(body, pal, frame, boss, pose, look) {
     const p = MPAL[pal] || MPAL.grey;
@@ -415,6 +468,7 @@
           g = humanoid(p[0], p[1], Object.assign({ style: 0 }, HUMANS[pal]));
           // the wight's eyes burn with the cold that keeps it walking
           if (pal === "rime_wight" && !pose) for (let y = 9; y < 12; y++) for (let x = 10; x < 18; x++) if (g.get(x, y) === "#b8c8e8") { g.set(x, y, E); g.set(x, y - 1, mix(E, "#ffffff", 0.5)); }
+          if (HUMANS[pal].drowned && !pose) seaworn(g, E, HUMANS[pal]);
           break;
         }
         const [head, outfit, weapon] = map[pal] || ["none", "leather", "sword"];

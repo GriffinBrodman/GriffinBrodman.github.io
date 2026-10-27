@@ -184,7 +184,7 @@
 
   function nodeName(id, mid) {
     if (!id) return "";
-    const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || { name: id }).name;
+    const n = (S.towns[id] || S.wilds[id] || S.dungeons[id] || (S.layer_places || {})[id] || { name: id }).name;
     return mid && n.startsWith("The ") ? "the" + n.slice(3) : n;
   }
   function clsName(id) { return (S.classes[id] || { name: id }).name; }
@@ -349,18 +349,27 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   }
   // the heavy players (fights, meals, readings, music and night games) load with their first page, in order; a <script> tag works from file://
   const scripts = {};
+  // the big tables only the heavy players read (the songbook, the fight effects, the gear tables, the dishes) ride in their own data file
+  // (league/export.py LAZY_STATIC), folded into S before the player that reads them loads
+  const STATIC_OF = { music: "static_music", music_replay: "static_music", fight_director: "static_fight", views_dungeon: "static_gear",
+    delve_scenes: "static_gear", food_art: "static_food", stage: "static_food" };
+  function staticPart(key) {
+    return load(key).then((d) => {
+      for (const k of Object.keys(d)) S[k] = S[k] && typeof S[k] === "object" && !Array.isArray(S[k]) ? Object.assign(S[k], d[k]) : d[k];
+    });
+  }
   function need(names) {
-    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js${V}"]`) ? Promise.resolve() : new Promise((resolve, reject) => {
+    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js${V}"]`) ? Promise.resolve() : (STATIC_OF[n] ? staticPart(STATIC_OF[n]) : Promise.resolve()).then(() => new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = `js/${n}.js${V}`;
       s.onload = resolve;
       s.onerror = () => { delete scripts[n]; reject(new Error("could not load " + n)); };
       document.head.appendChild(s);
-    }))), Promise.resolve());
+    })))), Promise.resolve());
   }
   // the heavy drawing and sound files load with the first page that uses them (eval #92), in this order: the place headers before the
   // tavern and camp that stand in them, the tavern before the ballad stage
-  const PLACES = ["town_scenes", "wild_scenes"];
+  const PLACES = ["town_scenes", "wild_scenes", "isle_scenes"];
   const STAGE = PLACES.concat(["mount_art", "tavern", "camp", "ballad"]);
   const SONG = STAGE.concat(["music"]);
   // a part of a page whose file isn't in yet: an empty slot now, swapped for the drawing once the file loads (nothing draws before it)
@@ -374,8 +383,10 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // a story vignette: a song is staged on the ballad stage, a dungeon framed from its own header; anything else draws now
   function vignette(e, W, H, cls) {
     const make = () => { const c = Scenes.vignette(e, W, H); if (cls) c.className = cls; return c; };
-    const names = e.kind === "song" && S.towns[e.loc] ? ["town_scenes", "wild_scenes", "tavern", "music", "ballad"]
-      : S.dungeons[e.loc] ? (["boss", "boss_kill"].includes(e.kind) ? PLACES.concat(["deaths"]) : PLACES) : e.kind === "mount" ? ["mount_art"] : null;
+    // a set piece (a season's poster, the sunrise over a town's own header) draws with season_posters.js
+    const names = e.kind === "song" && S.towns[e.loc] ? PLACES.concat(["tavern", "music", "ballad"])
+      : S.dungeons[e.loc] ? (["boss", "boss_kill"].includes(e.kind) ? PLACES.concat(["deaths"]) : PLACES) : e.kind === "mount" ? ["mount_art"]
+      : e.sunrise || e.kind === "season_start" ? PLACES.concat(["season_posters"]) : null;
     return names ? later(names, make) : make();
   }
   // the road strip, busts and map pins (road_scenes.js, road_art.js) load with the first page that draws them
@@ -453,10 +464,12 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   const NEEDS = [];
   function needs(re, names) { NEEDS.push([re, names]); }
   // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
-  const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
+  const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
     [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
+    // the ceremony and the Your Season card, with the trophies they hand out
+    [/^\/finale(\/|$)/, ["js/trophy_art.js", "js/views_finale.js"], ["css/finale.css"]],
     // the replay pages (replay.js) and everything their players stand on
-    [/^\/(fight|night|meal|catch|road|reading|table|day)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
+    [/^\/(fight|night|meal|catch|road|reading|table|day)\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/mount_art.js", "js/tavern.js", "js/camp.js", "js/ballad.js",
       "js/music.js", "js/replay.js"], []]];
   const lazyLoaded = new Set();
   function lazy(hash) {
@@ -525,6 +538,10 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     }
     const meta = L.meta;
     document.title = meta.name;
+    // the season theme dresses the whole site (web/css/app.css keys a skin on these: the Long Night's lamplit parchment while its sky is dark)
+    const root = document.documentElement;
+    root.dataset.themeId = meta.phase === "season" && meta.theme ? meta.theme.id : "";
+    if (meta.sky) root.dataset.sky = meta.sky; else delete root.dataset.sky;
     document.getElementById("brand-name").textContent = meta.name;
     const icon = document.getElementById("brand-icon");
     const anyHero = L.heroes.find((h) => h.alive) || L.heroes[0];

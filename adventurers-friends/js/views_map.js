@@ -161,6 +161,8 @@
   }
   // the great event, where it touches this place
   function eventLine(id) {
+    const dw = L.dragon;
+    if (dw && dw.at === id) return el("p", { class: "ev-here" }, el("b", null, dw.name), dw.where === "wait" ? " waits on the hill above, for the muster." : ` is down here (since day ${dw.since}).`);
     const h = L.hyper;
     if (!h) return null;
     const go = el("a", { href: "#/event" }, "The great event ▸");
@@ -225,7 +227,7 @@
     if (lately.length) p.appendChild(el("div", null, el("h4", null, "Lately in " + t.name), A.feed(lately, {})));
     const maps = (L.map_stock || {})[id] || [];
     if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
-      el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
+      S.dungeons[m.dungeon] ? el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name) : A.nodeName(m.dungeon), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
   }
   // one move a day, pinned under a white footprint; whoever answers the Society's letters is never named
   function yetiBoard(y) {
@@ -250,7 +252,13 @@
     const kind = Scenes.locKind(id);
     const TS = window.TownScenes;
     let bd = null;
-    if (TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    // a lair that is a town for a season has a town scene of its own (static towns[id].scene)
+    // The Dragon Wakes: she sits on the skyline of the place she is down in
+    const dw = L.dragon && L.dragon.at === id && window.Isle && Isle.dragonActs ? L.dragon : null;
+    const more = dw ? (W, scene) => Isle.dragonActs(dw, W, scene) : null;
+    // a town she burned this season shows it: charred roofs, rafters, smoke
+    const scorched = !!t && ((L.dragon || {}).burned || []).some((b) => b[1] === id);
+    if (TS) { try { bd = TS.header((t && t.scene) || id, 560, 170, { night: L.meta.sky === "night", more, scorched }); } catch (e) { bd = null; } }
     if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);

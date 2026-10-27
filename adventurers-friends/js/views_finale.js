@@ -1,45 +1,26 @@
-/* The season finale ceremony (#/finale, #/finale/<n>) and each hero's Your Season card (#/finale/<n>/<hero>). */
+/* The season finale ceremony (#/finale, #/finale/<n>) and each hero's Your Season card (#/finale/<n>/<hero>), loaded with their first
+   visit (App LAZY); the seal, the odds board and the opened-envelopes mark the Crier shows live in views.js (Finale). */
 (function () {
   const A = App;
   const { L, cap, el, events, heroes, parties, plural } = A;
   const { panel, rivalryPanel, runnerUp } = Views;
+  const { waxSeal, oddsBoard, seen, markSeen } = Finale;
   A.needs(/^\/finale/, A.PLACES.concat(["mount_art", "music_replay", "finale_party", "ceremony_replay"]));
   const calm = () => !!(window.Settings && Settings.calm());
   const sfx = (k) => { if (window.Sound) Sound.sfx(k); };
   const num = (v) => Number(v || 0).toLocaleString("en-US");
   const ord = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-  const valueText = (a) => `${num(a.value)}${a.unit ? " " + a.unit : ""}`;
+  const valueText = (a) => `${a.note ? a.note + " · " : ""}${num(a.value)}${a.unit ? " " + a.unit : ""}`;
   // the night happens where the party's vignettes put it (league/ceremony.py), else where the finale record says
   const townOf = (s, fin) => (s.party && s.party.town) || (fin && fin.venue) || null;
+  // what only the ceremony reads rides in the finale's own file (league/export.py season_row): the party, the Closing Games, the theme's
+  // lines for each hero and crew
+  const withCeremony = (s, fin) => {
+    const x = (fin && fin.season) || {};
+    return Object.assign({}, s, x, { theme_outcome: Object.assign({}, s.theme_outcome, x.theme_outcome) });
+  };
 
-  // a visitor who has opened a season's envelopes once (or skipped them) gets the results straight away after that
-  const seenKey = (n) => `al.finale.${(L.meta && L.meta.name) || "league"}.${n}`;
-  function seen(n) { try { return localStorage.getItem(seenKey(n)) === "1"; } catch (e) { return false; } }
-  function markSeen(n) { try { localStorage.setItem(seenKey(n), "1"); } catch (e) { /* storage unavailable */ } }
-
-  // ---------- small art: the wax seal, the ballot box, a hero as they were on a day ----------
-  let sealGrid = null;
-  function waxSeal(scale, cls) {
-    if (!sealGrid) {
-      const g = new Art.Grid(26, 26), C = 12.5;
-      for (let y = 0; y < 26; y++) for (let x = 0; x < 26; x++) {
-        const a = Math.atan2(y - C, x - C), d = Math.hypot(x - C, y - C), r = 11 + Math.sin(a * 7) * 0.7 + Math.sin(a * 3 + 1) * 0.5;
-        if (d > r) continue;
-        const l = (-(x - C) - (y - C)) / (d || 1);
-        let c = d > r - 1.2 ? (l > 0.3 ? "#c8463a" : "#7a1e1a") : d > 8.2 && d < 9.4 ? (l > 0 ? "#6a1414" : "#d05a48") : l > 0.5 && d < 8 ? "#c8463a" : "#a82a24";
-        if (d < 8.2) c = (x + y) % 9 === 0 ? "#b8382e" : c;
-        g.set(x, y, c);
-      }
-      const CROWN = ["#...#...#", "#...#...#", "##.###.##", "#########", "#########", ".........", "#########"];
-      for (const [dy, c] of [[1, "#5a1010"], [0, "#e8806a"]]) CROWN.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === "#") g.set(8 + i, 9 + j + dy, c); }));
-      g.outline("#3a0c08");
-      sealGrid = g;
-    }
-    const cv = sealGrid.toCanvas(scale || 3);
-    cv.className = "wax-seal " + (cls || "");
-    cv.setAttribute("aria-hidden", "true");
-    return cv;
-  }
+  // ---------- small art: the ballot box, a hero as they were on a day ----------
   let boxGrid = null;
   function ballotBox(scale) {
     if (!boxGrid) {
@@ -67,28 +48,6 @@
     return A.heroPortrait(x, scale, { noGray: true, cls });
   }
   const who = (id) => (heroes[id] ? A.heroLink(id) : el("span", null, "someone"));
-
-  // ---------- the Crier's odds: a bookie's chalkboard (no wagers on the page, just the Crier's prices) ----------
-  const VERDICT = { called_it: ["Called it", "called"], upset: ["Upset", "upset"], fair: ["Fair call", "fair"], field: ["The field", "field"], no_award: ["Not given", "none"] };
-  function oddsBoard(odds, opts) {
-    if (!odds || !(odds.boards || []).length) return null;
-    const o = opts || {}, judged = !!o.judged;
-    const nameOf = (x) => (x.hero && heroes[x.hero] ? A.heroLink(x.hero) : x.party && parties[x.party] ? A.partyLink(x.party) : el("span", null, x.name));
-    const boards = odds.boards.map((b) => {
-      const won = new Set(judged ? b.winner || [] : []);
-      const rows = b.entries.map((x) => el("li", { class: won.has(x.hero || x.party) ? "won" : "" }, el("span", { class: "chalk-name" }, nameOf(x)),
-        el("span", { class: "chalk-dots", "aria-hidden": "true" }), el("b", { class: "chalk-odds", title: `${Math.round(x.p * 100)}% by the Crier's reckoning` }, x.odds)));
-      if (b.field) rows.push(el("li", { class: "field" + (judged && b.verdict === "field" ? " won" : "") }, el("span", { class: "chalk-name" }, "the field"), el("span", { class: "chalk-dots", "aria-hidden": "true" }), el("b", { class: "chalk-odds" }, b.field)));
-      const v = judged && b.verdict ? VERDICT[b.verdict] || [b.verdict, ""] : null;
-      return el("div", { class: "chalk-board" }, el("h4", null, b.name, b.unit ? el("span", { class: "chalk-unit" }, ` · most ${b.unit}`) : null),
-        el("ul", null, rows), v ? el("div", { class: `chalk-verdict v-${v[1]}` }, el("span", { class: "chalk-stamp" }, v[0]), b.text ? el("span", null, A.storyText(b.text.replace(/^[A-Z ]+:\s*/, ""))) : null) : null);
-    });
-    const when = o.live ? `Posted on day ${odds.sday} of ${L.meta.season_length || 30}, with ${plural(odds.left, "day")} to go.` : `As posted on day ${odds.sday}, ${plural(odds.left, "day")} out${judged ? ", and how it went" : ""}.`;
-    return el("section", { class: "panel chalk" }, el("div", { class: "chalk-frame" },
-      el("div", { class: "chalk-head" }, el("span", { class: "chalk-title" }, "The Crier's Odds"), el("span", { class: "chalk-when" }, when)),
-      el("div", { class: "chalk-boards" }, boards),
-      el("p", { class: "chalk-foot" }, judged ? "The Crier writes the prices from the table as it stood. Long shots are real." : "The Crier's own prices, from the table as it stands. Long shots are real. Nobody here takes bets.")));
-  }
 
   // ---------- one hero's card in the final table (the reveal and the results share it) ----------
   function honourBit(fin, id) {
@@ -284,7 +243,7 @@
     if (p.kind === "nib") return "Nib the goblin, who was not invited,";
     return `${cap(p.name)}, ${ROLE[p.role] || "a local"}${p.town ? " of " + A.nodeName(p.town) : ""},`;
   }
-  function envWinner(env) { return env.kind === "party" ? (parties[env.winner] || {}).name || "a crew" : [env.winner].concat(env.co || []).map((id) => (heroes[id] || {}).name || "someone").join(" and "); }
+  function envWinner(env) { return env.kind === "party" ? (parties[env.winner] || {}).name || "a crew" : [env.winner].concat(env.co || []).map((id) => (heroes[id] || {}).name || "someone").join(", ").replace(/, ([^,]*)$/, " and $1"); }
   function nightPanel(s, fin) {
     if (!window.CeremonyReplay || !(fin && (fin.ceremony || []).length)) return null;
     const cap0 = el("div", { class: "cn-kicker finale-kicker" }), lines = el("div", { class: "cn-lines" });
@@ -640,6 +599,7 @@
     v.appendChild(el("section", { class: "finale-hero" },
       el("div", { class: "finale-kicker" }, `The Season ${s.season} Ceremony`),
       el("h1", null, s.theme),
+      s.theme_outcome && s.theme_outcome.text ? el("p", { class: "finale-outcome" }, s.theme_outcome.text) : null,
       el("p", null, `${plural((s.end_day - (s.start_day || s.end_day - 27)) + 1, "day")}${venue ? ` · the party is in ${venue}` : ""} · ${L.meta.name}`)));
     const stage = el("div", { class: "fin-stage" }), rest = el("div", { class: "fin-rest" });
     v.append(stage, rest);
@@ -671,7 +631,7 @@
     const isLast = s === all[all.length - 1];
     if (!s.finale) { page(v, s, null, isLast); return; }
     v.appendChild(el("p", { class: "loading" }, "Opening the hall…"));
-    return A.load(s.finale).then((fin) => page(v, s, fin, isLast), () => page(v, s, null, isLast));
+    return A.load(s.finale).then((fin) => page(v, withCeremony(s, fin), fin, isLast), () => page(v, s, null, isLast));
   });
 
   // ---------- Your Season: one tall card per hero, sized for a phone screenshot ----------
@@ -689,10 +649,34 @@
     if (v.how === "self" || v.for === b.hero) return ["Voted for themselves. Of course."];
     return v.for && heroes[v.for] ? ["Voted for ", A.heroLink(v.for), "."] : null;
   }
+  // the hero's place in the season theme's race and their crew's, as the board stood at the close
+  // the theme's pixel sign, from its THEMES row (a season kept before its outcome had an id is found by name)
+  function themeSign(s, px) {
+    const o = s.theme_outcome || {}, T = A.S.theme_signs || {}, row = T[o.id] || Object.values(T).find((t) => t.name === (o.name || s.theme));
+    const cv = row && row.emblem && window.Emblems ? Emblems.canvas(row.emblem, px) : null;
+    if (cv) cv.classList.add("theme-emblem");
+    return cv;
+  }
+  function themeSec(s, id) {
+    const o = s.theme_outcome || {}, mine = (o.heroes || {})[id], crew = (o.crews || {})[id];
+    return mine || crew ? el("section", { class: "ys-sec ys-theme" }, el("h4", { class: "ys-theme-head" }, themeSign(s, 1), el("span", null, o.name || s.theme)),
+      mine ? el("p", { class: "small" }, mine) : null, crew ? el("p", { class: "tiny dim" }, crew) : null) : null;
+  }
+  // the season's wins beside the hero's own trophies: the crew's theme trophy (every member's) and a climax the theme names the hero for
+  // (the great quarry taken, Quillon's vault found), as the sim kept them in the theme's outcome
+  function themeWins(s, id) {
+    const o = s.theme_outcome || {};
+    const crew = ((o.crew_won || {})[id] || []).map((c) => el("div", { class: "ys-award" }, Trophies.canvas("party_theme", 2),
+      el("div", null, el("b", null, c.name), el("div", { class: "tiny dim" }, `Crew trophy · ${c.crew} · ${c.amount}`))));
+    const f = (o.feats || {})[id];
+    const feat = f ? [el("div", { class: "ys-award" }, themeSign(s, 3) || Trophies.canvas("theme", 2), el("div", null, el("b", null, f.name), el("div", { class: "tiny dim" }, f.text)))] : [];
+    return feat.concat(crew);
+  }
   function seasonCard(s, fin, id) {
     const b = fin.bundles[id], h = heroes[id];
     const tn = (fin.then_now || {})[id];
     const awards = (b.awards || []).map((aid) => (s.awards || []).find((a) => a.id === aid && a.hero === id)).filter(Boolean);
+    const wins = themeWins(s, id), slots = awards.length + wins.length;
     const t = b.toast;
     const tease = b.honour && b.honour.tone === "tease";
     const copyBtn = el("button", { class: "btn small", type: "button", onclick: () => A.copy(`${b.blurb}\n${A.shareUrl(`#/finale/${s.season}/${id}`)}`, "Copied. Paste it in the group chat.") }, "Copy blurb");
@@ -702,8 +686,8 @@
         el("h1", null, h.name), h.epithet ? el("div", { class: "epi" }, h.epithet) : null,
         el("div", { class: "small muted" }, `${h.npc ? "League hero" : h.owner + "'s hero"} · Lv ${b.portrait ? b.portrait.level : h.level} ${A.clsName(b.portrait ? b.portrait.cls : h.cls)}`),
         el("div", { class: "ys-rank" }, el("b", null, ord(b.rank)), el("span", null, ` of ${b.of}`), el("span", { class: "ys-ren" }, `${num(b.renown)} renown`))),
-      awards.length ? el("section", { class: "ys-sec ys-awards" }, el("h4", null, awards.length > 1 ? "Trophies" : "Trophy"),
-        awards.map((a) => el("div", { class: "ys-award" }, Trophies.canvas(a.id, 2), el("div", null, el("b", null, a.name), el("div", { class: "tiny dim" }, valueText(a)))))) : null,
+      slots ? el("section", { class: "ys-sec ys-awards" }, el("h4", null, slots > 1 ? "Trophies" : "Trophy"),
+        awards.map((a) => el("div", { class: "ys-award" }, Trophies.canvas(a.id, 2), el("div", null, el("b", null, a.name), el("div", { class: "tiny dim" }, valueText(a))))), wins) : null,
       b.honour ? el("section", { class: "ys-sec ys-honour" + (tease ? " tease" : "") }, el("h4", null, "Honour"),
         el("div", { class: "ys-award" }, Trophies.canvas("honour", 2, b.honour.id, b.honour.tone), el("div", null, el("b", null, b.honour.title), A.storyLink(b.honour.event) ? el("div", { class: "tiny" }, A.storyLink(b.honour.event)) : null))) : null,
       b.best_moment ? el("section", { class: "ys-sec" }, el("h4", null, "The moment"), el("p", { class: "small" }, A.storyLine(b.best_moment))) : null,
@@ -712,6 +696,7 @@
         el("div", { class: "tiny dim" }, "— ", t.by && heroes[t.by] ? A.heroLink(t.by) : t.by_name)) : null,
       voteLine(b) || b.points ? el("section", { class: "ys-sec ys-vote" }, el("h4", null, "The Heroes' Choice"),
         el("p", { class: "small" }, voteLine(b), b.points ? [" ", el("b", null, plural(b.points, "point")), " came their way."] : null)) : null,
+      themeSec(s, id),
       (b.stats || []).length ? el("section", { class: "ys-sec" }, el("h4", null, "Against the league"), (b.stats || []).slice(0, 3).map(statRow)) : null,
       tn && tn.then && tn.now ? el("section", { class: "ys-sec ys-tn" }, el("h4", null, "Then and now"),
         el("div", { class: "tn-pics" }, snapPortrait(id, tn.then, 2, true), el("span", { class: "tn-arrow", "aria-hidden": "true" }, "▸"), snapPortrait(id, tn.now, 2)),
@@ -725,9 +710,9 @@
     return A.load(s.finale).then((fin) => {
       if (!(fin.bundles || {})[id]) { none(`${heroes[id].name} wasn't in season ${n}'s table.`); return; }
       v.innerHTML = "";
-      v.appendChild(el("div", { class: "ys" }, seasonCard(s, fin, id)));
+      v.appendChild(el("div", { class: "ys" }, seasonCard(withCeremony(s, fin), fin, id)));
     }, () => none("The ceremony's file didn't load."));
   });
 
-  window.Finale = { oddsBoard, seasonCard, results, countdown, revealPlan, waxSeal, seen, markSeen };
+  Object.assign(window.Finale, { seasonCard, results, countdown, revealPlan });
 })();

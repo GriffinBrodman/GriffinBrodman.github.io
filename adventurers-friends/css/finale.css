@@ -1,6 +1,6 @@
-/* The season finale: the sealed envelopes and the countdown, Ceremony Night, the program after the crown, the Your Season card, the
-   Crier's odds board and the trophy cabinet. Parchment, wax, wood and brass; no glows. */
-.trophy-px, .wax-seal, .ballot-box, .ceremony-canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+/* The season finale, loaded with the ceremony's first visit (App LAZY): the sealed envelopes and the countdown, Ceremony Night, the
+   program after the crown and the Your Season card. Parchment, wax, wood and brass; no glows. The Crier's odds board, the trophy
+   cabinet and the ceremony-day seal are in pages.css, with the first page. */
 
 /* ---------- the sealed scroll ---------- */
 .fin-scroll { padding: 0; background: none; border: 0; box-shadow: none; max-width: 640px; margin: 0 auto 18px; }
@@ -72,29 +72,6 @@
 .fin-crews li { display: flex; align-items: center; gap: 6px; }
 .fin-crews-n { font-family: var(--px); color: var(--muted); width: 18px; text-align: right; }
 .fin-crews li > .gold { white-space: nowrap; margin-left: auto; }
-
-/* ---------- the Crier's odds: a slate in a wooden frame, chalk on it ---------- */
-.chalk { padding: 0; background: none; border: 0; box-shadow: none; }
-.chalk-frame { background: #26302a; border: 8px solid var(--wood3); outline: 2px solid var(--wood0); box-shadow: inset 0 0 0 2px #1a221e, 3px 3px 0 rgba(30, 18, 8, 0.4); padding: 12px 14px; color: #ece6d6;
-  background-image: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 9px); }
-.chalk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; border-bottom: 2px dashed rgba(236, 230, 214, 0.35); padding-bottom: 6px; margin-bottom: 8px; }
-.chalk-title { font-family: var(--px); font-size: 22px; color: #f4efe2; letter-spacing: 1px; }
-.chalk-when { font-size: 15px; color: #c8c2b2; }
-.chalk-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 18px; }
-.chalk-board h4 { color: #f0d27a; margin: 0 0 4px; font-size: 13px; }
-.chalk-unit { color: #a8b8a8; text-transform: none; letter-spacing: 0; }
-.chalk-board ul { list-style: none; margin: 0; padding: 0; }
-.chalk-board li { display: flex; align-items: baseline; gap: 4px; font-size: 16px; line-height: 1.5; }
-.chalk-board li a { color: #ece6d6; border-bottom: 1px dotted rgba(236, 230, 214, 0.4); }
-.chalk-board li.field .chalk-name { font-style: italic; color: #bfb9a8; }
-.chalk-dots { flex: 1; border-bottom: 2px dotted rgba(236, 230, 214, 0.3); transform: translateY(-4px); min-width: 12px; }
-.chalk-odds { font-family: var(--body); font-weight: 700; color: #f0d27a; font-variant-numeric: lining-nums tabular-nums; }
-.chalk-board li.won .chalk-name { outline: 2px solid #a8d890; outline-offset: 1px; border-radius: 8px; padding: 0 3px; }
-.chalk-verdict { margin-top: 6px; font-size: 14px; color: #d8d2c2; line-height: 1.35; }
-.chalk-verdict a { color: #ece6d6; }
-.chalk-stamp { display: inline-block; font-family: var(--px); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; padding: 0 5px; margin-right: 6px; border: 2px solid currentColor; transform: rotate(-3deg); }
-.v-called .chalk-stamp { color: #a8d890; } .v-upset .chalk-stamp { color: #f09a84; } .v-fair .chalk-stamp, .v-field .chalk-stamp { color: #f0d27a; } .v-none .chalk-stamp { color: #bfb9a8; }
-.chalk-foot { margin: 8px 0 0; font-size: 13px; color: #a8a292; }
 
 /* ---------- Ceremony Night ---------- */
 .cn { margin: 0; }
@@ -225,6 +202,7 @@
 .ys-sec p { margin: 0; }
 .ys-award { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
 .ys-award .trophy-px { flex: none; }
+.ys-theme-head { display: flex; align-items: center; gap: 6px; }
 .ys-honour.tease b { color: var(--blue); }
 .ys-toast blockquote { margin: 0; font-style: italic; }
 .ys-stat { margin: 6px 0; }
@@ -236,19 +214,3 @@
 .ys-tn .tn-pics { justify-content: center; }
 .ys-tn ul { margin: 4px 0 0; padding-left: 18px; }
 .ys-foot { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 14px 10px 0; }
-
-/* ---------- the trophy cabinet ---------- */
-.cabinet h2 { margin-bottom: 2px; }
-.cab-sum { margin: 0 0 6px; }
-.cab-shelf { display: flex; flex-wrap: wrap; gap: 6px 0; align-items: flex-start; padding: 8px 8px 6px; background: #3e2818; border: 3px solid var(--wood0); box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 2px #5c3c24; }
-.cab-item { width: 86px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 0 2px; cursor: help; outline: none; }
-.cab-art { align-self: stretch; justify-content: center; border-bottom: 4px solid #8a5a32; box-shadow: 0 2px 0 #2a1a0e, inset 0 -1px 0 #c8904a; }
-.cab-item:focus-visible { box-shadow: 0 0 0 2px var(--brass2); }
-.cab-art { height: 60px; display: flex; align-items: flex-end; }
-.cab-art canvas { display: block; }
-.cab-name { font-size: 12px; line-height: 1.15; color: #f3e2bc; margin-top: 5px; padding: 0 2px; max-height: 3.5em; overflow: hidden; }
-.cab-season { font-family: var(--px); font-size: 10px; color: var(--brass2); }
-
-/* ---------- the Crier on the ceremony's day ---------- */
-.lead.sealed h1 { margin-bottom: 4px; }
-.lead.sealed .wax-seal { float: right; width: 52px; height: 52px; margin: 0 0 6px 10px; }

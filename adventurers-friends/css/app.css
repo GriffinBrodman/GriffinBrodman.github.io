@@ -80,7 +80,8 @@ nav a.join { color: #b8e08a; }
 .nav-more-list .nav-settings { display: none; }
 @media (min-width: 601px) { nav .nav-world { order: 1; } nav .nav-songs { order: 2; } nav .nav-replays { order: 3; } nav .nav-history { order: 4; } nav .annals-link { order: 5; } nav .nav-guide { order: 6; } }
 nav a.join.on { color: #f3f0c8; background: linear-gradient(180deg, #4f7a34, #33521f); box-shadow: inset 0 0 0 1px #79a050; }
-.clock { margin-left: auto; font-family: var(--px); font-size: 14px; color: var(--on-wood); text-align: right; padding-bottom: 6px; }
+/* the pixel face's 2 reads as an 8 at clock size ("Day 80/30" on day 20, "Season 8"), so the clock is in the book face */
+.clock { margin-left: auto; font-family: var(--body); font-weight: 700; font-size: 16px; letter-spacing: 0.2px; color: var(--on-wood); text-align: right; padding-bottom: 6px; }
 .clock b { color: var(--brass2); }
 .clock a { color: #f6d77a; text-decoration: underline; text-underline-offset: 3px; }
 .clock a:hover { color: #fff3c8; }
@@ -126,6 +127,7 @@ main { max-width: 1240px; margin: 18px auto; padding: 20px 20px 28px; background
 .town-col > .panel { margin: 0; }
 ul.board { margin: 4px 0; padding-left: 18px; font-size: 15px; }
 ul.board li + li { margin-top: 3px; }
+ul.board.pinned { list-style: none; padding: 6px 10px; margin: 2px 0 8px; background: rgba(120, 84, 40, 0.1); border-left: 3px solid #8a5a2a; }
 .pill { display: inline-block; padding: 0 7px; border-radius: 3px; background: rgba(120, 85, 40, 0.12); color: var(--muted); font-size: 15px; border: 1px solid var(--edge); white-space: nowrap; }
 .pill.gold { color: #2a1a0b; background: var(--brass); border-color: var(--brass0); }
 .pill.red { color: #fbe6c8; background: var(--crimson); border-color: #5a1410; }
@@ -158,6 +160,37 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .lead h1 { font-size: 30px; line-height: 1.1; }
 .lead .scene { width: 100%; display: block; border: 3px solid var(--wood2); box-shadow: 0 0 0 1px var(--brass); margin: 8px 0 10px; }
 .theme-banner { display: flex; gap: 10px; align-items: center; background: linear-gradient(90deg, #ecd2ac, var(--parch2)); border-left: 5px solid var(--crimson); }
+.panel h4.theme-group { margin: 10px 0 4px; }
+/* the season theme near the top of the Crier: name and the board in a line, the reader's hero's place, the way to the board */
+.mast-theme { color: var(--crimson); text-decoration: underline dotted; text-underline-offset: 3px; }
+.theme-strip { background: linear-gradient(90deg, #ecd2ac, var(--parch2)); border-left: 5px solid var(--crimson); padding: 6px 10px; margin: 0 0 10px; font-size: 16px; }
+.theme-strip-head b { color: var(--crimson); }
+.theme-strip-head .sep, .theme-strip .sep { color: var(--muted); }
+.theme-strip-mine { margin-top: 2px; }
+.theme-strip-go { display: inline-block; margin-top: 2px; font-weight: bold; }
+/* the theme's pixel sign (emblem_art.js) at the strip's left, and on a brass plaque in place of the board title's diamond */
+.theme-strip.has-emblem { display: flex; align-items: flex-start; gap: 10px; }
+.theme-strip-body { flex: 1 1 auto; min-width: 0; }
+.theme-emblem, .theme-emblem-plaque { image-rendering: pixelated; flex: none; }
+.theme-strip .theme-emblem { margin-top: 2px; }
+h2.has-emblem::before { display: none; }
+.theme-stat b { color: var(--gold); }
+.hero-theme { margin: 2px 0 4px; }
+.week-theme { margin: 10px 0; padding: 8px 10px; border-left: 4px solid var(--crimson); background: rgba(236, 210, 172, 0.45); }
+.week-theme h4 { margin: 0 0 4px; }
+.week-theme .diary { margin: 4px 0; }
+.week-board > summary { cursor: pointer; color: var(--crimson); margin-top: 4px; }
+.week-board > .panel { margin: 6px 0 0; box-shadow: none; }
+.hist-theme { margin-top: 8px; padding: 4px 8px; border-left: 3px solid var(--brass); }
+.theme-tug { margin: 6px 0 8px; }
+.theme-tug-names { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 3px; }
+.theme-tug-bar { height: 12px; background: #4d4640; }
+.theme-tug-bar > i { background: linear-gradient(90deg, #f4e2a8, var(--brass)); }
+.theme-rows-title { margin: 8px 0 2px; }
+.diary.theme-rows { list-style: none; padding-left: 4px; }
+.theme-rows li.theme-row-true::before { content: "✓ "; color: var(--green); font-weight: bold; }
+.theme-rows li.theme-row-wrong::before { content: "✗ "; color: var(--crimson); font-weight: bold; }
+.theme-rows li.theme-row-held::before { content: "? "; color: var(--brass); font-weight: bold; }
 
 /* events */
 .feed { list-style: none; margin: 0; padding: 0; }
@@ -299,12 +332,10 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
 .replay-bar .spds .btn:last-child { border-radius: 0 3px 3px 0; }
 .replay-bar .btn[disabled] { opacity: 0.45; cursor: default; }
 .replay-shot { position: relative; }
-.snd-tap { position: absolute; right: 8px; bottom: 8px; z-index: 3; font-family: var(--px); font-size: 13px; line-height: 1; padding: 6px 10px 7px; cursor: pointer;
+.snd-tap { font-family: var(--px); font-size: 13px; line-height: 1; padding: 6px 10px 7px; cursor: pointer;
   background: linear-gradient(#ecdcb4, #d8c28e); color: #3a1e08; border: 2px solid #8a6a34; border-radius: 3px; box-shadow: 0 0 0 2px #1a1008, 0 3px 0 #0008;
   animation: snd-tap 1.6s ease-in-out infinite; }
 .snd-tap[hidden] { display: none; }
-/* in a fight the team plates hold the top corners and the HUD the bottom, so the tap waits at mid-height on the right */
-.fight-stage .snd-tap { top: 42%; bottom: auto; }
 .snd-tap:hover { background: linear-gradient(#f6ead0, #e4d0a0); }
 @keyframes snd-tap { 50% { transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .snd-tap { animation: none; } }
@@ -320,8 +351,8 @@ canvas.portrait-px.grp:first-child { margin-left: 0; }
   .replay-bar { gap: 4px; }
   .replay-bar .btn { padding: 2px 9px; min-width: 36px; min-height: 34px; justify-content: center; }
   .replay-bar .btn .lbl { display: none; }
-  /* on a phone the stage is too small to float a button over: the bar's own sound button asks for the tap instead */
-  .replay-shot .snd-tap { display: none; }
+  /* on a phone the bar has no room for it: the bar's own sound button asks for the tap instead */
+  .replay-bar .snd-tap { display: none; }
   .replay-bar .btn.snd-wait { animation: snd-tap 1.6s ease-in-out infinite; box-shadow: 0 0 0 2px #e8c46a; }
   .replay-bar .btn.snd-wait .lbl { display: inline; }
 }
@@ -482,6 +513,19 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 .say-try { max-width: 420px; margin: 0 auto 8px; }
 .say-try .say { font-size: 15px; }
 .say-try-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+/* the pet card (web/js/pet_card.js): a season the beasts talked */
+.pet-card { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--edge2); background: rgba(255, 250, 235, 0.35); }
+.pet-card-head { margin-bottom: 6px; }
+.pet-card-play { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 6px; }
+.pet-card-stage { flex: 1 1 224px; max-width: 342px; }
+.pet-card-stage .say { font-size: 13px; max-width: 94%; text-wrap: balance; }
+.pet-card-stage .say::after { display: none; }
+.pet-quotes { list-style: none; margin: 0 0 4px; padding: 0; }
+.pet-quote { position: relative; margin: 0 0 7px 6px; padding: 4px 10px 5px; background: var(--parch); border: 1px solid var(--edge); border-radius: 10px; font-size: 16px; }
+.pet-quote::before { content: ""; position: absolute; left: -7px; top: 9px; border: 6px solid transparent; border-right-color: var(--edge); border-left: 0; }
+.pet-quote.no { border-color: var(--red); }
+.pet-quote.no::before { border-right-color: var(--red); }
+.pet-quote-who { display: block; font-family: var(--px); font-size: 12px; letter-spacing: 0.4px; color: var(--gold); }
 @media (max-width: 600px) { .set-row { grid-template-columns: minmax(0, 1fr); } .set-row > :last-child { justify-self: start; } .set-slide { justify-self: stretch !important; } .set-slide input { width: 100%; max-width: none; } }
 /* the bard */
 .bard-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -499,7 +543,16 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
 @media (max-width: 600px) { .song-row { grid-template-columns: 1fr; gap: 0; } }
 
 .wx-strip { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 15px; color: var(--muted); padding: 6px 0 2px; border-bottom: 1px solid var(--edge2); margin-bottom: 8px; }
-.wx-strip .wonder { color: #fff; background: var(--purple); padding: 0 8px; border-radius: 2px; }
+.wx-strip .wonder { display: inline-flex; align-items: center; gap: 6px; color: #f0e0c0; background: #3a2a1c; padding: 1px 8px 1px 4px; border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 236, 190, 0.25); }
+.wx-strip .wonder .wx-icon { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+.wx-strip .wx { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.wx-strip .wx .wx-icon { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+.wx-strip .w-blood_moon { background: #3a1410; color: #f0c8a0; }
+.wx-strip .w-aurora { background: #0e2a2a; color: #c8f0e0; }
+.wx-strip .w-frogs { background: #1a2a3a; color: #d8f0b0; }
+.wx-strip .w-golden_fog { background: #3a2c0c; color: #f8e0a0; }
+.wx-strip .w-brimstone { background: #3a160a; color: #ffd0a0; }
 .hy-strip { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; margin: 4px 0 14px; padding: 12px 14px 12px 12px; color: #f1e3c2;
   background: linear-gradient(180deg, #2a1712, #1c0f0b); border-top: 5px solid var(--crimson); border-bottom: 2px solid var(--wood0); box-shadow: 0 0 0 1px var(--brass0), inset 0 1px 0 rgba(236, 197, 106, 0.18); }
 .hy-strip a { color: var(--brass2); }
@@ -507,6 +560,7 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
   background: radial-gradient(circle at 50% 62%, rgba(176, 40, 30, 0.55), rgba(176, 40, 30, 0) 68%), #140a07; border: 2px solid var(--brass0); box-shadow: inset 0 0 0 1px #000; }
 .hy-comet .hy-sprite, .hy-tournament .hy-sprite { background: radial-gradient(circle at 50% 55%, rgba(236, 197, 106, 0.35), rgba(236, 197, 106, 0) 68%), #140a07; align-items: center; padding: 0; }
 .hy-plague .hy-sprite { background: radial-gradient(circle at 50% 55%, rgba(120, 140, 90, 0.4), rgba(120, 140, 90, 0) 68%), #140a07; align-items: center; padding: 0; }
+.hy-strip.no-pic { grid-template-columns: 1fr; }
 .hy-px { image-rendering: pixelated; display: block; max-width: 100%; max-height: 100%; }
 .hy-kick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-family: var(--px); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #c9a878; }
 .hy-tag { background: var(--crimson); color: #fff1d0; padding: 1px 7px 0; border: 1px solid #c8563c; box-shadow: 0 0 0 1px #3a0e0a; }
@@ -541,7 +595,7 @@ canvas.portrait-px.grp.big { width: 44px; height: 44px; }
   .brand { font-size: 16px; padding-bottom: 2px; }
   .brand canvas { width: 18px; height: 22px; }
   .brand { order: 0; }
-  .clock { order: 1; display: block; margin-left: auto; width: auto; padding: 0 78px 2px 0; font-size: 12px; }
+  .clock { order: 1; display: block; margin-left: auto; width: auto; padding: 0 78px 2px 0; font-size: 15px; }
   .clock .clock-long { display: none; }
   .clock .clock-short { display: inline; }
   /* one row on a phone: five sections and a "More" menu for the rest (round 38) */
@@ -1084,3 +1138,53 @@ input[type=text].pick-find { width: 7.5em; font-size: 15px; padding: 2px 6px; }
 .pc-goal.missed { opacity: 0.75; }
 .hy-more { margin: 4px 0 0; font-size: 15px; }
 .hy-name a { color: inherit; }
+
+/* a theme's goal counter of a handful: a row of little lamps, lit as they come in */
+.theme-pips { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 10px; }
+.theme-pips canvas { image-rendering: pixelated; }
+.theme-pips i { width: 11px; height: 15px; background: #3e3830; box-shadow: inset 0 0 0 1px #221c16, 0 2px 0 #5a4a36; }
+.theme-pips i.lit { background: radial-gradient(circle at 50% 45%, #fff6c8 0 22%, #f4bc4c 50%, #b06a1c 100%);
+  box-shadow: inset 0 0 0 1px #6a3c10, 0 2px 0 #5a4a36, 0 0 8px 1px rgba(255, 196, 90, 0.7); }
+/* The Drowned Spring's flood gauge: the painted marks on the bridge pier, a foot each, rising left to right; under water once the river is up to them */
+.theme-pips-water { align-items: flex-end; gap: 3px; }
+.theme-pips-sparks { gap: 2px 3px; align-items: center; }
+.theme-pips-water i { width: 14px; background: #c9b48a; box-shadow: inset 0 0 0 1px #7a6440, 0 2px 0 #5a4a36; }
+.theme-pips-water i.lit { background: linear-gradient(#8fc6d8, #3d7f9a 60%, #2a5a70); box-shadow: inset 0 0 0 1px #1f4252, 0 2px 0 #5a4a36; }
+
+/* The Long Night: the whole site after dark (while the theme's sky is dark): a night-blue wall behind the beam, and the Crier's parchment
+   read by lamplight, warm at the top where the lamp hangs and falling off into shadow at the edges */
+html[data-theme-id="long_night"][data-sky="night"] {
+  --parch: #e6cc96; --parch2: #dcbd84; --parch3: #c9a46a; --edge: #8c6a3c; --edge2: #6a4c2a;
+  --muted: #5e4630; --dim: #7a6044; --on-wood: #d6cdb8;
+  background: #0b1018;
+}
+html[data-theme-id="long_night"][data-sky="night"] body {
+  background-color: #0c121c;
+  background-image: radial-gradient(1px 1px at 12% 18%, rgba(235, 240, 255, 0.7), transparent 60%), radial-gradient(1px 1px at 33% 42%, rgba(235, 240, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 58% 12%, rgba(235, 240, 255, 0.65), transparent 60%), radial-gradient(1px 1px at 81% 33%, rgba(235, 240, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 91% 8%, rgba(235, 240, 255, 0.7), transparent 60%), radial-gradient(1px 1px at 6% 66%, rgba(235, 240, 255, 0.45), transparent 60%),
+    radial-gradient(ellipse 70% 40% at 85% 0%, rgba(150, 175, 210, 0.16), transparent 70%),
+    linear-gradient(180deg, #121a28, #0a0f17 70%);
+  background-size: 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 100% 100%, 100% 100%;
+  background-attachment: fixed;
+}
+html[data-theme-id="long_night"][data-sky="night"] .top { background: linear-gradient(180deg, #2c2016, #18110b 85%); }
+html[data-theme-id="long_night"][data-sky="night"] .panel {
+  background: radial-gradient(ellipse 90% 70% at 22% 0%, rgba(255, 226, 150, 0.55), transparent 70%), var(--parch2) var(--dither);
+  box-shadow: inset 2px 2px 0 rgba(255, 236, 190, 0.55), inset 0 0 38px rgba(60, 30, 5, 0.32), 2px 2px 0 rgba(0, 0, 0, 0.5), 0 0 22px rgba(255, 180, 80, 0.07);
+}
+html[data-theme-id="long_night"][data-sky="night"] .theme-banner {
+  background: radial-gradient(ellipse 60% 120% at 8% 50%, rgba(255, 214, 120, 0.75), transparent 70%), linear-gradient(90deg, #d8b878, var(--parch2));
+  border-left-color: #c8963e;
+}
+html[data-theme-id="long_night"][data-sky="night"] .foot { color: #a8b0c0; }
+/* the masthead after dark at every width: a strip of night sky with its stars for the rule under the title, and a crescent before it */
+html[data-theme-id="long_night"][data-sky="night"] .mast { border-bottom: 0; padding-bottom: 20px; image-rendering: pixelated;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='5' viewBox='0 0 24 5' shape-rendering='crispEdges'><rect x='0' y='0' width='24' height='5' fill='%23121a28'/><rect x='2' y='1' width='1' height='1' fill='%23e8ecff'/><rect x='9' y='3' width='1' height='1' fill='%238a96c0'/><rect x='15' y='1' width='1' height='1' fill='%23f4ecd0'/><rect x='20' y='2' width='1' height='1' fill='%238a96c0'/><rect x='12' y='2' width='1' height='1' fill='%23e8ecff'/></svg>") left bottom 4px / 48px 10px repeat-x; }
+html[data-theme-id="long_night"][data-sky="night"] .mast .title::before { content: ""; display: inline-block; width: 22px; height: 22px; margin: 0 12px 0 -34px; vertical-align: 0.1em; image-rendering: pixelated;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 11 11' shape-rendering='crispEdges'><path fill='%232a2016' d='M2 1h1v1h-1zM3 0h1v1h-1zM5 1h1v1h-1zM4 2h1v1h-1zM4 0h1v1h-1zM1 2h1v1h-1zM0 3h1v1h-1zM4 3h1v1h-1zM0 4h1v1h-1zM4 4h1v1h-1zM0 5h1v1h-1zM4 5h1v1h-1zM0 6h1v1h-1zM5 6h1v1h-1zM0 7h1v1h-1zM1 8h1v1h-1zM6 7h1v1h-1zM10 7h1v1h-1zM8 7h1v1h-1zM9 8h1v1h-1zM9 6h1v1h-1zM2 9h1v1h-1zM7 7h1v1h-1zM8 9h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1z'/><path fill='%23f4ecc8' d='M3 1h1v1h-1zM4 1h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM1 6h1v1h-1z'/><path fill='%23d8cca0' d='M3 5h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1z'/></svg>") center / 22px 22px no-repeat; }
+@media (max-width: 600px) {
+  html[data-theme-id="long_night"][data-sky="night"] .mast .title::before { margin: 0 8px 0 -30px; }
+  .mast .sub { justify-content: center; column-gap: 14px; font-size: 14px; }
+}
+.afterglow { color: #2a8a8a; font-style: italic; }

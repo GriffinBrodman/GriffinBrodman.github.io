@@ -70,6 +70,18 @@
   }
   const pennant = (b, x, y, len, ramp, s) => { b.line(x, y, x, y + len + 4, OAK[2]); for (let j = 0; j < 4; j++) for (let i = 0; i < 6 - j * 1.5; i++) b.px(x + s * (1 + i), y + j, ramp[j < 2 ? 1 : 2]); };
 
+  function standard(b, ramp) {
+    roll(b, 11, 1, 2, 20, OAK);
+    b.rect(5, 3, 14, 1, BRASS[1]); b.px(5, 2, BRASS[0]); b.px(18, 2, BRASS[2]);
+    for (let y = 4; y < 16; y++) for (let x = 6; x < 18; x++) {
+      if (y >= 13 && Math.abs(x + 0.5 - 12) < (y - 12) * 1.6) continue;
+      b.px(x, y, ramp[x === 6 ? 0 : x === 17 || y === 15 ? 3 : y === 4 ? 1 : 2 - ((x + y) % 7 === 0 ? 1 : 0)]);
+    }
+    ell(b, 12, 9, 2.6, 2.6, BRASS);
+    for (const [x, y] of [[12, 5], [12, 13], [8, 9], [16, 9]]) b.px(x, y, BRASS[1]);
+    plinth(b, 20, 14, true);
+  }
+
   const DRAW = {
     // the Hero of the Season's laurel cup: gold, a band of laurel round the bowl, a ruby at its heart
     mvp(b) {
@@ -245,6 +257,9 @@
       plinth(b, 20, 12, false);
     },
     // Old Guard: a round shield, iron-rimmed, a brass chevron
+    // a season theme's own prize: the season's standard, a gold star on a hanging banner (green for a hero, red for a crew)
+    theme(b) { standard(b, GREEN); },
+    party_theme(b) { standard(b, RED); },
     party_old(b) {
       for (let y = 1; y < 21; y++) for (let x = 2; x < 22; x++) {
         const d = Math.hypot(x + 0.5 - 12, y + 0.5 - 11);
@@ -339,6 +354,8 @@
     party_morale: ["....n..n....", ".nnnn..nnnn.", ".NNNN..NNNN.", "stTTs..tTTss", "stSTs..tSTss", "stTTs..tTTss", ".tTTs..tTTs.", ".ssss..ssss.", ...PLINTH],
     party_drama: ["..........Y.", ".........yY.", "........yyYb", "bb....yyyyYb", "bbyyyyYyyyYb", "bb....bbbbbd", "........bbbd", ".........bd.", "..........d.", ".....S......", "....SSS.....", ...PLINTH],
     party_pvp: ["y...........", "kiiiiiiiiiI.", "kiiinnnniiI.", "kiiinjnjiiI.", "kiiiinniiiI.", "kiinIiiniiI.", "kiiiniiniiI.", "kiiiiiiiiiI.", "k...........", "k...........", ...PLINTH],
+    theme: [".....yb.....", "..wwwwwwwk..", "..gGGGGGGG..", "..gGGyYGGG..", "..gGyYYbGG..", "..gGGbbGGG..", "..gGGGGGGG..", "..gG.wk.GG..", ".....wk.....", ".....wk.....", ...PLINTH],
+    party_theme: [".....yb.....", "..wwwwwwwk..", "..rRRRRRRR..", "..rRRyYRRR..", "..rRyYYbRR..", "..rRRbbRRR..", "..rRRRRRRR..", "..rR.wk.RR..", ".....wk.....", ".....wk.....", ...PLINTH],
     party_old: ["...sTTTTs...", "..TWWWWWWs..", ".TWWWWWWWWs.", "TWWWWyWWWWWs", "TWWWybyWWWWs", "TWWybWbyWWWs", "TWybWWWbyWWs", ".TWWWWWWWWs.", "..TWWWWWWs..", "...sTTTTs..."],
   };
   function scene(kind) {

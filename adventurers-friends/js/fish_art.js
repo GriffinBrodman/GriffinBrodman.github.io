@@ -802,7 +802,13 @@
   // one backdrop per (water, hour, weather), kept
   const scenes = new Map();
   const TODS = ["morning", "day", "day", "dusk"];
-  function todOf(rec) { return rec.night ? "night" : TODS[hash(String(rec.id || "") + (rec.day || 0)) % TODS.length]; }
+  // a record that says its hour is drawn at it once the sun is down (an evening catch reads as dusk, a late one as night)
+  function todOf(rec) {
+    if (rec.night) return "night";
+    const hr = rec.hour;
+    if (hr != null && (hr >= 17.5 || hr < 5.5)) return hr >= 20.5 || hr < 5.5 ? "night" : "dusk";
+    return TODS[hash(String(rec.id || "") + (rec.day || 0)) % TODS.length];
+  }
   function scene(rec, o) {
     o = o || {};
     const fr = framing(rec), wid = rec.water && SCENES[rec.water] ? rec.water : fr === "D" ? "streamD" : "stream";

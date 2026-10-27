@@ -279,7 +279,7 @@
     return softCache[hex];
   }
   // faces and hair are drawn in flat ramps; dither is for cloth and backdrops
-  const FLAT = new Set(["skin", "hair", "lip", "stub", "hd"]);
+  const FLAT = new Set(["skin", "hair", "beard", "lip", "stub", "hd"]);
   const HEAD_TOP = { none: 5.5, hood: 5.5, skull_hood: 5.5, beast_hood: 3, leather_cap: 5.5, helm: 4.5, great_helm: 4.5, skull_helm: 4.5, horns: 4.5, wizard_hat: -1,
     mitre: -1, wide_hat: 2.5, top_hat: 0, tricorn: 4, bandana: 6, feather_cap: 6, circlet: 5, crown: 5, mask: 5.5, fur_cap: 5, herb_wreath: 5, slouch_hat: 0.5 };
   const tierOf = (x, d) => Math.max(0, Math.min(3, x && x.tier != null ? x.tier : x && x.glow ? 3 : d));
@@ -362,17 +362,28 @@
   }
 
   function setup(h, clsLook) {
-    const look = Object.assign({}, h.look, { fav: soften(h.look.fav), hair: soften(h.look.hair || "#2a1c14") }), r = rng(hash(h.id || h.name || "x") + 17), cx = 20, K = kitView(h, clsLook || {});
+    // a wild surge's blue hair (look.afterglow) dyes the hair everywhere the hero is drawn, the portrait too, at full strength (magic is
+    // the one hair colour not reined in toward the earthy palette); the beard keeps its own colour, or a dyed beard reads as a mask
+    const blue = h.look.afterglow === "blue_hair", beardHex = soften(h.look.hair || "#2a1c14");
+    const look = Object.assign({}, h.look, { fav: soften(h.look.fav), hair: blue ? "#3a7ae0" : beardHex }), r = rng(hash(h.id || h.name || "x") + 17), cx = 20, K = kitView(h, clsLook || {});
     const scars = look.scars || [], head = K.head ? K.head.art : "none";
     let outfit = K.outfit;
     const dark = outfit === "plate_dark";
     if (dark) outfit = "plate";
     const pale = scars.includes("pale"), skinHex = pale ? mix(look.skin, "#c8ccd8", 0.35) : look.skin;
-    if (head === "hood" || head === "skull_hood" || head === "beast_hood") look.hair = mix(look.hair, "#241c1a", 0.45);
+    const hooded = head === "hood" || head === "skull_hood" || head === "beast_hood";
+    if (hooded && !blue) look.hair = mix(look.hair, "#241c1a", 0.45);
     const mats = makeMats(Object.assign({}, look, { skinHex }), { at: K.at, mat: K.mat, dark, wt: K.w.tier, ht: tierOf(K.head, 1), ot: tierOf(K.off, 1), bt: tierOf(K.back, 1),
       head, back: K.back && K.back.art, neckGem: K.neck && soften(K.neck.gem || (K.neck.art === "scarf" ? look.fav : null)), tint: K.pocket && soften(K.pocket.tint),
       belt: K.belt && delveCol(K.belt, "belt"), boots: K.boots && delveCol(K.boots, "boots"), gloves: K.gloves && delveCol(K.gloves, "gloves") });
-    const c = { h, look, r, cx, scars, head, outfit, pale, mats, st: look.style, k: K, ht: tierOf(K.head, 1), mark: K.mark };
+    // a dyed head (blue, pink, green: saturated and outside the gingers and blonds) keeps facial hair a deep shade of its own,
+    // or a moustache the exact colour of the hair reads as a mask over the mouth
+    const [hh, hs] = toHsv(h.look.hair || "#2a1c14"), dyed = hs > 0.35 && (hh < 0.015 || hh > 0.17);
+    if (blue || dyed) {
+      const own = dyed ? mix(beardHex, "#2a1c14", 0.5) : beardHex, bh = hooded ? mix(own, "#241c1a", 0.45) : own;
+      mats.beard = ramp(bh); mats.stub = ramp(mix(skinHex, mix(bh, "#2a1c14", 0.4), 0.5));
+    }
+    const c = { h, look, r, cx, scars, head, outfit, pale, mats, st: look.style, k: K, ht: tierOf(K.head, 1), mark: K.mark, beardM: blue || dyed ? "beard" : "hair" };
     c.faceW = 6.5 + r() * 1.1; c.jawW = c.faceW - 0.9 - r() * 0.7; c.chin = 24.6 + r() * 0.8;
     c.pointy = r() < 0.28; c.freckles = r() < 0.2 && toHsv(look.skin)[2] > 0.8; c.eye = EYES[Math.floor(r() * EYES.length)];
     c.gaze = r() < 0.5 ? 1 : -1; c.bigNose = r() < 0.35; c.browUp = r() < 0.3; c.tusks = look.skin === "#9cc48a" && r() < 0.7;
@@ -479,10 +490,10 @@
       }
       P.layer = 5;
       if (look.face === 2) {
-        P.ell(cx, 23.2, jawW + 0.9, 5.6, "hair", { s: -0.05, fn: (x, y, s) => (y < 20.5 || (y === 21 && x > cx - 4 && x < cx + 3) ? false : s + hairTex(x, y) + (y > 25 ? 0 : 0.1)) });
-        if (features) { for (let x = cx - 2; x <= cx + 1; x++) P.px(x, 22, "lip", -0.75); P.px(cx - 3, 21, "hair", 0.2); P.px(cx + 2, 21, "hair", -0.2); }
+        P.ell(cx, 23.2, jawW + 0.9, 5.6, c.beardM, { s: -0.05, fn: (x, y, s) => (y < 20.5 || (y === 21 && x > cx - 4 && x < cx + 3) ? false : s + hairTex(x, y) + (y > 25 ? 0 : 0.1)) });
+        if (features) { for (let x = cx - 2; x <= cx + 1; x++) P.px(x, 22, "lip", -0.75); P.px(cx - 3, 21, c.beardM, 0.2); P.px(cx + 2, 21, c.beardM, -0.2); }
       }
-      if (look.face === 3) { for (let x = cx - 3; x <= cx + 2; x++) P.px(x, 21, "hair", x < cx ? 0.1 : -0.3); P.px(cx - 4, 22, "hair", -0.2); P.px(cx + 3, 22, "hair", -0.4); }
+      if (look.face === 3) { for (let x = cx - 3; x <= cx + 2; x++) P.px(x, 21, c.beardM, x < cx ? 0.1 : -0.3); P.px(cx - 4, 22, c.beardM, -0.2); P.px(cx + 3, 22, c.beardM, -0.4); }
     }
     P.layer = 6;
     if (!covered || HAIRY.has(head)) hairTop(P, st, cx, faceW, c.r, hairTex, covered);
@@ -1998,6 +2009,7 @@
         g.set(sx, sy, ac[1]); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.set(sx + dx, sy + dy, mix(ac[0], bgBase, 0.3));
       }
     }
+    if (look.afterglow && window.Afterglow && Afterglow.portrait) Afterglow.portrait(g, P, look.afterglow, opts.frame || 0, c);
     return g;
   }
 
@@ -2094,6 +2106,7 @@
     // o.turn: three-quarter to the right (flip the grid for left): the head a pixel forward, the face features two, the near ear hidden.
     // o.arms {r, l}: [hx, hy] or [hx, hy, ex, ey, thickness] in sprite pixels, a bent arm reaching its hand there (the elbow found if not given);
     // o.part "hands" keeps only those hands, to lay over whatever they hold; "reach" the forearms and hands, to lay over a table they lean on
+    if (!q && !o.part && o.look && o.look.afterglow === "goose" && window.Afterglow) return Afterglow.goose(o, M, BH, !!o.seated);
     const turn = o.turn ? 1 : 0, armR = o.arms && o.arms.r, armL = o.arms && o.arms.l;
     c.sprite = true; c.frame = o.frame || 0; c.turn = turn; c.noR = !!armR; c.noL = !!armL;
     const base = BASE[outfit] || "hide";
@@ -2249,6 +2262,7 @@
       if (rg.glow) jewels.push([[gx, 24], rg.glow, true]);
       else { P.px(gx, 24, gem || band, gem ? undefined : 0.7); P.px(gx, 25, gem ? mix(gem, "#16121a", 0.35) : band, gem ? undefined : 0.1); }
     });
+    if (!q && !o.part && window.Afterglow) Afterglow.paint(P, M, c, o);
     if (o.part === "hands" || o.part === "reach") { const keep = new Set(o.part === "hands" ? handPx : reachPx); for (let i = 0; i < P.mat.length; i++) if (!keep.has(i)) P.mat[i] = null; }
     if (q && q.part === "weapon") { const keep = new Set(wpx); for (let i = 0; i < P.mat.length; i++) if (!keep.has(i)) P.mat[i] = null; }
     let g = P.render(M, { outline: o.legend ? "#5a3a08" : "#16121a", flat: FLAT });
@@ -2262,6 +2276,7 @@
       for (let j = 0; j < 2; j++) for (let i = 0; i < (half ? 1 : 2); i++) g.set(x + i, y + j, j ? mix(gl, "#16121a", 0.3) : gl);
       g.set(x, y, mix(gl, "#ffffff", o.frame ? 0.3 : 0.65));
     }
+    if (!q && whole && window.Afterglow) Afterglow.post(g, P, o, outline);
     const aura = cl.aura || (o.legend ? "gold" : null);
     if (q) { g.pad = pad; g.stand = [28, BH]; return g; }
     if (aura && whole) {
@@ -2484,7 +2499,7 @@
     P.layer = 5;
     if (c.pointy) draw(() => P.poly([[2.4, 0.2], [6.6, -2.6], [3.6, 2.6]], "skin", -0.15));
     else if (BARE_EARS.has(st)) draw(() => P.ell(3.3, 1.1, 0.9, 1.4, "skin", { s: -0.2, k: 0.5 }));
-    if (look.face === 2) field(-5, 1.5, 3, 7, "hair", (x, y) => {
+    if (look.face === 2) field(-5, 1.5, 3, 7, c.beardM, (x, y) => {
       if (!face(x, y) && ((x + 0.9) / 3.4) ** 2 + ((y - 2.8) / 3.4) ** 2 > 1) return false;
       if (y < 2.6 || (y < 3.6 && Math.abs(x + 1.2) < 1.6)) return false;
       return 0.05 - (y - 3) * 0.12 + tex(Math.floor(x), Math.floor(y));
@@ -2508,7 +2523,7 @@
       dot(-1.0, 2.6, "skin", -0.7);
       if (look.face !== 2) { dot(-1.6, 3.9, "lip", -0.6); dot(-0.6, 3.9, "lip", -0.6); }
       else dot(-1.1, 3.9, "lip", -0.75);
-      if (look.face === 3) for (const [x, y] of [[-2.6, 3.4], [-1.6, 3.4], [-0.6, 3.4], [0.4, 3.4]]) dot(x, y, "hair", x < -1 ? 0.1 : -0.25);
+      if (look.face === 3) for (const [x, y] of [[-2.6, 3.4], [-1.6, 3.4], [-0.6, 3.4], [0.4, 3.4]]) dot(x, y, c.beardM, x < -1 ? 0.1 : -0.25);
       if (look.face === 1) for (const [x, y] of [[-3.6, 3.6], [-2.6, 4.8], [-1.6, 5.4], [-0.4, 5.4], [0.6, 4.8], [1.6, 3.8]]) dot(x, y, "stub", 0);
       if (c.tusks) { dot(-2.6, 4.0, "#efe8d4"); dot(0.4, 4.0, "#efe8d4"); }
       if (c.freckles) for (const [x, y] of [[-3.2, 2.2], [-2.2, 2.6], [0.4, 2.2], [1.2, 2.0]]) dot(x, y, "skin", -0.6);

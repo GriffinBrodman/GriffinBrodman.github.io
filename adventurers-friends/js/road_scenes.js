@@ -81,8 +81,12 @@
   // the light on the land: a tint toward a colour, a darkening, a loss of colour
   function lightAt(hr, weather) {
     let tint = [255, 255, 255], amt = 0, dark = 0, sat = 1;
-    if (isNight(hr)) { tint = [70, 92, 150]; amt = 0.5; dark = 0.52; sat = 0.55; }
+    // moonlight: cool and low, but the land, the road and the verge still read apart from the sky
+    const MOON = { tint: [96, 120, 178], amt: 0.5, dark: 0.24, sat: 0.55 };
+    if (isNight(hr)) { tint = MOON.tint; amt = MOON.amt; dark = MOON.dark; sat = MOON.sat; }
     else if (hr < 7.5) { const k = clamp((7.5 - hr) / 2.7, 0, 1); tint = [255, 196, 170]; amt = 0.3 * k; dark = 0.16 * k; }
+    // the last of the dusk eases from the sunset's light into the moon's, with no step darker than the night itself
+    else if (hr > 18.8) { const k = (hr - 18.8) / 1.7, k0 = (18.8 - 16.2) / 4.3; tint = mix([255, 168, 104], MOON.tint, k); amt = lerp(0.12 + 0.24 * k0, MOON.amt, k); dark = lerp(0.05 + 0.4 * k0 * k0, MOON.dark, k); sat = lerp(1 - 0.3 * k0, MOON.sat, k); }
     else if (hr > 16.2) { const k = clamp((hr - 16.2) / 4.3, 0, 1); tint = hr > 19 ? [130, 120, 160] : [255, 168, 104]; amt = 0.12 + 0.24 * k; dark = 0.05 + 0.4 * k * k; sat = 1 - 0.3 * k; }
     const W = { cloudy: [0.85, 0.06], rain: [0.68, 0.16], storm: [0.55, 0.3], fog: [0.62, 0.02], snow: [0.75, 0.0], heat: [1.05, 0] }[weather];
     if (W) { sat *= W[0]; dark += W[1]; }
@@ -140,14 +144,17 @@
     if (dungeon) { L.sat *= 0.7; L.dark = clamp(L.dark + 0.12, 0, 0.8); }
     const fogK = weather === "fog" ? 0.75 : weather === "snow" ? 0.25 : weather === "rain" || weather === "storm" ? 0.3 : weather === "heat" ? 0.2 : 0;
     const over = { cloudy: ["#9aa4ae", 0.55], rain: ["#7a8590", 0.72], storm: ["#3e4652", 0.84], fog: ["#c2c6c2", 0.8], snow: ["#c4cad4", 0.7], heat: ["#f0e0b0", 0.25] }[weather];
-    const skyC = over ? sky.map((c) => mix(c, isNight(hr) ? mix(over[0], "#0a0e1e", 0.8) : over[0], over[1] * (isNight(hr) ? 0.6 : 1))) : sky;
+    // how far into the dark the hour is: 0 by day, 1 at night, between through the last of the dusk and the first of the dawn
+    const nk = isNight(hr) ? 1 : hr > 18.8 ? (hr - 18.8) / 1.7 : hr > 4.8 && hr < 6 ? 1 - (hr - 4.8) / 1.2 : 0;
+    const skyC = over ? sky.map((c) => mix(c, mix(over[0], mix(over[0], "#0a0e1e", 0.8), nk), over[1] * (1 - 0.4 * nk))) : sky;
     const haze = skyC[2];
     const G = grader(L, haze, fogK);
-    // people on the road stay readable after dark: the same light, half the darkness and less haze
-    const Gf = grader(Object.assign({}, L, { dark: L.dark * 0.45, amt: L.amt * 0.7 }), haze, fogK * 0.5);
+    // people on the road stay readable after dark: the same light, half the darkness and less haze, and at night less of the
+    // moon's blue and grey, so a face keeps its skin tone and a tabard its colour
+    const Gf = grader(Object.assign({}, L, { dark: L.dark * 0.45, amt: L.amt * (0.7 - 0.25 * nk), sat: lerp(L.sat, Math.max(L.sat, 0.78), nk) }), haze, fogK * 0.5);
     const img = new Buf(w, h);
     const put = (x, y, c, depth, a) => { if (c) img.px(x, y, G(c, depth), a); };
-    const info = Object.assign({}, lay, { hr, weather, biome, theme, dungeon, light: L, night: isNight(hr), sky: skyC, haze, G, Gf, seed });
+    const info = Object.assign({}, lay, { hr, weather, biome, theme, dungeon, light: L, night: isNight(hr), nk, sky: skyC, haze, G, Gf, seed });
 
     // sky
     // flat bands, each boundary broken by a short staggered step: an ordered dither between bands read as a checkerboard at 4x
@@ -160,11 +167,13 @@
     const dayArc = clamp((hr - 5.6) / 13.2, 0, 1);
     const sunX = Math.round(lerp(w * 0.08, w * 0.92, dayArc)), sunY = Math.round(hz - 4 - Math.sin(dayArc * Math.PI) * (hz - 10));
     const heavy = weather === "rain" || weather === "storm" || weather === "fog" || weather === "snow";
-    if (info.night) {
+    // the first stars come out and the moon rises through the dusk, so an evening after sunset already reads as night falling
+    if (nk > 0.3) {
       if (weather !== "storm" && weather !== "fog") {
-        for (let i = 0; i < w * hz / 55; i++) { const x = Math.floor(r() * w), y = Math.floor(r() * (hz - 4)), b = r(); img.px(x, y, b > 0.8 ? "#f4ecd0" : "#8a96c0", heavy ? 0.4 : 1); }
-        const mx = Math.round(w * 0.78), my = Math.round(hz * 0.3);
-        disc(img, mx, my, 5, "#f0e8c8", "#c8c0a0", heavy ? 0.45 : 1, (x, y) => (x - mx + 2.5) ** 2 + (y - my - 1.5) ** 2 > 16);
+        const k = Math.min(1, (nk - 0.3) / 0.5);
+        for (let i = 0; i < w * hz / 55; i++) { const x = Math.floor(r() * w), y = Math.floor(r() * (hz - 4)), b = r(); if (y < hz * (0.45 + 0.4 * k)) img.px(x, y, b > 0.8 ? "#f4ecd0" : "#8a96c0", (heavy ? 0.4 : 1) * k); }
+        const mx = Math.round(w * 0.78), my = Math.round(lerp(hz * 0.62, hz * 0.3, k));
+        disc(img, mx, my, 5, "#f0e8c8", "#c8c0a0", heavy ? 0.5 : 1, (x, y) => (x - mx + 2.5) ** 2 + (y - my - 1.5) ** 2 > 16);
         info.moon = [mx, my];
       }
     } else if (!heavy) {
@@ -202,8 +211,8 @@
   function clouds(img, info, w, hz, weather, seed, sunX) {
     const thr = { clear: 0.66, heat: 0.74, cloudy: 0.46, rain: 0.38, storm: 0.34, snow: 0.4, fog: 0.9 }[weather] || 0.6;
     const dark = weather === "storm" ? 0.55 : weather === "rain" ? 0.35 : 0;
-    const base = info.night ? "#2a3250" : info.hr < 7.2 || info.hr > 17 ? "#f0b890" : "#f4f6f4";
-    const shadeC = info.night ? "#141a30" : info.hr < 7.2 || info.hr > 17 ? "#8a5a6a" : "#a8b4c4";
+    const nk = info.nk || 0, dusk = info.hr < 7.2 || info.hr > 17;
+    const base = mix(dusk ? "#f0b890" : "#f4f6f4", "#2a3250", nk), shadeC = mix(dusk ? "#8a5a6a" : "#a8b4c4", "#141a30", nk);
     for (let y = 2; y < hz - 3; y++) for (let x = 0; x < w; x++) {
       const n = fbm(x / 46, y / 11, seed + 77, 3) - (y / hz) * 0.12;
       if (n < thr) continue;
@@ -435,6 +444,18 @@
       let col = o.map ? o.map(c, i, j) : c;
       if (!col) continue;
       if (G && !(o.lit && o.lit(c))) col = G(col, depth);
+      // o.rim: the edge on the moon's side (the right of the frame) caught in its light, just inside the outline, which stays dark
+      if (o.rim) {
+        const d = flip ? -1 : 1, n1 = i + d, n2 = i + 2 * d, has = (k) => k >= 0 && k < g.w && !!g.px[j * g.w + k];
+        if (has(n1) && !has(n2)) col = mix(col, o.rim, 0.5);
+      }
+      // o.warm: a lamp's side (o.warm.side, -1 left or 1 right of the frame) catches its light on the outline and the pixel inside it
+      if (o.warm) {
+        const d = (flip ? -1 : 1) * o.warm.side, has = (k) => k >= 0 && k < g.w && !!g.px[j * g.w + k];
+        if (!has(i + d)) col = mix(col, o.warm.col, 0.7);
+        else if (!has(i + 2 * d)) col = mix(col, o.warm.col, 0.35);
+      }
+      if (o.mark && xx >= 0 && xx < img.w) o.mark[yy * img.w + xx] = 1;
       img.px(xx, yy, col, a);
     }
   }

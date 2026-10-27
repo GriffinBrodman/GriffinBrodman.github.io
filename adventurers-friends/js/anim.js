@@ -16,7 +16,8 @@
                     skeleton({x0,x1,y})  cat({x,y,range,col})  quad({x0,x1,y,kind:"deer"|"wolf"|"goat"|"rat"})
                     rabbit({x,y,range,col})  crab({x,y,range})  wagon({y,W,speed})  flag({x,y,h,c1,c2})
     sky:            bird({W,y,speed,col,flock})  gull({W,y})  eagle({x,y,r})  bat({W,y0,y1})  butterfly({x,y,w,h})
-    light and air:  torch({x,y,r})  glow({x,y,r,rgb,a,amp,speed})  smoke({x,y})  embers({x0,x1,y,n,rise})
+    light and air:  torch({x,y,r})  glow({x,y,r,rgb,a,amp,speed})  smoke({x,y,col,col2,n,rise,life,wind})  embers({x0,x1,y,n,rise})
+                    column({x,y,h,wind,cols,life}) (a big smoke column)
                     fireflies({x,y,w,h,n,rgb,glow})  wisp({x,y,w,h})  snow({W,H,n,speed})  rain({W,H,n,storm})
                     mist({W,y,h,rgb,a,speed})  shade({W,y0,y1,speed})  (a cloud shadow sliding over the ground)
     water, caves:   waves({x0,x1,y,h,rgb})  bubbles({x,y,w,rgb,rise})  drip({x,y0,y1,rgb})  twinkle({pts,rgb})
@@ -342,9 +343,34 @@
         const x = o.x + Math.sin(a * 4 + phase * 6 + i) * 1.2 + a * a * (o.wind == null ? 5 : o.wind), y = o.y - a * rise;
         const sz = a < 0.25 ? 1 : 2;
         ctx.globalAlpha = Math.max(0, 0.75 * (1 - a));
-        dot(ctx, x, y, a < 0.45 ? col : "#b0acac", sz, sz);
+        dot(ctx, x, y, a < 0.45 ? col : o.col2 || "#b0acac", sz, sz);
       }
       ctx.globalAlpha = 1;
+    } };
+  }
+  // a real column of smoke (a burned house, a far fire): solid puffs in mid grey, lit on their upper left, that climb a leaning path and
+  // swell as they rise, then thin out pixel by pixel near the top, the outer pixels first, so the column tapers into single specks
+  // instead of ending in a square of checker
+  function column(o) {
+    const r = rng((o.seed || 1) * 131 + 7), ph = r(), H = o.h || 34, lean = o.wind == null ? 5 : o.wind, n = Math.max(8, R(H / 2.6)), life = o.life || 6;
+    const [lt, md, dk] = o.cols || ["#9a958c", "#77726a", "#57534d"];
+    const jit = Array.from({ length: n }, () => r() * 6.3);
+    return { z: o.z == null ? -5 : o.z, light: o.light, draw(ctx, t) {
+      for (let i = n - 1; i >= 0; i--) {
+        const a = frac(t / life + ph + i / n), rad = 1.5 + Math.min(a, 0.7) * 3.4, cy = o.y - a * H, keep = a < 0.55 ? 1 : 1 - (a - 0.55) / 0.45;
+        const cx = o.x + lean * a * a + Math.sin(a * 5 + jit[i]) * (0.3 + a);
+        const x0 = Math.floor(cx - rad), x1 = Math.ceil(cx + rad), y0 = Math.floor(cy - rad), y1 = Math.ceil(cy + rad), qx = R(cx), qy = R(cy);
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = dx * dx + dy * dy;
+          if (d > rad * rad) continue;
+          if (keep < 1) {
+            const hsh = ((Math.imul((x - qx) * 73 + (y - qy) * 151 + i * 37 + 1013, 2654435761) >>> 24) & 255) / 256;
+            if (hsh * 0.55 + (d / (rad * rad)) * 0.45 > keep * 0.95) continue;
+          }
+          ctx.fillStyle = dx + dy < -rad * 0.55 ? lt : dx + dy > rad * 0.75 ? dk : md;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
     } };
   }
   function embers(o) {
@@ -602,7 +628,7 @@
   window.Anim = { stage, sprite, put, light, get reduced() { return calm(); }, rng, look,
     villager, skeleton, cat, quad, rabbit, crab, wagon, flag,
     bird, gull, eagle, bat, butterfly,
-    torch, glow, smoke, embers, fireflies, wisp, snow, rain, mist, shade,
+    torch, glow, smoke, column, embers, fireflies, wisp, snow, rain, mist, shade,
     waves, bubbles, drip, twinkle, cobweb,
     flip: flipA, rise };
 })();

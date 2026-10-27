@@ -16,13 +16,14 @@
   function seasonsPanel() {
     const m = L.meta, p = panel("Seasons");
     p.id = "hist-seasons";
-    if (m.phase === "season") p.appendChild(el("div", { class: "hist-now" }, el("b", null, `Season ${m.season}${m.theme && m.theme.name ? ": " + m.theme.name : ""}`),
-      el("div", { class: "small" }, `Under way: day ${m.season_day} of ${m.season_length}. Season ${m.season} closes on day ${m.season_length}; its awards and the ceremony land here then.`)));
+    if (m.phase === "season") p.appendChild(el("div", { class: "hist-now" }, el("b", null, sign(m.theme && m.theme.id, m.theme && m.theme.name), `Season ${m.season}${m.theme && m.theme.name ? ": " + m.theme.name : ""}`),
+      el("div", { class: "small" }, `Under way: day ${m.season_day} of ${m.season_length}. Season ${m.season} closes on day ${m.season_length}; its awards and the ceremony land here then.`),
+      L.theme_board && L.theme_board.head ? el("div", { class: "small" }, "On the board so far: ", A.storyText(L.theme_board.head)) : null));
     else if (m.phase === "preseason") p.appendChild(el("p", { class: "small" }, `Season ${m.season || 1} hasn't started. When it closes, after ${m.season_length} days, its awards and the ceremony land here.`));
     const seasons = (L.seasons || []).slice().reverse();
     if (!seasons.length && m.phase !== "season") p.appendChild(el("p", { class: "empty" }, "No season has finished yet. Awards are handed out on the last day."));
     for (const s of seasons) {
-      const box = el("div", { class: "hist-season" }, el("h3", null, `Season ${s.season}: ${s.theme}`),
+      const box = el("div", { class: "hist-season" }, el("h3", null, sign((s.theme_outcome || {}).id, s.theme), `Season ${s.season}: ${s.theme}`),
         el("p", null, el("a", { class: "btn small", href: `#/finale/${s.season}` }, "🏆 The ceremony")));
       const aw = el("div", { class: "cols", style: { gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" } });
       for (const a of s.awards) {
@@ -30,6 +31,8 @@
         aw.appendChild(el("div", { class: "award" }, h ? A.heroPortrait(h, 1) : null, el("div", null, el("div", { class: "small gold" }, a.name), h ? A.heroLink(h.id) : "?", el("span", { class: "dim small" }, ` (${a.value})`), runnerUp(a))));
       }
       box.appendChild(aw);
+      const to = themeOutcome(s);
+      if (to) box.appendChild(to);
       if (s.parties.length) box.appendChild(el("p", { class: "small", style: { marginTop: "8px" } }, "Top party: ", el("b", null, s.parties[0].name), ` (${s.parties[0].renown} renown)`));
       if (s.deaths.length) box.appendChild(el("p", { class: "small red" }, `Lost this season: ${s.deaths.map((d) => d.name).join(", ")}`));
       const ge = (L.hyper_log || []).find((x) => x.season === s.season);
@@ -37,6 +40,24 @@
       p.appendChild(box);
     }
     return p;
+  }
+  // the season theme's pixel sign at 1x, the theme's name tag everywhere else (a season kept before its outcome had an id is found by name)
+  function sign(id, name) {
+    const T = A.S.theme_signs || {}, row = T[id] || Object.values(T).find((t) => t.name === name);
+    const cv = row && row.emblem && window.Emblems ? Emblems.canvas(row.emblem, 1) : null;
+    if (cv) cv.classList.add("hist-emblem");
+    return cv;
+  }
+  // how the season's theme went, as the sim kept it at the close: its board's last line and who took its hero and crew trophies
+  function themeOutcome(s) {
+    const o = s.theme_outcome;
+    if (!o) return null;
+    const prizes = (o.awards || []).filter((a) => heroes[a.hero]).map((a) => [el("b", null, a.name), ": ", A.heroLink(a.hero), ` (${a.amount}${a.note ? ", " + a.note : ""})`])
+      .concat((o.crew_awards || []).filter((a) => A.parties[a.party]).map((a) => [el("b", null, a.name), ": ", A.partyLink(a.party), ` (${a.amount})`]));
+    if (!o.line && !prizes.length) return null;
+    return el("div", { class: "hist-theme small" }, el("div", { class: "gold" }, `How ${o.name || s.theme} went`),
+      o.line ? el("div", null, A.storyText(o.line)) : null,
+      prizes.length ? el("div", null, prizes.map((x, i) => [i ? " · " : "", x])) : null);
   }
   function treasures() {
     const t = treasuresPanel(), a = cursesPanel();

@@ -9,10 +9,16 @@
 
   A.route(/^\/event(?:\/(\d+))?$/, (v, season) => {
     const m = L.meta, log = L.hyper_log || [];
-    season = season ? Number(season) : L.hyper ? m.season : (log.slice(-1)[0] || {}).season || m.season;
+    // The Dragon Wakes: this season's beast is the dragon, whatever the great event was last season
+    const dw = L.dragon && S.monsters[L.dragon.monster] && (!season || Number(season) === m.season) ? L.dragon : null;
+    season = season ? Number(season) : L.hyper || dw ? m.season : (log.slice(-1)[0] || {}).season || m.season;
     const live = L.hyper && season === m.season ? L.hyper : null, done = log.filter((x) => x.season === season).slice(-1)[0];
     const story = (L.hyper_story || []).filter((e) => e.season === season);
     v.classList.add("ev-page");
+    if (dw) {
+      dragonPage(v, dw, season);
+      if (!live && !done) { v.appendChild(earlier(season)); return; }
+    }
     if (!live && !done) {
       v.appendChild(el("h1", null, "The great event"));
       v.appendChild(panel(null, el("p", null, `Every season has one great event, in its last ten days: a megabeast, a plague, a falling star or the Tournament of Crowns. Omens come a few days before. `,
@@ -22,7 +28,7 @@
       return;
     }
     const h = live || done;
-    v.appendChild(el("p", { class: "small" }, el("a", { href: "#/" }, "‹ The Crier"), " · ", el("a", { href: "#/world" }, "The World"), " · ", el("a", { href: "#/history" }, "History")));
+    if (!dw) v.appendChild(crumbs());
     v.appendChild(head(h, live, season));
     if (live && live.kind === "megabeast") v.appendChild(beastRoute(live));
     else if (live) v.appendChild(panel("Where it is", el("p", null, whereLine(live))));
@@ -39,6 +45,53 @@
 
   function panel(title, ...kids) {
     return el("section", { class: "panel" }, title ? el("h2", null, title) : null, ...kids);
+  }
+  function crumbs() {
+    return el("p", { class: "small" }, el("a", { href: "#/" }, "‹ The Crier"), " · ", el("a", { href: "#/world" }, "The World"), " · ", el("a", { href: "#/history" }, "History"));
+  }
+  // The Dragon Wakes: the dragon herself (she is this season's beast), where she is, where she has been, who has met her, the muster
+  function dragonPage(v, dw, season) {
+    const m = L.meta, mu = dw.muster || {};
+    const place = (id) => el("a", { href: A.placeHref(id) }, A.nodeName(id));
+    const pic = sprite({ kind: "megabeast", body: dw.monster });
+    const where = dw.where === "down" && dw.at ? [`${dw.short} is down in `, place(dw.at), `, since day ${dw.since}.`, dw.heading ? ` She is restless; the smart money says ${dw.heading} next.` : ""]
+      : dw.where === "wait" && mu.town ? [`${dw.short} waits on the hill above `, place(mu.town), ` for the League's muster.`]
+      : { asleep: "Emberdeep smokes. Nobody has seen her yet.", home: `${dw.short} has gone home to Emberdeep.`, dead: `${dw.short} is dead.`, sea: `${dw.short} is somewhere out over the sea.` }[dw.where] || "";
+    const counts = [];
+    const count = (n, what) => counts.push(el("div", { class: "hy-count" }, el("b", null, n <= 0 ? "Today:" : n === 1 ? "Tomorrow:" : `${n} days`), el("span", null, n <= 1 ? what : `until ${what}`)));
+    if (dw.where === "wait" && mu.sday) count(mu.sday - m.season_day, `the muster at ${A.nodeName(mu.town)}`);
+    if (m.phase === "season") count(m.season_length - m.season_day, "the season ends");
+    v.appendChild(crumbs());
+    v.appendChild(el("section", { class: "hy-strip hy-dragon ev-head" },
+      pic ? el("div", { class: "hy-sprite" }, pic) : null,
+      el("div", { class: "hy-body" },
+        el("div", { class: "hy-kick" }, el("span", { class: "hy-tag" }, mu.outcome ? "Over" : "Now"), `The Dragon Wakes · season ${season}`),
+        el("h1", { class: "hy-name" }, dw.name),
+        el("p", { class: "hy-line" }, where),
+        counts.length ? el("div", { class: "hy-counts" }, counts) : null)));
+    if (mu.outcome) {
+      const word = { slain: "She fell", driven: "Driven off, home to Emberdeep", standoff: "A stand-off: she left for the sea", rout: "The League broke" }[mu.outcome];
+      v.appendChild(panel("The muster", el("p", null, el("b", null, word), ` at `, place(mu.town), `, on day ${mu.sday}, with ${plural(mu.count || 0, "hero")} in the line.`,
+        (mu.fights || []).length && A.kept("fight", mu.fights[mu.fights.length - 1]) ? [" ", el("a", { class: "watch", href: `#/fight/${mu.fights[mu.fights.length - 1]}` }, "▶ watch the last wave")] : null)));
+    }
+    const stops = (dw.path || []).map(([d, n]) => [n, d]);
+    if (stops.length) {
+      const ol = el("ol", { class: "ev-route" }, stops.slice().reverse().map(([n, d], i) => el("li", { class: `${i ? "" : "now"}${S.towns[n] ? " town" : ""}` },
+        place(n), el("span", { class: "tiny dim" }, ` · day ${d}`), S.towns[n] ? el("span", { class: "tiny red" }, " · burned") : null)));
+      v.appendChild(panel("Her flight", el("div", { class: "ev-route-grid" }, islandMap(), ol)));
+    }
+    const stood = new Set(dw.stood || []);
+    const met = {};
+    for (const e of (L.hyper_story || [])) {
+      if (e.kind !== "dragon" || e.season !== season || (mu.sday && e.sday >= mu.sday)) continue;
+      for (const id of e.heroes || []) (met[id] = met[id] || []).push(e);
+    }
+    const rows = Object.entries(met).filter(([id]) => heroes[id]).sort((a, b) => b[1].length - a[1].length || stood.has(b[0]) - stood.has(a[0])).map(([id, evs]) =>
+      el("li", null, A.heroPortrait(heroes[id], 1), el("div", null, A.heroLink(id), el("span", { class: "tiny dim" }, ` · ${plural(evs.length, "meeting")}${stood.has(id) ? " · stood up to her" : ""}`),
+        el("div", { class: "tiny" }, evs.map((e, i) => [i ? " · " : null, `Day ${e.sday || e.day}`])))));
+    v.appendChild(panel("Who has met her", rows.length ? el("ul", { class: "ev-met" }, rows) : el("p", { class: "empty" }, "Nobody yet. The bold will go and look.")));
+    const story = (L.hyper_story || []).filter((e) => e.kind === "dragon" && e.season === season);
+    v.appendChild(panel("The story so far", storyList(story)));
   }
   function sprite(h) {
     if (Views.hyperSprite) { try { return Views.hyperSprite(h); } catch (e) { /* the monster's own sprite below */ } }
@@ -60,8 +113,10 @@
       } else if (live.left != null) count(live.left, live.kind === "comet" ? "it cools" : live.kind === "tournament" ? "the first bout" : "it burns out");
       count(live.season_left, "the season ends");
     }
-    return el("section", { class: `hy-strip hy-${h.kind} ev-head` },
-      el("div", { class: "hy-sprite" }, live ? sprite(live) : null),
+    // an event that is over keeps its picture; with none to draw, no empty frame
+    const pic = sprite(h);
+    return el("section", { class: `hy-strip hy-${h.kind} ev-head${pic ? "" : " no-pic"}` },
+      pic ? el("div", { class: "hy-sprite" }, pic) : null,
       el("div", { class: "hy-body" },
         el("div", { class: "hy-kick" }, el("span", { class: "hy-tag" }, live ? "Now" : "Over"), `The great event of season ${season}${day ? ` · day ${day}` : ""}`,
           Views.helpLink ? Views.helpLink("great-event", "the great event") : null),
@@ -92,6 +147,14 @@
       el("div", { class: "ev-route-grid" }, mapWith(stops), ol));
     if (h.stands) box.appendChild(el("p", { class: "small" }, `${plural(h.stands, "stand")} against it so far. Every stand wears it down.`));
     return box;
+  }
+  // the island as the map page draws it: in her season that is the dragon, her flight and what she burned
+  function islandMap() {
+    if (!window.Scenes) return el("span");
+    const wrap = el("div", { class: "mapwrap ev-map" }), cv = el("canvas");
+    wrap.append(cv);
+    requestAnimationFrame(() => { try { Scenes.drawMap(cv, {}); } catch (e) { console.error(e); } });
+    return wrap;
   }
   function mapWith(stops) {
     if (!window.Scenes || !window.Isle) return el("span");

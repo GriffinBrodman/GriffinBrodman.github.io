@@ -348,19 +348,22 @@
     for (const [k, v] of SKY) if (t >= k) c = v;
     return c;
   }
-  let hillsUrl = null, starsUrl = null;
-  function hills() {
-    if (hillsUrl) return hillsUrl;
-    const g = new Grid(40, 7), far = "#a9b98a", near = "#8aa070";
+  const hillsUrl = {};
+  let starsUrl = null;
+  // night: the hills under a theme's dark sky, in the moon's colours
+  function hills(night) {
+    const key = night ? "night" : "day";
+    if (hillsUrl[key] !== undefined) return hillsUrl[key];
+    const g = new Grid(40, 7), far = night ? "#3a5a48" : "#a9b98a", near = night ? "#2e4a3c" : "#8aa070", tree = night ? "#22382c" : "#5f7a4c";
     for (let x = 0; x < 40; x++) {
       const a = Math.round(3 + 2 * Math.sin(x / 40 * Math.PI * 2) + Math.sin(x / 40 * Math.PI * 6) * 0.8);
       const b = Math.round(4.6 + 1.6 * Math.sin((x + 13) / 40 * Math.PI * 4));
       for (let y = a; y < 7; y++) g.set(x, y, far);
       for (let y = b; y < 7; y++) g.set(x, y, near);
     }
-    for (const x of [6, 7, 23, 31]) { g.set(x, 3, "#5f7a4c"); g.set(x, 4, "#5f7a4c"); }
-    try { hillsUrl = g.toCanvas(1).toDataURL(); } catch (e) { hillsUrl = ""; }
-    return hillsUrl;
+    for (const x of [6, 7, 23, 31]) { g.set(x, 3, tree); g.set(x, 4, tree); }
+    try { hillsUrl[key] = g.toCanvas(1).toDataURL(); } catch (e) { hillsUrl[key] = ""; }
+    return hillsUrl[key];
   }
   function stars() {
     if (starsUrl) return starsUrl;
@@ -411,6 +414,8 @@
     opts = opts || {};
     if (!db) return null;
     const ev = db.evening && (db.evening.kind || db.evening.line) ? db.evening : null;
+    // a day under a theme's dark sky (db.sky: the hours the sim drew it at) keeps the clock but paints the sky after dusk, with a moon
+    const lit = (t) => (db.sky ? Math.max(20, db.sky.from + (Math.min(24, Math.max(6, t)) - 6) / 18 * (db.sky.to - db.sky.from)) : t);
     // each block knows its place in the day's file and its hero, so a town stretch can link its scene
     const list = (db.blocks || []).map((b, i) => (b && (b.scene || hunting(b)) ? Object.assign({}, b, { i, wday: db.wday, hero: opts.hero }) : b)).filter((b) => b && b.to > b.from).slice().sort((a, b) => a.from - b.from);
     if (!list.length && !ev) return null;
@@ -437,7 +442,7 @@
       const li = h("li", {
         class: "db-b" + (right ? " db-r" : "") + (to - from <= 1 ? " db-short" : ""),
         "data-act": act || "", "data-cat": CAT[act] || "misc",
-        style: { gridColumn: `${Math.round((from - start) * 2) + 1} / ${Math.max(Math.round((from - start) * 2) + 2, Math.round((to - start) * 2) + 1)}`, "--h": String(to - from), "--sky": sky(mid) },
+        style: { gridColumn: `${Math.round((from - start) * 2) + 1} / ${Math.max(Math.round((from - start) * 2) + 2, Math.round((to - start) * 2) + 1)}`, "--h": String(to - from), "--sky": sky(lit(mid)) },
         onmouseenter: () => cap.classList.add("on"), onmouseleave: () => cap.classList.remove("on"),
       },
       h("div", { class: "db-gut", "aria-hidden": "true" }, h("span", { class: "db-gut-t" }, clock(from)), h("span", { class: "db-gut-to" }, "to " + clock(to)),
@@ -460,7 +465,7 @@
       } else if ((b.stretch || street) && window.RoadScenes && RoadScenes.strip) {
         const base = b.stretch ? b : { stretch: "town", biome: roadDay.biome, weather: roadDay.weather, line: b.line };
         const dressed = RoadScenes.dress ? RoadScenes.dress(Object.assign({}, base, { seed: db.day })) : {};
-        const strip = RoadScenes.strip(Object.assign({ biome: base.biome, hour: from, weather: base.weather, place_kind: b.place_kind, heroes: opts.heroes || [] }, dressed),
+        const strip = RoadScenes.strip(Object.assign({ biome: base.biome, hour: b.hour != null ? b.hour : from, weather: base.weather, place_kind: b.place_kind, heroes: opts.heroes || [] }, dressed),
           // the canvas grows with the stretch, so a long tile shows more road at the same pixel size rather than a bigger band
           { heroes: opts.heroes || [], w: Math.round(Math.max(200, Math.min(480, (to - from) * 120))), h: 80 });
         if (strip) { strip.classList.add("road-strip"); li.append(strip); }
@@ -482,11 +487,11 @@
       if (major) ticks.append(h("span", { class: "db-rl" + (NAMES[t] ? " db-name" : "") + (t === start ? " db-first" : t === end ? " db-last" : ""), style: { left: pct(t) + "%" } }, NAMES[t] || clock(t)));
     }
     const stops = [];
-    for (let t = start; t < end; t++) stops.push(`${sky(t + 0.5)} ${pct(t)}% ${pct(t + 1)}%`);
+    for (let t = start; t < end; t++) stops.push(`${sky(lit(t + 0.5))} ${pct(t)}% ${pct(t + 1)}%`);
     const noon = pct(start <= 12 && end >= 12 ? 12 : (start + end) / 2);
-    const skyEl = h("div", { class: "db-sky", "aria-hidden": "true", style: { backgroundImage: `${hills() ? `url(${hills()}),` : ""} linear-gradient(90deg, ${stops.join(", ")})` } });
+    const skyEl = h("div", { class: "db-sky", "aria-hidden": "true", style: { backgroundImage: `${hills(!!db.sky) ? `url(${hills(!!db.sky)}),` : ""} linear-gradient(90deg, ${stops.join(", ")})` } });
     skyEl.innerHTML = `<svg class="db-arc" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0,40 Q${noon},-24 100,40" fill="none" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke"/></svg>`;
-    const sun = icon("sun", 2);
+    const sun = icon(db.sky ? "moon" : "sun", 2);
     sun.classList.add("db-sun");
     sun.style.left = noon + "%";
     skyEl.append(sun);

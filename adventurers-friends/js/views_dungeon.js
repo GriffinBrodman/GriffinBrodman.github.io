@@ -220,7 +220,7 @@
     const p = el("section", { class: "panel dg-head" });
     const info = el("div", { class: "dg-info" });
     p.append(info);
-    if (window.TownScenes) { try { const bd = TownScenes.header(D.id, 560, 150); bd.classList.add("dg-header-art"); info.appendChild(bd); } catch (e) { /* the picture is optional */ } }
+    if (window.TownScenes) { try { const bd = TownScenes.header(D.id, 560, 150, { night: L.meta.sky === "night" }); bd.classList.add("dg-header-art"); info.appendChild(bd); } catch (e) { /* the picture is optional */ } }
     info.append(el("h1", { class: "dg-name" }, D.name),
       el("p", { class: "small muted" }, `Level ${D.level} dungeon · ${cap(D.theme)} · ${A.plural(D.floors.length, "floor")}`));
     if (D.desc) info.appendChild(el("p", { class: "small" }, D.desc));
