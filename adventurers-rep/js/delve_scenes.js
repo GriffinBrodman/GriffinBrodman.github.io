@@ -1313,8 +1313,8 @@
     const k = "m:" + id + ":" + (frame || 0);
     let c = SPR.get(k);
     if (c) return c;
-    const m = (statics().monsters || {})[id];
-    try { c = root.Art.monsterGrid(m || { body: "goblin", pal: "green" }, frame || 0).toCanvas(1); } catch (e) { c = mk(16, 16); const x = c.getContext("2d"); x.fillStyle = "#5a7a3a"; x.fillRect(2, 2, 12, 14); }
+    const [mid, role, gen] = String(id).split("@"), m = (statics().monsters || {})[mid];
+    try { c = root.Art.monsterGrid(m ? root.Art.withLook(m, role ? { role, gen: +gen } : null) : { body: "goblin", pal: "green" }, frame || 0).toCanvas(1); } catch (e) { c = mk(16, 16); const x = c.getContext("2d"); x.fillStyle = "#5a7a3a"; x.fillRect(2, 2, 12, 14); }
     SPR.set(k, c);
     return c;
   }

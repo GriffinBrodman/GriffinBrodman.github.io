@@ -123,7 +123,7 @@
             ctx.fillStyle = shade(S.timber, 0.1); ctx.fillRect(wx - 1, wy + 10, 9, 2);
             for (let j = 0; j < 8; j++) { ctx.fillStyle = S.snow ? "#dfe6f0" : ["#d84a5a", "#f0c040", "#5a9a3a", "#e86a9a", "#4a8a3a"][(j + i + n) % 5]; ctx.fillRect(wx - 1 + j, wy + 9 - (j % 2), 1, 1); }
           }
-          if (glowing) k.lights.push({ x: wx + 3, y: wy + 10, r: 20, k: 0.45 });
+          if (glowing) k.lights.push({ x: wx + 3, y: wy + 10, r: 20, k: k.L.night ? 0.3 : 0.45 });
         }
       }
       if (door != null) {
@@ -219,7 +219,7 @@
     });
     FLAT[set](k);
     k.things.sort((a, b) => a.key - b.key);
-    const shine = (L.lamps || L.night) ? Tv().lighting(W, H, null) : null;
+    const shine = (L.lamps || L.night) ? Tv().lighting(W, H, null) : null, moon = kit.moonWash(W, H, L, base.hour, k.lights);
     return {
       W, H, st, set, town: base.town, hour: base.hour, weather: base.weather, night: L.night, lamps: L.lamps, outdoor: true, flat: true, bg: cv, things: k.things,
       spots: k.spots, crowd: k.crowdAt, walkers: k.walkers, npc: k.npc || null, S, th: base.th, L,
@@ -237,6 +237,7 @@
         for (const f of k.overs) f(c, t, still);
         for (const [x, y] of k.candles) Tv().candle(c, R(x), R(y), t, 0.8, 3);
         if (L.tint) { c.fillStyle = `rgba(${[1, 3, 5].map((i) => parseInt(L.tint[0].slice(i, i + 2), 16)).join(",")},${L.tint[1]})`; c.fillRect(0, 0, W, H); }
+        if (moon) moon(c);
         if (shine) shine(c, t, k.lights, L.night ? 0.36 : 0.62);
         root.TownSets.weather(c, t, still, base.weather, true);
       },

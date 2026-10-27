@@ -1,4 +1,4 @@
-/* The season's party on the ceremony page: the vignettes league/ceremony.py seats (the champion's long table, the band, the dance floor in the street, the fireside corner, the bar, the stable yard out back), drawn with the heroes' own sprites in the venue town's tavern and street. */
+/* The season's party on the ceremony page: the vignettes league/ceremony.py seats (the champion's top table, the band, the dance floor in the street, the fireside corner, the bar, the stable yard out back), drawn with the heroes' own sprites in the venue town's tavern and street. */
 (function () {
   "use strict";
   const R = Math.round, frac = (v) => ((v % 1) + 1) % 1, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -164,7 +164,7 @@
     return { cv, acts: acts.map((a) => ({ z: a.z, front: a.front, draw(ctx, t) { ctx.save(); ctx.translate(-x0, 0); a.draw(ctx, t); ctx.restore(); } })) };
   }
 
-  // ---------- the long table: the champion stands at its middle, everyone's mug goes up together ----------
+  // ---------- the top table: the champion stands at its middle, everyone's mug goes up together ----------
   function toast(sc, town, seed) {
     const rm = room(town, W, seed), ctx = rm.cv.getContext("2d"), TOP = 93;
     bunting(ctx, 2, W / 2 - 4, 5, 5, PARTY_COLS, 0); bunting(ctx, W / 2 + 4, W - 2, 5, 5, PARTY_COLS, 2);
@@ -896,7 +896,7 @@
   }
 
   const MAKERS = { toast, band, dance, arm, corner, bar, yard };
-  const TITLES = { toast: "The long table", band: "The band", dance: "The dance floor", arm: "The arm-wrestle", corner: "By the fire", bar: "At the bar", yard: "Out back" };
+  const TITLES = { toast: "The top table", band: "The band", dance: "The dance floor", arm: "The arm-wrestle", corner: "By the fire", bar: "At the bar", yard: "Out back" };
   function scene(sc, town, seed) {
     const make = MAKERS[sc.kind];
     if (!make || !window.Art || !window.Anim) return null;

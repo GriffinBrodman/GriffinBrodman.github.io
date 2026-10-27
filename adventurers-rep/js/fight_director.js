@@ -87,6 +87,11 @@
           cur = add({ kind: "act", a: e.a, e, ev: [li], support: e.fx, allies: units.filter((u) => u && u.side === (units[e.a] || {}).side && alive[u.i]).map((u) => u.i),
             foes: units.filter((u) => u && u.side !== (units[e.a] || {}).side && alive[u.i]).map((u) => u.i) });
           cur = null; break;
+        // a wild surge is its caster's beat: the heals and blows it lets loose ride along with it
+        case "surge":
+          cur = add({ kind: "act", a: e.a, e, ev: [li], surge: true, allies: units.filter((u) => u && u.side === (units[e.a] || {}).side && alive[u.i]).map((u) => u.i),
+            foes: units.filter((u) => u && u.side !== (units[e.a] || {}).side && alive[u.i]).map((u) => u.i) });
+          break;
         case "tick": add({ kind: "tick", a: e.a, e, ev: [li] }); cur = null; break;
         case "stunned": add({ kind: "stun", a: e.a, e, ev: [li] }); cur = null; break;
         case "carry": add({ kind: "carry", a: e.a, e, ev: [li] }); cur = null; break;
@@ -108,7 +113,7 @@
         // a crew buff plays on everyone it buffed; a status nobody fell for still reaches the other side and fizzles there
         const missed = e.fx === "debuff" && e.t != null && ![].concat(e.t).length;
         if (missed) b.whiff = true;
-        tgt = missed ? b.foes : (e.fx === "debuff" || e.fx === "parley") && e.t != null ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
+        tgt = e.fx === "surge" ? ([].concat(e.t || []).length ? [].concat(e.t) : [b.a]) : missed ? b.foes : (e.fx === "debuff" || e.fx === "parley") && e.t != null ? [].concat(e.t) : e.fx === "fear" ? b.foes : e.fx === "rally" || (e.fx === "buff" || /all/.test(e.st || "")) && !e.own ? b.allies
           : e.fx === "summon" && e.new ? [e.new.i] : [b.a];
       }
       b.to = tgt.filter((i) => units[i]);

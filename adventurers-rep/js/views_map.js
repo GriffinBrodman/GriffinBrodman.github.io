@@ -138,10 +138,10 @@
     for (const [id, d] of Object.entries(S.dungeons).sort((a, b) => a[1].level - b[1].level)) {
       const st = L.dungeons[id] || {};
       const here = L.heroes.filter((h) => h.alive && h.loc === id && !h.travel).length;
-      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1)),
+      dt.appendChild(el("tr", null, el("td", null, A.monsterSprite(d.boss, 1, false, st.boss_look)),
         el("td", null, el("a", { href: `#/dungeon/${id}` }, d.name), here ? el("div", { class: "tiny dim" }, `${plural(here, "hero")} below now`) : null),
         el("td", { class: "num" }, d.level), el("td", { class: "num dg-opt" }, d.floors),
-        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${d.boss_name} (slain)` : d.boss_name), el("td", { class: "dg-opt" }, dangerWord(st.danger)),
+        el("td", { class: st.boss_alive === false ? "green" : "" }, st.boss_alive === false ? `${st.boss_name || d.boss_name} (slain)` : st.boss_name || d.boss_name), el("td", { class: "dg-opt" }, dangerWord(st.danger)),
         el("td", null, st.explored_word || "untouched (0%)"), el("td", { class: "num" }, st.visits || 0)));
     }
     return panel("Every dungeon", el("div", { class: "scrollx" }, dt));
@@ -161,6 +161,8 @@
   }
   // the great event, where it touches this place
   function eventLine(id) {
+    const dw = L.dragon;
+    if (dw && dw.at === id) return el("p", { class: "ev-here" }, el("b", null, dw.name), dw.where === "wait" ? " waits on the hill above, for the muster." : ` is down here (since day ${dw.since}).`);
     const h = L.hyper;
     if (!h) return null;
     const go = el("a", { href: "#/event" }, "The great event ▸");
@@ -225,7 +227,7 @@
     if (lately.length) p.appendChild(el("div", null, el("h4", null, "Lately in " + t.name), A.feed(lately, {})));
     const maps = (L.map_stock || {})[id] || [];
     if (maps.length) p.appendChild(el("p", { class: "small" }, "The mapmaker sells: ", maps.map((m, i) => [i ? ", " : "",
-      el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
+      S.dungeons[m.dungeon] ? el("a", { href: `#/map/${m.dungeon}` }, S.dungeons[m.dungeon].name) : A.nodeName(m.dungeon), ` (${m.pct}%, drawn by `, A.heroLink(m.by), ")"])));
   }
   // one move a day, pinned under a white footprint; whoever answers the Society's letters is never named
   function yetiBoard(y) {
@@ -250,7 +252,13 @@
     const kind = Scenes.locKind(id);
     const TS = window.TownScenes;
     let bd = null;
-    if (TS) { try { bd = TS.header(id, 560, 170); } catch (e) { bd = null; } }
+    // a lair that is a town for a season has a town scene of its own (static towns[id].scene)
+    // The Dragon Wakes: she sits on the skyline of the place she is down in
+    const dw = L.dragon && L.dragon.at === id && window.Isle && Isle.dragonActs ? L.dragon : null;
+    const more = dw ? (W, scene) => Isle.dragonActs(dw, W, scene) : null;
+    // a town she burned this season shows it: charred roofs, rafters, smoke
+    const scorched = !!t && ((L.dragon || {}).burned || []).some((b) => b[1] === id);
+    if (TS) { try { bd = TS.header((t && t.scene) || id, 560, 170, { night: L.meta.sky === "night", more, scorched }); } catch (e) { bd = null; } }
     if (!bd) bd = Scenes.backdrop(kind === "town" ? "plains" : kind, 200, 60, Art.hash(id));
     bd.style.width = "100%"; bd.style.borderRadius = "4px";
     p.appendChild(bd);
@@ -268,7 +276,7 @@
         el("div", { class: "bar", style: { marginTop: "3px" } }, el("i", { style: { width: `${pct}%` } }))));
       const mappers = L.heroes.filter((x) => (x.maps || []).some((m) => m.dungeon === id && m.pct >= 30));
       if (mappers.length) p.appendChild(el("p", { class: "small dim" }, "Holding maps of it: ", mappers.map((x, i) => [i ? ", " : "", A.heroLink(x.id)])));
-      const bossRow = el("div", { class: "row" }, A.monsterSprite(d.boss, 2, true), el("div", null, el("b", null, d.boss_name),
+      const bossRow = el("div", { class: "row" }, A.monsterSprite(d.boss, 2, true, st.boss_look), el("div", null, el("b", null, st.boss_name || d.boss_name),
         el("div", { class: st.boss_alive === false ? "green small" : "red small" }, st.boss_alive === false ? "Slain. Something new will move in." : "Lurking in the deepest chamber.")));
       p.appendChild(bossRow);
       for (const k of (st.boss_kills || []).slice(-3)) p.appendChild(el("p", { class: "small" }, `Slain by ${k.by} (season ${k.season})`));

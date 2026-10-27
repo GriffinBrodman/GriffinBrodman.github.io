@@ -1603,6 +1603,8 @@
     const statics = (root.LD && root.LD.static) || {};
     env.boss = rec.boss && rec.boss.mon ? rec.boss.mon : ((statics.dungeons || {})[rec.did] || {}).boss || null;
     env.rec.bossName = (rec.boss && rec.boss.name) || ((statics.monsters || {})[env.boss] || {}).name;
+    // a successor rides in the sprite id (DelveScenes.monCanvas reads "id@role@gen"), so every lair beat draws its variant
+    if (env.boss && rec.boss && rec.boss.role) env.boss += `@${rec.boss.role}@${rec.boss.gen || 2}`;
     env.rec.foes = rec.foes || [];
     const P = { env, clips: [], events: [], len: 0 }, S = { dx: 0 };
     if (!env.bg.A.mural) env.bg.A = Object.assign({}, env.bg.A, { mural: [24, 14, 76, 34] });

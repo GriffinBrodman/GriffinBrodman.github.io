@@ -53,12 +53,33 @@
   function columnBlock(d) {
     return el("div", { class: "week-column" }, el("h4", null, d.columnist ? `From the columnist: ${d.columnist}` : "From the columnist"), ...String(d.column).split(/\n\s*\n/).map((t) => el("p", null, A.storyText(t.trim()))));
   }
-  const goods = (xs, cls) => xs.map((x, i) => [i ? ", " : "", el("span", { class: cls }, `${S.goods[x.good].name} in ${S.towns[x.town].name} (×${x.ratio})`)]);
+  const goods = (xs, cls) => xs.map((x, i) => [i ? ", " : "", el("span", { class: cls }, `${S.goods[x.good].name} in ${A.nodeName(x.town)} (×${x.ratio})`)]);
   const NUMS = [["fight", "fight", "fights"], ["boss_kill", "boss slain", "bosses slain"], ["death", "death", "deaths"], ["evolve", "class change", "class changes"],
     ["party_formed", "party formed", "parties formed"], ["party_disband", "party broken", "parties broken"], ["bond", "new bond", "new bonds"], ["brawl", "brawl", "brawls"],
     ["pvp", "hero vs hero", "hero vs hero"], ["robbery", "robbery", "robberies"], ["body_sold", "body sold", "bodies sold"], ["crime", "arrest or crime", "arrests & crimes"], ["funeral", "funeral", "funerals"]];
 
   // opts.rankings: a back issue has no standings table, so its week carries the top five
+  // "This season": the theme's week as the sim kept it with the issue: the board in a line, who climbed it, the week's biggest theme
+  // stories and the whole board as it stood that day (folded, since the live board moves on). The season's last week has one too, sealed
+  // or not: the sim keeps the ceremony's own results out of it, and the front page shows the same board
+  const CEREMONY = ["top_party", "season_end", "award", "podium", "race_end"];
+  function thisSeason(d, opts) {
+    const t = d.theme;
+    if (!t) return null;
+    const b = t.board || {};
+    const moved = (t.moved || []).filter((m) => heroes[m.hero]);
+    // an issue kept from before the sim left the ceremony's results out of it
+    const lines = (t.lines || []).filter((e) => !opts.sealed || !CEREMONY.includes(e.kind));
+    const box = el("div", { class: "week-theme" }, el("h4", null, `This season: ${t.name}`),
+      b.head ? el("p", { class: "small" }, el("b", null, A.storyText(b.head))) : null,
+      moved.length ? el("p", { class: "small" }, `Climbing this week${t.label ? " (" + t.label + ")" : ""}: `,
+        moved.map((m, i) => [i ? ", " : "", A.heroLink(m.hero), ` ${m.text}`])) : null,
+      lines.length ? el("ul", { class: "diary" }, lines.map((e) => el("li", null, A.storyLine(e)))) : null,
+      (t.notes || []).length ? el("ul", { class: "diary small" }, t.notes.map((x) => el("li", null, A.storyText(x)))) : null);
+    if (t.board && Views.themeBoard) box.appendChild(el("details", { class: "week-board" }, el("summary", { class: "small" }, `The board as it stood on day ${d.day_to}`),
+      Views.themeBoard(t.board, { asOf: d.day_to })));
+    return box.childNodes.length > 1 ? box : null;
+  }
   function theWeek(d, opts) {
     opts = opts || {};
     const sec = el("section", { class: "panel parch week" },
@@ -74,6 +95,8 @@
         note(`The most talked-about hero this week${d.hero_of_week_n ? ` (${plural(d.hero_of_week_n, "story", "stories")})` : ""}, not the strongest: that's the ${opts.rankings ? "power rankings" : "standings"}.`)) : null,
       pw ? el("div", null, el("h4", null, "Party of the week"), partyCard(pw, { noNews: true }),
         d.party_of_week_n ? note(`The most talked-about crew this week (${plural(d.party_of_week_n, "story", "stories")}).`) : null) : null));
+    const ts = thisSeason(d, opts);
+    if (ts) sec.appendChild(ts);
     if (d.ledger && d.ledger.header) sec.appendChild(ledger(d.ledger, d.week));
     const market = el("div", { class: "week-market" }, el("h4", null, "Market report"),
       d.market_hot.length ? el("p", { class: "small" }, el("b", null, "Hot: "), goods(d.market_hot, "green")) : null,

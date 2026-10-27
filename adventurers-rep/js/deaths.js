@@ -16,7 +16,7 @@
   // where each body turns when it goes over (fractions of its standing sprite, facing right)
   const PIVOT = { warchief: [0.2, 1], goblin: [0.22, 1], kobold: [0.24, 1], human: [0.18, 1], troll: [0.17, 1] };
 
-  function monster(u) { const m = S().monsters && S().monsters[u.ref]; return m ? Object.assign({ id: u.ref }, m, { boss: !!u.boss }) : null; }
+  function monster(u) { const m = S().monsters && S().monsters[u.ref]; return m ? Art.withLook(Object.assign({ id: u.ref }, m, { boss: !!u.boss }), u.look) : null; }
   const groupOf = (u) => { const m = u && S().monsters && S().monsters[u.ref]; return (m && m.death) || null; };
 
   // ---------- sprites: the standing sprite and posed ones, as canvases facing dir ----------
@@ -26,7 +26,7 @@
     if (!c) { const pad = g.pad || 0, stand = g.stand || [g.w, g.h]; c = (dir < 0 ? g.flipX() : g).toCanvas(1); c.pad = pad; c.stand = stand; cache.set(key, c); }
     return c;
   }
-  const keyOf = (m) => m.body + "|" + m.pal + "|" + (m.boss ? 1 : 0);
+  const keyOf = (m) => m.body + "|" + m.pal + "|" + (m.boss ? 1 : 0) + (m.role ? "|" + m.role + m.gen : "");
   function stand(m, dir) { return toCv(Art.monsterGrid(m, 0), dir, "s|" + keyOf(m) + dir); }
   function posed(m, pose, dir) { const k = JSON.stringify(pose); return toCv(Art.monsterPose(m, pose), dir, "p|" + keyOf(m) + k + dir); }
   // a posed canvas lands with its standing place on the unit's feet, exactly where the standing sprite is drawn

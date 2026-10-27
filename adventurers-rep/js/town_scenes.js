@@ -15,7 +15,10 @@
     hollowood: { primary: "#3a6a34", accent: "#d8b45a", dark: "#16261a", light: "#e4ecd0" },
     saltmarrow: { primary: "#2a6aa8", accent: "#d84a3a", dark: "#16304a", light: "#f4f0e4" },
     frosthold: { primary: "#4a7ab0", accent: "#8a5a34", dark: "#142440", light: "#f0f6ff" },
+    // Goblin Town, the season the camp is a town (The Goblin Kingdom): the king's green and gold
+    goblin_camp: { primary: "#4e8a3a", accent: "#e0b43a", dark: "#1e2e18", light: "#eef2d8" },
   };
+  THEME.goblin_town = THEME.goblin_camp;
 
   function canvas(w, h) {
     const c = document.createElement("canvas");
@@ -114,6 +117,8 @@
     };
     k.win = (x, y, w, h, lit, fr) => {
       fr = fr || "#2a1e18";
+      // after dark most of a town's windows have a lamp behind them (hashed from the spot, so the day's random draws don't shift)
+      if (!lit && k.night) { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; lit = s - Math.floor(s) < 0.6; }
       F(x - 1, y - 1, w + 2, h + 2, fr);
       F(x, y, w, h, lit ? "#ffd27a" : "#3a4858");
       if (lit) F(x, y + h - 1, w, 1, "#e89a44"); else P(x, y, "#9ab0c4");
@@ -337,7 +342,7 @@
   }
   function beam(o) {
     const A = window.Anim;
-    return { z: o.z || 0, front: true, draw(ctx, t) {
+    return { z: o.z || 0, front: true, light: true, draw(ctx, t) {
       const s = Math.sin(t * 0.8), dir = s > 0 ? 1 : -1, str = Math.abs(s);
       A.light(ctx, o.x, o.y, 10, "255,236,160", 0.35 + 0.35 * str);
       for (let i = 2; i < o.len * str; i++) {
@@ -351,7 +356,7 @@
   }
   function aurora(o) {
     const ph = (o.seed || 0) * 0.13;
-    return { z: -100, draw(ctx, t) {
+    return { z: -100, light: true, draw(ctx, t) {
       for (let x = 0; x < o.W; x += 2) {
         const y = o.y + Math.sin(x * 0.034 + t * 0.22 + ph) * 5 + Math.sin(x * 0.012 - t * 0.15 + 1) * 7;
         const a = Math.max(0, 0.5 + 0.5 * Math.sin(x * 0.045 - t * 0.5) * Math.sin(x * 0.017 + t * 0.21 + 2));
@@ -376,7 +381,7 @@
     } };
   }
   function shafts(o) {
-    return { z: -200, draw(ctx, t) {
+    return { z: -200, day: true, draw(ctx, t) {
       for (const [x0, w, a, ph] of o.list) {
         const al = a * (0.75 + 0.25 * Math.sin(t * 0.45 + ph));
         for (let y = o.y0; y < o.y1; y += 1) {
@@ -454,7 +459,7 @@
   function sparkle(o) {
     const r = Art.rng((o.seed || 3) * 131 + 7), ps = [];
     for (let i = 0; i < o.n; i++) ps.push([o.x + r() * o.w, o.y + r() * o.h, r(), 1.5 + r() * 2.5]);
-    return { z: o.z || 0, draw(ctx, t) {
+    return { z: o.z || 0, day: true, draw(ctx, t) {
       for (const [x, y, ph, per] of ps) {
         const a = frac(t / per + ph);
         if (a > 0.35) continue;
@@ -1011,8 +1016,9 @@
     for (const [x, y] of lamps) { F(x, y - 2, 1, 2, OL); F(x - 1, y, 3, 3, OL); P(x, y + 1, "#ffd870"); add(A.glow({ x, y: y + 1, r: 10, rgb: "255,210,120", a: 0.18, seed: x })); }
     const cx2 = R((t2[0] + 12 + t3[0] - 10) / 2);
     const cot = k.house({ x: cx2 - 13, g: 78, w: 24, wh: 11, rh: 10, wall: ["#e8d8b0", "#ccb88c", "#a08a64"], roof: ["#7ab044", "#4e8a30", "#2e5a20"], frame: "#5a3c22", ol: OL, chim: "r", chimC: "#8a7a6a", speckle: true, lit: true, wins: 2, doorAt: 10, doorC: "#5a7a3a" });
-    F(cx2 - 15, 68, 28, 1, "#4a3420");
-    for (let i = 0; i < 6; i++) { const hx = cx2 - 13 + i * 4; F(hx, 69, 2, 3, k.pick(["#8ab04a", "#c8a050", "#a85a8a", "#6a9a4a", "#d8c060"])); P(hx, 68, "#4a3420"); }
+    // the bunting burns with the cottage (its colours are still drawn from the dice, so the rest of the scene doesn't shift)
+    if (!cot.burned) F(cx2 - 15, 68, 28, 1, "#4a3420");
+    for (let i = 0; i < 6; i++) { const hx = cx2 - 13 + i * 4, c = k.pick(["#8ab04a", "#c8a050", "#a85a8a", "#6a9a4a", "#d8c060"]); if (!cot.burned) { F(hx, 69, 2, 3, c); P(hx, 68, "#4a3420"); } }
     for (let i = 0; i < 3; i++) { const px = cx2 + 14 + i * 4; F(px, 75, 3, 3, "#a8583a"); F(px, 75, 3, 1, "#c87a4a"); P(px + 1, 74, k.pick(["#6aa040", "#e8c040", "#c84a6a"])); }
     const shroom = (x, y, big, c) => {
       const s = big ? 3 : 2;
@@ -1168,10 +1174,11 @@
     const chims = [], glows = [];
     const hut = (x, w, wh, rh) => {
       const h = k.house({ x, g: 74, w, wh, rh, wall: LOG, roof: ["#7a5a44", "#5a4232", "#3e2c20"], ol: OL, logs: "#3e2a1e", lit: true, wins: 1, chim: "r", chimC: "#5a5a66", snow: true, doorC: "#4a3020" });
-      for (const t of h.tops) if (t.length === 2) F(t[0], t[1] - 2, 1, 3, k.r() < 0.6 ? SN[0] : SN[1]);
+      for (const t of h.tops) if (t.length === 2) { const c = k.r() < 0.6 ? SN[0] : SN[1]; if (!h.burned) F(t[0], t[1] - 2, 1, 3, c); }
       F(x - 3, 73, w + 6, 2, SN[1]);
-      for (let xx = x; xx < x + w; xx += 2) P(xx, h.top + 1, "#cce4ff");
-      chims.push(h.chim); glows.push([x + 2, h.top + 5]);
+      if (!h.burned) for (let xx = x; xx < x + w; xx += 2) P(xx, h.top + 1, "#cce4ff");
+      chims.push(h.burned ? null : h.chim);
+      if (!h.burned) glows.push([x + 2, h.top + 5]);
       return h;
     };
     const rack = (x) => {
@@ -1221,14 +1228,17 @@
   const GOB_BODY = [".FRFcccgssw.", ".FRFbbYbC.w.", ".fRfcCcCc.w."];
   const GOB_LEGS = [["..f.g..g..w.", "...dd..dd.w."], ["..f..gg...w.", ".....dd...w."]];
   const COOK = ["...aaa...", "..aaaaa..", "...AAAA..", "ss.sssss.", ".Pgssesd.", "..ddsssss", "..caaaac.", "...aaaa..", "...aaaa.."];
-  function goblinFrames(cook) {
+  function goblinFrames(cook, pal) {
     const A = window.Anim;
     if (cook) return GOB_LEGS.map((l) => A.sprite(COOK.concat(l.map((r) => r.slice(0, 9).replace(/[fw]/g, "."))), GOB));
-    return GOB_LEGS.map((l) => A.sprite(GOB_HEAD.concat(GOB_BODY, l), GOB));
+    return GOB_LEGS.map((l) => A.sprite(GOB_HEAD.concat(GOB_BODY, l), pal ? Object.assign({}, GOB, pal) : GOB));
   }
+  // the same goblin in Goblin Town's compulsory hat: the helm's colours repainted as a hat, its shade, its band and its brim
+  const HATS = [{ H: "#c8463a", h: "#8a2a22", r: "#f0c84a", k: "#5a1e18" }, { H: "#4a6ab0", h: "#2e4478", r: "#e8e0c8", k: "#1e2a4a" },
+                { H: "#e0b43a", h: "#a87a20", r: "#7a3a8a", k: "#5a3a10" }];
   // walks a stretch and back, stopping at each end to look both ways; `clip` hides it behind whatever is in front of it
   function patrol(o) {
-    const A = window.Anim, fr = goblinFrames(), ph = (o.seed || 0) * 0.37;
+    const A = window.Anim, fr = goblinFrames(false, o.pal), ph = (o.seed || 0) * 0.37;
     const span = o.x1 - o.x0, speed = o.speed || 4, rest = 0.2, per = (2 * span / speed) / (1 - 2 * rest), a = 0.5 - rest;
     return { z: o.y, walker: true, draw(ctx, t) {
       const f = frac(t / per + ph);
@@ -1242,7 +1252,7 @@
     } };
   }
   function lookout(o) {
-    const A = window.Anim, fr = goblinFrames(), ph = (o.seed || 0) * 0.21;
+    const A = window.Anim, fr = goblinFrames(false, o.pal), ph = (o.seed || 0) * 0.21;
     return { z: o.y, draw(ctx, t) {
       const f = frac(t / 11 + ph), left = f < 0.42 || (f > 0.62 && f < 0.7);
       A.put(ctx, fr[1], o.x, o.y + (frac(t / 2.6 + ph) < 0.12 ? 1 : 0), left);
@@ -1294,10 +1304,29 @@
     } };
   }
 
-  function goblin_camp(k, A) {
+  // the King of Goblin Town on his Throne Wagon: a chair nailed to a farm cart, a red blanket over the chair, a crown, and a wave
+  const KING = ["..Y.Y.Y..", "..YYYYY..", "ss.sssss.", ".Pgssesd.", "..ddsssss", ".BBYYYBB.", ".BBBYBBB.", "..BBBBB.."];
+  const KING_WAVE = ["s........", ".s.......", "..s......"];
+  function throneKing(o) {
+    const A = window.Anim, body = A.sprite(KING, Object.assign({ B: "#3e5ab0" }, GOB)), arm = [A.sprite(KING_WAVE, GOB), A.sprite(KING_WAVE.slice(1).concat(["s........"]), GOB)];
+    return { z: o.z, draw(ctx, t) {
+      A.put(ctx, body, o.x, o.y, false);
+      const wave = frac(t / 5 + 0.2) < 0.4;
+      if (wave) A.put(ctx, arm[Math.floor(t * 4) % 2], o.x - 3, o.y - 9, false);
+    } };
+  }
+  // Goblin Town: the camp as it is the season it is a town (The Goblin Kingdom): posts painted green and the warning skulls taken down,
+  // the king's crown and charter over the gate, market stalls and the Throne Wagon in the yard, buttons where the bones were, and hats
+  function goblin_town(k, A) {
+    goblin_camp(k, A, true);
+  }
+  function goblin_camp(k, A, town) {
     const { W, F, P } = k, add = k.add, o = k.o;
     const OL = "#2a1c14", WD = ["#c8935a", "#a06e40", "#7a5230", "#563820"], ROPE = "#d4b474", BURNT = "#5a3c24";
-    const HIDE = ["#e2c690", "#c49e66", "#96723f", "#664a2a"], BONE = "#f0e8d6", RED = ["#d85a3a", "#b03a2a", "#7a2420"];
+    // the stolen fence posts, painted the king's green before they go back to their farmers
+    const PAINT = ["#94c86e", "#68a44c", "#467c38", "#2e5a28"];
+    const HIDE = ["#e2c690", "#c49e66", "#96723f", "#664a2a"], BONE = "#f0e8d6", RED = town ? ["#5ea84a", "#3e7a34", "#264e22"] : ["#d85a3a", "#b03a2a", "#7a2420"];
+    const GOLD = ["#fff0a0", "#f0c84a", "#c8962a", "#7a5418"];
     k.grad(0, 60, ["#4e8cc8", "#72a8d4", "#a2c4d8", "#dcd2a8", "#f0bc78"]);
     k.cloud(W * 0.2, 9, 30, ["#fff6e8", "#f6e6d0", "#e0c4a4"]); k.cloud(W * 0.72, 15, 24, ["#fff6e8", "#f6e6d0", "#e0c4a4"]); k.cloud(W * 0.95, 6, 14, ["#fff6e8", "#f6e6d0", "#e0c4a4"]);
     k.ridge(50, 9, 36, "#93aaa2", 31, "#a8beb2");
@@ -1309,7 +1338,8 @@
     for (let i = 0; i < W * 1.4; i++) { const x = k.ri(0, W), y = k.ri(63, 89); P(x, y, k.r() < 0.5 ? "#a8925e" : "#6e5a36"); }
     for (let i = 0; i < W / 7; i++) { const x = k.ri(0, W), y = k.ri(64, 89); if (Math.abs(x - gx) < 16) continue; P(x, y, "#6a8a3a"); P(x + 1, y - 1, "#8aa84a"); P(x - 1, y - 1, "#6a8a3a"); }
     const tops = new Array(W).fill(wy);
-    const stake = (kk, x, base, h, w, fence, rec) => {
+    const stake = (kk, x, base, h, w, fence, rec, paint) => {
+      const C = paint || WD;
       const top = base - h, n = (w + 1) >> 1;
       kk.F(x - 1, top + n, w + 2, h - n, OL);
       if (fence) {
@@ -1318,23 +1348,23 @@
         if (rec) for (let i = -1; i <= w; i++) if (x + i >= 0 && x + i < W) tops[x + i] = Math.min(tops[x + i], top + n - 1);
         return;
       }
-      kk.F(x, top + n, 1, h - n, WD[0]); kk.F(x + 1, top + n, w - 2, h - n, WD[1]); kk.F(x + w - 1, top + n, 1, h - n, WD[2]);
+      kk.F(x, top + n, 1, h - n, C[0]); kk.F(x + 1, top + n, w - 2, h - n, C[1]); kk.F(x + w - 1, top + n, 1, h - n, C[2]);
       for (let i = 0; i < n; i++) {
         const ww = Math.min(w, 1 + 2 * i), xx = x + ((w - ww) >> 1), y = top + i;
         kk.F(xx - 1, y, 1, 1, OL); kk.F(xx + ww, y, 1, 1, OL);
-        kk.F(xx, y, ww, 1, i < n - 1 ? BURNT : "#7a5636");
+        kk.F(xx, y, ww, 1, paint ? (i < n - 1 ? C[3] : C[2]) : i < n - 1 ? BURNT : "#7a5636");
         if (rec) for (let j = xx - 1; j <= xx + ww; j++) if (j >= 0 && j < W) tops[j] = Math.min(tops[j], y);
       }
       kk.P(x + (w >> 1), top - 1, OL);
       if (rec && x + (w >> 1) < W) tops[x + (w >> 1)] = Math.min(tops[x + (w >> 1)], top - 1);
-      for (let j = 0; j < (h >> 3); j++) kk.P(x + 1, top + n + 2 + k.ri(0, h - n - 4), WD[2]);
+      for (let j = 0; j < (h >> 3); j++) kk.P(x + 1, top + n + 2 + k.ri(0, h - n - 4), C[2]);
     };
     const wall = [];
     for (let x = 0; x < W; x += 4) {
       if (Math.abs(x + 1 - gx) < 14) continue;
       const h = 15 + ((x * 7 + (x >> 3)) % 5), fence = k.r() < 0.08;
       wall.push([x, h]);
-      stake(k, x, wy, h, 3, fence, true);
+      stake(k, x, wy, h, 3, fence, true, town && (x * 13 + (x >> 2)) % 5 < 2 ? PAINT : null);
     }
     for (const y of [wy - 5, wy - 11]) for (let x = 0; x < W; x++) {
       if (Math.abs(x - gx) < 13) continue;
@@ -1345,15 +1375,24 @@
     post(gx - 14, 30); post(gx + 10, 30);
     F(gx - 16, 34, 32, 4, OL); F(gx - 15, 35, 30, 2, WD[1]); F(gx - 15, 35, 30, 1, WD[0]);
     for (const x of [gx - 14, gx + 10]) { F(x - 1, 38, 6, 1, ROPE); F(x - 1, 33, 6, 1, ROPE); }
-    for (const s of [-1, 1]) {
-      k.line(gx + s * 3, 30, gx + s * 6, 27, OL); k.line(gx + s * 6, 27, gx + s * 8, 24, OL); k.line(gx + s * 8, 24, gx + s * 8, 22, OL);
-      k.line(gx + s * 3, 29, gx + s * 6, 26, BONE); k.line(gx + s * 6, 26, gx + s * 7, 24, "#d8ccb4"); P(gx + s * 7, 23, "#d8ccb4");
+    if (town) {
+      // a wooden crown over the gate, gilded badly, and the charter nailed to the crossbar
+      F(gx - 7, 27, 15, 8, OL); F(gx - 6, 29, 13, 5, GOLD[1]); F(gx - 6, 33, 13, 1, GOLD[2]); F(gx - 6, 29, 13, 1, GOLD[0]);
+      for (const dx of [-6, -2, 2, 6]) { F(gx + dx - 1, 24, 3, 5, OL); F(gx + dx, 25, 1, 4, GOLD[1]); P(gx + dx, 24, GOLD[0]); }
+      for (const [dx, c] of [[-4, "#c8302a"], [0, "#3a6ad0"], [4, "#c8302a"]]) { P(gx + dx, 31, c); P(gx + dx, 30, GOLD[0]); }
+      F(gx - 2, 38, 5, 7, OL); F(gx - 1, 39, 3, 5, "#f2e8cc"); P(gx, 40, "#8a7a62"); P(gx - 1, 42, "#8a7a62"); P(gx + 1, 42, "#8a7a62"); F(gx - 1, 44, 3, 1, "#c8302a");
+    } else {
+      for (const s of [-1, 1]) {
+        k.line(gx + s * 3, 30, gx + s * 6, 27, OL); k.line(gx + s * 6, 27, gx + s * 8, 24, OL); k.line(gx + s * 8, 24, gx + s * 8, 22, OL);
+        k.line(gx + s * 3, 29, gx + s * 6, 26, BONE); k.line(gx + s * 6, 26, gx + s * 7, 24, "#d8ccb4"); P(gx + s * 7, 23, "#d8ccb4");
+      }
+      k.blob(gx, 31, 4, 3, OL); k.blob(gx, 31, 3, 2, BONE); F(gx - 1, 33, 3, 3, OL); F(gx - 1, 33, 3, 2, "#e0d6c0");
+      P(gx - 1, 31, OL); P(gx + 1, 31, OL); P(gx - 2, 30, "#d8ccb4"); P(gx, 34, "#8a7a62");
     }
-    k.blob(gx, 31, 4, 3, OL); k.blob(gx, 31, 3, 2, BONE); F(gx - 1, 33, 3, 3, OL); F(gx - 1, 33, 3, 2, "#e0d6c0");
-    P(gx - 1, 31, OL); P(gx + 1, 31, OL); P(gx - 2, 30, "#d8ccb4"); P(gx, 34, "#8a7a62");
     const banner = (x, y, h) => {
       F(x - 1, y - 1, 7, h + 1, OL); F(x, y, 5, h, RED[1]); F(x, y, 1, h, RED[0]); F(x + 4, y, 1, h, RED[2]);
       for (let i = 0; i < 5; i += 2) P(x + i, y + h, RED[1]);
+      if (town) { P(x + 1, y + 2, GOLD[1]); P(x + 2, y + 1, GOLD[1]); P(x + 3, y + 2, GOLD[1]); F(x + 1, y + 3, 3, 2, GOLD[1]); P(x + 2, y + 3, GOLD[0]); P(x + 2, y + 6, GOLD[1]); return; }
       P(x + 1, y + 3, BONE); P(x + 3, y + 3, BONE); F(x + 1, y + 2, 3, 1, BONE); P(x + 2, y + 4, BONE); P(x + 1, y + 6, BONE); P(x + 3, y + 6, BONE); P(x + 2, y + 7, BONE);
     };
     banner(gx - 11, 38, 9); banner(gx + 6, 38, 9);
@@ -1383,7 +1422,7 @@
     k.line(tx - 2, py - 29, tx + 2, py - 25, OL); k.line(tx + 2, py - 29, tx - 2, py - 25, OL);
     for (let x = tx - 13; x < tx + 13; x += 4) stake(o, x, py, 5, 3, false, false);
     o.F(tx - 13, py - 3, 27, 1, ROPE);
-    add(lookout({ x: tx - 1, y: py - 3, seed: 3 }));
+    add(lookout({ x: tx - 1, y: py - 3, seed: 3, pal: town ? HATS[1] : null }));
     add(pennant({ x: tx, y: py - 30, len: 6, h: 2, c1: RED[1], c2: RED[0], seed: 8 }));
     F(tx, py - 30, 1, 4, OL);
 
@@ -1397,8 +1436,37 @@
     F(wcx - 1, wcy - 1, 2, 2, "#3a3440");
     barrel(lx, 70); barrel(lx + 6, 71); crate(lx + 12, 72); barrel(lx + 3, 63);
     k.blob(lx - 6, 69, 4, 3, OL); k.blob(lx - 6, 69, 3, 2, "#d8c08a"); P(lx - 7, 67, "#f0dca8"); F(lx - 7, 66, 2, 1, "#a8884a");
-    for (const [bx, by] of [[gx - 22, 84], [gx + 26, 80], [R(W * 0.42), 87], [R(W * 0.6), 74]]) { F(bx, by, 3, 1, BONE); P(bx - 1, by - 1, BONE); P(bx + 3, by + 1, BONE); }
+    for (const [bx, by] of [[gx - 22, 84], [gx + 26, 80], [R(W * 0.42), 87], [R(W * 0.6), 74]]) {
+      if (town) { P(bx, by, GOLD[1]); P(bx + 1, by, GOLD[2]); P(bx + 3, by + 1, "#c8c8d0"); continue; }
+      F(bx, by, 3, 1, BONE); P(bx - 1, by - 1, BONE); P(bx + 3, by + 1, BONE);
+    }
 
+    // a market stall: two posts, a striped awning, a counter of goods
+    const stall = (x, g, cols) => {
+      for (const dx of [0, 13]) { F(x + dx - 1, g - 13, 3, 13, OL); F(x + dx, g - 12, 1, 12, WD[1]); }
+      F(x - 2, g - 16, 18, 4, OL);
+      for (let i = 0; i < 16; i++) { F(x - 1 + i, g - 15, 1, 2, cols[(i >> 1) % 2]); }
+      for (let i = 0; i < 16; i += 2) P(x - 1 + i, g - 13, cols[0]);
+      F(x - 1, g - 6, 16, 3, OL); F(x, g - 5, 14, 1, "#b08a50"); F(x, g - 4, 14, 1, "#7a5a30");
+      const wares = [GOLD[1], "#c8463a", "#e8dcb8", "#6a9a3a", "#3e6ab0", "#c8c8d0"];
+      for (let i = 0; i < 6; i++) { F(x + 1 + i * 2, g - 7, 2, 2, OL); P(x + 1 + i * 2, g - 7, wares[(i + x) % wares.length]); P(x + 2 + i * 2, g - 6, wares[(i + x + 2) % wares.length]); }
+    };
+    // the Throne Wagon: a farm cart, a chair nailed to its bed, a red blanket over the chair, and the king
+    const throneWagon = (x, g) => {
+      F(x - 2, g - 9, 26, 4, OL); F(x - 1, g - 8, 24, 2, "#a06e40"); F(x - 1, g - 8, 24, 1, "#c8935a");
+      k.line(x + 22, g - 7, x + 30, g - 3, OL); k.line(x + 22, g - 6, x + 30, g - 2, "#7a5230");
+      for (const wx of [x + 3, x + 18]) {
+        for (let a = 0; a < 28; a++) { const t = a / 28 * Math.PI * 2; P(wx + R(Math.cos(t) * 4), g - 3 + R(Math.sin(t) * 4), OL); }
+        for (let a = 0; a < 22; a++) { const t = a / 22 * Math.PI * 2; P(wx + R(Math.cos(t) * 3), g - 3 + R(Math.sin(t) * 3), "#9a6a3a"); }
+        k.line(wx - 3, g - 3, wx + 3, g - 3, "#7a5230"); k.line(wx, g - 6, wx, g, "#7a5230"); P(wx, g - 3, OL);
+      }
+      F(x + 6, g - 22, 11, 14, OL); F(x + 7, g - 21, 9, 3, "#7a5230"); F(x + 7, g - 18, 9, 9, "#b8302a"); F(x + 7, g - 18, 9, 1, "#e0604a");
+      for (let i = 0; i < 9; i += 2) P(x + 7 + i, g - 10, GOLD[1]);
+      F(x + 6, g - 24, 2, 3, OL); F(x + 15, g - 24, 2, 3, OL); P(x + 6, g - 24, GOLD[1]); P(x + 16, g - 24, GOLD[1]);
+      add(throneKing({ x: x + 7, y: g - 16, z: g + 1 }));
+      add(pennant({ x: x - 1, y: g - 22, len: 6, h: 3, c1: RED[1], c2: RED[0], c3: RED[2], fork: true, seed: 6 }));
+      F(x - 1, g - 22, 1, 13, OL);
+    };
     const tent = (x, g, w, h, chief) => {
       k.tri(x - 1, g - h - 1, w + 2, h + 1, OL);
       for (let i = 0; i < h; i++) {
@@ -1414,17 +1482,22 @@
       F(x - 1, g, w + 2, 1, "#5e4a2c");
       return [ax, ay];
     };
-    tent(R(W * 0.66), 70, 22, 13, false);
+    if (town) throneWagon(R(W * 0.64), 76);
+    else tent(R(W * 0.66), 70, 22, 13, false);
     const [cx, cy] = tent(R(W * 0.8), 73, 30, 18, true);
     add(A.smoke({ x: cx, y: cy - 3, n: 4, rise: 12, wind: 3, col: "#c8c0b8", seed: 11 }));
-    k.blob(cx, cy + 9, 2, 2, OL); k.blob(cx, cy + 9, 2, 1, BONE); P(cx - 1, cy + 9, OL); P(cx + 1, cy + 9, OL);
-    for (const s of [-1, 1]) { P(cx + s * 3, cy + 8, BONE); P(cx + s * 4, cy + 7, BONE); P(cx + s * 4, cy + 6, "#d8ccb4"); }
+    if (town) { F(cx - 2, cy + 7, 5, 3, OL); F(cx - 1, cy + 8, 3, 1, GOLD[1]); P(cx - 1, cy + 7, GOLD[1]); P(cx + 1, cy + 7, GOLD[1]); }
+    else {
+      k.blob(cx, cy + 9, 2, 2, OL); k.blob(cx, cy + 9, 2, 1, BONE); P(cx - 1, cy + 9, OL); P(cx + 1, cy + 9, OL);
+      for (const s of [-1, 1]) { P(cx + s * 3, cy + 8, BONE); P(cx + s * 4, cy + 7, BONE); P(cx + s * 4, cy + 6, "#d8ccb4"); }
+    }
     const sx = R(W * 0.8) + 34;
     F(sx - 1, 46, 3, 28, OL); F(sx, 47, 1, 27, WD[1]);
-    k.blob(sx, 45, 2, 2, OL); k.blob(sx, 45, 1, 1, BONE); P(sx, 45, OL);
+    if (town) { F(sx - 1, 44, 3, 2, OL); P(sx, 44, GOLD[0]); } else { k.blob(sx, 45, 2, 2, OL); k.blob(sx, 45, 1, 1, BONE); P(sx, 45, OL); }
     F(sx - 8, 48, 8, 12, OL); F(sx - 7, 49, 7, 10, RED[1]); F(sx - 7, 49, 7, 1, RED[0]); F(sx - 7, 49, 1, 10, RED[0]);
     for (let i = 0; i < 7; i += 2) P(sx - 7 + i, 59, RED[1]);
-    F(sx - 5, 51, 3, 2, BONE); P(sx - 5, 52, OL); P(sx - 3, 52, OL); P(sx - 4, 53, BONE); P(sx - 6, 55, BONE); P(sx - 2, 55, BONE); P(sx - 5, 56, BONE); P(sx - 3, 56, BONE); P(sx - 4, 57, BONE);
+    if (town) { for (const dx of [-6, -4, -2]) P(sx + dx, 51, GOLD[1]); F(sx - 6, 52, 5, 2, GOLD[1]); F(sx - 6, 54, 5, 1, GOLD[2]); P(sx - 4, 52, "#c8302a"); F(sx - 6, 56, 5, 1, GOLD[1]); }
+    else { F(sx - 5, 51, 3, 2, BONE); P(sx - 5, 52, OL); P(sx - 3, 52, OL); P(sx - 4, 53, BONE); P(sx - 6, 55, BONE); P(sx - 2, 55, BONE); P(sx - 5, 56, BONE); P(sx - 3, 56, BONE); P(sx - 4, 57, BONE); }
 
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2, x = gx + R(Math.cos(a) * 7), y = fy + R(Math.sin(a) * 2);
@@ -1448,12 +1521,24 @@
 
     const pk = gx - 25;
     F(pk - 1, 72, 3, 16, OL); F(pk, 73, 1, 15, WD[1]);
-    k.blob(pk, 70, 3, 3, OL); k.blob(pk, 70, 2, 2, BONE); P(pk - 1, 70, OL); P(pk + 1, 70, OL); F(pk - 1, 72, 3, 1, "#d8ccb4"); P(pk, 72, OL);
+    if (town) {
+      F(pk - 5, 70, 11, 3, OL); F(pk - 4, 71, 9, 1, "#c8463a"); F(pk - 2, 66, 5, 5, OL); F(pk - 1, 67, 3, 3, "#c8463a"); F(pk - 1, 69, 3, 1, GOLD[1]); P(pk + 2, 65, "#f0e8d6"); P(pk + 3, 64, "#f0e8d6");
+      F(pk + 3, 75, 10, 7, OL); F(pk + 4, 76, 8, 5, "#e8dcb8"); F(pk + 5, 77, 6, 1, "#7a5a3a"); F(pk + 5, 79, 4, 1, "#7a5a3a"); F(pk + 10, 79, 1, 1, "#c8302a"); F(pk + 7, 82, 1, 5, OL);
+    } else { k.blob(pk, 70, 3, 3, OL); k.blob(pk, 70, 2, 2, BONE); P(pk - 1, 70, OL); P(pk + 1, 70, OL); F(pk - 1, 72, 3, 1, "#d8ccb4"); P(pk, 72, OL); }
     add(chicken({ x: R(W * 0.71), y: 81, seed: 2 })); add(chicken({ x: R(W * 0.75), y: 83, seed: 5, col: "#c87a3a" }));
     const clip = (x) => (x >= 0 && x < W ? tops[x] : 0);
-    add(patrol({ x0: R(W * 0.2), x1: R(W * 0.43), y: wy - 13, speed: 3, clip, seed: 2 }));
-    add(patrol({ x0: R(W * 0.2), x1: R(W * 0.4), y: 77, speed: 4, seed: 5 }));
-    add(patrol({ x0: R(W * 0.6), x1: R(W * 0.88), y: 86, speed: 4.5, seed: 9 }));
+    if (town) {
+      stall(R(W * 0.38), 80, ["#c8463a", "#f2e8cc"]); stall(R(W * 0.57), 86, ["#3e6ab0", "#f2e8cc"]);
+      add(patrol({ x0: R(W * 0.2), x1: R(W * 0.43), y: wy - 13, speed: 3, clip, seed: 2, pal: HATS[0] }));
+      add(patrol({ x0: R(W * 0.18), x1: R(W * 0.34), y: 79, speed: 3.5, seed: 5, pal: HATS[1] }));
+      add(patrol({ x0: R(W * 0.44), x1: R(W * 0.56), y: 89, speed: 3, seed: 7, pal: HATS[2] }));
+      add(patrol({ x0: R(W * 0.66), x1: R(W * 0.9), y: 86, speed: 4.5, seed: 9, pal: HATS[0] }));
+      add(A.villager({ x0: R(W * 0.4), x1: R(W * 0.52), y: 84, speed: 2.6, look: { hood: "#6a4426", shirt: "#5a6a8a", hat: null }, seed: 171 }));
+    } else {
+      add(patrol({ x0: R(W * 0.2), x1: R(W * 0.43), y: wy - 13, speed: 3, clip, seed: 2 }));
+      add(patrol({ x0: R(W * 0.2), x1: R(W * 0.4), y: 77, speed: 4, seed: 5 }));
+      add(patrol({ x0: R(W * 0.6), x1: R(W * 0.88), y: 86, speed: 4.5, seed: 9 }));
+    }
     const perch = wall.find(([x]) => x > W * 0.58);
     if (perch) add(raven({ x: perch[0] + 1, y: wy - perch[1] - 2, seed: 4 }));
     add(A.bird({ W, y: 12, flock: 3, col: "#1e1a20", speed: 6, gap: 14, seed: 3 }));
@@ -1465,6 +1550,8 @@
 
   const SCENES = { ironhaven, thornwall, veldrock, carrbridge, ashfen, hollowood, saltmarrow, frosthold };
   const DUNGEON_SCENES = { goblin_camp };
+  // a place that is a town for one season only (a theme's as_town), named by its static row's `scene`
+  const SEASON_SCENES = { goblin_town };
   const WILD_SCENES = {};
 
   // the night version of a scene: the sky is painted in a key colour so it can be swapped for a night sky, everything else is
@@ -1473,51 +1560,265 @@
   function nightSky(y, h) { const t = Math.min(1, y / Math.max(1, h)); return [R(10 + 22 * t), R(15 + 26 * t), R(36 + 46 * t)]; }
   function grade(cv, sky) {
     const ctx = cv.getContext("2d"), im = ctx.getImageData(0, 0, cv.width, cv.height), d = im.data, mask = new Uint8Array(cv.width * cv.height);
-    const r = Art.rng(77), skyH = Math.max(1, sky || cv.height);
+    const r = Art.rng(77), skyH = Math.max(1, sky || cv.height), w = cv.width, h = cv.height;
+    const warm = (i) => d[i + 3] && d[i] > 190 && d[i + 1] >= 90 && d[i + 2] < 130 && d[i] - d[i + 2] > 110;
+    // a summed table of the warm-coloured pixels: a lit window or an ember is a bright spot in something dark, while a wheat field,
+    // thatch, a gilt dome or desert sand is a whole patch of warm colour, so only the bright spots glow on through the dark
+    const warmish = (i) => d[i + 3] && d[i] > 130 && d[i] - d[i + 2] > 60;
+    const sum = new Uint32Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) for (let x = 0, run = 0; x < w; x++) { run += warmish((y * w + x) * 4) ? 1 : 0; sum[(y + 1) * (w + 1) + x + 1] = sum[y * (w + 1) + x + 1] + run; }
+    const dense = (x, y) => {
+      const x0 = Math.max(0, x - 4), x1 = Math.min(w, x + 5), y0 = Math.max(0, y - 4), y1 = Math.min(h, y + 5);
+      return (sum[y1 * (w + 1) + x1] - sum[y0 * (w + 1) + x1] - sum[y1 * (w + 1) + x0] + sum[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+    };
+    const dark = (c0, c1, c2) => { const l = c0 * 0.3 + c1 * 0.55 + c2 * 0.15; return [8 + c0 * 0.2 + l * 0.08, 10 + c1 * 0.22 + l * 0.1, 24 + c2 * 0.26 + l * 0.2]; };
+    const d0 = new Uint8ClampedArray(d), lum0 = (p) => d0[p * 4] * 0.3 + d0[p * 4 + 1] * 0.55 + d0[p * 4 + 2] * 0.15;
     for (let i = 0; i < d.length; i += 4) {
       if (!d[i + 3]) continue;
-      const p = i >> 2, y = Math.floor(p / cv.width);
+      const p = i >> 2, y = Math.floor(p / w);
       if (d[i] === 255 && d[i + 1] === 0 && d[i + 2] === 254) {
         mask[p] = 1;
         const [a, b, c] = nightSky(y, skyH), star = r() < 0.012 ? 120 + r() * 110 : 0;
         d[i] = Math.min(255, a + star); d[i + 1] = Math.min(255, b + star); d[i + 2] = Math.min(255, c + star * 0.9);
         continue;
       }
+      // haze or a glow laid half over the key sky: take the key's share back out and put the night sky in its place, so it never
+      // grades to a purple band
+      const ka = Math.min(d[i], d[i + 2]) - d[i + 1];
+      if (ka > 70 && Math.abs(d[i] - d[i + 2]) < 50) {
+        const a = Math.min(0.95, ka / 255), un = (v, k) => Math.max(0, Math.min(255, (v - a * k) / (1 - a)));
+        const g = dark(un(d[i], 255), un(d[i + 1], 0), un(d[i + 2], 254)), s = nightSky(y, skyH);
+        d[i] = R(a * s[0] + (1 - a) * g[0]); d[i + 1] = R(a * s[1] + (1 - a) * g[1]); d[i + 2] = R(a * s[2] + (1 - a) * g[2]);
+        continue;
+      }
       // lava, lit windows and embers glow on through the dark
-      if (d[i] > 190 && d[i + 2] < 120 && d[i] - d[i + 2] > 110) { d[i] = R(d[i] * 0.92); d[i + 1] = R(d[i + 1] * 0.85); d[i + 2] = R(d[i + 2] * 0.8); continue; }
-      const l = d[i] * 0.3 + d[i + 1] * 0.55 + d[i + 2] * 0.15;
-      d[i] = R(8 + d[i] * 0.2 + l * 0.08); d[i + 1] = R(10 + d[i + 1] * 0.22 + l * 0.1); d[i + 2] = R(24 + d[i + 2] * 0.26 + l * 0.2);
+      const lit = warm(i) ? Math.max(0, Math.min(1, (0.6 - dense(p % w, y)) / 0.25)) : 0;
+      const g = dark(d[i], d[i + 1], d[i + 2]);
+      d[i] = R(g[0] + (d[i] * 0.92 - g[0]) * lit); d[i + 1] = R(g[1] + (d[i + 1] * 0.85 - g[1]) * lit); d[i + 2] = R(g[2] + (d[i + 2] * 0.8 - g[2]) * lit);
+    }
+    // the moon catches the tops of things: a roof against the sky, or a lit face just under a dark outline, takes a cool edge, so
+    // rows of rooftops stay apart instead of grading into one dark mass
+    for (let p = w; p < w * h; p++) {
+      const i = p * 4, up = p - w;
+      if (mask[p] || !d0[i + 3] || warm(i)) continue;
+      if (!(mask[up] || (lum0(up) < 60 && lum0(p) > 90 && lum0(p) - lum0(up) > 50))) continue;
+      d[i] = R(d[i] * 0.55 + 106 * 0.45); d[i + 1] = R(d[i + 1] * 0.55 + 122 * 0.45); d[i + 2] = R(d[i + 2] * 0.55 + 168 * 0.45);
     }
     ctx.putImageData(im, 0, 0);
     return mask;
   }
-  // a scene's still layers and moving life at width W (90 tall), for a header or for another view to frame (opts.night)
+  // opts.life keeps the rest of the life on a night scene too (the townsfolk, carts, boats, smoke), drawn in the moonlight's colour;
+  // the birds and butterflies and the sun's own glints still go
+  const DAY_ONLY = new Set(["bird", "gull", "eagle", "butterfly"]);
+  let moonCv = null;
+  function moonlit(a) {
+    return Object.assign({}, a, { draw(ctx, t) {
+      const w = ctx.canvas.width, h = ctx.canvas.height;
+      if (!moonCv || moonCv.width !== w || moonCv.height !== h) moonCv = canvas(w, h);
+      const g = moonCv.getContext("2d");
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h); g.setTransform(ctx.getTransform());
+      a.draw(g, t);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-atop"; g.fillStyle = "rgba(14,20,46,0.64)"; g.fillRect(0, 0, w, h); g.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(moonCv, 0, 0); ctx.restore();
+    } });
+  }
+  // a low sun (scenes.js's TONES: the Long Night's dawn): the key sky becomes the tone's sky with its disc low on the right, half behind
+  // the roofs; everything else takes the tone's flat grade, and an edge that faces the sun (sky to its right or above it) catches it
+  const hexRGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  function toneGrade(cv, skyEnd, T) {
+    const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, im = ctx.getImageData(0, 0, w, h), d = im.data, mask = new Uint8Array(w * h);
+    const skyH = Math.max(1, skyEnd || h), dc = T.disc, rr = dc.r + 2;
+    // the sun comes up where the roofs on the right sit lowest, just its top half over them
+    const key = (x, y) => { const i = (y * w + x) * 4; return d[i] === 255 && d[i + 1] === 0 && d[i + 2] === 254; };
+    const line = [];
+    for (let x = 0; x < w; x++) { let y = 0; while (y < h && key(x, y)) y++; line.push(y); }
+    let sx = R(w * dc.x), best = -1;
+    for (let cx = R(w * 0.6); cx <= R(w * 0.94); cx++) {
+      let s = 0;
+      for (let x = cx - rr; x <= cx + rr; x++) s += line[Math.max(0, Math.min(w - 1, x))];
+      const v = s / (rr * 2 + 1) - Math.abs(cx - w * dc.x) * 0.05;
+      if (v > best) { best = v; sx = cx; }
+    }
+    let lo = 0;
+    for (let x = sx - rr; x <= sx + rr; x++) lo += line[Math.max(0, Math.min(w - 1, x))];
+    const sy = skyEnd ? R(lo / (rr * 2 + 1)) + 2 : -99;
+    const skyAt = (y) => { const t = Math.min(1, y / skyH); return hexRGB(t < 0.55 ? Art.mix(T.sky[0], T.sky[1], t / 0.55) : Art.mix(T.sky[1], T.sky[2], (t - 0.55) / 0.45)); };
+    const glow = hexRGB(dc.ring), disc = dc.c.map(hexRGB);
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const p = i >> 2, x = p % w, y = (p / w) | 0;
+      if (d[i] === 255 && d[i + 1] === 0 && d[i + 2] === 254) {
+        mask[p] = 1;
+        const dx = x - sx, dy = y - sy, dd = Math.sqrt(dx * dx + dy * dy);
+        let c = skyAt(y);
+        if (dd <= rr) c = dx + dy < -rr * 0.7 ? disc[0] : dd > rr - 1.6 && dx + dy > 0 ? disc[2] : disc[1];
+        else if (dd <= rr + 6 && (x + y) % 2 === 0) c = c.map((v, j) => R(v + (glow[j] - v) * (dd <= rr + 3 ? 0.7 : 0.35)));
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+        continue;
+      }
+      const ka = Math.min(d[i], d[i + 2]) - d[i + 1];
+      if (ka > 70 && Math.abs(d[i] - d[i + 2]) < 50) {
+        const a = Math.min(0.95, ka / 255), un = (v, k) => Math.max(0, Math.min(255, (v - a * k) / (1 - a)));
+        const g = T.land(un(d[i], 255), un(d[i + 1], 0), un(d[i + 2], 254)), s = skyAt(y);
+        d[i] = R(a * s[0] + (1 - a) * g[0]); d[i + 1] = R(a * s[1] + (1 - a) * g[1]); d[i + 2] = R(a * s[2] + (1 - a) * g[2]);
+        continue;
+      }
+      const g = T.land(d[i], d[i + 1], d[i + 2]);
+      d[i] = g[0]; d[i + 1] = g[1]; d[i + 2] = g[2];
+    }
+    for (let p = w; p < w * h; p++) {
+      const i = p * 4;
+      if (mask[p] || !d[i + 3] || !(mask[p - w] || (p % w < w - 1 && mask[p + 1]))) continue;
+      d[i] = R(d[i] * 0.5 + glow[0] * 0.5); d[i + 1] = R(d[i + 1] * 0.5 + glow[1] * 0.5); d[i + 2] = R(d[i + 2] * 0.5 + glow[2] * 0.5);
+    }
+    ctx.putImageData(im, 0, 0);
+    return mask;
+  }
+  // the life on a toned scene, drawn in the tone's warm shadow
+  let toneCv = null;
+  function toned(a) {
+    return Object.assign({}, a, { draw(ctx, t) {
+      const w = ctx.canvas.width, h = ctx.canvas.height;
+      if (!toneCv || toneCv.width !== w || toneCv.height !== h) toneCv = canvas(w, h);
+      const g = toneCv.getContext("2d");
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h); g.setTransform(ctx.getTransform());
+      a.draw(g, t);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-atop"; g.fillStyle = "rgba(80,36,30,0.3)"; g.fillRect(0, 0, w, h); g.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(toneCv, 0, 0); ctx.restore();
+    } });
+  }
+  // The Dragon Wakes: a town she burned this season. Two or three houses, spread along the street, have their roofs gone to char along
+  // the roof's own line (ridge and eaves kept, the ridge broken in a notch or two), their windows dark and their wall-tops sooted, with
+  // a glowing crack in the char and a real column of smoke. The houses are picked on a dry run of the scene, and the real run draws the
+  // same pixels in the same order (the kit's dice are untouched), so only the burned houses change
+  const CHAR = ["#5e4232", "#3a2619", "#20140d"];
+  // the houses whose roofs show most once the whole scene is drawn (a city's houses stand behind its wall and towers)
+  function burnPick(list, W, base, over) {
+    const B = base.getContext("2d").getImageData(0, 0, W, IH).data, O = over.getContext("2d").getImageData(0, 0, W, IH).data;
+    const hex = (d, i) => "#" + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+    for (const h of list) {
+      const rf = new Set(h.rf.map((c) => c.toLowerCase()));
+      h.seen = h.px.filter(([x, y]) => {
+        const i = (y * W + x) * 4;
+        return x >= 0 && y >= 0 && x < W && y < IH && (h.front ? O[i + 3] && rf.has(hex(O, i)) : !O[i + 3] && rf.has(hex(B, i)));
+      }).length;
+    }
+    const pick = [];
+    for (const h of list.filter((h) => h.seen >= 14).sort((a, b) => b.seen - a.seen)) {
+      if (pick.length >= (list.length > 3 ? 3 : 2)) break;
+      if (pick.every((p) => Math.abs(p.cx - h.cx) > W / 7)) pick.push(h);
+    }
+    return new Set(pick.map((h) => h.i));
+  }
+  function scorchHouse(kk, o, out, seed) {
+    const r = Art.rng(seed), x0 = o.x, x1 = o.x + o.w - 1, top = out.top, ol = o.ol || "#2a1e18", span = x1 - x0;
+    // a hip roof keeps its top per column, a gable per row
+    const colTop = (x) => Math.min(top, ...out.tops.filter((t) => (t.length === 2 ? t[0] === x : t[0] <= x && x < t[1])).map((t) => t[t.length - 1]));
+    let ridge = top;
+    for (let x = x0; x <= x1; x++) ridge = Math.min(ridge, colTop(x));
+    const peak = [];
+    for (let x = x0; x <= x1; x++) if (colTop(x) === ridge) peak.push(x);
+    // the fire took the snow off the roof: put back what stood behind the drift, the outline and the char's top course
+    if (o.snow) for (const t of out.tops) if (t.length === 2) {
+      kk.ctx.putImageData(kk.ctx.getImageData(t[0], t[1] - 3, 1, 1), t[0], t[1] - 2);
+      kk.P(t[0], t[1] - 1, ol); kk.P(t[0], t[1], CHAR[0]);
+    }
+    // ash on the char's upper courses, and cracks lower down
+    for (let x = x0 - 1; x <= x1 + 1; x++) {
+      const ct = colTop(x);
+      if (ct >= top) continue;
+      for (let y = ct; y < top; y++) if (r() < (y - ct < 2 ? 0.2 : 0.07)) kk.P(x, y, y - ct < 2 ? "#6a584a" : "#0c0604");
+    }
+    // the ridge broken where the roof fell in: whatever stood behind shows through a notch, floored by the outline
+    for (let n = 0, nn = span > 14 ? 2 : 1; n < nn; n++) {
+      const nx = x0 + Math.round(span * (n ? 0.62 + r() * 0.14 : 0.22 + r() * 0.14)), nw = span > 10 && r() < 0.6 ? 2 : 1;
+      for (let x = nx; x < nx + nw; x++) {
+        const ct = colTop(x), dep = Math.min(2, top - ct - 2);
+        if (dep < 1) continue;
+        const behind = kk.ctx.getImageData(x, ct - 2, 1, 1);
+        for (let y = ct - 1; y < ct - 1 + dep; y++) kk.ctx.putImageData(behind, x, y);
+        // the fire still alive where the roof fell in: a glow on the notch's floor, one ember to a notch, never a pair side by side
+        kk.P(x, ct - 1 + dep, x === nx && n === 0 ? "#f08030" : ol);
+        if (x === nx && n === 0) kk.P(x, ct + dep, "#a83a1a");
+      }
+    }
+    for (let x = x0; x <= x1; x++) if (r() < 0.6) kk.F(x, top, 1, 1 + Math.floor(r() * 3), Art.mix("#1a100c", "#5a4a3a", r() * 0.5));
+    return { x: peak.length ? peak[peak.length >> 1] : R((x0 + x1) / 2), y: ridge - 1 };
+  }
+  // the smoke off a house she burned: a column of solid puffs in mid grey, lit on their upper left, that climb along a leaning path,
+  // swell as they rise and break into a dither near the top (at night, the same in the moon's greys)
+  // (Anim.column, shared with the season posters)
+  const column = (o) => window.Anim.column(o);
+  // a scene's still layers and moving life at width W (90 tall), for a header or for another view to frame (opts.night, opts.scorched)
   function build(id, W, opts) {
-    const fn = SCENES[id] || DUNGEON_SCENES[id] || WILD_SCENES[id];
+    const fn = SCENES[id] || DUNGEON_SCENES[id] || WILD_SCENES[id] || SEASON_SCENES[id];
     if (!fn || !window.Art || !window.Anim) return null;
     opts = opts || {};
-    const seed = Art.hash("town:" + id), night = !!opts.night;
+    const seed = Art.hash("town:" + id), night = !!opts.night, tone = !night && opts.tone && window.Scenes && Scenes.TONES ? Scenes.TONES[opts.tone] : null;
+    const run = (base, over, burn) => {
+      const k = kit(base.getContext("2d"), W, IH, seed);
+      k.o = kit(over.getContext("2d"), W, IH, seed + 1);
+      k.night = k.o.night = night;
+      const res = { acts: [], skyEnd: 0, houses: [], burned: [] };
+      if (night || tone) {
+        const grad = k.grad;
+        k.grad = (y0, y1, stops, x0, x1) => { if (y0 === 0) { res.skyEnd = Math.max(res.skyEnd, y1); stops = stops.map(() => SKY_KEY); } grad(y0, y1, stops, x0, x1); };
+        k.cloud = () => {};
+      }
+      const life = night && !!opts.life;
+      k.add = (a) => { if (!burn) return; if (a && tone) res.acts.push(a.light ? a : toned(a)); else if (a && (!night || a.light)) res.acts.push(a); else if (a && life && !a.day) res.acts.push(moonlit(a)); };
+      if (opts.scorched) {
+        let n = 0;
+        for (const kk of [k, k.o]) {
+          const h0 = kk.house;
+          kk.house = (o) => {
+            const i = n++, hit = burn && burn.has(i), w0 = kk.win;
+            // a burned house's windows are dark holes, day or night
+            if (hit) kk.win = (x, y, w, h, lit, fr) => { kk.F(x - 1, y - 1, w + 2, h + 2, fr || "#2a1e18"); kk.F(x, y, w, h, "#1a1410"); };
+            const out = h0(hit ? Object.assign({}, o, { roof: CHAR, doorC: "#3a2619" }) : o);
+            kk.win = w0;
+            if (hit) out.burned = true;
+            if (!burn) {
+              const px = [];
+              for (const t of out.tops) { if (t.length === 2) for (let y = t[1]; y < out.top; y++) px.push([t[0], y]); else for (let x = t[0]; x < t[1]; x++) px.push([x, t[2]]); }
+              res.houses.push({ i, cx: o.x + o.w / 2, rf: o.roof, px, front: kk === k.o });
+            }
+            if (hit) res.burned.push(Object.assign(scorchHouse(kk, o, out, seed + i), { front: kk === k.o }));
+            return out;
+          };
+        }
+      }
+      let A = window.Anim;
+      if (night) {
+        A = Object.create(window.Anim);
+        for (const name of LIGHTS) if (typeof window.Anim[name] === "function") A[name] = (o) => Object.assign(window.Anim[name](o), { light: true });
+        for (const name of DAY_ONLY) if (typeof window.Anim[name] === "function") A[name] = (o) => Object.assign(window.Anim[name](o), { day: true });
+      }
+      fn(k, A);
+      // with the dragon sat on her perch (opts.perched), that roof's smoke goes up behind her and off to the side, not out of her head
+      const sat = opts.perched ? perchOf(res.burned, W) : null;
+      for (const b of res.burned) {
+        const aside = b === sat;
+        k.add(column({ x: aside ? b.x - 19 : b.x, y: aside ? b.y + 5 : b.y, h: Math.max(12, Math.min(40, b.y - 2)), wind: aside ? -14 : 4, seed: b.x, light: night, cols: night ? ["#8a8ea4", "#62667c", "#44485e"] : null }));
+        k.add(A.embers({ x0: b.x - 2, x1: b.x + 2, y: b.y + 1, n: 2, rise: 9, z: b.front ? 1e3 : -4, cols: ["#ffe08a", "#f08030", "#c84a1e", "#5a2a14"], seed: b.x + 1 }));
+      }
+      return res;
+    };
+    let pick = new Set();
+    if (opts.scorched) {
+      const b0 = canvas(W, IH), o0 = canvas(W, IH);
+      pick = burnPick(run(b0, o0, null).houses, W, b0, o0);
+    }
     const base = canvas(W, IH), over = canvas(W, IH);
-    const k = kit(base.getContext("2d"), W, IH, seed);
-    k.o = kit(over.getContext("2d"), W, IH, seed + 1);
-    let skyEnd = 0;
-    if (night) {
-      const grad = k.grad;
-      k.grad = (y0, y1, stops, x0, x1) => { if (y0 === 0) { skyEnd = Math.max(skyEnd, y1); stops = stops.map(() => SKY_KEY); } grad(y0, y1, stops, x0, x1); };
-      k.cloud = () => {};
-    }
-    const acts = [];
-    k.add = (a) => { if (a && (!night || a.light)) acts.push(a); };
-    let A = window.Anim;
-    if (night) {
-      A = Object.create(window.Anim);
-      for (const name of LIGHTS) if (typeof window.Anim[name] === "function") A[name] = (o) => Object.assign(window.Anim[name](o), { light: true });
-    }
-    fn(k, A);
-    const sky = night ? grade(base, skyEnd) : null;
+    const res = run(base, over, pick);
+    const sky = night ? grade(base, res.skyEnd) : tone ? toneGrade(base, res.skyEnd, tone) : null;
     if (night) grade(over);
-    return { base, over, acts, W, H: IH, sky };
+    else if (tone) toneGrade(over, 0, tone);
+    const perch = perchOf(res.burned, W);
+    return { base, over, acts: res.acts, W, H: IH, sky, perch: perch ? [perch.x, perch.y + 3] : null };
   }
+  // where something big can land: on the roof of a house she burned, the one nearest the right of the street, if she fits under the sky
+  const perchOf = (burned, W) => burned.filter((b) => b.y > 34).sort((a, b) => Math.abs(a.x - W * 0.7) - Math.abs(b.x - W * 0.7))[0] || null;
   // the row each dungeon's way in stands on, so a view can set it on its own horizon
   const FOOT = { goblin_camp: 66, wolf_den: 84, collapsed_mine: 76, cragtooth_warren: 72, ashveil_crypts: 76, thornmere_ruins: 74, frostspire: 66, sunken_vault: 78, emberdeep: 82 };
   // the same, cut down to h rows from row y0 (default: the bottom of the scene, a few rows up), with the life moved to match
@@ -1536,9 +1837,11 @@
     if (!window.Art || !window.Anim) return null;
     opts = opts || {};
     w = Math.max(40, R(w || 600)); h = Math.max(30, R(h || 180));
-    const b = build(townId, Math.max(150, R(w * IH / h)));
+    const b = build(townId, Math.max(150, R(w * IH / h)), { night: !!opts.night, life: !!opts.night, scorched: !!opts.scorched, perched: !!opts.more });
     if (!b) return null;
-    const { base, over, acts, W } = b;
+    const { base, over, W } = b;
+    // `more`: fn(W, scene) -> extra actors a view adds over the scene (the dragon while she is down there, on the scene's `perch`)
+    const acts = opts.more ? b.acts.concat(opts.more(W, b) || []) : b.acts;
     const cv = canvas(W, IH);
     cv.className = "town-scene";
     cv.style.imageRendering = "pixelated";
@@ -1550,13 +1853,14 @@
     return cv;
   }
 
-  const DUNGEONS = Object.keys(DUNGEON_SCENES), WILDS = [];
-  // wild_scenes.js adds the wilds and the other dungeons, drawn with the same kit and actors
-  function register(id, fn, group) {
-    (group === "dungeons" ? DUNGEON_SCENES : WILD_SCENES)[id] = fn;
-    const list = group === "dungeons" ? DUNGEONS : WILDS;
+  const TOWNS = Object.keys(SCENES), DUNGEONS = Object.keys(DUNGEON_SCENES), WILDS = [];
+  // wild_scenes.js adds the wilds and the other dungeons, and isle_scenes.js a risen layer's town with its panel colours, drawn with the same kit and actors
+  function register(id, fn, group, theme) {
+    (group === "towns" ? SCENES : group === "dungeons" ? DUNGEON_SCENES : WILD_SCENES)[id] = fn;
+    const list = group === "towns" ? TOWNS : group === "dungeons" ? DUNGEONS : WILDS;
     if (!list.includes(id)) list.push(id);
+    if (theme) THEME[id] = theme;
   }
   const actors = { pennant, sails, wheel, swing, rowboat, eel, surf, shore, beam, aurora, leaves, shafts, rope, chicken, ship, plume, walker, sparkle, raven, bonfire };
-  window.TownScenes = { header, build, frame, FOOT, THEME, TOWNS: Object.keys(SCENES), DUNGEONS, WILDS, register, kit, rect, ln, actors };
+  window.TownScenes = { header, build, frame, FOOT, THEME, TOWNS, DUNGEONS, WILDS, register, kit, rect, ln, actors };
 })();

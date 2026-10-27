@@ -198,7 +198,7 @@
         const rm = (d.rooms || []).find((x) => x.floor === r.floor && x.n === r.room);
         if (!rm) continue;
         const sd = S.dungeons[D.id] || {};
-        return Object.assign({}, rm, { theme: D.theme, pace: d.pace, crew: (d.heroes || []).map((x) => heroes[x]).filter(Boolean), did: D.id, boss: { mon: sd.boss, name: D.boss && D.boss.name } });
+        return Object.assign({}, rm, { theme: D.theme, pace: d.pace, crew: (d.heroes || []).map((x) => heroes[x]).filter(Boolean), did: D.id, boss: Object.assign({ mon: sd.boss }, D.boss && { name: D.boss.name, role: D.boss.role, gen: D.boss.gen }, d.boss) });
       }
       return null;
     }).catch(() => null));

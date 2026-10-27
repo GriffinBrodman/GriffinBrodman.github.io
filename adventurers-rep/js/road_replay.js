@@ -114,11 +114,21 @@
   };
 
   // ---------- drawing pieces ----------
+  // after dark (and through the last of the dusk) the people on the road keep a moonlit edge, so dark kit doesn't sink into the night
+  // and whoever stands in reach of a lamp, a fire or a lit door takes a warm edge on the side facing it; FIG marks the people's
+  // pixels so the night's light pass darkens them a step less than the land
+  let MOONRIM = null, LAMPS = [], FIG = null;
   function put(img, g, cx, feet, o) {
     o = o || {};
     if (!g) return;
     const fr = o.walk !== undefined ? RS.walker(g, o.walk) : g;
-    blit(img, fr, Math.round(cx - fr.w / 2), Math.round(feet - fr.h + 1 + (o.dy || 0)), { G: o.G, depth: 0, flip: o.flip, alpha: o.alpha, clip: o.clip, map: o.map });
+    let warm = null, best = 1e9;
+    for (const [lx, ly, r] of LAMPS) {
+      const dx = lx - cx, reach = r * 0.8 + fr.w / 2;
+      if (Math.abs(dx) > fr.w / 4 && Math.abs(dx) < reach && Math.abs(dx) < best && ly > feet - fr.h - 30) { best = Math.abs(dx); warm = { side: dx > 0 ? 1 : -1, col: "#e8a050" }; }
+    }
+    const rim = warm && warm.side > 0 ? null : MOONRIM;
+    blit(img, fr, Math.round(cx - fr.w / 2), Math.round(feet - fr.h + 1 + (o.dy || 0)), { G: o.G, depth: 0, flip: o.flip, alpha: o.alpha, clip: o.clip, map: o.map, rim, warm, mark: FIG });
   }
   function text(img, s, x, y, col, o) { return FK.text(img, s, x, y, col, o); }
   const tw = (s, o) => FK.textWidth(s, o);
@@ -175,7 +185,8 @@
   }
   function tag(img, s, x, y, col) { text(img, s.toUpperCase(), x, y, col || "#ffe08a", { outline: "#2a1a12", center: true }); }
   function dust(img, x, y, lt, n) { for (let i = 0; i < (n || 4); i++) { const ph = (lt * 1.6 + i / (n || 4)) % 1, px = x - ph * 10 - i, py = y - ph * 4; img.px(px, py, "#d8c8a8", (1 - ph) * 0.6); img.px(px + 1, py, "#d8c8a8", (1 - ph) * 0.4); } }
-  function glow(img, x, y, rad, col, a) { for (let j = -rad; j <= rad; j++) for (let i = -rad; i <= rad; i++) { const d = Math.hypot(i, j) / rad; if (d < 1) img.px(x + i, y + j, col, a * (1 - d) * (1 - d)); } }
+  // a light's glow as two flat steps of its colour, a bright core and a fainter ring, never a soft gradient over the drawing
+  function glow(img, x, y, rad, col, a) { for (let j = -rad; j <= rad; j++) for (let i = -rad; i <= rad; i++) { const d = Math.hypot(i, j) / rad; if (d < 1) img.px(x + i, y + j, col, a * (d < 0.45 ? 0.42 : 0.14)); } }
   function coin(img, x, y, ph) { const w = Math.max(0, Math.round(Math.abs(Math.cos(ph)) * 2)); for (let j = -2; j <= 2; j++) for (let i = -w; i <= w; i++) img.px(x + i, y + j, Math.abs(j) === 2 || Math.abs(i) === w ? "#8a5a20" : "#d8903a"); if (w > 0) img.px(x - 1, y - 1, "#ffd890"); }
   function darken(img, a, col) { for (let i = 0; i < img.w * img.h; i++) img.px(i % img.w, Math.floor(i / img.w), col || "#120c08", a); }
 
@@ -422,7 +433,19 @@
       const [cx, cy] = P.candle;
       const fl = gutter ? Math.max(0, 1 - k * 1.2) : 1;
       if (k <= 0) return;
-      glow(img, cx, cy - 2, Math.round(6 + 10 * k * fl), "#ffc860", 0.55 * fl);
+      // the niche lit from inside: its glass in two flat amber steps with the saint backlit against it, a warm pixel on the stone
+      // round it, and a faint ring of light on the snow outside, never a soft wash over the drawing
+      const a = Math.min(1, k) * fl, nx = cx - 4, ny = cy - 11;
+      glow(img, cx, cy - 4, Math.round(8 + 8 * a), "#ffc860", 0.3 * a);
+      for (let y = ny; y < ny + 12; y++) for (let x = nx; x < nx + 8; x++) {
+        const d = Math.hypot((x + 0.5 - cx) / 4, (y + 0.5 - cy + 2) / 6);
+        img.px(x, y, d < 0.62 ? "#ffd27a" : "#c8843a", 0.9 * a);
+      }
+      for (const [ex, ey, rx, ry] of [[cx, cy - 6, 2.4, 3], [cx, cy - 1, 3, 3.2]]) for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let x = Math.floor(ex - rx); x <= ex + rx; x++) {
+        if (((x + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2 <= 1 && y < cy + 1) img.px(x, y, "#4a2c18", 0.85 * a);
+      }
+      for (let y = ny; y < ny + 12; y++) { img.px(nx - 1, y, "#b8783a", 0.8 * a); img.px(nx + 8, y, "#b8783a", 0.8 * a); }
+      for (let x = nx; x < nx + 8; x++) img.px(x, ny - 1, "#b8783a", 0.8 * a);
       const hh = gutter ? Math.round(2 * fl + (Math.sin(lt * 30) > 0 ? 1 : 0)) : 3 + Math.round(k);
       for (let j = 0; j < hh; j++) img.px(cx, cy - 2 - j, j === 0 ? "#fff0a0" : "#ffb040");
       if (gutter && k > 0.7) for (let i = 0; i < 4; i++) { const ph = (lt * 0.7 + i / 4) % 1; img.px(cx + Math.sin(ph * 6 + i) * 2, cy - 4 - ph * 14, "#9aa0a8", (1 - ph) * 0.6); }
@@ -1451,10 +1474,12 @@
     o = o || {};
     const [b, i] = beatAt(p, Math.max(0, t)), lt = Math.max(0, t) - b.t0;
     let img, I;
-    if (b.draw) { img = new K.Buf(W, H); b.draw(img, lt); I = RS.scene(b.spec, W, H).info; }
+    if (b.draw) { MOONRIM = null; LAMPS = []; FIG = null; img = new K.Buf(W, H); b.draw(img, lt); I = RS.scene(b.spec, W, H).info; }
     else {
       const sc = RS.scene(b.spec, W, H), tt = Math.max(0, t);
       I = sc.info; img = sc.base.copy();
+      MOONRIM = I.nk > 0.3 && !I.dungeon ? "#b4c4f0" : null;
+      LAMPS = lightsOf(I, tt); FIG = LAMPS.length || I.night ? new Uint8Array(W * H) : null;
       for (const f of sc.loops) if (f.under) f(img, tt);
       // bare: the backdrop alone (the still and its weather), what a cut cross-fades; the people and props come in whole
       if (o.bare) { for (const f of sc.loops) if (!f.under) f(img, tt); return { img, i, lt }; }
@@ -1477,22 +1502,29 @@
   // after dusk the scene's own lights carry it: a fire, a lamp post, an inn's door and windows throw warm pools with a dithered
   // edge and everything outside them sinks toward the night, as the camp and tavern scenes are lit
   const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-  function lightPass(img, I, t) {
+  function lightsOf(I, t) {
     const hr = I.hr, dusk = hr >= 17.6 || hr < 6.2;
-    if (!dusk) return;
+    if (!dusk) return [];
     const lights = [], fl = 0.92 + Math.sin(t * 11) * 0.04 + Math.sin(t * 6.3) * 0.04;
     for (const e of I.extras || []) { if (e.fire) lights.push([e.fire[0], e.fire[1] - 2, 46, 1.0 * fl]); if (e.lamp) lights.push([e.lamp[0], e.lamp[1], 40, 0.9 * fl]); }
     const P = I.place || {};
     if (P.door && P.lit) lights.push([P.door[0], I.roadTop - 6, 40, 0.8 * fl]);
     for (const w of P.windows || []) if (P.lit) lights.push([w[0], w[1], 18, 0.5]);
     if (P.candle) lights.push([P.candle[0], P.candle[1], 20, 0.6 * fl]);
-    const night = I.night, amb = night ? 0.62 : 0.8, d = img.d;
+    return lights;
+  }
+  function lightPass(img, I, t) {
+    const hr = I.hr, dusk = hr >= 17.6 || hr < 6.2;
+    if (!dusk) return;
+    const lights = lightsOf(I, t);
+    // the people are lit a step brighter than the land, so a face at night still reads as a face (skin, not grey)
+    const night = I.night, amb = night ? 0.62 : 0.8, ambF = night ? 0.8 : 0.88, d = img.d;
     if (!lights.length && !night) return;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       let L = 0;
       for (const [lx, ly, r, k] of lights) { const q = ((x - lx) ** 2 + ((y - ly) * 1.4) ** 2) / (r * r); if (q < 1) L += (1 - q) * (1 - q) * k; }
-      const th = (BAYER4[((y & 3) << 2) | (x & 3)] + 0.5) / 16, Lq = Math.min(1.2, Math.floor((L * 6 + th)) / 6);
-      const m = amb + (1 - amb) * Math.min(1, Lq) , warm = Math.min(1, Lq) * 0.32, o = (y * W + x) * 4;
+      const th = (BAYER4[((y & 3) << 2) | (x & 3)] + 0.5) / 16, Lq = Math.min(1.2, Math.floor((L * 6 + th)) / 6), a = FIG && FIG[y * W + x] ? ambF : amb;
+      const m = a + (1 - a) * Math.min(1, Lq) , warm = Math.min(1, Lq) * 0.32, o = (y * W + x) * 4;
       d[o] = Math.min(255, d[o] * m + 255 * warm * 0.5); d[o + 1] = Math.min(255, d[o + 1] * m + 170 * warm * 0.5); d[o + 2] = d[o + 2] * m + 60 * warm * 0.3;
     }
   }

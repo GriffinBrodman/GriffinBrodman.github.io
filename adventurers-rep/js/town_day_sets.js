@@ -139,10 +139,28 @@
     const grey = wx === "rain" || wx === "storm" || wx === "fog" || wx === "cloudy";
     if (hr < 5.5 || hr >= 21) return { night: true, lamps: true, sky: ["#0e1428", "#1e2a4a"], tint: null, amb: 0.36 };
     if (hr < 7) return { night: false, lamps: true, sky: grey ? ["#6a6e80", "#a8a0a0"] : ["#6a7aa8", "#f0b898"], tint: ["#ffb880", 0.14], amb: 0.9 };
-    if (hr >= 19.5) return { night: true, lamps: true, sky: ["#1a1e3a", "#5a4a6a"], tint: null, amb: 0.5 };
+    if (hr >= 19.5) return { night: true, lamps: true, sky: ["#141c38", "#3e4c6c"], tint: null, amb: 0.5 };
     if (hr >= 17.5) return { night: false, lamps: true, sky: grey ? ["#5a5e6e", "#a88a78"] : ["#4a6aa0", "#f4a868"], tint: ["#ff9a50", 0.16], amb: 0.85 };
     if (grey) return { night: false, lamps: false, sky: wx === "fog" ? ["#a8aeb4", "#c8ccce"] : ["#7a8494", "#a4acb6"], tint: ["#8a96a8", 0.1], amb: 1 };
     return { night: false, lamps: false, sky: hr < 10 ? ["#7ab0e0", "#d8e8f0"] : ["#5a98d8", "#c8e0f0"], tint: hr < 9 ? ["#ffd8a0", 0.06] : null, amb: 1 };
+  }
+
+  // how deep into the night an hour is: 0 at the first dark (19.5), 1 from 22 until the dawn
+  const deepOf = (hr) => (hr < 12 ? 1 : Math.max(0, Math.min(1, (hr - 19.5) / 2.5)));
+  // the moonlight over an outdoor set after dark: a cool multiply over everything the lamps, windows and fires don't reach, so a
+  // daylit palette (bright grass, white plaster, blue water) sinks into the night while the lamplight pools stay warm
+  function moonWash(w, h, L, hr, lights) {
+    if (!L.night) return null;
+    const cv = canvas(w, h), g = cv.getContext("2d"), d = deepOf(hr);
+    g.fillStyle = mix("#b4bed8", "#7e8cb8", d); g.fillRect(0, 0, w, h);
+    // inside a light's reach the wash turns lamp-coloured instead, so what the lamp falls on reads warm rather than daylit
+    for (const l of lights) {
+      if (l.cool || !l.r) continue;
+      const big = l.r >= 30, rr = l.r * (big ? 0.9 : 0.6), gr = g.createRadialGradient(l.x, l.y, 0, l.x, l.y, rr);
+      gr.addColorStop(0, `rgba(255,222,170,${Math.min(1, l.k * (big ? 1.5 : 1.1))})`); gr.addColorStop(1, "rgba(255,222,170,0)");
+      g.fillStyle = gr; g.fillRect(l.x - rr, l.y - rr, rr * 2, rr * 2);
+    }
+    return (c) => { c.globalCompositeOperation = "multiply"; c.drawImage(cv, 0, 0); c.globalCompositeOperation = "source-over"; };
   }
 
   // ---------- the stage and its two kinds of set ----------
@@ -209,7 +227,7 @@
           // shutters in the town's trim colour
           for (const [s0, s1] of [[wa - 0.32, wa - 0.08], [wa + 0.78, wa + 1.02]]) P.fillPoly(ctx, st.quad(wall, s0, s1, wy, wy + 10), (x, y) => (on(x, y)[1] % 3 < 1 ? shade(S.trim, -0.3) : S.trim));
           P.fillPoly(ctx, st.quad(wall, wa - 0.15, wa + 0.85, wy - 2, wy - 1), shade(S.stone[0], 0.1));
-          if (glowing) { const [x, y] = wall(wa + 0.35, wy + 5); lit.push({ x, y: y + 10, r: 26, k: 0.5 }); }
+          if (glowing) { const [x, y] = wall(wa + 0.35, wy + 5); lit.push({ x, y: y + 10, r: 26, k: L.night ? 0.34 : 0.5 }); }
           if (b.flowers && wy < 20 && r() < 0.6) for (let j = 0; j < 6; j++) { const [x, y] = wall(wa + j * 0.12, wy - 2); ctx.fillStyle = ["#d84a5a", "#f0c040", "#e86a9a", "#5a9a3a"][(j + i) % 4]; ctx.fillRect(R(x), R(y) - 1, 1, 1); }
         }
       }
@@ -489,6 +507,7 @@
     const inside = outdoor ? null : Tv().inRoom(st, st.g.NU, st.g.NV, st.g.WH);
     const shine = (L.lamps || L.night) ? Tv().lighting(W, H, outdoor ? null : (x, y) => inside(x, y) || y < st.OY) : null;
     for (const [u, v, drop] of k.lamps) if (!outdoor && (L.lamps || L.night)) { const [x, y] = st.iso(u, v); k.lights.push({ x, y: y - drop + 10, r: 60, k: 0.5 }); }
+    const moon = outdoor ? moonWash(W, H, L, hr, k.lights) : null;
     const sc = {
       W, H, st, set, town, hour: hr, weather: wx, night: L.night, lamps: L.lamps, outdoor, bg, things: k.things, spots: k.spots, crowd: k.crowdAt, walkers: k.walkers,
       npc: k.npc || null, S, th, L, horse: k.horse, bed: k.bed, water: k.water, lodge: k.lodge,
@@ -522,7 +541,8 @@
           const flick = 0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.08, lights = k.lights.slice();
           if (k.fire) { const p = st.lwall((k.fire[0] + k.fire[1]) / 2, 8); lights.push({ x: p[0] + 14, y: p[1] + 4, r: 84, k: 0.6 + flick * 0.35 }); }
           for (const [x, y] of k.candles) lights.push({ x, y: y - 5, r: 24, k: 0.45 + flick * 0.12 });
-          shine(c, t, lights, L.night ? (outdoor ? 0.34 : 0.42) : 0.62);
+          if (moon) moon(c);
+          shine(c, t, lights, L.night ? (outdoor ? 0.34 : 0.42 - deepOf(hr) * 0.1) : 0.62);
         }
         weather(c, t, still, wx, outdoor, k);
         if (k.bars) { c.fillStyle = "#2a2a30"; for (let x = 6; x < W; x += 16) c.fillRect(x, 0, 3, H); c.fillStyle = "#4a4a52"; for (let x = 6; x < W; x += 16) c.fillRect(x, 0, 1, H); c.fillRect(0, 10, W, 3); }
@@ -564,5 +584,5 @@
     if (outdoor) OUTDOOR.add(name);
     if (!root.TownSets.SETS.includes(name)) root.TownSets.SETS.push(name);
   }
-  root.TownSets = { build, register, weather, SETS: Object.keys(SETS), STYLE, OUTDOOR, kit: { shade, mix, pix, glow, h01, frac, W, H, M, F, wallOf, groundOf, room, window_, crate, basket, barrel, lampPost, facades, sign } };
+  root.TownSets = { build, register, weather, SETS: Object.keys(SETS), STYLE, OUTDOOR, kit: { shade, mix, pix, glow, h01, frac, W, H, M, F, wallOf, groundOf, room, window_, crate, basket, barrel, lampPost, facades, sign, moonWash, deepOf } };
 })(typeof window !== "undefined" ? window : globalThis);
