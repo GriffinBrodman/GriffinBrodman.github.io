@@ -1690,7 +1690,10 @@
       else if (!cats.length) tip.appendChild(el("div", { class: "dim" }, "No money changed hands."));
       else for (const [k, v] of cats) tip.appendChild(el("div", { class: v > 0 ? "green" : "red" }, el("b", null, `${v > 0 ? "+" : "−"}${A.money(v)}`), el("span", { class: "dim" }, " · "), k));
       tip.hidden = false;
-      tip.style.left = `${Math.min(70, Math.max(0, (X(r[0]) / W) * 100 - 15))}%`;
+      // the second half of the chart hangs the tip off its right edge, so a late day never runs off a phone screen
+      const at = (X(r[0]) / W) * 100;
+      tip.style.left = at < 50 ? `${Math.max(0, at - 15)}%` : "auto";
+      tip.style.right = at < 50 ? "auto" : `${Math.max(0, 85 - at)}%`;
     };
     const step = rows.length > 1 ? (X(d1) - X(d0)) / (rows.length - 1) : W;
     for (const r of rows) {

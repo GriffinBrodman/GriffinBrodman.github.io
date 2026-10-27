@@ -1068,7 +1068,8 @@ table.lifetime td.live { font-style: italic; color: var(--muted); }
 .purse-hit { fill: transparent; cursor: pointer; }
 .purse-pt { fill: var(--wood3); }
 .purse-pt.bare { fill: var(--parch3); stroke: var(--wood3); stroke-width: 1; }
-.purse-tip { position: absolute; top: 4px; min-width: 150px; max-width: 30%; background: var(--parch, #f7ecd5); border: 2px solid var(--wood3, #4a2f1c); padding: 6px 8px; font-size: 13px; pointer-events: none; box-shadow: 3px 3px 0 rgba(46, 33, 22, 0.25); }
+/* above the panels after this one (each is position: relative, so later ones would paint over it) */
+.purse-tip { position: absolute; z-index: 5; top: 4px; min-width: 150px; max-width: 30%; background: var(--parch, #f7ecd5); border: 2px solid var(--wood3, #4a2f1c); padding: 6px 8px; font-size: 13px; pointer-events: none; box-shadow: 3px 3px 0 rgba(46, 33, 22, 0.25); }
 @media (max-width: 480px) { .purse-tip { max-width: 60%; } }
 
 /* the Kit's belt, gloves and boots row, and the map panel's link to a dungeon's own page */
