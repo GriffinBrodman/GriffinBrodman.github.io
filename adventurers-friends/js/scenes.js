@@ -31,6 +31,11 @@
     snow: ["#8cb4e0", "#c4daf0", "#f0f4fa"], coast: ["#5ab0ec", "#9cd6f6", "#e4f4f8"], marsh: ["#8aa4b4", "#b4c8c4", "#d8e0cc"],
     volcanic: ["#3a2028", "#7a3a34", "#d0784e"],
   };
+  // the day sky under the day's weather (an event's `wx`): low grey cloud in place of the blue, darker as it gets wetter
+  const OVERCAST = {
+    cloudy: ["#8e98a6", "#b4bcc6", "#d8dce0"], rain: ["#6a7482", "#8e98a4", "#b4bac2"], storm: ["#3e4652", "#5a6270", "#7e8692"],
+    snow: ["#a4aebc", "#c8d0da", "#e8ecf2"], fog: ["#b4b8bc", "#cacdd0", "#dcdedf"],
+  };
   const CAVE = {
     cave: ["#3a3040", "#2a2230", "#4a4050"], undead: ["#2a3034", "#1e2428", "#3a4248"], swamp: ["#2a3a2a", "#1e2a1e", "#3a4a32"],
     ice: ["#5a7a9a", "#4a6a8a", "#8ab0d0"], fire: ["#4a2020", "#3a1818", "#6a2a20"], sea: ["#1a3a4a", "#12303e", "#2a4a5a"],
@@ -63,9 +68,10 @@
   }
 
   // `night`: false, true (after dark), "blood" (a blood moon), or the name of one of the TONES (dawn, dusk, gloam)
-  function paint(kind, W, H, seed, place, night) {
+  // `wx`: the day's weather, which greys a day sky (OVERCAST)
+  function paint(kind, W, H, seed, place, night, wx) {
     const tone = TONES[night] ? night : null;
-    const info = { kind, W, H, horizon: Math.round(H * 0.62), torches: [], tips: [], tombs: [], houses: [], pools: [], night: !!night && !tone, blood: night === "blood", tone };
+    const info = { kind, W, H, horizon: Math.round(H * 0.62), torches: [], tips: [], tombs: [], houses: [], pools: [], night: !!night && !tone, blood: night === "blood", tone, wx };
     const cv = paintInto(kind, W, H, seed, place, info);
     cv.info = info;
     return cv;
@@ -169,7 +175,8 @@
       return cv;
     }
     const bk = { goblin: "plains", beast: "forest", town: "plains", swamp: "marsh" }[kind] || kind;
-    const night = info.night, tone = info.tone && TONES[info.tone], sky = tone ? tone.sky : night ? (bk === "volcanic" ? NIGHT_EMBER : NIGHT_SKY) : SKY[bk] || SKY.plains, n = noise2(seed || 3);
+    const night = info.night, tone = info.tone && TONES[info.tone], overcast = !tone && !night && bk !== "volcanic" && OVERCAST[info.wx];
+    const sky = tone ? tone.sky : night ? (bk === "volcanic" ? NIGHT_EMBER : NIGHT_SKY) : overcast || SKY[bk] || SKY.plains, n = noise2(seed || 3);
     for (let y = 0; y < horizon; y++) {
       const t = y / horizon;
       F(0, y, W, 1, t < 0.55 ? mix(sky[0], sky[1], t / 0.55) : mix(sky[1], sky[2], (t - 0.55) / 0.45));
@@ -208,8 +215,9 @@
       info.disc = rr;
     }
     // clouds: a few round puffs on a flatter base, lit along their lumpy tops (by the moon at night) and shaded underneath
-    const CL = tone ? tone.cloud : bk === "volcanic" ? ["#8a6a66", "#6a4a4a", "#4a3434"] : night ? ["#8a96b8", "#3a4660", "#2a3448"] : ["#ffffff", "#f2f6fc", mix(sky[1], "#8aa8d8", 0.5)];
-    for (let i = 0; i < Math.max(2, W / 70); i++) {
+    const CL = tone ? tone.cloud : bk === "volcanic" ? ["#8a6a66", "#6a4a4a", "#4a3434"] : night ? ["#8a96b8", "#3a4660", "#2a3448"]
+      : overcast ? [mix(sky[2], "#ffffff", 0.3), sky[1], mix(sky[0], "#000000", 0.15)] : ["#ffffff", "#f2f6fc", mix(sky[1], "#8aa8d8", 0.5)];
+    for (let i = 0; i < Math.max(2, W / (overcast ? 30 : 70)); i++) {
       const cx = Math.floor(r() * W), cy = Math.floor(4 + r() * horizon * 0.35), cw = 10 + Math.floor(r() * 16), rc = rng((seed || 3) * 7 + i * 131 + 17);
       // a cloud keeps clear of the moon and its ring of light, as the stars do (a blood moon under a cloud reads as a jellyfish)
       const m = info.moon, reach = (info.disc || 4) + 8;
@@ -530,6 +538,15 @@
     if (S.wilds[loc]) return S.wilds[loc].biome;
     return "plains";
   }
+  // a road story has no place of its own: it is drawn in the road's country (the event's `biome`, or, for one saved before road
+  // events carried it, the wild end of the road, as roads.biome_of picks it)
+  function roadKind(e) {
+    if (e.biome) return e.biome;
+    const S = App.S, ends = String(e.road).split("~"), wild = ends.find((n) => !S.towns[n]) || ends[1];
+    return ((S.wilds[wild] || S.dungeons[wild] || S.towns[wild] || {}).biome) || "plains";
+  }
+  // snow lies on green country: the meadow, the wood and the town's roofs go white (an ice cave or a burning land keep their own)
+  const SNOWS_ON = new Set(["plains", "town", "forest", "hills", "marsh", "goblin"]);
 
   // story vignette: background + heroes + a prop that hints at what happened
   const TAVERN_KINDS = new Set(["brawl", "dice", "insult", "arm_wrestle", "drinking_contest", "flirt", "bond", "loan", "repay", "chat", "mentor",
@@ -541,20 +558,21 @@
     // a set piece (season_posters.js): a season's first day dressed in its theme, the Long Night's sunrise; it may set the place's kind,
     // the sky, the weather, or frame a town's own header
     const piece = window.Posters ? Posters.of(e) : null;
-    const kind = (piece && piece.kind) || locKind(e.loc), seed = hash(e.id);
+    const wx = (piece && piece.wx) || e.wx, seed = hash(e.id);
+    const at = (piece && piece.kind) || (e.road && !e.loc ? roadKind(e) : locKind(e.loc)), kind = wx === "snow" && !(piece && piece.kind) && SNOWS_ON.has(at) ? "snow" : at;
     const indoors = S.towns[e.loc] && TAVERN_KINDS.has(e.kind) ? "tavern" : S.towns[e.loc] && e.kind === "crime" ? "jail" : null;
     const place = indoors ? null : placeAt(e.loc);
     const ground = Math.round(H * 0.62) + 14;
     // a story from this season while a theme keeps the sky dark (the Long Night) happened after dark
     const meta = (App.L && App.L.meta) || {}, dark = !indoors && meta.sky === "night" && (e.season == null || e.season === meta.season);
     const wonder = App.L && App.L.wonder, blood = dark && wonder && wonder.kind === "blood_moon" && wonder.region === "*" && e.day >= meta.day - 1;
-    const sky = piece && piece.sky != null ? piece.sky : blood ? "blood" : dark, night = sky === true || sky === "blood", wx = (piece && piece.wx) || e.wx;
+    const sky = piece && piece.sky != null ? piece.sky : blood ? "blood" : dark, night = sky === true || sky === "blood";
     // a dungeon is framed from its own map header, cut so its way in stands just behind the heroes; a set piece may frame a town's
     // (a set piece's `frame` names the header itself when it isn't the event's place: Goblin Town for the Goblin Kingdom's first day)
     const TS = window.TownScenes, fid = piece && typeof piece.frame === "string" ? piece.frame : e.loc;
     const framed = !indoors && TS && TS.frame && (S.dungeons[fid] ? TS.DUNGEONS.includes(fid) : piece && piece.frame && (TS.TOWNS.includes(fid) || fid !== e.loc));
     const hdr = framed ? TS.frame(fid, W, H, { y0: (TS.FOOT[fid] || 70) - (ground - 9), night, tone: TONES[sky] ? sky : null }) : null;
-    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, indoors ? { town: e.loc, wx: e.wx } : place, sky);
+    const bg = hdr ? hdr.base : paint(indoors || (kind === "town" ? "plains" : kind), W, H, seed, indoors ? { town: e.loc, wx: e.wx } : place, sky, wx);
     const info = hdr ? { kind, W, H, horizon: ground - 14, bk: (S.dungeons[fid] || S.towns[fid] || {}).biome || "plains", night } : bg.info;
     const open = night && !CAVE[info.kind];
     if (wx && !indoors) weatherOverlay(bg.getContext("2d"), W, H, wx, seed, night, info.horizon);
