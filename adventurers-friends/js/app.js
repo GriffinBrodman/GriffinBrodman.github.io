@@ -466,6 +466,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
   const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
     [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
+    // a megabeast's fall, painted full size
+    [/^\/fall\//, ["js/full_art.js"], []],
     // the ceremony and the Your Season card, with the trophies they hand out
     [/^\/finale(\/|$)/, ["js/trophy_art.js", "js/views_finale.js"], ["css/finale.css"]],
     // the replay pages (replay.js) and everything their players stand on
