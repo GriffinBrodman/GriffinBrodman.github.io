@@ -1886,7 +1886,8 @@
   function draw(body, pal, frame, boss, palette, pose, look) {
     const f = frame || 0, size = SIZES[body] || SIZES.blob;
     const V = variant(look, palette);
-    const k = (boss && !NATIVE_BOSS.has(body) ? 1.35 : 1) * (BODYK[body] || 1) * (V ? V.k : 1);
+    // look.k paints the beast natively bigger (a megabeast in a full-art scene), never resampled
+    const k = (boss && !NATIVE_BOSS.has(body) ? 1.35 : 1) * (BODYK[body] || 1) * (V ? V.k : 1) * ((look && look.k) || 1);
     const w = body === "spider_big" ? 34 : size[0], h = body === "spider_big" ? 24 : size[1];
     const s = (body === "spider_big" ? 34 / 24 : 1) * k;
     const W = Math.round(w * k), H = Math.round(h * k);
