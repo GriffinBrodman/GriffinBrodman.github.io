@@ -59,6 +59,7 @@
     const lev = new Uint8Array(TW * TH), bio = new Array(TW * TH), landv = new Float32Array(TW * TH);
     const river = new Uint8Array(TW * TH), road = new Uint8Array(TW * TH);
     const isle = new Uint8Array(TW * TH), flat = new Uint8Array(TW * TH), cause = new Uint8Array(TW * TH), seav = new Float32Array(TW * TH).fill(-9);
+    const own = new Int16Array(TW * TH).fill(-1);
     const roads = S.roads.map(([a, b]) => [nodeById[a].xy, nodeById[b].xy, !!(nodeById[a].layer || nodeById[b].layer)]);
     const mainRoads = roads.filter((r) => !r[2]), isleRoads = S.roads.filter(([a, b]) => IN.includes(nodeById[a]) && IN.includes(nodeById[b])).map(([a, b]) => [nodeById[a].xy, nodeById[b].xy]);
     const C = IN.length ? [IN.reduce((a, d) => a + d.xy[0], 0) / IN.length, IN.reduce((a, d) => a + d.xy[1], 0) / IN.length] : null;
@@ -78,9 +79,10 @@
       const rd = Math.min(...RIVER.slice(1).map((p, k) => segDist(mx + (n2(mx / 8, my / 8) - 0.5) * 3, my, RIVER[k][0], RIVER[k][1], p[0], p[1])));
       if (l <= 0.16) continue;
       const wx = mx + (fbm(n, mx / 16, my / 16) - 0.5) * 26, wy = my + (fbm(n, mx / 16 + 40, my / 16) - 0.5) * 26;
-      let best = M[0], bd = 1e9;
-      for (const d of M) { const dd = (d.xy[0] - wx) ** 2 + (d.xy[1] - wy) ** 2; if (dd < bd) { bd = dd; best = d; } }
+      let best = M[0], bd = 1e9, bj = 0;
+      for (let j = 0; j < M.length; j++) { const d = M[j], dd = (d.xy[0] - wx) ** 2 + (d.xy[1] - wy) ** 2; if (dd < bd) { bd = dd; best = d; bj = j; } }
       const b = best.biome;
+      own[i] = bj;
       bio[i] = b;
       if (l < 0.25) { lev[i] = 1; bio[i] = "sand"; }
       else {
@@ -127,7 +129,7 @@
         }
       }
     }
-    return { lev, bio, landv, river, road, isle, flat, cause, seav, N, n, n2, n3 };
+    return { lev, bio, landv, river, road, isle, flat, cause, seav, own, M, N, n, n2, n3 };
   }
 
   function levelAt(mx, my) {
@@ -138,7 +140,8 @@
 
   function render() {
     T = build();
-    const { lev, bio, landv, river, road, isle, flat, cause, seav, N, n, n2, n3 } = T;
+    const { lev, bio, landv, river, road, isle, flat, cause, seav, own, N, n, n2, n3 } = T;
+    const COLD = cold(), lv = (i) => (own[i] >= 0 ? COLD.lvl[own[i]] : 0);
     const cv = document.createElement("canvas");
     cv.width = TW; cv.height = TH;
     const ctx = cv.getContext("2d");
@@ -151,6 +154,8 @@
       const i = y * TW + x;
       if (flat[i]) { put(x, y, sand(x, y, i)); continue; }
       const l = Math.max(landv[i], seav[i]), v = fbm(n2, x / 14, y / 5);
+      // the deep cold freezes the shallows along every shore
+      if (COLD.sea && l > -0.08 + fbm(n3, x / 9, y / 7) * 0.22 + bayer(x, y) * 0.04) { put(x, y, (x * 3 + y) % 13 === 0 ? "#ffffff" : bayer(x, y) > 0 ? "#e6f0f8" : "#d0e2ee"); continue; }
       let c = l > 0.12 + bayer(x, y) * 0.04 ? "#7cc8f0" : l > 0.02 + bayer(x, y) * 0.06 ? "#5aaee6" : l > -0.25 ? "#3f94d8" : l > -0.5 + bayer(x, y) * 0.08 ? "#3484cc" : "#2c74bc";
       if (l <= 0.12 && v > 0.7) fx.crest.push([x, y, (x + (y >> 1)) % 6, c]);
       if (l <= 0.12 && v > 0.7 && (x + (y >> 1)) % 6 < 3) c = "#a4dcf8";
@@ -184,29 +189,39 @@
       const i = y * TW + x, L = lev[i];
       if (!L) continue;
       const b = bio[i], ty = y - L * CH, cl = isle[i] ? CLIFF.drowned : b === "sand" ? CLIFF.sand : b === "snow" ? CLIFF.snow : b === "volcanic" ? CLIFF.volcanic : CLIFF.def;
+      const sw = b === "volcanic" ? 0 : lv(i);
       for (let sy = ty + 1; sy <= y; sy++) {
         const t = (sy - ty) / (L * CH);
         let c;
-        if (river[i]) { c = FALLS[(sy + x * 2 + (x >> 1)) % 3]; fx.falls.push([x, sy, (sy + x * 2 + (x >> 1)) % 3]); }
+        if (river[i] && COLD.ice) c = ICEFALL[x % 3];
+        else if (river[i]) { c = FALLS[(sy + x * 2 + (x >> 1)) % 3]; fx.falls.push([x, sy, (sy + x * 2 + (x >> 1)) % 3]); }
         else if (road[i]) c = (sy - ty) % 2 ? "#c4a462" : "#8e7046";
         else {
           let k = t < 0.12 ? 0 : t < 0.5 ? 1 : t < 0.86 ? 2 : 3;
           if ((x * 7 + Math.floor(sy / 4)) % 13 === 0 || (sy - ty) % CH === 0 && t > 0.2) k = Math.min(3, k + 1);
           c = cl[k];
+          // deep snow overhangs the top of a cliff, with an icicle here and there
+          if (sw === 2 && (sy === ty + 1 || (sy === ty + 2 && x % 4 === 0))) c = sy === ty + 1 ? "#f4f8ff" : "#d6e6f6";
         }
         put(x, sy, c);
       }
-      const pal = SURF[b] || SURF.plains, v = fbm(n, x / 9, y / 7) + bayer(x, y) * 0.12;
+      // snow lies in drifts on light cover and over everything when deep, a tuft of the ground poking through here and there
+      const snowy = sw && (sw === 2 ? fbm(n2, x / 3 + 5, y / 3) < 0.79 : fbm(n, x / 6 + 11, y / 5) + bayer(x, y) * 0.1 > 0.47);
+      const pal = snowy ? SNOWY : SURF[b] || SURF.plains, v = fbm(n, x / 9, y / 7) + bayer(x, y) * 0.12;
       let c = pal[v > 0.6 ? 2 : v < 0.42 ? 0 : 1];
       const front = y + 1 < TH && lev[i + TW] < L, back = y > 0 && lev[i - TW] < L, left = x > 0 && lev[i - 1] < L, right = x + 1 < TW && lev[i + 1] < L;
       if (back || left) c = pal[2];
       if (right) c = pal[0];
-      if (river[i]) { c = (x + y) % 6 === 0 ? "#bfe6fa" : bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"; fx.river.push([x, ty, (x + y) % 6, bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"]); }
-      else if (road[i]) c = (road[i - 1] && road[i + 1] && road[i - TW] && road[i + TW]) ? "#ecd49a" : "#d2b072";
-      else if (b === "marsh" && fbm(n2, x / 6, y / 6) > 0.66) c = (x + y) % 3 ? "#6aa0a0" : "#88b8b4";
+      const inner = road[i - 1] && road[i + 1] && road[i - TW] && road[i + TW];
+      if (river[i] && COLD.ice) c = (x * 3 + y) % 11 === 0 ? "#ffffff" : fbm(n2, x / 2, y / 2) > 0.72 ? "#8cb8d8" : bayer(x, y) > 0 ? "#d4eaf6" : "#bcdcee";
+      else if (river[i]) { c = (x + y) % 6 === 0 ? "#bfe6fa" : bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"; fx.river.push([x, ty, (x + y) % 6, bayer(x, y) > 0 ? "#5ab4ec" : "#4aa4e2"]); }
+      // a road under deep snow is a trodden track: packed snow with the ruts showing
+      else if (road[i] && sw === 2) c = inner ? ((x * 5 + y) % 7 === 0 ? "#cbbd9c" : "#eee6d2") : "#bfae8c";
+      else if (road[i]) c = inner ? "#ecd49a" : "#d2b072";
+      else if (b === "marsh" && fbm(n2, x / 6, y / 6) > 0.66) c = sw ? ((x + y) % 3 ? "#d4e8f0" : "#b8d4e4") : (x + y) % 3 ? "#6aa0a0" : "#88b8b4";
       else if (b === "volcanic" && fbm(n2, x / 4, y / 4) > 0.72) c = (x + y) % 2 ? "#ff7a2a" : "#ffb04a";
       if (isle[i] && !road[i] && fbm(n2, x / 4 + 30, y / 4) > 0.64) c = (x + y) % 2 ? "#4e6a3a" : "#5e7c44";
-      if (front && !river[i]) c = mix(pal[0], "#1e3a1a", 0.35);
+      if (front && !river[i]) c = mix(pal[0], snowy ? "#3a4a6a" : "#1e3a1a", 0.35);
       put(x, ty, c);
       // where the old sea floor runs up to a shore, mainland or isle, the shore comes down to it as a low stepped sand ramp, not a sea cliff,
       // so the isle and the coast it rose off read as one landmass; barnacles speckle the isle's ramp
@@ -224,8 +239,8 @@
         const S = 3 + Math.floor(fbm(n2, x / 10, 7) * 9) + (river[i] ? 0 : 0);
         for (let k = 1; k <= S; k++) {
           const t = k / S;
-          put(x, y + k, river[i] ? FALLS[(y + k + x * 2) % 3] : SEACLIFF[t < 0.2 ? 0 : t < 0.55 ? 1 : t < 0.85 ? 2 : 3 - ((x * 5 + k) % 9 === 0 ? 1 : 0)]);
-          if (river[i]) fx.falls.push([x, y + k, (y + k + x * 2) % 3]);
+          put(x, y + k, river[i] ? (COLD.ice ? ICEFALL[x % 3] : FALLS[(y + k + x * 2) % 3]) : SEACLIFF[t < 0.2 ? 0 : t < 0.55 ? 1 : t < 0.85 ? 2 : 3 - ((x * 5 + k) % 9 === 0 ? 1 : 0)]);
+          if (river[i] && !COLD.ice) fx.falls.push([x, y + k, (y + k + x * 2) % 3]);
         }
         if (flat[(y + S + 1) * TW + x]) { put(x, y + S + 1, "#7a6444"); put(x, y + S + 2, "#9a8058"); continue; }
         put(x, y + S + 1, (x + y) % 3 ? "#f2fbff" : "#c4e6fa");
@@ -250,7 +265,7 @@
       if (p > dens) continue;
       const [sx, sy] = [jx, jy - lev[i] * CH];
       if (lev[i + 2 * TW] < lev[i]) continue;
-      sprites.push({ y: sy, draw: () => b === "snow" ? pine(ctx, sx, sy, true) : b === "hills" || b === "volcanic" ? rock(ctx, sx, sy, b) : b === "marsh" ? reeds(ctx, sx, sy, h) : tree(ctx, sx, sy, b === "forest" ? h : h + 1) });
+      sprites.push({ y: sy, draw: () => b === "snow" ? pine(ctx, sx, sy, true) : b === "hills" || b === "volcanic" ? rock(ctx, sx, sy, b) : b === "marsh" ? reeds(ctx, sx, sy, h) : tree(ctx, sx, sy, b === "forest" ? h : h + 1, lv(i)) });
     }
     for (const d of N) {
       const [sx, sy] = [d.xy[0] * U, d.xy[1] * U - levelAt(d.xy[0], d.xy[1]) * CH];
@@ -264,13 +279,50 @@
     sprites.push({ y: by + 1, draw: () => bridge(ctx, bx, by) });
     sprites.sort((a, b) => a.y - b.y);
     for (const s of sprites) s.draw();
+    if (COLD.any) capped(ctx, D, lv);
     // a moving pixel only moves where no house, tree or bridge was drawn over it
     const after = ctx.getImageData(0, 0, TW, TH).data;
     const bare = ([x, y]) => { const i = (y * TW + x) * 4; return D[i] === after[i] && D[i + 1] === after[i + 1] && D[i + 2] === after[i + 2]; };
     for (const k of Object.keys(fx)) fx[k] = fx[k].filter((p) => p[1] >= 0 && p[1] < TH && bare(p));
     T.fx = fx;
     T.clouds = clouds(landv, seav);
+    // where it is snowing today, flakes coming down over the land
+    T.flakes = [];
+    const fr = rng(31);
+    for (let y = 4; y < TH; y += 7) for (let x = 2; x < TW; x += 7) {
+      const jx = x + Math.floor(fr() * 6), jy = y + Math.floor(fr() * 6), i = jy * TW + jx;
+      if (jy < TH && lev[i] && own[i] >= 0 && COLD.falling[own[i]]) T.flakes.push([jx, jy - lev[i] * CH, fr()]);
+    }
     return cv;
+  }
+  // the season's cold on the land (league `winter`, The Long Winter): until the thaw every region lies under snow, deep where it is snowing
+  // today and everywhere in the deep cold, with the rivers iced over and, in the deep cold, the shallows too; in any other season a region
+  // it is snowing on today is dusted
+  const SNOWY = ["#c8d4ec", "#e0e8f6", "#f6f9ff"], ICEFALL = ["#f4fbff", "#c8e4f6", "#9cc8e6"];
+  function cold() {
+    const S = App.S, L = App.L || {}, W = L.winter && !L.winter.thawed ? L.winter : null, wx = L.weather || {}, reg = {};
+    for (const [r, ids] of Object.entries(S.regions || {})) for (const id of ids) reg[id] = r;
+    const falling = T.M.map((d) => wx[reg[d.id]] === "snow");
+    const lvl = T.M.map((d, j) => (W ? (W.deep || falling[j] ? 2 : 1) : falling[j] ? 1 : 0));
+    return { lvl, falling, ice: !!W, sea: !!(W && W.deep), any: lvl.some((v) => v) };
+  }
+  // snow on everything standing in it: the top pixel of every roof, tree, rock and wall (under a dark outline, the pixel below it), and in
+  // deep snow a dither of it on the row under; what gives its own light keeps it
+  function capped(ctx, D, lv) {
+    const im = ctx.getImageData(0, 0, TW, TH), A = im.data, B = new Uint8ClampedArray(A);
+    const drawn = (i) => { const q = i * 4; return B[q] !== D[q] || B[q + 1] !== D[q + 1] || B[q + 2] !== D[q + 2]; };
+    const set = (i, c) => { const v = rgb(c), q = i * 4; A[q] = v[0]; A[q + 1] = v[1]; A[q + 2] = v[2]; };
+    for (let y = 1; y < TH - 8; y++) for (let x = 0; x < TW; x++) {
+      const i = y * TW + x;
+      if (!drawn(i) || drawn(i - TW)) continue;
+      const s = Math.max(lv(i), lv(i + 6 * TW)), q = i * 4;
+      if (!s || (B[q] > 240 && B[q + 1] > 110 && B[q + 2] < 150)) continue;
+      const j = B[q] * 0.3 + B[q + 1] * 0.55 + B[q + 2] * 0.15 < 70 ? i + TW : i;
+      if (!drawn(j)) continue;
+      set(j, "#f4f8ff");
+      if (s === 2 && drawn(j + TW) && (x + y) % 2 === 0) set(j + TW, "#d8e4f4");
+    }
+    ctx.putImageData(im, 0, 0);
   }
 
   // the moving water, as six frames drawn once each: crests drift, foam pulses, the river glints downstream, the falls fall
@@ -707,7 +759,7 @@
       sprites.push({ y: hy, draw: burnt && k % 2 === 1 ? () => charred(ctx, hx, hy, one, seed, d.id) : one });
     }
   }
-  function tree(ctx, x, y, h) {
+  function tree(ctx, x, y, h, snow) {
     const big = (h >> 5) & 1;
     F(ctx, x - 1, y - 1, 2, 2, "#5a3a22");
     F(ctx, x - 3, y - 7 - big, 7, 6 + big, "#1e4a24");
@@ -717,6 +769,11 @@
     F(ctx, x - 2, y - 6 - big, 3, 2, "#5cb046");
     F(ctx, x - 1, y - 6 - big, 1, 1, "#94d862");
     F(ctx, x + 1, y - 3, 2, 1, "#2a6a2e");
+    // snow on the crown: a cap along the top, and in deep snow drifted into the boughs as well
+    if (snow) {
+      F(ctx, x - 2, y - 7 - big, 5, 1, "#f4f8ff"); F(ctx, x - 3, y - 6 - big, 2, 1, "#dce6f6"); F(ctx, x + 2, y - 6 - big, 1, 1, "#dce6f6");
+      if (snow > 1) { F(ctx, x - 1, y - 6 - big, 3, 1, "#f4f8ff"); F(ctx, x - 4, y - 5 - big, 2, 1, "#dce6f6"); F(ctx, x + 2, y - 4, 2, 1, "#dce6f6"); F(ctx, x - 2, y - 3, 1, 1, "#f4f8ff"); }
+    }
   }
   function pine(ctx, x, y, snow) {
     F(ctx, x, y - 1, 1, 2, "#5a3a22");
@@ -933,13 +990,32 @@
 
   // a roadside place a hero has found (league road_places: {road: [a, b], at}): a tiny pin on the road where it bends, as the road was drawn
   const PIN = { inn: "#c8963e", waystation: "#c8963e", shrine: "#f6ead0", toll: "#c0402c", ferry: "#4a7ab8", ford: "#4a7ab8" };
-  function placeXY(p) {
+  function placeXY(p) { return roadXY(p.road, p.at); }
+  // a point a share t of the way along a road from road[0] to road[1], on the road as it was drawn
+  function roadXY(road, at) {
     const S = App.S, nodeById = Object.fromEntries(T.N.map((d) => [d.id, d]));
-    const r = S.roads.find(([a, b]) => (a === p.road[0] && b === p.road[1]) || (a === p.road[1] && b === p.road[0]));
+    const r = S.roads.find(([a, b]) => (a === road[0] && b === road[1]) || (a === road[1] && b === road[0]));
     if (!r || !nodeById[r[0]] || !nodeById[r[1]]) return null;
-    const A = nodeById[r[0]].xy, B = nodeById[r[1]].xy, t = r[0] === p.road[0] ? p.at : 1 - p.at;
+    const A = nodeById[r[0]].xy, B = nodeById[r[1]].xy, t = r[0] === road[0] ? at : 1 - at;
     const len = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, wob = (T.n2(A[0] / 9, B[1] / 9) - 0.5) * 14, bend = Math.sin(t * Math.PI) * wob;
     return project(A[0] + (B[0] - A[0]) * t - ((B[1] - A[1]) / len) * bend, A[1] + (B[1] - A[1]) * t + ((B[0] - A[0]) / len) * bend);
+  }
+  // a flooded road: floodwater in stepped pools along it, short of the places at its ends, with the light catching a ripple
+  function floodRoad(ctx, road, k) {
+    const r = rng(hash(road.join("~")));
+    for (let t = 0.14; t <= 0.86; t += 0.06) {
+      const xy = roadXY(road, t);
+      if (!xy) return;
+      const cx = Math.round(xy[0] + (r() - 0.5) * 3), cy = Math.round(xy[1] + (r() - 0.5) * 2), rx = 4 + Math.floor(r() * 3), ry = 2 + Math.floor(r() * 2);
+      for (let j = -ry; j <= ry; j++) {
+        const w = Math.round(rx * Math.sqrt(1 - (j / (ry + 0.5)) ** 2));
+        for (let i = -w; i <= w; i++) {
+          const edge = Math.abs(i) === w || Math.abs(j) === ry;
+          ctx.fillStyle = edge ? "#5e7a6a" : (i + j * 3 + cx) % 7 === 0 ? "#b4d8ec" : (i + j) % 2 ? "#5a92b8" : "#6aa2c4";
+          ctx.fillRect((cx + i) * k, (cy + j) * k, k, k);
+        }
+      }
+    }
   }
   function roadPins(ctx, k) {
     for (const p of App.L.road_places || []) {
@@ -972,6 +1048,22 @@
     tent: { line: true, pal: { t: "#c8a060", T: "#e8c890", d: "#3a2616" }, rows: ["...t...", "..tTt..", ".tTdTt.", "tTTdTTt", "ttTdTtt"] },
     lantern: { line: true, pal: { k: "#2a1b11", y: "#ffd84a", Y: "#fff6d0" }, rows: ["..kkk..", ".k...k.", "kkkkkkk", "kyYYYyk", "kyYYYyk", "kkkkkkk"] },
     // the League's muster: a red war banner on a pole where everyone is called
+    // a pass the Long Winter has snowed in: a drift over the road with the wardens' red-tipped pole in it
+    drift: { line: true, pal: { s: "#b8c8e4", S: "#f4f8ff", p: "#5a3a22", r: "#c0402c", R: "#e8644a" }, rows: ["....R....", "....r....", "....p....", "...SpS...", "..SSpSS..", ".SSSSSSs.", "SSSSSSsss", "sssssssss"] },
+    // the season's places (league map_marks): a fallen star still lying out, a gold strike, a beast's tracks under the Hunter's Moon, the
+    // pavilion over a town a gathering is called to, and the Great Caravan's wagon
+    star: { line: true, pal: { y: "#7ab8ff", Y: "#c8e4ff", W: "#ffffff" }, rows: ["...y...", "...Y...", "..YWY..", "yYWWWYy", "..YWY..", "...Y...", "...y..."] },
+    strike: { line: true, pal: { o: "#b07a28", y: "#f0c050", Y: "#fff2a8" }, rows: ["......y..", ".....yYy.", "......y..", "..ooo....", ".oYYoo...", "oYyyooo..", ".ooooo..."] },
+    paw: { line: true, pal: { m: "#8a6040" }, rows: ["......m.m", ".....mmmm", "......mm.", ".........", "m.m......", "mmmm.....", ".mm......"] },
+    fullmoon: { pal: { a: "#d08a40", A: "#f6c870", c: "#e0a050" }, rows: ["..aaaaa..", ".aAAAAAa.", "aAAcAAAAa", "aAAAAAcAa", "aAcAAAAAa", "aAAAAcAAa", "aAAAAAAAa", ".aAAAAAa.", "..aaaaa.."] },
+    pavilion: { line: true, pal: { R: "#c0402c", W: "#f6ead0", p: "#5a3a1e", y: "#f0c850" }, rows: ["....y....", "....RR...", "....p....", "...WRW...", "..WRWRW..", ".WRWRWRW.", "WRWRWRWRW", "W.WRpRW.W"] },
+    wagon: { line: true, pal: { w: "#e8dcc0", W: "#f6ead0", b: "#7a5232", k: "#2a1b11" }, rows: ["..wwww...", ".wWWWWw..", "wWWWWWWw.", "bbbbbbbbb", ".k....k.."] },
+    // a wonder over a region (league wonder), beside its weather
+    aurora: { pal: { g: "#3ad890", G: "#a8f8d0" }, rows: ["..g...g..", ".gG..gG.g", "gGg.gGg.G", "Gg.gGg.gG", "g.gGg.gG.", ".gGg.gG..", "gG...G..."] },
+    blood_moon: { pal: { a: "#8a1e1a", A: "#e04a3a", c: "#b8302a" }, rows: ["..aaaaa..", ".aAAAAAa.", "aAAcAAAAa", "aAAAAAcAa", "aAcAAAAAa", "aAAAAcAAa", "aAAAAAAAa", ".aAAAAAa.", "..aaaaa.."] },
+    frogs: { pal: { k: "#1a1a1a", g: "#4a9a3a", G: "#8ad060" }, rows: [".k...k.", "kGk.kGk", "ggggggg", "gGGGGGg", ".g...g.", "gg...gg"] },
+    golden_fog: { pal: { f: "#f0d070" }, rows: [".fffffff.", ".........", "fffffff..", ".........", "..fffffff"] },
+    brimstone: { pal: { w: "#a89080", g: "#7a6050", b: "#ff8a30" }, rows: ["...ww....", ".wwwwww..", "wwwwwwwww", ".ggggggg.", ".b..b..b.", "b..b..b.."] },
     banner: { line: true, pal: { p: "#5a3a1e", r: "#b8302a", R: "#e8604a", y: "#f0c850" }, rows: ["p......", "prrRRr.", "prRyyR.", "prrRRr.", "prr.rr.", "p......", "p......"] },
   };
   MARK.clear = MARK.sun;
@@ -1074,6 +1166,16 @@
       hx = Math.max(2 * k, Math.min(cv.width - w - 2 * k, hx)); hy = Math.max(2 * k, Math.min(cv.height - h - 2 * k, hy));
       drake = { g: dg, ds, x, y, hx: Math.round(hx), hy: Math.round(hy), cv: dg.toCanvas(ds) };
     }
+    // The Long Winter: while the frost giant stirs it stands beside Frostspire, sized for the screen like the dragon, with the cold coming off it
+    const wn = L.winter;
+    let giant = null;
+    const gg = wn && wn.giant === "stirring" && xyOf(wn.lair) ? dragonGrid(wn.monster) : null;
+    if (gg) {
+      const [x, y] = project(...xyOf(wn.lair)), gs = Math.max(k, mpx(phone ? 44 : 70, gg.h)), w = gg.w * gs, h = gg.h * gs;
+      let hx = x * k - 12 * k - w, hy = y * k - h + 4 * k;
+      hx = Math.max(2 * k, Math.min(cv.width - w - 2 * k, hx)); hy = Math.max(2 * k, Math.min(cv.height - h - 2 * k, hy));
+      giant = { g: gg, gs, hx: Math.round(hx), hy: Math.round(hy), cv: gg.toCanvas(gs) };
+    }
     // where the figures' drawn pixels are, so a name can step aside instead of hiding under one
     const solid = (g, x, y) => {
       let x0 = g.w, y0 = g.h, x1 = -1, y1 = -1;
@@ -1081,18 +1183,22 @@
       return x1 < 0 ? null : [x + x0 * k, y + y0 * k, (x1 - x0 + 1) * k, (y1 - y0 + 1) * k];
     };
     for (const p of placed) p.box = solid(p.g, p.hx, p.hy);
-    const figs = placed.map((p) => p.box).concat(beast ? [solid(beast.g, beast.hx, beast.hy)] : [], drake ? [[drake.hx, drake.hy, drake.g.w * drake.ds, drake.g.h * drake.ds]] : []).filter(Boolean);
+    const figs = placed.map((p) => p.box).concat(beast ? [solid(beast.g, beast.hx, beast.hy)] : [], drake ? [[drake.hx, drake.hy, drake.g.w * drake.ds, drake.g.h * drake.ds]] : [],
+      giant ? [[giant.hx, giant.hy, giant.g.w * giant.gs, giant.g.h * giant.gs]] : []).filter(Boolean);
     const paint = () => {
       ctx.clearRect(0, 0, over.width, over.height);
-      // lowest: the roadside pins, just above the roads, so names and figures always cover them
+      // lowest: a road under water (league map_marks.flooded) floods along its length, then the roadside pins just above the roads,
+      // so names and figures always cover them
+      for (const rd of (L.map_marks || {}).flooded || []) floodRoad(ctx, rd, k);
       if (!opts.small) roadPins(ctx, k);
+      // a sign keeps clear of the roadside pins, the places and their names, and the figures, as the names do: it takes the nearest
+      // free spot round its region's middle (or its place), so it never reads as a pin's shadow
+      const keep = (App.L.road_places || []).map(placeXY).filter(Boolean).map(([x, y]) => [x * k - 4 * k, y * k - 7 * k, 8 * k, 8 * k])
+        .concat(T.N.map((d) => { const [x, y] = project(d.xy[0], d.xy[1]); return [x * k - 16 * k, y * k - 22 * k, 32 * k, 40 * k]; }), figs);
+      const hit = (a, b, s) => keep.some((o) => a < o[0] + o[2] && o[0] < a + s && b < o[1] + o[3] && o[1] < b + s);
+      const free = (spots, s) => { const p = spots.find(([a, b]) => !hit(a - s / 2, b - s / 2, s)) || spots[0]; keep.push([p[0] - s / 2, p[1] - s / 2, s, s]); return p; };
       if (!opts.small && S.regions && L.weather) {
         ctx.globalAlpha = 0.9;
-        // a sign keeps clear of the roadside pins, the places and their names, and the figures, as the names do: it takes the nearest
-        // free spot round its region's middle, so it never reads as a pin's shadow
-        const keep = (App.L.road_places || []).map(placeXY).filter(Boolean).map(([x, y]) => [x * k - 4 * k, y * k - 7 * k, 8 * k, 8 * k])
-          .concat(T.N.map((d) => { const [x, y] = project(d.xy[0], d.xy[1]); return [x * k - 16 * k, y * k - 22 * k, 32 * k, 40 * k]; }), figs);
-        const hit = (a, b, s) => keep.some((o) => a < o[0] + o[2] && o[0] < a + s && b < o[1] + o[3] && o[1] < b + s);
         for (const [r, nodesIn] of Object.entries(S.regions)) {
           const pts = nodesIn.map((id) => (S.towns[id] || S.wilds[id] || S.dungeons[id] || {}).xy).filter(Boolean);
           const m = night ? nightMark(L.weather[r]) : MARK[L.weather[r]];
@@ -1100,9 +1206,11 @@
           const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
           const [x, y] = project(cx, cy), px = mpx(10, 9), s = 9 * px + 2 * k;
           const spots = [[0, -14], [0, -26], [14, -14], [-14, -14], [0, -2], [22, -20], [-22, -20], [26, -6], [-26, -6], [0, -38]].map(([dx, dy]) => [(x + dx) * k, (y + dy) * k]);
-          const [sx, sy] = spots.find(([a, b]) => !hit(a - s / 2, b - s / 2, s)) || spots[0];
-          keep.push([sx - s / 2, sy - s / 2, s, s]);
+          const [sx, sy] = free(spots, s);
           mark(ctx, m, sx, sy, px);
+          // a wonder over the region takes the next free spot beside its weather
+          const wo = L.wonder && L.wonder.region === r && MARK[L.wonder.kind];
+          if (wo) { const [ox, oy] = free(spots, s); mark(ctx, wo, ox, oy, px); }
         }
         ctx.globalAlpha = 1;
       }
@@ -1114,6 +1222,36 @@
       if (!opts.small && dawn && dawn.loc && dawn.loc !== "ironhaven") {
         const xy = (S.towns[dawn.loc] || S.wilds[dawn.loc] || S.dungeons[dawn.loc] || {}).xy;
         if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, MARK.sun, (x + 10) * k, (y - 20) * k, mpx(12, 9)); }
+      }
+      const mm = L.map_marks || {};
+      if (!opts.small) {
+        // the season's places, each beside its place on the nearest free spot
+        const near = (id, m, css) => {
+          const xy = xyOf(id);
+          if (!xy || !m) return;
+          const [x, y] = project(...xy), px = mpx(css, m.rows[0].length), s = m.rows[0].length * px + 2 * k;
+          const [sx, sy] = free([[10, -20], [-10, -20], [16, -8], [-16, -8], [0, -30], [22, -22], [-22, -22]].map(([dx, dy]) => [(x + dx) * k, (y + dy) * k]), s);
+          mark(ctx, m, sx, sy, px);
+        };
+        // the Great Caravan's road, in gold dots from the town it sets out from, with its wagon at the start
+        if (mm.caravan && xyOf(mm.caravan[0]) && xyOf(mm.caravan[1])) {
+          const [ax, ay] = project(...xyOf(mm.caravan[0])), [bx, by] = project(...xyOf(mm.caravan[1])), len = Math.hypot(bx - ax, by - ay) * k, dot = mpx(2.5, 1);
+          for (let s = 14 * k; s < len - 14 * k; s += dot * 4) {
+            const px = Math.round((ax * k + ((bx - ax) * k * s) / len) / dot) * dot, py = Math.round(((ay - 6) * k + ((by - ay) * k * s) / len) / dot) * dot;
+            ctx.fillStyle = "rgba(40,24,8,0.8)"; ctx.fillRect(px - k, py - k, dot + 2 * k, dot + 2 * k);
+            ctx.fillStyle = "#f0c050"; ctx.fillRect(px, py, dot, dot);
+          }
+          near(mm.caravan[0], MARK.wagon, 16);
+        }
+        for (const id of new Set(mm.stars || [])) {
+          const xy = xyOf(id);
+          if (xy) { const [x, y] = project(...xy); ctx.fillStyle = "rgba(160,210,255,0.22)"; ctx.beginPath(); ctx.arc(x * k, (y - 4) * k, 10 * k, 0, Math.PI * 2); ctx.fill(); }
+          near(id, MARK.star, 16);
+        }
+        if (mm.strike) { near(mm.strike, MARK.strike, 15); near(mm.strike, MARK.tent, 11); near(mm.strike, MARK.tent, 11); }
+        if (mm.hunt) { if (mm.hunt.moon) near(mm.hunt.at, MARK.fullmoon, 16); near(mm.hunt.at, MARK.paw, 14); }
+        const dam = (mm.rally || {}).kind === "drowned_spring";
+        for (const id of (mm.rally || {}).at || []) near(id, dam ? MARK.banner : MARK.pavilion, dam ? 14 : 15);
       }
       if (dw && !opts.small) {
         // her flight so far, stepped as square dots on the map's own pixel grid
@@ -1145,7 +1283,16 @@
       for (const [id, until] of Object.entries(L.closed || {})) {
         if (until <= L.meta.day) continue;
         const xy = (S.wilds[id] || {}).xy;
-        if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, MARK.closed, x * k, (y - 14) * k, mpx(10, 9)); }
+        if (xy) { const [x, y] = project(xy[0], xy[1]); mark(ctx, wn && id === wn.pass ? MARK.drift : MARK.closed, x * k, (y - 14) * k, mpx(wn && id === wn.pass ? 12 : 10, 9)); }
+      }
+      // the giant's cold on the ground round it: a stepped disc of frost blue
+      if (giant) {
+        const { g, gs, hx, hy } = giant, cx = g.w / 2, cy = g.h * 0.75, r = Math.max(g.w, g.h) * 0.6;
+        for (const [rr, a] of [[r, 0.14], [r * 0.65, 0.18]]) {
+          ctx.fillStyle = `rgba(190,225,255,${a})`;
+          for (let j = Math.floor(cy - rr * 0.5); j <= Math.ceil(cy + rr * 0.5); j++) for (let i = Math.floor(cx - rr * 1.2); i <= Math.ceil(cx + rr * 1.2); i++)
+            if (((i - cx) / 1.2) ** 2 + ((j - cy) * 2) ** 2 <= rr * rr && (i + j) % 2 === 0) ctx.fillRect(hx + i * gs, hy + j * gs, gs, gs);
+        }
       }
       // her heat on the ground under the names and figures: a stepped disc in her own pixels
       if (drake) {
@@ -1230,6 +1377,7 @@
       // under the heroes' feet in the Tonight view: what kind of night each group has
       for (const [x, y, m] of Object.values(nights)) mark(ctx, MARK[m], (x - 11) * k, (y + 2) * k, mpx(15, 7));
       // highest: the figures, a megabeast and then the heroes, over every name and pin
+      if (giant) ctx.drawImage(giant.cv, giant.hx, giant.hy);
       if (beast) {
         ctx.fillStyle = "rgba(160,20,20,0.35)"; ctx.beginPath(); ctx.arc(beast.x * k, (beast.y - 6) * k, 22 * k, 0, Math.PI * 2); ctx.fill();
         ctx.drawImage(beast.g.toCanvas(k), beast.hx, beast.hy);
@@ -1256,12 +1404,22 @@
       c.imageSmoothingEnabled = false;
       for (const cl of T.clouds) c.drawImage(night ? nightCloud(cl) : cl.cv, Math.round((cloudAt(cl, t) - cl.ox) * k), Math.round((cl.y - cl.oy) * k), cl.cv.width * k, cl.cv.height * k);
     } };
+    // snow coming down where it is snowing today: each flake drops a little way over its own patch of ground and melts into it
+    const fl = T.flakes, snowfall = { z: 2, draw: (c, t) => {
+      c.fillStyle = night ? "#b8c4e0" : "#ffffff";
+      for (const [x, y, ph] of fl) {
+        const f = (t * 0.45 + ph) % 1;
+        c.globalAlpha = f < 0.8 ? 0.85 : (1 - f) * 4;
+        c.fillRect(Math.round((x + Math.sin(t * 1.3 + ph * 6) * 1.5) * k), Math.round((y - 16 + f * 16) * k), k, k);
+      }
+      c.globalAlpha = 1;
+    } };
     if (cv.anim) cv.anim.stop();
     const show = () => {
       if (cv.anim && cv.anim.draw) { cv.anim.draw(cv.anim.still); return; }
-      const c = cv.getContext("2d"); c.drawImage(base, 0, 0); water.draw(c, 0); sky.draw(c, 0); c.drawImage(over, 0, 0);
+      const c = cv.getContext("2d"); c.drawImage(base, 0, 0); water.draw(c, 0); sky.draw(c, 0); if (fl.length) snowfall.draw(c, 0); c.drawImage(over, 0, 0);
     };
-    if (window.Anim) Anim.stage(cv, base, [water, sky], { over, fps: 8, still: 0 });
+    if (window.Anim) Anim.stage(cv, base, fl.length ? [water, sky, snowfall] : [water, sky], { over, fps: 8, still: 0 });
     else show();
     // the road art loads late: the whole sheet is painted again with its pins, so they stay under the names and figures
     if (!opts.small && !window.RoadArt && (L.road_places || []).length) App.roadArt().then(() => { if (window.RoadArt && cv.isConnected) { paint(); show(); } }, () => {});
