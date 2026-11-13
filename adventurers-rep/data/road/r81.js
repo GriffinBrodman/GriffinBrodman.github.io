@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r81"]={"day":21,"kind":"meet","place":null,"road":"frosthold~veldrock","biome":"hills","weather":"clear","tod":"morning","hour":11,"heroes":["h15"],"lead":"h15","line":"Ryan stops to help Ines for the first time, who has rolled up her only copy of a map inside the wrong cloak.","traveller":"ines","met":1,"outcome":"meet","id":"r81"};
