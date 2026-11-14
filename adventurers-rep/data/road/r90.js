@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r90"]={"day":22,"kind":"inn","place":"pickaxe_rest","road":"collapsed_mine~veldrock","biome":"hills","weather":"cloudy","tod":"afternoon","hour":15,"heroes":["h17","h4"],"lead":"h4","line":"Garrett hears a rumble from inside the Pickaxe Rest and is assured it is only the cellar.","place_kind":"inn","tally":4,"outcome":"place","id":"r90"};
