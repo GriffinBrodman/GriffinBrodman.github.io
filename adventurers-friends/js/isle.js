@@ -1058,6 +1058,8 @@
     fullmoon: { pal: { a: "#d08a40", A: "#f6c870", c: "#e0a050" }, rows: ["..aaaaa..", ".aAAAAAa.", "aAAcAAAAa", "aAAAAAcAa", "aAcAAAAAa", "aAAAAcAAa", "aAAAAAAAa", ".aAAAAAa.", "..aaaaa.."] },
     pavilion: { line: true, pal: { R: "#c0402c", W: "#f6ead0", p: "#5a3a1e", y: "#f0c850" }, rows: ["....y....", "....RR...", "....p....", "...WRW...", "..WRWRW..", ".WRWRWRW.", "WRWRWRWRW", "W.WRpRW.W"] },
     wagon: { line: true, pal: { w: "#e8dcc0", W: "#f6ead0", b: "#7a5232", k: "#2a1b11" }, rows: ["..wwww...", ".wWWWWw..", "wWWWWWWw.", "bbbbbbbbb", ".k....k.."] },
+    // a god theme's figure where it is tonight (league map_marks.theme_pin, by the theme's emblem): the Visitor's ladle
+    ladle: { line: true, pal: { h: "#d8a860", H: "#f0c880", b: "#8a5a34", B: "#d8583a", R: "#f08a5a" }, rows: ["........H", ".......Hh", "......Hh.", ".....Hh..", "....Hh...", "bbbbhb...", "bRBBBb...", ".bBBb....", "..bb....."] },
     // a wonder over a region (league wonder), beside its weather
     aurora: { pal: { g: "#3ad890", G: "#a8f8d0" }, rows: ["..g...g..", ".gG..gG.g", "gGg.gGg.G", "Gg.gGg.gG", "g.gGg.gG.", ".gGg.gG..", "gG...G..."] },
     blood_moon: { pal: { a: "#8a1e1a", A: "#e04a3a", c: "#b8302a" }, rows: ["..aaaaa..", ".aAAAAAa.", "aAAcAAAAa", "aAAAAAcAa", "aAcAAAAAa", "aAAAAcAAa", "aAAAAAAAa", ".aAAAAAa.", "..aaaaa.."] },
@@ -1252,6 +1254,17 @@
         if (mm.hunt) { if (mm.hunt.moon) near(mm.hunt.at, MARK.fullmoon, 16); near(mm.hunt.at, MARK.paw, 14); }
         const dam = (mm.rally || {}).kind === "drowned_spring";
         for (const id of (mm.rally || {}).at || []) near(id, dam ? MARK.banner : MARK.pavilion, dam ? 14 : 15);
+        // a god theme's figure on a little parchment plaque clear of the place's own art, so it holds over castle and forest alike
+        const tp = mm.theme_pin, tm = tp && MARK[tp.emblem];
+        if (tm && xyOf(tp.at)) {
+          const [x, y] = project(...xyOf(tp.at)), px = mpx(16, tm.rows[0].length), s = tm.rows[0].length * px + 6 * k;
+          const [sx, sy] = free([[28, -14], [-28, -14], [0, -38], [30, -30], [-30, -30], [28, 4]].map(([dx, dy]) => [(x + dx) * k, (y + dy) * k]), s);
+          const x0 = Math.round(sx - s / 2), y0 = Math.round(sy - s / 2);
+          ctx.fillStyle = "#3a2414"; ctx.fillRect(x0 - k, y0 - k, s + 2 * k, s + 2 * k);
+          ctx.fillStyle = "#f2e2bc"; ctx.fillRect(x0, y0, s, s);
+          ctx.fillStyle = "#c8a870"; ctx.fillRect(x0, y0 + s - k, s, k); ctx.fillRect(x0 + s - k, y0, k, s);
+          mark(ctx, tm, sx, sy, px);
+        }
       }
       if (dw && !opts.small) {
         // her flight so far, stepped as square dots on the map's own pixel grid

@@ -1214,6 +1214,7 @@
       for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, x = R(cx + Math.cos(a) * 12), y = R(cy + Math.sin(a) * 3.6); Tv().candle(c, x, y, t + i, 0.8, 3); }
     });
     k.lights.push({ x: cx, y: cy, r: 70, k: 0.55 });
+    if (root.TownScenes && TownScenes.altar) TownScenes.altar(k);
     k.spot("altar", 2.3, 4.1, 1); k.spot("npc", 2.3, 4.1, 1); k.spot("rail", 3.3, 3.2, -1, "kneel"); k.spot("kneel", 3.3, 3.2, -1, "kneel");
     k.spot("pew", 6.68, 6.8, -1, "sit"); k.spot("act", 6.68, 6.8, -1, "sit"); k.spot("booth", 12.1, 2.35, 1, "kneel"); k.spot("booth_in", 12.5, 1.1, 1);
     k.spot("box", 10.3, 1.35, 1); k.spot("aisle", 4.2, 5.7, 1); k.spot("broom", 4.2, 5.7, 1); k.spot("steps", 7.0, 5.7, 1, "kneel"); k.spot("window", 4.6, 1.0, 1);

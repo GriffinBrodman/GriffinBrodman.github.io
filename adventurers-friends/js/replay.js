@@ -845,6 +845,35 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
 
     // ---------- what is moving right now ----------
     const slotAt = (t) => { let s = P.slots[0]; for (const x of P.slots) if (x.t0 <= t) s = x; return s; };
+    // a god omen landing (f.god_omens: {hero id: {god, kind}}, gods on only): the god leans in over the top of the stage, the 48 px
+    // figure's top half at 2x, as the hero it favours (or is cross with) first acts; two at most a fight
+    const GOD_LEN = 1.9;
+    const godCuts = [];
+    for (const [hid, o] of Object.entries(f.god_omens || {})) {
+      const q = units.find((x) => x && x.kind === "hero" && x.ref === hid);
+      const s0 = q && P.slots.find((x) => x.members.some((m) => m.b && m.b.kind === "act" && m.b.a === q.i));
+      if (s0 && godCuts.length < 2) godCuts.push({ god: o.god, kind: o.kind, who: q.name, t0: s0.t0 + (s0.cutin ? s0.pre : 0) });
+    }
+    // never over a hero's own cut-in band, a boss's entrance, the title or the end card, nor over the other god; and never over a
+    // close-up or a slowed, name-tagged beat, where the camera is on somebody else and the tag and the numbers sit at the top of the frame
+    const span = (x) => [x.t0, x.t0 + (x.cutin ? x.pre : x.len)];
+    const hard = P.slots.filter((x) => x.kind === "title" || x.kind === "boss" || x.cutin).map(span).concat([[P.end, Infinity]]);
+    const framed = P.slots.filter((x) => x.kind === "beat" && (x.close || x.kill || x.turning || x.rate < 1)).map(span);
+    const place = (g, busy) => { for (let moved = true; moved;) { moved = false; for (const [a, b] of busy) if (g.t0 < b && g.t0 + GOD_LEN > a) { g.t0 = b; moved = true; } } };
+    godCuts.sort((a, b) => a.t0 - b.t0);
+    godCuts.forEach((g, k) => {
+      if (k) g.t0 = Math.max(g.t0, godCuts[k - 1].t0 + GOD_LEN + 0.3);
+      const t0 = g.t0;
+      place(g, hard.concat(framed));
+      // a fight that is all close-ups keeps its god: back where it was, clear of the hard bands only (the tags and numbers then
+      // keep out of its way, godBox); one that cannot finish before the end card is dropped rather than laid over VICTORY
+      if (g.t0 + GOD_LEN > P.end) { g.t0 = t0; place(g, hard); }
+      if (g.t0 + GOD_LEN > P.end) g.drop = true;
+    });
+    for (let k = godCuts.length - 1; k >= 0; k--) if (godCuts[k].drop) godCuts.splice(k, 1);
+    let godArt = false;
+    if (godCuts.length) A.need(["god_sprites", "god_art"]).then(() => { GodArt.init({}); GodArt.ready(() => { godArt = true; if (!playing) draw(T); }); }, () => {});
+    const godAt = (t) => godCuts.find((g) => t >= g.t0 && t < g.t0 + GOD_LEN) || null;
     function active(t) {
       const out = [];
       for (const s of P.slots) {
@@ -1017,6 +1046,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
       const acts = active(t), pose = posesAt(acts, t), V = view(t, slot, u);
       const L = FXL();
       const inX = (x, m) => clamp(x, V.vx + m, V.vx + V.vw - m), inY = (y, m) => Math.max(V.vy + m + (slot.close ? V.vh * 0.1 : 0), y);
+      const gw = godWorld(t, V);
       // the world, at stage size
       o.setTransform(1, 0, 0, 1, 0, 0);
       o.clearRect(0, 0, W, H);
@@ -1123,8 +1153,9 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
         const an = anchors[im.t] || { x: q.x, y: q.y, top: q.y - q.sh }, ch = chestOf({ x: an.x, y: q.y, h: q.sh });
         const n = stack[im.t] = (stack[im.t] || 0) + 1;
         const e = f.log[im.li] || {};
-        // numbers on one fighter stack a glyph and its rim apart, and never rise into the letterbox or off the top
-        const ny = Math.max(inY(0, 30) + (n - 1) * 13, an.top - 6 - (n - 1) * 13);
+        // numbers on one fighter stack a glyph and its rim apart, and never rise into the letterbox, off the top or into a god's band
+        const ny0 = Math.max(inY(0, 30) + (n - 1) * 13, an.top - 6 - (n - 1) * 13);
+        const ny = gw && an.x > gw.x0 - NUM_HALF && an.x < gw.x1 + NUM_HALF ? Math.max(ny0, gw.y1 + NUM_DROP + (n - 1) * 13) : ny0;
         if (im.kind === "hit" || im.kind === "crit") {
           if (!inverted) L.sparks(o, ch.x, ch.y, a, { school: (im.b && im.b.look.params.school) || "physical", count: 0, size: im.crit ? 1.4 : 1, dir: q.side ? 1 : -1, seed: im.li, crit: im.crit });
           L.number(o, im.crit ? "crit" : "normal", String(e.v), an.x, ny, a);
@@ -1419,7 +1450,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
     // the HUD's resolve panels and chips take the top of the frame whenever they show; a tag keeps below them
     const hudShows = (t, slot, u) => !(slot.close || slot.cutin && u < slot.pre || slot.kind === "boss");
     const hudFloor = (t, slot, u, B) => !hudShows(t, slot, u) ? 0 : slot.kind === "title" || t >= P.end ? 19 * B : 31 * B;
-    function nameTag(t, slot, u, X, Y, B) {
+    function nameTag(t, slot, u, X, Y, B, gb) {
       if (!tagAlpha(slot, u)) return;
       const q = units[shot(slot).tag.a], an = anchors[q.i] || { x: q.x, top: q.y - q.sh }, lb = slot.close ? cv.height * 0.1 : 0, px = X(an.x);
       // once the camera has followed the effect away, the tag goes with the actor rather than clinging to the edge
@@ -1428,6 +1459,8 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
       ctx.font = `${R(5.5 * B)}px ${FONT}`;
       const str = `${marks[q.i] || ""} ${q.name}`.trim().toUpperCase(), w = ctx.measureText(str).width + 8 * B, h = 8.5 * B;
       const x = clamp(px - w / 2, 2 * B, cv.width - w - 2 * B), y = Math.max(lb + 2 * B, hudFloor(t, slot, u, B), Y(an.top) - h - 6 * B);
+      // under a god's band the tag waits: it comes back the moment the god has gone
+      if (gb && inBand(gb, x + w / 2, y + (h + 3 * B) / 2, w / 2, (h + 3 * B) / 2)) return;
       ctx.globalAlpha = al;
       ctx.fillStyle = "rgba(28,20,18,0.9)"; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = "#f0c450"; ctx.fillRect(x, y + h - Math.max(1, B * 0.6), w, Math.max(1, B * 0.6));
@@ -1448,7 +1481,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
       ctx.filter = "none";
       if (cut && (calm || !("filter" in ctx))) { ctx.fillStyle = "rgba(10,8,22,0.55)"; ctx.fillRect(0, 0, cvw, cvh); }
       const X = (x) => (x - vw0.vx) * K + sx, Y = (y) => (y - vw0.vy) * K + sy;
-      const B = (cvw / 384) * Math.max(1, Math.min(2, 640 / (cv.clientWidth || 640)));
+      const B = stageB();
       // the slow beats close in with a vignette
       if (slot.kill || slot.turning) {
         const k = Math.min(ease(u / 0.25), ease((slot.len - u) / 0.3));
@@ -1457,17 +1490,20 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
         ctx.fillStyle = g; ctx.fillRect(0, 0, cvw, cvh);
       }
       if (!slot.close) marksOnBars(X, Y, K, B);
+      // the god leans in under the fight's own words: the damage numbers and the actor's name tag paint over the banner
+      godCut(t, B);
       // stamps keep one size on screen however close the camera is
       // a status word is a footnote to the blow, not the blow: one size on the full stage whatever the zoom or the screen,
       // so it never swallows the fighter it names and their neighbours
       const sk = Math.min(K, (cvw / cam.vw) * 1.3), L = FXL(), skStatus = (cvw / W) * 0.9;
-      for (const [kind, x, y, a, label] of stamps) { const k = kind === "status" ? skStatus : sk; ctx.save(); ctx.translate(R(X(x)), R(Y(y))); ctx.scale(k, k); L.stamp(ctx, kind, 0, 0, a, label); ctx.restore(); }
+      const gb = godBox(t, B);
+      for (const [kind, x, y, a, label] of stamps) { const k = kind === "status" ? skStatus : sk, [hw, hh, up] = stampHalf(kind, label); if (gb && inBand(gb, X(x), Y(y) - up * k / 2, hw * k, (hh + up / 2) * k)) continue; ctx.save(); ctx.translate(R(X(x)), R(Y(y))); ctx.scale(k, k); L.stamp(ctx, kind, 0, 0, a, label); ctx.restore(); }
       if (slot.close) closeup(t, slot, u, st, B, K);
       if (cut) cutin(slot, u, B, K, X, Y);
       if (slot.kind === "boss") bossIntro(slot, u, B, X, Y, K);
       if (slot.bossKill) bossOutro(t, slot, B);
       hud(t, slot, u, live, B);
-      nameTag(t, slot, u, X, Y, B);
+      nameTag(t, slot, u, X, Y, B, gb);
       if (slot.kind === "title") titleCard(u, B);
       if (slot.kind === "morale") banner(vb(label(slot.side), "breaks!", "break!"), u, B, slot.len);
       if (t >= P.end) endCard(t - P.end, B);
@@ -1520,7 +1556,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
       if (slot.kind === "merge") lab = `${slot.members.length} TRADES, ONE BEAT`;
       else if (slot.turning) lab = "TURNING POINT";
       else if (b && b.kind === "act" && units[b.a]) { const k = b.e.k && b.e.k !== "Attack" ? b.e.k : null; lab = k ? `${units[b.a].name.toUpperCase()} · ${k.toUpperCase()}` : null; }
-      if (lab) chip(trunc(lab, 40), cvw / 2, y, "#f6ebd0", "center", B);
+      if (lab && !(godArt && godAt(t))) chip(trunc(lab, 40), cvw / 2, y, "#f6ebd0", "center", B);
     }
     function titleCard(u, B) {
       const cvw = cv.width, cvh = cv.height, k = Math.min(ease(u / 0.25), ease((P.slots[0].len - u) / 0.3));
@@ -1689,6 +1725,74 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
       txt(trunc(h ? `${a.name}, ${A.clsName ? A.clsName(h.cls) : h.cls} · level ${h.level}`.toUpperCase() : a.name.toUpperCase(), 44), tx, yc + off + Math.min(10 * B, hh * 0.3), 5, "#d8c8a0", "center", B);
       ctx.restore();
     }
+    // the strip is built natively at 48 x 24 (24 rows of the figure from its sprite's cut row, in its hall light, a fire rule along the foot) and shown at 2x
+    const stripCache = {};
+    function godStrip(g, frame) {
+      const key = g.god + ":" + g.kind + ":" + frame;
+      if (stripCache[key]) return stripCache[key];
+      const c = document.createElement("canvas"); c.width = 48; c.height = 24;
+      const x = c.getContext("2d"), r = Paint.ramp(Paint.godFire(g.god)), cross = g.kind === "cross";
+      const dark = Art.mix(r[0], "#0c0a12", cross ? 0.75 : 0.6);
+      for (let py = 0; py < 24; py++) for (let px = 0; px < 48; px++) {
+        const d = Math.hypot((px + 0.5 - 24) / 1.25, py + 0.5 - 13) / 15 + ((px & 1) + (py & 1) * 2) * 0.03;
+        x.fillStyle = d < 0.55 ? Art.mix(dark, r[1], cross ? 0.3 : 0.5) : d < 0.8 ? Art.mix(dark, r[1], cross ? 0.15 : 0.25) : dark;
+        x.fillRect(px, py, 1, 1);
+      }
+      const mood = cross ? ((window.GodSprites && GodSprites[g.god] && (GodSprites[g.god].moods || [])[0]) || "cross") : null;
+      const fig = cross ? GodArt.figure(g.god, frame, mood) : GodArt.litFigure(g.god, frame, "r");
+      x.drawImage(fig, 0, (GodSprites[g.god] || {}).cut || 0, 48, 24, 0, 0, 48, 24);
+      x.fillStyle = "#16121a"; x.fillRect(0, 22, 48, 2);
+      x.fillStyle = cross ? r[1] : r[2]; x.fillRect(0, 22, 48, 1);
+      x.fillStyle = cross ? r[0] : r[3]; for (let px = 2; px < 48; px += 6) x.fillRect(px, 22, 2, 1);
+      return (stripCache[key] = c);
+    }
+    function stageB() { return (cv.width / 384) * Math.max(1, Math.min(2, 640 / (cv.clientWidth || 640))); }
+    // where the god's strip and caption sit on the canvas this frame: the strip, the caption, and the box round both
+    function godBox(t, B) {
+      const g = godArt && godAt(t);
+      if (!g) return null;
+      const cvw = cv.width, sc = cvw / W, a = t - g.t0, k = calm ? 1 : Math.min(ease(a / 0.25), ease((GOD_LEN - a) / 0.25));
+      const w = 96 * sc, h = 48 * sc, x = R((cvw - w) / 2), y = R(-h * (1 - k));
+      const name = ((S.god_names || {})[g.god] || g.god).toUpperCase(), who = (g.who || "").toUpperCase();
+      const line = trunc(g.kind === "cross" ? `${name} IS CROSS WITH ${who}` : g.kind === "help" ? `${name} ANSWERS ${who}` : `${name} SMILES ON ${who}`, 44);
+      ctx.font = `${R(7 * B)}px ${FONT}`;
+      const tw = ctx.measureText(line).width + 10 * B, ty = y + h + sc, cx = R(cvw / 2 - tw / 2), ch = R(12 * B);
+      return { g, a, k, sc, x, y, w, h, line, tw, ty, ch, rects: [[x - sc, y, w + 2 * sc, h + sc], [cx, ty, R(tw), ch]],
+        x0: Math.min(x - sc, cx), x1: Math.max(x + w + sc, cx + R(tw)), y1: ty + ch };
+    }
+    // a box centred on (cx, cy), half-sizes hw and hh, against the god's strip and caption, with a little air
+    function inBand(gb, cx, cy, hw, hh) {
+      const m = 2 * gb.sc;
+      return gb.rects.some(([x, y, w, h]) => cx + hw > x - m && cx - hw < x + w + m && cy + hh > y - m && cy - hh < y + h + m);
+    }
+    // the same box in stage units, for the numbers painted into the world before it is framed
+    // a number's half-width with its rims, its crit pop and a miss's drift (tools/cutin_check.js measures what is drawn)
+    const NUM_HALF = 28, NUM_DROP = 30;
+    // a stamp's half-size as fight_fx.js stampCanvas paints it (glyphs at 2x, 3x for CRIT, 4x for KO, on a plate) at its slam's
+    // largest, and how far a status word rises: near the god's band a stamp is judged by all of that, not by a fixed square
+    function stampHalf(kind, label) {
+      const sc = kind === "ko" ? 4 : kind === "crit" ? 3 : 2, pad = kind === "ko" ? 7 : 4, slam = kind === "ko" ? 1.7 : kind === "crit" ? 1.6 : 1.35;
+      const n = String(label || (kind === "ko" ? "KO" : kind === "crit" ? "CRIT" : "!")).length;
+      return [(n * 4 * sc - sc + pad * 2 + 4) / 2 * slam, (5 * sc + pad * 2 + 4) / 2 * slam, kind === "crit" || kind === "ko" ? 0 : 8];
+    }
+    function godWorld(t, V) {
+      const gb = godBox(t, stageB());
+      if (!gb) return null;
+      const K = cv.width / V.vw;
+      return { x0: V.vx + gb.x0 / K, x1: V.vx + gb.x1 / K, y1: V.vy + gb.y1 / K };
+    }
+    function godCut(t, B) {
+      const gb = godBox(t, B);
+      if (!gb) return;
+      const { g, a, k, sc, x, y, w, h, line, tw, ty, ch } = gb, cvw = cv.width, frame = calm ? 0 : Math.floor(a * 2.5) % 2;
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = "#16121a"; ctx.fillRect(x - sc, y, w + 2 * sc, h + sc);
+      ctx.drawImage(godStrip(g, frame), x, y, w, h);
+      ctx.globalAlpha = k;
+      ctx.fillStyle = "rgba(18,12,24,0.88)"; ctx.fillRect(R(cvw / 2 - tw / 2), ty, R(tw), ch);
+      txt(line, cvw / 2, ty + 8.8 * B, 7, Paint.ramp(Paint.godFire(g.god))[3], "center", B);
+      ctx.globalAlpha = 1;
+    }
     function bossIntro(slot, u, B, X, Y, K) {
       const cvw = cv.width, q = units[slot.who], k = Math.min(ease(u / 0.2), ease((slot.len - u) / 0.25));
       ctx.globalAlpha = 0.5 * k; ctx.fillStyle = "#0a0608"; ctx.fillRect(0, 0, cvw, cv.height); ctx.globalAlpha = 1;
@@ -1787,7 +1891,7 @@ ${A.shareUrl(`#/day/${hid}/${wday}/${i}`)}`, shared: "The hour and a link copied
     document.addEventListener("visibilitychange", () => { if (!document.hidden) kick(); });
     cv.addEventListener("click", () => { if (T < P.end && P.slots.some((s) => s.cutin && T >= s.t0 && T < s.t0 + s.pre)) { const s = P.slots.find((x) => x.cutin && T >= x.t0 && T < x.t0 + x.pre); T = s.t0 + s.pre; lastT = -1; if (!playing) draw(T); } });
     // a hook for review tools: render any moment of the replay
-    cv.replay = { plan: P, draw: (t) => { T = t; lastT = -1; draw(t); }, pause: () => { playing = false; } };
+    cv.replay = { plan: P, gods: godCuts, godBox: (t) => godBox(t, stageB()), godWorld: (t) => { const s = slotAt(t); return godWorld(t, view(t, s, t - s.t0)); }, draw: (t) => { T = t; lastT = -1; draw(t); }, pause: () => { playing = false; } };
     draw(0);
     kick();
   }

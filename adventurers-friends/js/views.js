@@ -168,21 +168,48 @@
   // ================= HOME: The Daily Crier =================
   // a season theme's climax (`climax`) is the league's story even when it names nobody (the strike, the midsummer night)
   const heroic = (e) => (e.heroes || []).length || (e.parties || []).length || ["season_end", "season_start"].includes(e.kind) || !!e.climax;
+  // a god's line (league/gods.py say: kind god_*, with the god): never a fresh lead, last at its importance, one slot in "Also today"
+  // a Vashk unmasking is the hero's news, not the god's: it never takes the god slot, and one day's unmaskings read as one story
+  const unmasked = (e) => e.kind === "hungry_star" && e.god === "vashk";
+  const godly = (e) => !unmasked(e) && (!!e.god || /^god_/.test(e.kind));
+  // the unmasking is the season's twist: it leads its day, and the seal's cult joke (same day, same heroes, no god) rides on its end
+  const UNMASK_IMP = 5;
+  const sealJoke = (e) => e.kind === "hungry_star" && !e.god && e.climax === "hs_seal" && (e.heroes || []).length;
+  function foldUnmasked(E) {
+    const by = {}, out = [];
+    for (const e of E) {
+      if (!unmasked(e)) { out.push(e); continue; }
+      const f = by[e.day];
+      // the export writes the folded story's headline, naming everyone unmasked that day (export._unmask_heads)
+      if (!f) out.push((by[e.day] = Object.assign({}, e, { heroes: (e.heroes || []).slice(), imp: Math.max(e.imp, UNMASK_IMP), head: ((L.gods || {}).unmask_heads || {})[e.day] })));
+      else { f.heroes.push(...(e.heroes || []).filter((x) => !f.heroes.includes(x))); f.text += " " + e.text; }
+    }
+    return out.filter((e) => {
+      const f = sealJoke(e) && by[e.day];
+      if (f && e.heroes.every((x) => f.heroes.includes(x))) { f.text += " " + e.text; return false; }
+      return true;
+    });
+  }
+  const godLast = (e) => (godly(e) ? 1 : 0);
+  // a hero's private luck is the hero page's news, not the paper's (the Mountain's feed skips it too)
+  const GOD_SECOND = 3, GOD_PRIVATE = new Set(["god_luck", "god_bad_luck"]);
   // what one day's front page shows, from that day's events and the two days before it
   function crierDay(today, E) {
+    E = foldUnmasked(E);
     // the owner's rule: a death or a boss kill is the big moment of its day, ahead of anything else at the same importance; so is a theme's
     // climax, the season's payoff, so a call-out notice or a fizzled showdown never takes its day
     const BIG = { death: 3, boss: 2, boss_kill: 2 }, big = (e) => BIG[e.kind] || (e.climax ? 2 : 0);
-    const allToday = E.filter((e) => e.day === today).sort((a, b) => b.imp - a.imp || big(b) - big(a) || idNum(a.id) - idNum(b.id));
+    // at equal importance a hero's own story goes ahead of a god's line (gods.md, the front page)
+    const byNews = (a, b) => b.imp - a.imp || godLast(a) - godLast(b) || big(b) - big(a) || idNum(a.id) - idNum(b.id);
+    const allToday = E.filter((e) => e.day === today).sort(byNews);
     const todays = allToday.filter(heroic);
-    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2);
     const seasonEnd = todays.find((e) => e.kind === "season_end");
     // deaths are rare by design; when one happens it is the story of the day
     const death = todays.find((e) => e.kind === "death");
     // the spotlight rotates: yesterday's stars don't take the lead again unless nothing else comes close
-    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort((a, b) => b.imp - a.imp || big(b) - big(a) || idNum(a.id) - idNum(b.id))[0];
+    const leadOf = (day) => E.filter((e) => e.day === day && heroic(e)).sort(byNews)[0];
     const recentStars = new Set([leadOf(today - 1), leadOf(today - 2)].filter(Boolean).flatMap((e) => e.heroes || []));
-    const fresh = todays.find((e) => e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
+    const fresh = todays.find((e) => !godly(e) && e.imp >= (todays[0] ? todays[0].imp - 1 : 9) && e.imp >= 3 && !(e.heroes || []).some((id) => recentStars.has(id)));
     const bossKill = todays.find((e) => big(e) === 2 && todays[0] && e.imp >= todays[0].imp);
     let lead = seasonEnd || death || bossKill || fresh || todays[0];
     if (!lead || lead.imp < 3) {
@@ -194,7 +221,11 @@
     const keys = todays.filter((e) => e.kind === "keystone" && e.imp >= 4 && e !== lead);
     const roundup = keys.length > 2 ? keys : [];
     const few = roundup.length ? [] : keys;
-    const second = few.concat(todays.filter((e) => e !== lead && e.imp >= 3 && !keys.includes(e)).slice(0, Math.max(0, 4 - few.length)));
+    // the fourth slot is kept for one god line, so the gods are on the front page most weeks without crowding the heroes out
+    const godLine = allToday.find((e) => godly(e) && !GOD_PRIVATE.has(e.kind) && e !== lead && e.imp >= GOD_SECOND) || null;
+    const heroLines = todays.filter((e) => e !== lead && e.imp >= 3 && !keys.includes(e) && !godly(e));
+    const second = few.concat(heroLines.slice(0, Math.max(0, 4 - few.length - (godLine ? 1 : 0))), godLine ? [godLine] : []);
+    const elsewhere = allToday.filter((e) => !heroic(e) && e.imp >= 2 && e !== godLine);
     const shown = new Set([lead, ...second, ...roundup]);
     const told = tellOnce([lead, ...second]);
     return { todays, elsewhere, lead, second: second.map(told), roundup, main: todays.filter((e) => e.imp >= 2 && !shown.has(e)).map(told), small: todays.filter((e) => e.imp < 2) };
@@ -291,10 +322,19 @@
         lead.kind === "season_end" ? el("p", null, el("a", { class: "btn primary", href: `#/finale/${lead.season}` }, "🏆 Enter the ceremony"),
           L.annals ? [" ", el("a", { class: "btn primary", href: "#/annals" }, "📜 The Annals of the Age")] : null) : null));
     }
-    if (second.length || (roundup || []).length) parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
+    const mtn = today === lastDay() ? mountainLine() : null;
+    if (second.length || (roundup || []).length || mtn) parch.appendChild(el("h4", { style: { color: "#6a5a4a", marginTop: "6px" } }, "Also today"));
     if ((roundup || []).length) parch.appendChild(el("div", { class: "ks-roundup" }, el("div", { class: "ks-head" }, "✦ Reaching new heights"),
       el("p", { class: "tiny muted" }, `${plural(roundup.length, "hero")} reached a turning point today.`), A.feed(roundup, { noDay: true, mark: true })));
     if (second.length) parch.appendChild(A.feed(second, { noDay: true, mark: true }));
+    if (mtn) parch.appendChild(mtn);
+  }
+  // with the gods on, every day's paper ends "Also today" with the week on the Mountain, quiet weeks included
+  function mountainLine() {
+    if (!L.gods) return null;
+    const wk = L.gods.week || {}, top = wk.top, box = (wk.box || []).find((x) => x.text === top);
+    return el("p", { class: "mountain-line" }, top ? el("span", { class: "mtn-top" }, A.richText(top, (box || {}).heroes || [])) : wk.day ? "A quiet week on the Mountain." : "The gods' first week is still under way.",
+      " ", el("a", { class: "mtn-go", href: "#/gods" }, "The Mountain ›"));
   }
   function smallerHappenings(p, small) {
     if (!small.length) return;
@@ -560,6 +600,7 @@
   }
 
   function headline(e) {
+    if (e.head) return e.head;
     const H = (id) => (heroes[id] || {}).name || "Someone";
     const P = (id) => (parties[id] || {}).name || "A party";
     const h0 = H((e.heroes || [])[0]), h1 = H((e.heroes || [])[1]);
@@ -978,7 +1019,7 @@
       body.innerHTML = "";
       ({
         diary: (b, x) => { b.append(...[nowBox, daySec, replays, nightBox].filter(Boolean)); if (x.alive === false) b.appendChild(dirgePanel(x)); diaryTab(b, x, hourByHour); },
-        character: (b, x) => { b.appendChild(about); if (tro) b.appendChild(tro); charTab(b, x); b.appendChild(heroExtras(x)); recordTab(b, x, "Career"); },
+        character: (b, x) => { b.appendChild(about); if (x.gods) b.appendChild(A.later(["god_sprites", "god_art", "god_panel"], () => GodPanel.panel(x))); if (tro) b.appendChild(tro); charTab(b, x); b.appendChild(heroExtras(x)); recordTab(b, x, "Career"); },
         people: (b, x) => { peopleTab(b, x); b.appendChild(repPanel(x)); b.appendChild(factionRows(x)); const tm = travellersMet(x); if (tm) b.appendChild(tm); },
       })[k](body, h);
     }
@@ -1024,11 +1065,19 @@
     // a big story from last week beats a small one from today; nothing older than a fortnight
     return theirs.filter((e) => e.day >= newest - 14).sort((a, b) => score(b) - score(a) || b.day - a.day)[0];
   }
+  const GOD_GRIM = new Set(["god_bad_luck", "god_wrath", "god_interest"]);
+  const CELEBRATE = new Set(["showdown", "pvp", "rescue", "boss_kill", "boss", "evolve", "keystone", "legend", "vow_kept", "epithet", "race_won", "award", "podium", "top_party", "hungry_star"]);
   function shareBlurb(h) {
     const ep = L.annals && (L.annals.epitaphs || {})[h.id];
     if (!h.alive) return `RIP ${h.name}, my level ${h.level} ${h.title}. ${cap(h.death_cause || "")}.${ep ? " " + ep : ""}`;
     const best = bestStory(h);
-    return `My hero ${h.name} (level ${h.level} ${h.title}${h.party ? ", " + (parties[h.party] || {}).name : ""}): ${best ? best.text : cap(h.doing || "out in the world") + "."}`;
+    // one god line rides along (export picks it: a swearing, the mark or a gift first, then a wrath or a miracle, then the latest mood),
+    // unless it is the main story already or a bad-luck line that would sour a celebration
+    const gs = h.gods && h.gods.share;
+    const told = gs && best && (gs.id === best.id || best.text.includes(gs.text) || gs.text.includes(best.text));
+    const sour = gs && best && GOD_GRIM.has(gs.kind) && CELEBRATE.has(best.kind);
+    const god = gs && !told && !sour ? " " + gs.text : "";
+    return `My hero ${h.name} (level ${h.level} ${h.title}${h.party ? ", " + (parties[h.party] || {}).name : ""}): ${best ? best.text : cap(h.doing || "out in the world") + "."}${god}`;
   }
 
   const GOAL_TIP = "Every party, and every hero on their own, picks one goal a season: a boss to bring down, a purse to fill, places to see. The season's ceremony counts who got there.";
@@ -1253,6 +1302,16 @@
     if (!(hist || []).length) return null;
     return el("ol", { class: "kit-hist" }, hist.slice(-8).map((x) => el("li", null, el("span", { class: "when" }, A.when(x.day)), " ", A.storyText(cap(x.text)))));
   }
+  // a trinket's armour is its whole "plus", and its effects line already gives the same number in words
+  const saidTwice = (it) => { const n = it.plus && it.fx && (it.plus.match(/\([^)]*\)$/) || [])[0]; return !!n && it.fx.includes(n); };
+  // a god's artifact: its power, what it wants and what it costs, and the god it came from (export._artifact_card)
+  function artifactLines(it) {
+    if (!it.artifact) return [];
+    return [it.power && it.power.text ? el("div", { class: "small art-power" }, el("b", null, it.power.name + ". "), it.power.text) : null,
+      it.wants ? el("div", { class: "small art-wants" }, it.wants) : null,
+      it.cost ? el("div", { class: "small art-cost" }, el("b", null, "The cost: "), it.cost) : null,
+      it.from_god ? el("div", { class: "small art-from", style: { "--fire": it.glow || "" } }, "From ", el("a", { href: `#/god/${it.god}` }, it.from_god)) : null].filter(Boolean);
+  }
   function kitPanel(h) {
     const items = h.kit_items || [], rings = items.filter((x) => /^ring/.test(x.slot));
     const graded = (x) => (x && h.kit && h.kit[x.slot] && h.kit[x.slot].grade ? Object.assign({}, x, { grade: h.kit[x.slot].grade }) : x);
@@ -1267,11 +1326,12 @@
         info.append(el("div", { class: "nm dim" }, KIT_SLOTS[k] || "Pocket"), el("p", { class: "small muted" }, two ? `Both hands are on the ${(bySlot("weapon") || {}).name || "weapon"}.` : "Nothing here yet."));
         return;
       }
-      const sub = [KIT_SLOTS[k] || cap(it.slot || ""), it.magic ? (it.enchant ? `enchanted: ${it.enchant}` : "magic") : qualityWord(it)].filter(Boolean).join(" · ");
+      const sub = [KIT_SLOTS[k] || cap(it.slot || ""), it.artifact ? "a god's gift" : it.magic ? (it.enchant ? `enchanted: ${it.enchant}` : "magic") : qualityWord(it)].filter(Boolean).join(" · ");
       info.append(...[el("div", { class: "nm" + (it.magic ? " magic" : ""), style: it.glow ? "--glow:" + it.glow : null }, it.name),
         el("div", { class: "tiny dim" }, sub),
-        it.plus ? el("div", { class: "small plus" }, it.plus) : null,
+        it.plus && !saidTwice(it) ? el("div", { class: "small plus" }, it.plus) : null,
         it.fx ? el("div", { class: "small fx" }, it.fx) : null,
+        ...artifactLines(it),
         it.desc ? el("p", { class: "small" }, it.desc.replace(/\{n\}/g, h.name)) : null,
         (it.history || []).length ? historyList(it.history) : it.story ? el("p", { class: "tiny muted story" }, cap(it.story) + (/[.!?]$/.test(it.story) ? "" : ".")) : null].filter(Boolean));
     };
@@ -1299,6 +1359,19 @@
     if (extra.length) {
       const row = el("div", { class: "kit-curios" });
       for (const x of extra) {
+        if (x.relic && x.relic.artifact) {
+          const r = x.relic, b = el("button", { class: "it curio artifact-packed", type: "button", style: r.glow ? "--glow:" + r.glow : null }, kitIcon(r, h, 2), r.name);
+          const go = () => {
+            tiles.forEach((t) => t.classList.remove("on")); info.innerHTML = "";
+            info.append(el("div", { class: "nm magic", style: r.glow ? "--glow:" + r.glow : null }, r.name), el("div", { class: "tiny dim" }, "In the pack (no free slot to wear it)"),
+              ...artifactLines(r), r.look ? el("p", { class: "small" }, r.look) : null);
+            const hl = historyList(r.history);
+            if (hl) info.appendChild(hl);
+          };
+          b.addEventListener("mouseenter", go); b.addEventListener("focus", go); b.addEventListener("click", go);
+          row.appendChild(b);
+          continue;
+        }
         if (x.relic) {
           const hidden = x.relic.identified === false;
           row.appendChild(el("span", { class: "it" }, A.itemSprite("relic", 2), hidden ? "an unidentified relic" : x.relic.name));
@@ -2550,7 +2623,9 @@
       const owner = t.owner && heroes[t.owner], cv = Art.gearIcon(t, owner ? owner.look : null).toCanvas(2);
       const card = el("div", { class: "artifact treasure", style: t.glow ? "--glow:" + t.glow : null },
         el("div", { class: "row", style: { gap: "8px" } }, cv, el("div", null, el("div", { class: "art-name" }, t.name),
+          t.artifact ? el("div", { class: "tiny dim" }, "A god's gift") : null,
           el("div", { class: "small" }, owner ? ["carried by ", A.heroLink(owner.id)] : "no one carries it now"))));
+      if (t.artifact) card.append(...artifactLines(t));
       const hl = historyList(t.history);
       if (hl) card.appendChild(hl);
       p.appendChild(card);
@@ -2791,7 +2866,7 @@
   }
 
   // shared with the route files (views_*.js) loaded after this one
-  window.Views = { fishPlaque, cursesPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline, hyperSprite,
+  window.Views = { crierDay, fishPlaque, cursesPanel, boardPanel, byDayDesc, civicPanel, dangerWord, factionsPanel, headline, hyperSprite,
     legendsPanel, moveMark, panel, partyCard, pendingPanel, rivalryPanel, runnerUp, sortedHeroes, stablesBlock,
-    tellOnce, themeBoard, tip, townLedger, treasuresPanel };
+    shareBlurb, tellOnce, themeBoard, tip, townLedger, treasuresPanel };
 })();

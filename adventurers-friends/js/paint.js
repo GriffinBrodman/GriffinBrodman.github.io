@@ -392,6 +392,7 @@
     c.aura = clsLook.aura;
     c.glint = head === "skull_helm" || clsLook.aura === "death" ? "#8af09a" : clsLook.aura === "holy" ? "#fff2a0" : clsLook.aura === "fire" || clsLook.aura === "rage" ? "#ffb04a" : null;
     if (K.head && K.head.glow && FULL.has(head)) c.glint = K.head.glow;
+    if (look.god_mark) { c.godMark = look.god_mark; c.godPale = !!look.god_mark_pale; c.godRamp = ramp(godFire(look.god_mark)); }
     c.inHead = (x, y) => ((x + 0.5 - cx) / c.faceW) ** 2 + ((y + 0.5 - 15.5) / 8) ** 2 <= 1 || ((x + 0.5 - cx) / c.jawW) ** 2 + ((y + 0.5 - 19.5) / (c.chin - 19.5)) ** 2 <= 1;
     c.hairTex = (x, y) => ((x * 2 + y * 3 + (x >> 2)) % 5 === 0 ? -0.35 : 0);
     return c;
@@ -505,6 +506,49 @@
     if (head === "skull_hood" && c.ht >= 2 && features) { P.px(lx + (gaze > 0 ? 1 : 0), ey, "#8af09a"); P.px(rx2 + (gaze > 0 ? 1 : 0), ey, "#8af09a"); }
     if ((c.mark === "antlers" && !(head === "none" || head === "circlet")) || CROWNS.has(c.mark)) { P.layer = 8; markArt(P, c.mark, c); }
     else if (FINE.has(c.mark) && !c.sprite) { P.layer = 8; fineMark(P, c, "front"); }
+    if (c.godMark && !c.sprite) { P.layer = 8; c.godPx = track(P, () => fineMark(P, c, "god")); }
+  }
+
+  // a god's mark (look.god_mark, league/gods_mark.py): one glyph a god in its fire colour on the brow, where the scar would have been;
+  // a vow gone pale fades it toward the skin and stills its pulse
+  const GOD_GLYPH = { aurel: [".x.", "xxx", ".x."], pell: ["x.x", "xxx"], brannock: ["x..", "xxx", "..x"], marrow: [".xx", "xx."], antlered: ["x.x", ".x.", ".x."],
+    gorm: ["x.x", ".x.", "x.x"], mab: ["..x", "..x", ".xx"], tally: ["xx", "xx"], veiled: ["x", "x", "x"], ferryman: ["..x", ".x.", "x.."] };
+  function godFire(id) {
+    const S = window.App && App.S;
+    return (S && ((S.god_fires || {})[id] || (((S.gods || {}).by || {})[id] || {}).fire)) || (window.GodArt && GodArt.fire(id)) || "#f0d890";
+  }
+  function godCols(c) {
+    const r = c.godRamp, sk = c.look.skin || "#c8a080";
+    return c.godPale ? [mix(r[3], sk, 0.5), mix(r[2], sk, 0.5)] : [r[3], r[2]];
+  }
+  function godGlyph(P, c) {
+    const rows = GOD_GLYPH[c.godMark] || GOD_GLYPH.aurel, w = rows[0].length, x0 = c.cx - Math.floor(w / 2), y0 = 15 - rows.length, [hi, lo] = godCols(c);
+    rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === "x") P.px(x0 + i, y0 + j, j === 0 ? hi : lo); }));
+  }
+  // the pulse: a 1 px ring of the fire's light step round the glyph, shown on the beat (drawn over the rendered head)
+  function godHalo(g, P, c) {
+    if (!c.godPx || !c.godPx.length || c.godPale) return null;
+    const W = P.w, on = new Set(c.godPx), out = [], hi = c.godRamp[3];
+    for (const i of c.godPx) for (const d of [-1, 1, -W, W]) {
+      const j = i + d;
+      if (j < 0 || j >= g.px.length || on.has(j) || !g.px[j] || out.some((o) => o[0] === j)) continue;
+      out.push([j, mix(g.px[j], hi, 0.6)]);
+    }
+    return out;
+  }
+  function pulsing(g) {
+    const flat = (scale) => Grid.prototype.toCanvas.call(g, scale);
+    g.toCanvas = (scale) => {
+      scale = scale || 1;
+      const cv = flat(scale);
+      if (!window.Anim) return cv;
+      const base = flat(scale), halo = document.createElement("canvas"), hx = halo.getContext("2d");
+      halo.width = cv.width; halo.height = cv.height;
+      for (const [j, col] of g.pulse) { hx.fillStyle = col; hx.fillRect((j % g.w) * scale, ((j / g.w) | 0) * scale, scale, scale); }
+      Anim.stage(cv, base, [{ z: 0, draw: (ctx, t) => { if (((t / 1.6) % 1) < 0.4) ctx.drawImage(halo, 0, 0); } }], { fps: 10 });
+      return cv;
+    };
+    return g;
   }
 
   const BRIM = { wizard_hat: [10.6, 10], wide_hat: [10, 12], top_hat: [10, 9], tricorn: [10, 10], mitre: [11, 5], feather_cap: [12, 7.5] };
@@ -577,6 +621,7 @@
     if (big) for (const [dx, dy] of [[2, 0], [-2, 0], [0, -2], [0, 2]]) P.px(x + dx, y + dy, m, -0.1);
   }
   function fineMark(P, c, part) {
+    if (part === "god") return godGlyph(P, c);
     const tf = P.tf, sp = !!c.sprite, f = c.frame || 0;
     if (sp) P.tf = null;
     switch (c.mark) {
@@ -710,6 +755,7 @@
   // the bust ends just under the chest, so what hangs at the hip is raised into frame there
   const HIP_LIFT = { wanted_poster: 1.5, satchel: 2.5, mortar: 3, poison_vial: 3.2, ladle: 3 };
   function bodyMark(P, c, sp, part) {
+    if (part === "god") { const [a, b] = godCols(c); P.px(13, 7, a); P.px(14, 7, b); return; }
     const f = c.frame || 0, tf0 = P.tf;
     if (part === "back" && !BEHIND.has(c.mark)) return;
     if ((part === "torso") !== (c.mark === "tabard")) return;
@@ -1988,6 +2034,9 @@
     };
     P.tf = null;
     const g = P.render(mats, { bg, outline: "#120e14", flat: FLAT });
+    const halo = c.godMark ? godHalo(g, P, c) : null;
+    if (halo && opts.frame) for (const [j, col] of halo) g.px[j] = col;
+    else if (halo) g.pulse = halo;
     if (K.w.glow) glowUp(g, P, wpx, K.w.glow, opts.frame, { outline: "#120e14", edgeAmt: 0.6 });
     for (const [px, gl] of glows) glowUp(g, P, px, gl, opts.frame, { outline: "#120e14", edge: "none" });
     if (ac) {
@@ -2224,6 +2273,7 @@
       if (c.look.face === 1) for (const [x, y, s] of [[12, 13, 0], [15, 13, -0.3], [12, 14, -0.1], [13, 14, 0], [14, 14, -0.2], [15, 14, -0.35]]) P.px(x, y, "stub", s);
     } else { P.px(12, 10, c.glint || "#e6dccf"); P.px(15, 10, c.glint || "#e6dccf"); }
     if (FINE.has(c.mark)) { P.layer = 8; fineMark(P, c, "front"); }
+    if (c.godMark) { P.layer = 8; bodyMark(P, c, true, "god"); }
     P.tf = null;
     if (K.head && K.head.glow) glows.push([hpx.filter((i) => P.lay[i] === 7 && P.mat[i] !== "skin" && P.mat[i] !== "hair"), K.head.glow]);
     if (back === "quiver" || back === "backpack") glows.push([track(P, () => backTop(P, back, bt)), K.back.glow]);
@@ -2909,12 +2959,73 @@
   const cache = new Map();
   function portraitGrid(h, cls, opts) {
     const look = (cls || {}).look || { outfit: "leather", head: "none" };
-    const key = JSON.stringify([h.id, h.look, look, h.weapon, h.weapon_tier, h.armor_tier, h.legend, h.kit || null, opts && opts.frame, opts && opts.bg]);
-    if (!cache.has(key)) cache.set(key, portrait(h, Object.assign({ cn: (cls || {}).name || "" }, look), opts));
+    const key = JSON.stringify([h.id, h.look, look, h.weapon, h.weapon_tier, h.armor_tier, h.legend, h.kit || null, opts && opts.frame, opts && opts.bg, h.look && h.look.god_mark ? godFire(h.look.god_mark) : 0]);
+    if (!cache.has(key)) { const g = portrait(h, Object.assign({ cn: (cls || {}).name || "" }, look), opts); cache.set(key, g.pulse ? pulsing(g) : g); }
     return cache.get(key);
+  }
+
+  // a god's 32 px bust (GodArt, god_art.js) as the site's small pieces, each drawn natively round the bust:
+  //   "ring"  a medallion (36): the bust in a round window lit by its fire, for the ring of ten and the Altar board
+  //   "token" the medallion in a band of its fire (40) for an active god omen; o.cross darkens the band, cracks it and shows the mood face
+  //   "pin"   the medallion on a point (36 x 44), the point's tip the place
+  //   "altar" the backlit bust on a stone plinth between two flames (32 x 40)
+  // o.dim greys it (an atheist's ring); null until god_art.js is loaded
+  const OUT = "#16121a";
+  const godMood = (id) => (window.GodSprites && GodSprites[id] && (GodSprites[id].moods || [])[0]) || "cross";
+  function godIcon(id, o) {
+    o = o || {};
+    if (!window.GodArt) return null;
+    const r = ramp(godFire(id)), mood = o.cross ? godMood(id) : o.mood || null, kind = o.kind || "ring";
+    const src = kind === "altar" ? GodArt.litBust(id, mood) : GodArt.bust(id, mood), sd = src.getContext("2d").getImageData(0, 0, 32, 32).data;
+    const W = kind === "token" ? 40 : kind === "altar" ? 32 : 36, H = kind === "pin" ? 44 : kind === "altar" ? 40 : W;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
+    const put = (x, y, hex) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const n = parseInt(hex.slice(1), 16), i = (y * W + x) * 4; d[i] = n >> 16; d[i + 1] = (n >> 8) & 255; d[i + 2] = n & 255; d[i + 3] = 255; };
+    const bustAt = (x, y, bx, by) => { const u = x - bx, v = y - by; if (u < 0 || v < 0 || u > 31 || v > 31) return null; const i = (v * 32 + u) * 4; return sd[i + 3] > 0 ? "#" + ((1 << 24) | (sd[i] << 16) | (sd[i + 1] << 8) | sd[i + 2]).toString(16).slice(1) : null; };
+    const dark = mix(r[0], "#0c0a12", 0.62);
+    if (kind === "altar") {
+      for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const p = bustAt(x, y, 0, 0); if (p) put(x, y, p); }
+      const stone = ramp("#7a7470");
+      for (let y = 31; y < 40; y++) for (let x = 2; x < 30; x++) {
+        const edge = x === 2 || x === 29 || y === 31 || y === 39 || (y === 34 && (x < 4 || x > 27));
+        if ((x < 4 || x > 27) && y < 34) continue;
+        put(x, y, edge ? OUT : y === 32 ? stone[3] : y < 34 ? stone[2] : (x + y) % 5 === 0 ? stone[0] : stone[1]);
+      }
+      // a candle at each end of the plinth, its flame in the god's fire
+      for (const fx of [4, 27]) {
+        for (const [x, y, col] of [[fx, 24, OUT], [fx - 1, 25, OUT], [fx + 1, 25, OUT], [fx - 1, 26, OUT], [fx + 1, 26, OUT], [fx - 2, 27, OUT], [fx + 2, 27, OUT], [fx - 1, 28, OUT], [fx + 1, 28, OUT],
+          [fx, 25, r[3]], [fx, 26, r[3]], [fx - 1, 27, r[2]], [fx, 27, r[3]], [fx + 1, 27, r[1]], [fx, 28, r[2]], [fx - 1, 29, OUT], [fx + 1, 29, OUT], [fx, 29, "#e4dac4"], [fx, 30, "#c8b898"]]) put(x, y, col);
+      }
+      for (let x = 12; x < 20; x++) put(x, 36, (x & 1) ? r[1] : r[0]);
+    } else {
+      const cx = W / 2, cy = kind === "pin" ? 18 : H / 2, R0 = 16.5, bx = cx - 16, by = cy - 15;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const dd = Math.hypot(x + 0.5 - cx, y + 0.5 - cy), up = (x + 0.5 - cx) + (y + 0.5 - cy) < 0;
+        if (kind === "token" && dd > R0 + 1 && dd <= R0 + 3.2) { const a = Math.atan2(y + 0.5 - cy, x + 0.5 - cx), stud = Math.abs(Math.sin(a * 2)) < 0.12;
+          put(x, y, o.cross ? (stud ? r[1] : up ? r[1] : r[0]) : stud ? r[3] : up ? (dd < R0 + 2 ? r[3] : r[2]) : r[1]); continue; }
+        if (dd > R0 + (kind === "token" ? 3.2 : 0) && dd <= R0 + (kind === "token" ? 4.2 : 1)) { put(x, y, OUT); continue; }
+        if (dd > R0) continue;
+        if (dd > R0 - 1) { put(x, y, up ? r[3] : r[1]); continue; }
+        const p = bustAt(x, y, bx, by);
+        if (p) { put(x, y, p); continue; }
+        const lit = Math.hypot(x + 0.5 - cx, y + 0.5 - cy + 4) / (R0 - 1), k = lit + (BAYER[(x & 1) + (y & 1) * 2] - 0.375) * 0.2;
+        put(x, y, k < 0.55 ? mix(dark, r[1], 0.45) : k < 0.8 ? mix(dark, r[1], 0.22) : dark);
+      }
+      if (kind === "pin") for (let y = Math.ceil(cy + R0); y < H; y++) {
+        const half = Math.max(0, (H - 1 - y) * 0.42);
+        for (let x = Math.floor(cx - half - 1); x <= Math.ceil(cx + half); x++) {
+          const e = x + 0.5 - cx, inn = Math.abs(e) <= half - 0.5;
+          if (Math.abs(e) <= half + 1) put(x, y, inn ? (e < 0 ? r[2] : r[1]) : OUT);
+        }
+      }
+      if (kind === "token" && o.cross) for (const [x, y] of [[28, 5], [29, 4], [29, 3], [30, 3], [30, 2]]) put(x, y, OUT);
+    }
+    if (o.dim) for (let i = 0; i < d.length; i += 4) { const l = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) * 0.7; d[i] = d[i] * 0.25 + l * 0.75; d[i + 1] = d[i + 1] * 0.25 + l * 0.75; d[i + 2] = d[i + 2] * 0.25 + l * 0.75 + 6; }
+    ctx.putImageData(img, 0, 0);
+    return cv;
   }
 
   // shared with Art.gearIcon: the same pieces, drawn alone
   const Gear = { soften, makeMats, headgear, offhand, OFF_C, axis, weapon, backSprite, neckSprite, track, glowUp, TMETAL, METAL, CROWN_Y, DELVE_COL, GRADE_GLOW };
-  window.Paint = { Paint, ramp, hsv, toHsv, portraitGrid, fullBody, sleeper, setAside, MARKS, PW, PH, Gear };
+  window.Paint = { Paint, ramp, hsv, toHsv, portraitGrid, godIcon, godFire, fullBody, sleeper, setAside, MARKS, PW, PH, Gear };
 })();

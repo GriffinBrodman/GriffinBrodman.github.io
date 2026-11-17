@@ -303,6 +303,144 @@
       "TTuuuTTTuuuuTTu.",
       ".uu..uuu...uuu..",
       "................"] },
+    // ---- the god themes (gods on only) ----
+    // The Visitor: a copper ladle held out, full to the brim with something rose-red
+    ladle: { ol: "#2a140c", pal: { H: "#f0c880", h: "#b8844a", C: "#e8a060", c: "#a8602a", d: "#6e3a18", R: "#f3988e", r: "#c8564a", q: "#8a2e2a", s: "#fff4e8" }, rows: [
+      "................",
+      "............Hh..",
+      "...........Hh...",
+      "..........Hh....",
+      ".........Hh.....",
+      "........Hh......",
+      ".......Hh.......",
+      ".......Hh.......",
+      ".CCCCCCHCCC.....",
+      ".cRRRRRRRRc.....",
+      ".crRrrrrrqc.....",
+      "..crrrrrqc......",
+      "..cCcccccd......",
+      "...cccccd.......",
+      "....dddd........",
+      "................"] },
+    // The Quarrel of Salt and Iron: a shield split down a crooked molten seam, a breaking wave on the left, riveted iron on the right
+    salt_iron: { ol: "#141a1c", pal: { W: "#f4fbfa", L: "#7ad8cc", T: "#22b3a6", t: "#13706a", I: "#8a929a", J: "#b8c0c6", i: "#4e555c", k: "#2e3338", O: "#f07c0c", Y: "#ffd080", R: "#a85a2a" }, rows: [
+      "................",
+      ".LLLLLLOJJJJJJJ.",
+      ".TTWWTTYOIIIIIi.",
+      ".TWLLWTOIkIIkIi.",
+      ".TWTtLWYOIIIIIi.",
+      ".TTttWTOIIRIIIi.",
+      ".TTTWWTYOIIIIRi.",
+      ".WWTTttOIkIIkIi.",
+      ".LLWTttYOIIIIIi.",
+      "..TLWWTOIIRIIi..",
+      "..tTLLWYOIIIIi..",
+      "...ttTtOIkIIi...",
+      "....tTtYOIIi....",
+      ".....ttOIii.....",
+      "......tOi.......",
+      "................"] },
+    // The Coin Is Missing: where the coin was, a dotted ring of gold round nothing, and a verdigris question in the middle
+    missing_coin: { ol: "#14200e", draw(g) {
+      for (let i = 0; i < 20; i += 2) {
+        const a = (i / 20) * Math.PI * 2, x = Math.round(7.5 + 6.4 * Math.cos(a)), y = Math.round(7.5 + 6.4 * Math.sin(a));
+        g.set(x, y, y < 7 ? "#ffd23a" : "#c89020");
+      }
+      ["..VVVv", ".Vv..vV", ".....vd", "....Vd.", "...Vd..", "...vd..", ".......", "...Vd.."].forEach((row, j) => [...row].forEach((ch, i) => {
+        const c = { V: "#9ae8a8", v: "#4fae6a", d: "#2e6a3e" }[ch];
+        if (c) g.set(4 + i, 3 + j, c);
+      }));
+    } },
+    // The Long Supper: the long table laid, a pie, a cup, a candle and a pink paper party hat left on the end of it
+    long_table: { ol: "#24140c", pal: { P: "#f0609e", p: "#b83a72", Y: "#ffe070", y: "#f0a030", W: "#fff4e0", C: "#efe2c0", c: "#c8b48a", T: "#c88a4a", t: "#8a5a2a", d: "#5a3a1a", B: "#e8a040", b: "#a86a20", M: "#c8ccd4" }, rows: [
+      "................",
+      ".....Y..........",
+      ".....y.......P..",
+      ".....W......PPp.",
+      ".....W.....PPPp.",
+      ".....W.....PYPpp",
+      "..BBB.M...PPPPpp",
+      ".BbbbbM...M.....",
+      "TTTTTTTTTTTTTTTT",
+      "tCcCcCcCcCcCcCct",
+      "dt............td",
+      ".t............t.",
+      ".t............t.",
+      ".d............d.",
+      "................",
+      "................"] },
+    // The Hungry Star Returns: a black star drawn on a wall, a violet hunger deep in it, its chalky edge smudged
+    black_star: { ol: "#d8d0e4", pal: { K: "#0e0a14", k: "#1e1628", V: "#5a2a8a", v: "#3a1a5a" }, rows: [
+      "................",
+      ".......K........",
+      ".......K........",
+      "......KkK.......",
+      "......KkK.......",
+      ".KKKKKKvKKKKKK..",
+      "..KKkkvVvkkKK...",
+      "...KKkvVvkKK....",
+      "....KkkvkkK.....",
+      "....KKkkkKK.....",
+      "...KKkKKKkKK....",
+      "...KkK...KkK....",
+      "..KkK.....KkK...",
+      "..KK.......KK...",
+      "................",
+      "................"] },
+    // The Ferryman Takes a Holiday: his oar dipped in a summer sea under a holiday sun, its blade banded in his blue
+    oar: { ol: "#14182a", pal: { Y: "#ffd860", S: "#fff6c0", h: "#6a4428", O: "#e8c490", o: "#9a6e3e", Q: "#d8b07a", q: "#a87a48", B: "#6f9be8", b: "#3a5aa8", W: "#e8f4ff" }, rows: [
+      "................",
+      ".hh........YY...",
+      ".hhO......YSSY..",
+      "...Oo.....YSSY..",
+      "....Oo.....YY...",
+      ".....Oo.........",
+      "......Oo........",
+      ".......Oo.......",
+      "........OQ......",
+      "........QQQ.....",
+      ".........BBB....",
+      "..........QQq...",
+      ".WW..WW....Qqq..",
+      "BBbBBBbBBBBbQqb.",
+      ".bbBbbbBbbBbbb..",
+      "................"] },
+    // The Old God's Funeral: the bier on its poles under a dark pall with a gold fringe, and one lost glove laid on top, fingers up
+    bier: { ol: "#141018", pal: { W: "#f4f0e6", w: "#c8c0b0", K: "#4a3e5a", k: "#2a2236", F: "#d8b048", P: "#8a5e34", p: "#5a3a20" }, rows: [
+      "................",
+      "......W_W_W.....",
+      "......W_W_W_W...",
+      "......WWWWW_W...",
+      "......WWWWWWw...",
+      ".......wWWWw....",
+      "..KKKKKFFFFFKK..",
+      "..KKKKKKKKKKKk..",
+      "..KKKKKKKKKKkk..",
+      "..kKKKKKKKKkkk..",
+      "PPPPPPPPPPPPPPPP",
+      "ppFkFkFkFkFkFkpp",
+      "...F.F.F.F.F.F..",
+      "...P........P...",
+      "...p........p...",
+      "................"] },
+    // The Contest of the Mountain: the peak with snow on its shoulders and the gods' pennant flying from the top
+    peak: { ol: "#1a1420", pal: { R: "#d02a2a", r: "#8a1e1e", Y: "#f5cc2e", P: "#4a3a28", W: "#ffffff", w: "#c8d4e4", S: "#8a94a6", s: "#5a6274", d: "#3a4050" }, rows: [
+      "................",
+      ".......PRRY.....",
+      ".......PRRr.....",
+      ".......Pr.......",
+      ".......P........",
+      "......WWw.......",
+      ".....WWWww......",
+      ".....WWSww......",
+      "....WWSSSws.....",
+      "....WSSSsss.....",
+      "...SSWSSssss....",
+      "...SSSSSsssdw...",
+      "..SSSWSSsssdww..",
+      ".SSSSSSSssssddd.",
+      "SSSSSSSSSsssdddd",
+      "................"] },
   };
   E.sunk_spire.pal.u = "#3a88b8";
   E.raindrop.pal.D = "#1a4a88";

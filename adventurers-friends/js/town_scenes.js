@@ -1841,7 +1841,9 @@
     if (!b) return null;
     const { base, over, W } = b;
     // `more`: fn(W, scene) -> extra actors a view adds over the scene (the dragon while she is down there, on the scene's `perch`)
-    const acts = opts.more ? b.acts.concat(opts.more(W, b) || []) : b.acts;
+    let acts = opts.more ? b.acts.concat(opts.more(W, b) || []) : b.acts;
+    const feast = feastGod(townId);
+    if (feast) acts = acts.concat([feastWalk(feast, W, !!opts.night)]);
     const cv = canvas(W, IH);
     cv.className = "town-scene";
     cv.style.imageRendering = "pixelated";
@@ -1853,6 +1855,146 @@
     return cv;
   }
 
+  // ---------- the gods (a gods-off league has no L.gods, and nothing below draws) ----------
+  // the pantheon as the site has it (static_gods, loaded lazily): each town's god is the first in the ring seated there; the gods with
+  // no town (the tavern gods) are each temple's guests, in a niche, unless the guest and the town's god are rivals
+  const panMemo = new WeakMap();
+  let godsAsked = false, artAsked = null;
+  function pantheon() {
+    const A = window.App, L = A && A.L;
+    if (!L || !L.gods) return null;
+    const G = (A.S && A.S.gods) || (window.LD && LD.static_gods && LD.static_gods.gods);
+    if (!G || !G.by) { if (!godsAsked && A.load) { godsAsked = true; A.load("static_gods").catch(() => {}); } return null; }
+    if (panMemo.has(G)) return panMemo.get(G);
+    const ring = G.ring || Object.keys(G.by), towns = {}, fires = {}, rival = {};
+    for (const g of ring) { const b = G.by[g] || {}; fires[g] = b.fire; rival[g] = b.rival; const t = b.seat && b.seat.town; if (t && !towns[t]) towns[t] = g; }
+    const seated = new Set(Object.values(towns)), p = { ring, towns, fires, rival, guests: ring.filter((g) => !seated.has(g)), feast: L.gods.feast || null };
+    panMemo.set(G, p);
+    return p;
+  }
+  // the god sprites (god_sprites.js, god_art.js) come in with the first scene that needs a god; cb runs once they are decoded
+  function godArt(cb) {
+    if (window.GodArt && window.GodSprites && !artAsked) artAsked = Promise.resolve();
+    if (!artAsked && window.App && App.need) {
+      artAsked = App.need(["god_sprites", "god_art"]).then(() => new Promise((res) => { const p = pantheon(); GodArt.init({ fires: p ? p.fires : {} }); GodArt.ready(res); }));
+      artAsked.catch(() => {});
+    }
+    if (artAsked && cb) artAsked.then(cb, () => {});
+    return !!(window.GodArt && window.GodSprites);
+  }
+
+  // each god's dressing for a temple's altar (town_day_sets_e.js): a sign on the reredos's middle panel where the holy star was, the
+  // panel in a dark of the god's fire, a thing on the altar cloth, one moving touch; f0-f4 are the fire's ramp, o the ink
+  const INK = "#1a1418";
+  const ALTARS = {
+    aurel: { sign: ["....o....", "...o4o...", "..oo3oo..", ".o33333o.", ".okk4w4o.", ".okk343o.", ".okk4w4o.", ".okk343o.", ".o33333o.", "..o222o..", "...o2o...", "..rrrrr..", ".r.r.r.r."],
+      pal: { k: "#140e0a", r: "#b8302a", w: "#fff8e0" }, on: [".ppp.", "prprp", "ppppp", ".prp."], onPal: { p: "#f0e4c4", r: "#b8302a" }, glint: [[0, -2], [1, 2], [1, 6]] },
+    pell: { sign: ["...s.s...", "..s.s....", "..ooooo..", ".o44444o.", ".o43334o.", "..o333o..", "...ooo...", "....w....", "....w....", "....w....", "....w....", "...www...", "....w...."],
+      pal: { w: "#b8844a", s: "#f4ece4" }, on: [".bbbb.", "bbcbbb", "bbbbcb", ".bbbb."], onPal: { b: "#c88a48", c: "#e8b878" }, steam: true },
+    brannock: { sign: ["....oso..", "....oso..", "....oso..", "....oso..", "....4w4..", "...o.4...", "....4w4..", "....oso..", "....oso..", "..ooooooo", "....ozo..", "....ozo..", "....oo..."],
+      pal: { s: "#c8ced4", w: "#fff0c0", z: "#6a4a30" }, seams: true, on: ["..k..", ".k4k.", "k3kkk", ".kk4k", "..kk."], onPal: { k: "#5a4a40" }, sparks: true },
+    marrow: { sign: ["hh.......", "..hhh....", ".....hhh.", "........h", "....o....", "...ooo...", "..o343o..", "..o4w4o..", "..o343o..", "..o333o..", "...ooo...", "....d...."],
+      pal: { h: "#c8ccd4", d: "#7ad0c8", w: "#f0fff8" }, on: ["n.n.n", ".nnn.", "n.n.n"], onPal: { n: "#6a6a5a" }, drip: true },
+    antlered: { sign: ["a.a...a..", "a.a...a.a", ".aa...aa.", "..a...a..", "a.a...a.a", ".aa...aa.", "..aa.aa..", "...aaa...", "...o.o..."],
+      pal: { a: "#e0d0b0" }, on: ["m.mm.", "mmmmm", ".mmm."], onPal: { m: "#5a8a34" }, flies: true },
+    gorm: { sign: ["....r....", "....r....", "...ooo...", "..oyyyo..", "..oyBBo..", ".oyBBBBo.", ".oBBBBbo.", "oBBBBbbbo", "ooooooooo", "....o....", "...oro..."],
+      pal: { r: "#f04a3a", y: "#fff0a0", B: "#e0b040", b: "#a87a28" }, on: ["wwwww", "w.w.w", "wwwww"], onPal: { w: "#e8e0cc" } },
+    mab: { sign: ["....w....", "....4....", "...434...", "...343...", "..43434..", "..34343..", ".4343434.", ".........", "..ooooo..", ".oyy4yyo.", ".oy...yo.", ".oyy4yyo.", "..ooooo.."],
+      pal: { w: "#fff8f0", y: "#e8c860" }, on: ["..3..", "..3..", ".343.", ".3o3.", "33333"], onPal: {}, confetti: true },
+    tally: { sign: ["..ooooo..", ".occvcco.", "occo.occo", "ocv...vco", "occo.occo", ".occvcco.", "..ooooo..", "....p....", "...ppp...", "....p...."],
+      pal: { c: "#c8783a", v: "#7ae08a", p: "#f0eadc" }, receipt: true, on: ["c.c.c", "ccccc", "ccccc"], onPal: { c: "#b87a3a" } },
+    veiled: { sign: ["....w....", "...wlw...", "...wwl...", "..wlwww..", "..wwoow..", "..lwoew..", ".wwlwwwl.", ".wlwwlww.", "wwwwlwwlw", "wlwwwwlww"],
+      pal: { w: "#d8e0ea", l: "#8a96aa", e: "#f4f8ff" }, on: ["..4..", ".43..", "..w..", "..w..", ".www."], onPal: { w: "#d8dce4" }, rime: true, cold: "#222a38", candle: true },
+    ferryman: { sign: ["....g....", "...g.g...", "....g....", "..ooooo..", ".owwwwwo.", "owwwwwwwo", "owwwkwwwo", "owwwwwwwo", ".owwwwwo.", "..ooooo..", "......t..", ".....ttt."],
+      pal: { g: "#a8a8b0", w: "#ece8dc", k: "#3a3640", t: "#e8dcb8" }, on: ["2...2", "w...w", "w.t.w", "wwttt"], onPal: { w: "#c8c4b8", t: "#e8dcb8" }, blue: [[-2, -4], [2, -4]] },
+  };
+  // the guests' token in the niche: Mab's paper hat and tambourine, Gorm's bell on its rope
+  const GUESTS = {
+    mab: [".......3.", "......3.3", ".....3...", "....444..", "...4.4.4.", "..44444..", ".22222...", "..o.o....", "..ooo....", "..oo.....", "...3.3...", "..3...3.."],
+    gorm: ["....r....", "....r....", "....r....", "....r....", "...ooo...", "..o444o..", "..o333o..", ".o33333o.", ".o22222o.", ".ooooooo.", "....3...."],
+  };
+  function altar(k, god) {
+    const p = pantheon(), T = window.Tavern, K = window.TownSets && TownSets.kit;
+    if (!p || !T || !K) return false;
+    god = god || p.towns[k.town];
+    const D = ALTARS[god], fire = p.fires[god];
+    if (!D || !fire) return false;
+    const { st, ctx, S, L } = k, { pix, shade, mix, glow } = K, r = Art.ramp(fire), wall = st.lwall, on = st.onL, m = 4.1;
+    const pal = Object.assign({ o: INK, 0: r[0], 1: r[1], 2: r[2], 3: r[3], 4: r[4] }, D.pal);
+    const dark = D.cold || mix(fire, "#160e12", 0.72), lo = D.cold ? "#4a566a" : r[1];
+    const panel = [wall(3.57, 16), wall(4.66, 16), wall(4.66, 49.4), wall(m, 55.2), wall(3.57, 49.4)];
+    T.fillPoly(ctx, panel, (x, y) => { const [a, h] = on(x, y); return h > 45 ? mix(dark, lo, 0.35) : h < 19 ? mix(dark, "#000000", 0.25) : (Math.round(a * 8) + Math.round(h)) % 6 === 0 ? mix(dark, lo, 0.14) : dark; });
+    if (D.seams) T.fillPoly(ctx, panel, (x, y) => { const [a, h] = on(x, y), z = Math.abs(((h * 0.45 + a * 9) % 7) - 3.5); return z < 0.4 && h > 18 && ((x * 7 + y) % 4) ? r[2] : null; });
+    const sw = D.sign[0].length, [sx, sy] = wall(m, 44).map(R);
+    pix(ctx, sx - (sw >> 1), sy, D.sign, pal);
+    const lit = [];
+    if (D.glint) for (const [dx, dy] of D.glint) lit.push([sx + dx, sy + 4 + dy]);
+    // the receipt runs down off the panel, over the altar's cloth and the frontal, and lies in loops on the floor
+    if (D.receipt) {
+      const paper = "#f0eadc", line = "#b8b0a0";
+      for (let h = 33; h > 13; h--) { const [x, y] = wall(m + Math.sin(h * 0.5) * 0.06, h).map(R); ctx.fillStyle = h % 3 ? paper : line; ctx.fillRect(x - 1, y, 3, 1); }
+      for (let i = 0; i < 16; i++) { const [x, y] = st.up(st.iso(1.0 + i * 0.08, 4.1 + Math.sin(i * 0.8) * 0.12), i < 9 ? 14 : 14 - (i - 8) * 1.6).map(R); ctx.fillStyle = i % 4 ? paper : line; ctx.fillRect(x - 1, y, 3, 1); }
+      for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, [x, y] = st.iso(2.5 + Math.cos(a) * 0.35, 4.1 + Math.sin(a) * 0.55).map(R); ctx.fillStyle = i % 5 ? paper : line; ctx.fillRect(x, y - 1, 2, 1); }
+    }
+    // the veil's hoarfrost on the reredos's candle side: hard rime, no glow
+    if (D.rime) for (const [a, h] of [[3.6, 42], [3.7, 40], [3.62, 36], [3.66, 31], [3.6, 26], [3.7, 21], [4.0, 44], [4.3, 46]]) { const [x, y] = wall(a, h).map(R); ctx.fillStyle = (x + y) % 2 ? "#e8f0f8" : "#b8c8d8"; ctx.fillRect(x, y, 1, 1); }
+    // the thing on the cloth, before the book
+    const at = (u, v, z) => st.up(st.iso(u, v), z == null ? 14 : z).map(R), [ox, oy] = at(1.25, 4.5), ow = D.on[0].length;
+    pix(ctx, ox - (ow >> 1), oy - D.on.length, D.on, Object.assign({}, pal, D.onPal));
+    // the frontal hung in the god's fire, the town's gold fringe kept
+    T.fillPoly(ctx, [at(2.02, 3.2, 13), at(2.02, 5.0, 13), at(2.02, 5.0, 3), at(2.02, 3.2, 3)], (x, y) => {
+      const [, vv] = st.toUV(x, y + 8), yy = y - st.up(st.iso(2.0, vv), 3)[1];
+      if (yy > -1.5) return null;
+      if (Math.abs(vv - 4.1) < 0.12 || (Math.abs(yy + 6) < 0.8 && Math.abs(vv - 4.1) < 0.4)) return D.cold ? "#e8f0f8" : r[3];
+      return D.cold ? (frac(vv * 3) < 0.1 ? "#8a96aa" : "#c8d0dc") : frac(vv * 3) < 0.1 ? r[1] : r[2];
+    });
+    // the guest in the saint's niche
+    const guest = p.guests.filter((g) => g !== god && p.rival[g] !== god && p.rival[god] !== g && p.fires[g] && GUESTS[g]);
+    if (guest.length) {
+      const g = guest[Math.floor(k.r() * guest.length)], gr = Art.ramp(p.fires[g]), a0 = 12.6, a1 = 14.0, mm = (a0 + a1) / 2;
+      T.fillPoly(ctx, [wall(a0, 20), wall(a1, 20), wall(a1, 50), wall(mm, 55), wall(a0, 50)], (x, y) => { const [a] = on(x, y); return shade(S.stone[1], -0.45 + (a - a0) * 0.1); });
+      const [gx, gy] = wall(mm, 21).map(R), rows = GUESTS[g];
+      pix(ctx, gx - 4, gy - rows.length - 1, rows, { o: INK, r: "#a83a2a", 0: gr[0], 1: gr[1], 2: gr[2], 3: gr[3], 4: gr[4] });
+      pix(ctx, gx - 4, gy - 1, ["r.g.y.r.", "gggggggg"], { r: "#d84a5a", g: "#5a8a3a", y: "#f0c040" });
+      k.lights.push({ x: gx, y: gy - 8, r: 18, k: 0.3 });
+    }
+    // what moves: the god's light breathing on the panel, and one touch of its own
+    const [gx, gy] = wall(m, 37).map(R), fl = [];
+    if (!D.cold) k.lights.push({ x: gx, y: gy, r: 30, k: 0.45 });
+    if (D.flies) for (let i = 0; i < 4; i++) fl.push([sx - 4 + i * 3, sy + 1 + (i % 2) * 3]);
+    k.anims.push((c, t, still) => {
+      if (!D.cold) glow(c, gx, gy, 16, r[3], (L.night ? 0.22 : 0.12) + (still ? 0 : Math.sin(t * 1.7) * 0.03));
+      for (const [x, y] of lit) { c.fillStyle = (Math.floor(t * 3 + x) % 4) ? r[4] : "#fff8e0"; c.fillRect(x, y, 1, 1); }
+      if (D.steam && !still) for (let i = 0; i < 3; i++) { const ph = frac(t * 0.5 + i / 3); c.globalAlpha = 1 - ph; c.fillStyle = "#f4ece4"; c.fillRect(R(sx + Math.sin(ph * 6 + i) * 1.5), R(sy + 2 - ph * 7), 1, 1); }
+      c.globalAlpha = 1;
+      if (D.sparks && !still && frac(t * 0.7) < 0.3) { c.fillStyle = frac(t * 3) < 0.5 ? r[4] : r[3]; c.fillRect(sx + 1 + R(frac(t * 2.3) * 3), sy + 5 - R(frac(t * 2.3) * 3), 1, 1); }
+      if (D.drip) { const ph = frac(t * 0.6); c.fillStyle = pal.d; c.fillRect(sx, sy + 12 + R(ph * 7), 1, 1); }
+      if (D.flies) fl.forEach(([x, y], i) => { const on2 = still || Math.sin(t * 2.1 + i * 1.9) > -0.2; if (on2) { c.fillStyle = r[4]; c.fillRect(x + R(Math.sin(t * 0.8 + i) * 1.4), y + R(Math.cos(t * 0.7 + i * 2) * 1.2), 1, 1); } });
+      if (D.confetti && !still) for (let i = 0; i < 5; i++) { const ph = frac(t * 0.25 + i / 5); c.fillStyle = [r[3], r[4], "#f0e060", "#60c0e0", r[2]][i]; c.fillRect(R(sx - 6 + i * 3 + Math.sin(ph * 7 + i) * 2), R(sy - 2 + ph * 26), 1, 1); }
+      if (D.candle) { const f = still ? 0 : Math.floor(t * 4) % 2; c.fillStyle = "#b088e8"; c.fillRect(ox + f - 0, oy - 6, 1, 1); c.fillStyle = r[3]; c.fillRect(ox + f - 1, oy - 5, 1, 1); }
+      if (D.blue) for (const [dx, dy] of D.blue) { const f = still ? 0 : Math.floor(t * 5 + dx) % 3; c.fillStyle = f ? r[3] : r[4]; c.fillRect(ox + dx, oy + dy - (f === 2 ? 1 : 0), 1, 2); }
+    });
+    return true;
+  }
+
+  // a feast day (L.gods.feast) in this town: its god walks the street in its 48 px figure, rimmed in its own fire, there and back
+  function feastGod(townId) {
+    const p = pantheon();
+    return p && p.feast && p.feast.town === townId && p.fires[p.feast.god] ? p.feast.god : null;
+  }
+  function feastWalk(god, W, night) {
+    godArt();
+    const span = W + 60, foot = IH - 2;
+    return { z: 950, front: true, draw(ctx, t) {
+      if (!window.GodArt || !window.GodSprites) return;
+      const leg = (t * 5) % (span * 2), right = leg < span, x = right ? leg - 30 : span * 2 - leg - 30, f = Math.floor(t * 2) % 2;
+      const g = GodArt.litFigure(god, f, right ? "r" : "l");
+      if (night) { ctx.save(); ctx.filter = "brightness(0.72) saturate(0.8)"; }
+      ctx.drawImage(g, R(x - g.width / 2), foot - g.height);
+      if (night) ctx.restore();
+    } };
+  }
+
   const TOWNS = Object.keys(SCENES), DUNGEONS = Object.keys(DUNGEON_SCENES), WILDS = [];
   // wild_scenes.js adds the wilds and the other dungeons, and isle_scenes.js a risen layer's town with its panel colours, drawn with the same kit and actors
   function register(id, fn, group, theme) {
@@ -1862,5 +2004,5 @@
     if (theme) THEME[id] = theme;
   }
   const actors = { pennant, sails, wheel, swing, rowboat, eel, surf, shore, beam, aurora, leaves, shafts, rope, chicken, ship, plume, walker, sparkle, raven, bonfire };
-  window.TownScenes = { header, build, frame, FOOT, THEME, TOWNS, DUNGEONS, WILDS, register, kit, rect, ln, actors };
+  window.TownScenes = { header, build, frame, FOOT, THEME, TOWNS, DUNGEONS, WILDS, register, kit, rect, ln, actors, altar, pantheon, godArt };
 })();

@@ -12,6 +12,7 @@
     goblin: [26, 30], kobold: [28, 26],
     shroom: [18, 20], stump: [24, 22], bugbear: [28, 36], ettercap: [26, 30], rats: [30, 15], wolfrider: [32, 32], batswarm: [30, 22], jelly: [22, 24],
     wyvern: [36, 32], croaker: [27, 25], strider: [35, 16], peatman: [24, 32], candle: [16, 28], hermit: [29, 20], wrack: [26, 33], imp: [20, 21], snowman: [23, 31],
+    mouth: [24, 34], starhungry: [25, 31],
   };
   // threat read: beasts that fight heroes toe to toe are drawn closer to hero height
   const BODYK = { rat: 1.1, wolf: 1.2, boar: 1.15, drake: 1.25, serpent: 1.4, spider: 1.2, crab: 1.1, bat: 1.1, bear: 1.1, rats: 1.1, strider: 1.15, hermit: 1.1,
@@ -1878,8 +1879,74 @@
     }
   }
 
+  // Vashk's two (gods on): a starfield shows through them, fixed to the screen like the god's own cut-out, so it does not move with the body
+  const STARS = ["#f4f0ff", "#b8c0e8", "#8a90c0", "#f0dca0"];
+  function starfield(P, x0, y0, x1, y1, only, seed) {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (P.matAt(x, y) !== only) continue;
+      const h = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453, v = h - Math.floor(h);
+      if (v < 0.11) P.mat[y * P.w + x] = STARS[v < 0.02 ? 0 : v < 0.05 ? 1 : v < 0.1 ? 2 : 3];
+      else if (v > 0.8) P.sh[y * P.w + x] += 0.45;
+    }
+  }
+  // the Hungry Mouth: a cultist of the Hungry Star in a hood with no face in it, only a round mouth ringed with teeth and the stars
+  // behind; it holds out an empty plate (the place Pell still lays), and the black star of the cult is stitched on its breast
+  function mouth(P, c, f) {
+    const q = c.q, kn = q ? q.kneel || 0 : 0, D = 5 * kn, u = (y) => y + D * Math.min(1, Math.max(0, (30 - y) / 20)), shut = q && q.eyes > 0.5;
+    P.layer = 1;
+    limb(P, [[7.6, u(13.6)], [5.4, u(18.4)], [5.6, u(23)]], 1.7, 1.3, "wb", -0.45);
+    P.ell(5.8, u(23.8), 1.3, 1.2, "n", { s: -0.3 });
+    P.layer = 2;
+    const hem = [[6.4, u(11)], [16, u(10.4)], [18.4, u(17)], [19.6 + kn * 2, 27], [21 + kn * 3, 33], [17, 32.4 + f * 0.4], [13, 33], [9, 32.4 - f * 0.4], [3 - kn * 3, 33], [4.6 - kn * 2, 27], [5.2, u(18)]];
+    P.poly(hem, "wb", (x, y) => 0.3 - (x - 4) * 0.05 - (y - 10) * 0.012 + (Math.sin(x * 1.7 + f) > 0.72 ? -0.45 : 0));
+    ln(P, 9.4, u(19), 7.6, 32, "wb", -0.6); ln(P, 14.6, u(19), 16.4, 32, "wb", -0.65);
+    P.rect(6, u(19.2), 12, 1, "cloth", 0.2); P.px(9, u(20.2), "cloth", 0); P.px(9, u(21.2), "cloth", -0.2); P.px(9, u(22.2), "cloth", -0.4);
+    for (const [x, y] of [[12, 21], [11, 22], [12, 22], [13, 22], [10, 23], [11, 23], [12, 23], [13, 23], [14, 23], [11, 24], [12, 24], [13, 24], [11, 25], [13, 25]]) P.px(x, u(y), "void", -0.6);
+    P.layer = 3;
+    P.poly([[7.2, u(8.4)], [10.6, u(-0.2)], [15.4, u(3.6)], [18.6, u(9)], [17.6, u(13.6)], [7.4, u(13.6)]], "wb", (x, y) => 0.45 - (x - 7) * 0.06 - (y - u(0)) * 0.03);
+    P.ell(12.4, u(8.6), 5.6, 5.4, "wb", { s: 0.05 });
+    P.layer = 4;
+    P.ell(14.6, u(8.4), 3.7, 4.1, "pink", { s: -0.35, k: 0.4 });
+    P.ell(14.8, u(8.4), 2.8, 3.2, "void", { k: 0, s: -0.6 });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + 0.3, x = 14.8 + Math.cos(a) * 2.4, y = u(8.4) + Math.sin(a) * 2.8;
+      P.px(x, y, "horn", Math.sin(a) < 0 ? 0.4 : -0.1);
+    }
+    if (!shut) { P.px(14.4, u(7.8), STARS[0]); P.px(15.6, u(9.2), f ? STARS[1] : STARS[3]); }
+    P.layer = 5;
+    limb(P, [[15.6, u(13.6)], [18.6, u(16.2)], [21, u(15.6)]], 1.7, 1.3, "wb", 0.1);
+    P.ell(21.4, u(15.8), 1.3, 1.2, "n", { s: 0.1 });
+    P.ell(21.2, u(14.2 - f * 0.3), 3.6, 1.2, "steel", { s: 0.3, k: 0.5 });
+    P.rect(19.4, u(14 - f * 0.3), 4, 1, "steel", -0.2);
+  }
+  // the star-hungry thing: a stooped, reaching spirit cut out of the night, all stars, with a black disc for a heart where a star was;
+  // a mote of starlight is drawn in towards its open mouth
+  function starhungry(P, c, f) {
+    const E = c.E;
+    P.layer = 1;
+    limb(P, [[8.4, 12], [5, 15.6], [2.6, 19.4 - f]], 1.6, 0.8, "void", -0.2);
+    P.layer = 2;
+    P.poly([[6.4, 10.4], [11.6, 5.6], [18.4, 7.4], [19.4, 14.6], [16.6, 20.6], [12.4, 24.6], [9.6, 28.8 + f], [8.2, 24.6], [5.4, 28.4 - f], [4.4, 22.4], [3.6, 25.6 + f], [3.2, 19.6], [5, 14]], "void", 0);
+    P.ell(15.6, 7.2, 4.4, 4.4, "void", { k: 0 });
+    P.layer = 3;
+    limb(P, [[16.6, 11.4], [20.4, 13.2], [22.4, 16.8 + f]], 1.6, 0.8, "void", 0);
+    for (const [x0, y0] of [[22.4, 16.8 + f], [2.6, 19.4 - f]]) { ln(P, x0, y0, x0 + 0.6, y0 + 2.2, "void", 0); ln(P, x0 - 0.8, y0, x0 - 1.4, y0 + 2, "void", 0); }
+    starfield(P, 0, 0, P.w - 1, P.h - 1, "void", 7);
+    for (let y = 0; y < P.h; y++) for (let x = 0; x < P.w; x++) {
+      if (P.matAt(x, y) === null) continue;
+      if (!P.has(x, y - 1) || !P.has(x - 1, y)) { P.mat[y * P.w + x] = "a"; P.sh[y * P.w + x] = !P.has(x, y - 1) ? 0.2 : -0.3; }
+    }
+    P.layer = 4;
+    P.ell(12.6, 14.6, 2.7, 2.7, "#000000", { k: 0 });
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; P.px(12.6 + Math.cos(a) * 3.2, 14.6 + Math.sin(a) * 3.2, "a", -0.6); }
+    P.px(14.4, 5.6, E); P.px(17.4, 5.8, E);
+    P.ell(17.2, 9.4, 2.4, 1.6, "#000000", { k: 0 });
+    for (const [x, y] of [[15.4, 8.4], [17, 8.2], [18.6, 8.4], [16.2, 10.4], [17.8, 10.4]]) P.px(x, y, "horn", 0.3);
+    c.lights = [[f ? 21 : 22, f ? 10 : 8, STARS[0]], [f ? 23 : 21, f ? 7 : 11, STARS[3]]];
+  }
+
   const DRAW = { rat, wolf, boar, bear, bat, slime, chest, wraith, crab, wisp, elemental, serpent, kraken, lich, crone, warchief,
-    shroom, stump, bugbear, ettercap, rats, wolfrider, batswarm, jelly, wyvern, croaker, strider, peatman, candle, hermit, wrack, imp, snowman };
+    shroom, stump, bugbear, ettercap, rats, wolfrider, batswarm, jelly, wyvern, croaker, strider, peatman, candle, hermit, wrack, imp, snowman, mouth, starhungry };
 
   // pose (deaths): the same body painted in another pose on a canvas padded by pad on every side, the standing sprite's place
   // at (pad, pad); tilt turns the whole figure about pivot (fractions of the standing sprite) and is painted natively at that angle
@@ -1917,6 +1984,7 @@
       default: (DRAW[body] || blob)(P, c, f);
     }
     if (body === "wisp") outline = mix(p[0], "#10182a", 0.75);
+    if (body === "starhungry") outline = "#1a1e34";
     if (V && V.R.all) for (let i = 0; i < P.mat.length; i++) { const x = P.mat[i]; if (x && x[0] === "#" && x !== c.E && x !== "#ffffff" && x !== INK) P.mat[i] = V.R.all(x); }
     const g = P.render(m, { outline });
     if (c.fade != null) fadeOut(g, P, c.fade);

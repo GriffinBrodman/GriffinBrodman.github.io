@@ -847,5 +847,91 @@
 
   // the pieces a set piece (season_posters.js) draws with
   const kit = { motes, sheep, frog, lantern };
-  window.Scenes = { backdrop, vignette, locKind, kit, TONES, drawMap: (...a) => Isle.drawMap(...a), nearestNode: (...a) => Isle.nearestNode(...a) };
+
+  // ---------- the dream panel (gods on): the night scene through a bedroom window, the god who came standing in it as a silhouette rimmed
+  // in its own fire, the dreamer asleep under the sill. Scenes.dreamOf(line) is the god a dream line names; Scenes.dream(god, W, H,
+  // {kind, seed, hero}) the panel, its god animated on its two idle frames once the god art is in (god_sprites.js, god_art.js) ----------
+  let dreamRx = null, godAsk = null;
+  function dreamOf(line) {
+    const S = (window.App && App.S) || {}, L = window.App && App.L;
+    if (!line || !L || !L.gods || !S.god_names || !/\bdream/i.test(line)) return null;
+    if (!dreamRx) dreamRx = Object.entries(S.god_names).map(([id, n]) => [id, new RegExp("(?<![A-Za-z])(?<!Old )" + String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/^the /, "[Tt]he ") + "(?![A-Za-z])")]);
+    let best = null, at = Infinity;
+    for (const [id, rx] of dreamRx) { const m = rx.exec(line); if (m && m.index < at) { best = id; at = m.index; } }
+    return best;
+  }
+  function godArtIn() {
+    if (window.GodArt && window.GodSprites) return Promise.resolve();
+    if (!godAsk && window.App && App.need) { godAsk = App.need(["god_sprites", "god_art"]).then(() => new Promise((res) => { GodArt.init({}); GodArt.ready(res); })); godAsk.catch(() => {}); }
+    return godAsk;
+  }
+  // the god's frame as a shape against the moon: every pixel the night's ink, except the rim its fire puts on both sides and the top
+  const shades = new Map();
+  function shadeOf(god, f) {
+    const key = god + ":" + f + ":" + (GodArt.drawn(god) ? 1 : 0);
+    if (shades.has(key)) return shades.get(key);
+    const a = GodArt.litFigure(god, f, "l"), b = GodArt.litFigure(god, f, "r"), w = a.width, h = a.height, rim = new Set(GodArt.ramp(god).slice(3).map((c) => c.toLowerCase()));
+    const da = a.getContext("2d").getImageData(0, 0, w, h).data, db = b.getContext("2d").getImageData(0, 0, w, h).data;
+    const out = document.createElement("canvas"); out.width = w; out.height = h;
+    const ctx = out.getContext("2d"), dark = mix(GodArt.ramp(god)[0], "#08060e", 0.82), hx = (d, i) => "#" + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (da[i + 3] < 128 && db[i + 3] < 128) continue;
+      const ca = hx(da, i), cb = hx(db, i);
+      ctx.fillStyle = rim.has(ca) ? ca : rim.has(cb) ? cb : (x + y) % 5 === 0 ? mix(dark, "#2a2840", 0.35) : dark;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    shades.set(key, out);
+    return out;
+  }
+  function dream(god, W, H, o) {
+    o = o || {};
+    W = W || 200; H = H || 96;
+    const seed = o.seed || hash("dream:" + god), kind = o.kind && BIOME[o.kind] ? o.kind : "plains";
+    const night = paint(kind, W, H, seed, null, true), base = copyOf(night);
+    const room = document.createElement("canvas"); room.width = W; room.height = H;
+    const ctx = room.getContext("2d"), r = rng(seed ^ 0x5bd1e995), F = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+    const fl = Math.round(H * 0.8), ww = 44, wh = Math.round(H * 0.64), wx = Math.round(W * 0.6 - ww / 2), wy = Math.round(H * 0.12);
+    const inWin = (x, y) => x >= wx && x < wx + ww && y >= wy && y < wy + wh;
+    // the wall in the dark, its boards picked out by the moon that comes in; the floor below
+    for (let y = 0; y < fl; y++) for (let x = 0; x < W; x++) {
+      if (inWin(x, y)) continue;
+      const board = Math.floor(x / 7), edge = x % 7 === 0, near = Math.max(0, 1 - Math.hypot((x - wx - ww / 2) / 70, (y - wy - wh / 2) / 50));
+      F(x, y, 1, 1, edge ? "#14121c" : mix((board % 3 ? "#262434" : "#2a2738"), "#4a5070", near * 0.35 + ((x * 3 + y * 7 + board) % 11 === 0 ? 0.08 : 0)));
+    }
+    for (let y = fl; y < H; y++) for (let x = 0; x < W; x++) F(x, y, 1, 1, (y - fl) % 4 === 0 ? "#18141e" : mix("#2e2630", "#1c1820", (y - fl) / (H - fl)));
+    // the moonlight through the window, laid across the floor
+    for (let y = fl; y < H; y++) { const k = (y - fl) / (H - fl), x0 = wx - 6 - k * 22, x1 = wx + ww - 10 - k * 22; for (let x = Math.round(x0); x < x1; x++) if ((x + y) % 2 === 0 || k < 0.5) { ctx.fillStyle = "rgba(170,190,230,0.16)"; ctx.fillRect(x, y, 1, 1); } }
+    // the frame, the sill, the curtains drawn back
+    F(wx - 2, wy - 2, ww + 4, 2, "#3a2a1e"); F(wx - 2, wy, 2, wh, "#3a2a1e"); F(wx + ww, wy, 2, wh, "#2a1e16");
+    F(wx - 4, wy + wh, ww + 8, 2, "#5a4430"); F(wx - 4, wy + wh, ww + 8, 1, "#7a6248"); F(wx - 3, wy + wh + 2, ww + 6, 1, "#1e1610");
+    for (const [cx, dir] of [[wx - 9, 1], [wx + ww + 2, -1]]) for (let y = wy - 3; y < wy + wh + 6; y++) {
+      const sway = Math.round(Math.sin(y * 0.3) * 0.8), w2 = 7;
+      for (let i = 0; i < w2; i++) F(cx + i + sway, y, 1, 1, i % 3 === 0 ? "#3a1e2a" : i % 3 === 1 ? "#5a2a3a" : "#4a2432");
+    }
+    F(wx - 11, wy - 4, ww + 22, 2, "#2a2018");
+    // the bed under the window, and the dreamer in it
+    const bx = Math.round(W * 0.14), bw = Math.round(W * 0.34), by = fl - 9;
+    F(bx - 2, by - 12, 3, 22, "#4a3020"); F(bx - 2, by - 12, 3, 1, "#6a4a30");
+    F(bx, by, bw, 4, "#5a3a24"); F(bx, by + 4, bw, 5, "#3a2418"); F(bx + bw - 2, by - 6, 3, 15, "#4a3020");
+    F(bx + 1, by - 3, 11, 4, "#d8d4c8"); F(bx + 1, by - 3, 11, 1, "#e8e4dc");
+    for (let x = bx + 10; x < bx + bw - 1; x++) for (let y = by - 4 - Math.round(Math.sin((x - bx) * 0.12) * 1.5); y < by + 4; y++) F(x, y, 1, 1, (x + y) % 6 === 0 ? "#4a5a7a" : y < by - 2 ? "#6a7aa0" : "#4a5a84");
+    const hero = o.hero, cls = hero && window.App && App.heroLook ? App.heroLook(hero) : null;
+    F(bx + 4, by - 6, 5, 3, "#3a2a22"); F(bx + 5, by - 4, 4, 2, "#b08a6a");
+    if (hero && Art.heroLying) { try { const g = Art.heroLying(hero, 0, cls).toCanvas(1); ctx.drawImage(g, bx + 1, by - g.height + 4, g.width, g.height); } catch (e) { /* a dreamer we can't draw is a blanket */ } }
+    const cv = copyOf(base);
+    cv.className = "dream-panel";
+    const fig = { z: 0, draw(c, t) {
+      if (!window.GodArt) return;
+      const f = Math.floor(t * 1.6) % 2, g = shadeOf(god, f);
+      c.save(); c.beginPath(); c.rect(wx, wy, ww, wh); c.clip();
+      c.drawImage(g, Math.round(wx + ww / 2 - g.width / 2), wy + 4);
+      c.restore();
+    } };
+    const go = () => { if (window.Anim) Anim.stage(cv, base, [fig], { over: room, fps: 10 }); else { const c = cv.getContext("2d"); fig.draw(c, 0); c.drawImage(room, 0, 0); } };
+    if (window.GodArt && window.GodSprites) go(); else { const c = cv.getContext("2d"); c.drawImage(room, 0, 0); const w8 = godArtIn(); if (w8) w8.then(go); }
+    return cv;
+  }
+
+  window.Scenes = { backdrop, vignette, locKind, kit, TONES, dream, dreamOf, drawMap: (...a) => Isle.drawMap(...a), nearestNode: (...a) => Isle.nearestNode(...a) };
 })();
