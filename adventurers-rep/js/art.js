@@ -766,7 +766,7 @@
   }
 
   const ITEM = {
-    ration: ["#c89a5a", "loaf"], potion: ["#e84a5a", "flask"], bandage: ["#f0e8d8", "roll"], rope: ["#b08a5a", "coil"], herbs: ["#5ab04a", "leaf"],
+    ration: ["#c89a5a", "loaf"], potion: ["#e84a5a", "flask"], bandage: ["#f0e8d8", "roll"], rope: ["#b08a5a", "coil"], herbs: ["#5ab04a", "leaf"], holy_water: ["#bfe2f8", "flask"],
     rare_herb: ["#b8a0f0", "leaf"], fish: ["#8ab0c8", "fish"], pelt: ["#9a6a42", "hide"], fang: ["#f0e8d0", "fang"], goblin_ear: ["#6aa04a", "ear"],
     chitin: ["#3a3440", "shard"], bones: ["#e8e0d0", "bone"], remains: ["#7a6a5a", "sack"], grave_dust: ["#9a9aa0", "pile"], ectoplasm: ["#7af08a", "flask"],
     wisp_light: ["#c8f0ff", "flask"], troll_hide: ["#6a7a6a", "hide"], ore: ["#8a7a6a", "rock"], gem: ["#5ad0f0", "gem"], trinket: ["#e8b84a", "ring"],
@@ -1028,6 +1028,106 @@
     if (t >= 2) { P.px(10, 13, metal, 0.5); P.px(4, 13, metal, 0.3); }
     if (t === 3) for (const [x, y] of [[4, 9], [6, 9], [8, 9], [10, 9]]) P.px(x, y, "gold", 0.4);
   }
+  // the ten gods' artifacts (league/gods_artifacts.py LOOKS), each in its god's fire ("fire", the item's glow) and the god's own stuff
+  const ART_MATS = { abrass: "#c09048", abronze: "#b0763a", airon: "#6a6e7a", awood: "#a87444", achar: "#4e3226", aflour: "#ece2cc", ateal: "#2aa898",
+    amoss: "#5e8236", abone: "#e6dece", aenamel: "#b8302a", aband: "#e2d8c6", aparch: "#e8dab4", acopper: "#b8703e", averd: "#5aa88a", apage: "#c4ccd4",
+    anavy: "#2e3a56", acandle: "#6a8ee0", atin: "#9aa2ac" };
+  // the Veiled One keeps violet to her candle (docs/gods/LOOKS.md), so her pages are rimmed in hoarfrost and only the tear shows her fire
+  const ART_RIM = { pages: "#9cb0c0" };
+  function artifactIcon(P, id) {
+    const px = (x, y, m, s) => P.px(x, y, m, s), W = "#ffffff";
+    switch (id) {
+      case "lamp":
+        P.rect(7, 1, 2, 1, "abrass", 0.2); P.ell(8, 3.5, 4.4, 2, "abrass", { s: 0.2 });
+        P.rect(4, 4, 8, 9, "abrass", (x) => 0.45 - (x - 4) * 0.12);
+        P.layer = 2; P.rect(3, 12, 10, 2, "abrass", (x) => 0.4 - (x - 3) * 0.1); P.rect(4, 14, 8, 1, "abrass", -0.5);
+        P.rect(9, 5, 2, 7, "achar", -0.8);
+        for (let y = 5; y < 12; y += 2) for (let x = 5; x < 9; x += 2) px(x + ((y >> 1) & 1), y, "fire", 0.6);
+        px(6, 8, W); px(5, 3, "abrass", 0.9);
+        break;
+      case "ladle":
+        P.line(14.5, 1.5, 8.5, 8.5, "awood", (t) => 0.45 - t * 0.3, 0.7);
+        P.layer = 2; P.ell(6, 11, 5, 3.6, "awood", { s: 0.05 }); P.ell(6.4, 10.2, 3.6, 2, "achar", { s: -0.3 });
+        px(7, 10, "fire", 0.2); px(14, 2, "aflour", 0.6); px(13, 3, "aflour", 0.4);
+        for (const [x, y] of [[5, 5], [4, 4], [5, 3]]) px(x, y, y > 3 ? "aflour" : W, 0.6);
+        break;
+      case "tongs":
+        P.line(3, 14.5, 9, 7, "airon", (t) => 0.1 - t * 0.2, 0.8); P.line(9, 7, 6.5, 1.5, "airon", 0, 0.7);
+        P.layer = 2; P.line(7.5, 14.5, 9, 7, "abronze", (t) => 0.3 - t * 0.2, 0.8); P.line(9, 7, 12.5, 2, "abronze", 0.2, 0.7);
+        P.layer = 3; P.ell(9, 7, 1.6, 1.6, "fire", { s: 0.6 });
+        for (const [x, y] of [[8, 9], [10, 9], [7, 6], [11, 6]]) px(x, y, "fire", 0.2);
+        px(9, 7, W);
+        break;
+      case "lantern":
+        P.ell(8, 2.2, 4.2, 1.4, "atin", { s: 0.3, fn: (x, y) => (Math.abs(x + 0.5 - 8.4) < 2.6 && y >= 2 ? false : undefined) });
+        P.rect(7, 3, 2, 1, "airon", 0);
+        P.rect(5, 4, 6, 1, "airon", 0.1); P.rect(5, 12, 6, 2, "airon", (x) => 0.2 - (x - 5) * 0.12);
+        P.layer = 2; P.rect(5, 5, 6, 7, "ateal", (x) => -0.2 - (x - 5) * 0.08);
+        P.layer = 3; P.rect(5, 5, 1, 7, "airon", 0.3); P.rect(10, 5, 1, 7, "airon", -0.4); P.px(6, 7, "airon", -0.5);
+        P.ell(8, 8.6, 1.4, 2.4, "fire", { s: 0.4 }); px(8, 9, W);
+        px(7, 14, "acandle", 0.2); px(8, 15, "acandle", -0.2);
+        break;
+      case "tine":
+        for (let i = 0; i <= 24; i++) {
+          const t = i / 24, u = 1 - t, x = u * u * 3 + 2 * u * t * 5 + t * t * 13.5, y = u * u * 14 + 2 * u * t * 4 + t * t * 1.5;
+          P.ell(x, y, 1.9 - t * 1.4, 1.9 - t * 1.4, "abone", { s: 0.3 + t * 0.3, k: 0.7 });
+        }
+        P.layer = 2; P.ell(3, 13.4, 2.6, 1.8, "amoss", { s: 0.1 }); px(4, 11, "amoss", 0.4); px(5, 12, "amoss", -0.2);
+        P.layer = 3; P.line(5, 9, 6, 6.5, "achar", -0.9); px(6, 7, "fire", 0.9);
+        for (const [x, y] of [[4, 8], [7, 4], [10, 2]]) px(x, y, "abone", 0.9);
+        break;
+      case "knuckle": {
+        // a knuckleduster on the slant, all brass: four finger-holes in one bar, the frame round both ends to the palm grip, one stud of
+        // Gorm's red; the gap is three pixels across (a narrower one fills with outline and glow and reads as a loaf), and face-on the
+        // holes over a red grip read as a grinning face
+        const rows = ["..........bbB...", ".........bhhB...", ".........bhhBd..", ".......bbBBBdd..", "......bhhBBddd..", "......bhhBdddd..", "....bbBBBd..dd..",
+          "...bhhBBd...Bd..", "...bhhBd...Bd...", ".bbBBBd...ed....", "bhhBBd...eE.....", "bhhBdd..Bd......", "BBBddddBd.......", "..dddddd........"];
+        const sh = { b: ["abrass", 0.85], B: ["abrass", 0.2], d: ["abrass", -0.33], e: ["aenamel", 0.2], E: ["aenamel", -0.33] };
+        rows.forEach((row, j) => { for (let x = 0; x < 16; x++) { const c = row[x]; if (c === "h") px(x, j + 1, "#1a1218"); else if (sh[c]) { P.layer = c === "e" || c === "E" ? 2 : 1; px(x, j + 1, sh[c][0], sh[c][1]); } } });
+        P.layer = 1; px(10, 1, W); px(4, 7, W);
+        break;
+      }
+      case "tambourine":
+        P.ell(7, 7, 5.6, 5.6, "awood", { s: 0.15 });
+        P.layer = 2; P.ell(7, 7, 4.3, 4.3, "aparch", { s: 0.3 });
+        P.line(4.5, 8, 6, 6.5, "achar", -0.8); P.line(6, 6.5, 7.5, 8, "achar", -0.8); P.line(7.5, 8, 9.5, 6, "achar", -0.8);
+        P.layer = 3; for (const [x, y] of [[2, 4], [12, 4], [1, 9], [13, 9]]) P.rect(x, y, 1, 2, "atin", 0.4);
+        P.line(10.5, 11, 13, 15, "fire", 0.4); P.line(9, 12, 10, 15, "fire", -0.2); P.line(11.5, 10, 15, 13, "aband", 0.3);
+        break;
+      case "coin": {
+        // Tally's own coin (his 128): a smooth copper ring lit from the top left, a flat face in his verdigris, one stamped profile, nothing
+        // hung on it; every shade sits mid-step so the painter's dither leaves the face flat
+        const prof = { 4: [7, 9], 5: [6, 10], 6: [6, 10], 7: [5, 9], 8: [6, 9], 9: [6, 8], 10: [7, 8], 11: [6, 9] };
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+          const dx = x + 0.5 - 7.5, dy = y + 0.5 - 7.5, d = Math.hypot(dx, dy);
+          if (d > 6.7) continue;
+          if (d > 4.9) { px(x, y, "acopper", dx + dy < -3 ? 0.85 : dx + dy > 3 ? -0.33 : 0.2); continue; }
+          const r = prof[y];
+          px(x, y, "fire", r && x >= r[0] && x <= r[1] ? -0.9 : 0.85);
+        }
+        px(3, 4, W); px(4, 3, "acopper", 0.85);
+        break;
+      }
+      case "pages":
+        P.poly([[1.5, 5], [8, 2.5], [10.5, 12], [4, 14.5]], "apage", -0.35);
+        P.layer = 2; P.poly([[4, 3.5], [11, 2], [12.5, 12.5], [5.5, 14]], "apage", 0.05);
+        P.layer = 3; P.poly([[6, 3], [13.5, 2.5], [14, 13], [7, 14]], "apage", (x, y) => 0.55 - (x - 6) * 0.04 - (y - 3) * 0.02);
+        for (const y of [5, 7, 11]) P.line(8, y, 12.5, y - 0.3, "anavy", -0.2);
+        P.line(7, 8.5, 14, 8.5, "apage", -0.5);
+        P.layer = 4; P.ell(10.6, 9.6, 1.5, 1.0, "anavy", { s: -0.9 }); px(10, 9, "fire", 0.5);
+        for (const [x, y] of [[7, 3], [10, 3], [13, 3], [13, 6], [7, 13], [2, 5]]) px(x, y, W);
+        break;
+      case "oar":
+        // a one-pixel shaft into a broad paddle: the jump in width is what says oar and not flute
+        P.line(13.5, 2.5, 8.2, 7.8, "anavy", 0.6);
+        P.line(15, 1, 13, 3, "abone", (t) => 0.7 - t * 0.5, 0.55);
+        P.layer = 2; P.poly([[8.42, 8.42], [8.15, 10.97], [6.44, 13.52], [3.42, 15.58], [0.42, 12.58], [2.48, 9.56], [5.03, 7.85], [7.58, 7.58]],
+          "anavy", (x, y) => 0.75 - (x + y - 15) * 0.226);
+        P.line(7, 9, 2, 14, "anavy", 0.95);
+        P.layer = 3; P.rect(4, 11, 1, 2, "acandle", 0.6); px(4, 10, "fire", 0.6); px(4, 9, W);
+        break;
+    }
+  }
   const DELVE_SLOT = new Set(["belt", "boots", "gloves"]);
   function drawGearIcon(it, look) {
     look = Object.assign({ fav: "#a8443a", skin: "#e0b088", hair: "#4a3020" }, look || {});
@@ -1043,7 +1143,13 @@
       spoon: Paint.ramp(mix(tint, "#c4cad4", 0.65)), cyan: Paint.ramp(mix(tint, "#9ad8f0", 0.55)), sheet: Paint.ramp("#e4d6b0") });
     let P;
     const c = { v: hash(String(it.name || art)), ht: Math.min(3, tier), hglow: null, cx: 20, faceW: 7, head: art, gaze: 1, eye: "#3a3a40" };
-    if (slot === "weapon") P = art === "daggers" && it.two !== false
+    const godGlow = it.artifact ? it.glow || ((window.App && App.S && App.S.god_fires) || {})[it.god] || null : null;
+    if (it.artifact) {
+      for (const k of Object.keys(ART_MATS)) M[k] = Paint.ramp(ART_MATS[k]);
+      M.fire = Paint.ramp(godGlow || "#e8b84a");
+    }
+    if (it.artifact) { P = new Paint.Paint(16, 16); artifactIcon(P, it.artifact); }
+    else if (slot === "weapon") P = art === "daggers" && it.two !== false
       ? iconFit((Q) => G.weapon(Q, art, k.wt, G.axis(Q, 0, 0, Math.PI / 4, 1), { glow: it.glow, second: G.axis(Q, (3.6 + [0, 3, 4, 5, 6, 6][k.wt]) * 0.707, 0, -Math.PI / 4, 1) }), M, 1.8)
       : iconFit((Q) => G.weapon(Q, art, k.wt, G.axis(Q, 0, 0, Math.PI / 4, 1), { glow: it.glow }), M, art === "wand" ? 1.8 : 1.2);
     else if (slot === "armor") { P = new Paint.Paint(16, 16); armorIcon(P, art, k.at, it.glow); }
@@ -1065,7 +1171,7 @@
     else { P = new Paint.Paint(16, 16); if (slot === "ring") ringIcon(P, art, it.gem || it.glow); else if (slot === "neck") neckIcon(P, art); else curioIcon(P, art); }
     P.tf = null;
     const g = P.render(M, { outline: OUTLINE });
-    const glow = it.glow || (DELVE_SLOT.has(slot) && G.GRADE_GLOW[it.grade]) || null;
+    const glow = (it.artifact && ART_RIM[it.artifact]) || godGlow || it.glow || (DELVE_SLOT.has(slot) && G.GRADE_GLOW[it.grade]) || null;
     if (glow) {
       const px = [];
       for (let i = 0; i < 256; i++) if (P.mat[i] !== null) px.push(i);
@@ -1216,7 +1322,7 @@
     });
   }
   function itemGrid(id) { return cached("i:" + id, () => drawItem(id)); }
-  function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, item.grade, look && look.fav]), () => drawGearIcon(item, look)); }
+  function gearIcon(item, look) { return cached("g:" + JSON.stringify([item.slot, item.artifact, item.god, item.art, item.family, item.material, item.tier, item.gem, item.tint, item.glow, item.name, item.two, item.grade, look && look.fav]), () => drawGearIcon(item, look)); }
   // ---------- trophies: the boss's own sprite, cut at the neck and mounted on a walnut shield plaque ----------
   // the head's box [x, y, w, h] in each boss body's standing sprite; a body not listed mounts its upper part around the bulk
   const TROPHY_HEAD = {

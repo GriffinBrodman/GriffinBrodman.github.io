@@ -1053,15 +1053,18 @@
     const cls = (S.classes || {})[x.cls] || { look: { outfit: "leather", head: "none" } };
     try { return x.look ? A.heroGrid(x, 0, (root.App && root.App.heroLook && root.App.heroLook(x)) || cls) : null; } catch (e) { return null; }
   }
+  function leadAt(I, n, t, o) {
+    const speed = o.speed || 9, span = I.w + 40 + n * 18, x0 = o.lead0 !== undefined ? I.w * o.lead0 : I.w * 0.45;
+    const tail0 = o.lead0 !== undefined ? x0 - (n - 1) * 17 : x0;
+    return o.still ? x0 : ((t * speed + tail0 + 20 + n * 18) % span) - 20 - n * 18;
+  }
   function band(img, I, list, t, o) {
     o = o || {};
     const gs = (list || []).map(gridOf).filter(Boolean).slice(0, 5);
     if (!gs.length) return;
     // lead0: where the leader stands at t = 0 (a fraction of the width); still: the band stands about there instead of walking
     // (lead0 places the front walker; the rest trail behind to the left)
-    const speed = o.speed || 9, span = I.w + 40 + gs.length * 18, x0 = o.lead0 !== undefined ? I.w * o.lead0 : I.w * 0.45;
-    const tail0 = o.lead0 !== undefined ? x0 - (gs.length - 1) * 17 : x0;
-    const lead = o.still ? x0 : ((t * speed + tail0 + 20 + gs.length * 18) % span) - 20 - gs.length * 18;
+    const lead = leadAt(I, gs.length, t, o);
     gs.forEach((g, i) => {
       if (o.still) {
         // gathered round the spot, each facing it
@@ -1075,6 +1078,49 @@
     });
   }
 
+
+  // ---------- a god on the road (gods on): a stretch whose line names a god has that god walking a stride ahead of the band, a head
+  // taller than any of them, in its 48 px figure (god_art.js) with the rim of its own fire, which the night does not dim ----------
+  let godRx = null, artAsked = null;
+  function godOf(line) {
+    const App = root.App, S = (App && App.S) || {};
+    if (!line || !App || !App.L || !App.L.gods || !S.god_names) return null;
+    if (!godRx) godRx = Object.entries(S.god_names).map(([id, name]) => [id, new RegExp("(?<![A-Za-z])(?<!Old )" + String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/^the /, "[Tt]he ") + "(?![A-Za-z])")]);
+    let best = null, at = Infinity;
+    for (const [id, rx] of godRx) { const m = rx.exec(line); if (m && m.index < at) { best = id; at = m.index; } }
+    return best;
+  }
+  function godArt() {
+    if (root.GodArt && root.GodSprites) return artAsked || (artAsked = Promise.resolve());
+    if (!artAsked && root.App && root.App.need) {
+      artAsked = root.App.need(["god_sprites", "god_art"]).then(() => new Promise((res) => { root.GodArt.init({}); root.GodArt.ready(res); }));
+      artAsked.catch(() => {});
+    }
+    return artAsked;
+  }
+  const godMemo = new Map();
+  function godGrid(id, f) {
+    const GA = root.GodArt;
+    if (!GA || !root.GodSprites) { godArt(); return null; }
+    const key = id + ":" + f + ":" + (GA.drawn(id) ? 1 : 0);
+    if (godMemo.has(key)) return godMemo.get(key);
+    const cv = GA.litFigure(id, f, "r"), d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data, g = new A.Grid(cv.width, cv.height + 1);
+    const hex = (i) => "#" + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+    let bottom = 0;
+    for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const i = (y * cv.width + x) * 4; if (d[i + 3] > 127) { g.set(x, y, hex(i)); bottom = y; } }
+    const rim = new Set(GA.ramp(id).slice(3).map((c) => c.toLowerCase()));
+    const out = { g, bottom, lit: (c) => rim.has(c) };
+    godMemo.set(key, out);
+    return out;
+  }
+  function godWalks(img, I, id, t, o, n) {
+    const f = Math.floor(t * 2.2) % 2, gg = godGrid(id, f);
+    if (!gg) return;
+    const lead = n ? leadAt(I, n, t, o) : I.w * (o.lead0 !== undefined ? o.lead0 : 0.45);
+    const x = o.traveller ? lead - Math.max(1, n) * 17 - 22 : o.still ? lead + (n > 1 ? 58 : 30) : lead + Math.max(0, n - 1) * 17 + 26;
+    blit(img, gg.g, Math.round(x - gg.g.w / 2), I.feet - gg.bottom, { G: I.Gf, depth: 0, lit: gg.lit });
+  }
+
   // ---------- rendering ----------
   function compose(spec, t, w, h, o) {
     const sc = scene(spec, w, h), img = sc.base.copy();
@@ -1085,8 +1131,9 @@
     if (spec.traveller && root.RoadArt) {
       try { const g = root.RoadArt.figure(spec.traveller, 0), tx = Math.round(w * Math.min(0.9, (spec.band_x || 0.45) + 0.2)); blit(img, g, tx - g.w / 2, sc.info.feet - g.h + 1, { G: sc.info.Gf, flip: true }); } catch (e) { /* an unknown traveller is simply not drawn */ }
     }
-    const band0 = o.band || spec.heroes;
-    if (band0 && band0.length) band(img, sc.info, band0, t, Object.assign({ lead0: spec.band_x, speed: spec.band_speed, still: spec.band_still || !!spec.traveller, traveller: !!spec.traveller }, o));
+    const band0 = o.band || spec.heroes, bo = Object.assign({ lead0: spec.band_x, speed: spec.band_speed, still: spec.band_still || !!spec.traveller, traveller: !!spec.traveller }, o);
+    if (spec.god) godWalks(img, sc.info, spec.god, t, bo, Math.min(5, (band0 || []).length));
+    if (band0 && band0.length) band(img, sc.info, band0, t, bo);
     if (o.over) o.over(img, sc.info, t);
     for (const f of sc.loops) if (!f.under) f(img, t);
     return { img, info: sc.info };
@@ -1139,6 +1186,7 @@
     doc.addEventListener("visibilitychange", wake);
     if (root.Settings && root.Settings.watch) root.Settings.watch(() => { if (wrap.isConnected) { paint(); wake(); } });
     paint();
+    if (sp.god && !(root.GodArt && root.GodSprites)) { const w8 = godArt(); if (w8) w8.then(paint); }
     return wrap;
   }
 
@@ -1170,11 +1218,13 @@
       if (b.place_kind === "crossroads") out.place_variant = /gallows/i.test(pn) ? "gallows" : /stone/i.test(pn) ? "stones" : undefined;
     }
     if (b.traveller) { out.traveller = b.traveller; out.band_x = 0.4; }
+    const god = godOf(b.line);
+    if (god) out.god = god;
     return out;
   }
 
   root.RoadScenes = {
     W: W0, H: H0, scene, frame, compose, strip, walker, piece, hourOf, isNight, dress, BIOMES: Object.keys(BIOME).concat(["dungeon"]), THEMES: Object.keys(THEME_BIOME),
-    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc, punch },
+    kit: { Buf, blit, C, mix, rng, hash, h2, fbm, clamp, lerp, bay, smooth, hourOf, pieceGrid, river, gridOf, band, smoke, painted, disc, punch, godOf, godArt },
   };
 })(typeof window !== "undefined" ? window : globalThis);

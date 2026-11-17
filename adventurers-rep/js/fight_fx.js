@@ -1389,7 +1389,7 @@
     about: "area spells: a burst across the floor, a rain from above, spikes from below, a lightning storm, a lingering cloud",
     count: (X) => (X.shape === "rain" ? 10 : X.shape === "storm" ? 4 : X.shape === "eruption" ? X.tos.length + 3 : 1),
     drops(X) {
-      const R = areaR(X), out = [], N = X.shape === "rain" ? X.n : X.shape === "storm" ? Math.max(X.n, X.tos.length) : X.n;
+      const R = areaR(X), out = [], N = X.shape === "burst" || X.shape === "cloud" ? X.n : Math.max(X.n, X.tos.length);
       for (let j = 0; j < N; j++) {
         const onT = j < X.tos.length, a = hs(X.seed, j, 1) * TAU, r = Math.sqrt(hs(X.seed, j, 2)) * R * 0.85;
         const x = onT ? X.tos[j].x + hr(X.seed, j, 3, -2, 2) : X.cx + Math.cos(a) * r, y = onT ? X.tos[j].y : X.cy + Math.sin(a) * r * FLAT;

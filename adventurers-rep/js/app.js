@@ -25,7 +25,7 @@
       if (k === "class") n.className = v;
       else if (k === "html") n.innerHTML = v;
       else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
-      else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
+      else if (k === "style" && typeof v === "object") for (const [p, x] of Object.entries(v)) { if (p.startsWith("--")) n.style.setProperty(p, x); else n.style[p] = x; }
       else n.setAttribute(k, v === true ? "" : v);
     }
     for (const k of kids.flat(Infinity)) {
@@ -235,13 +235,20 @@
   }
   // a place name that opens a longer proper name ("the Saltmarrow Shell Dice", "Ironhaven Lullaby") names a thing, not the place
   // a hero's name straight after another name's possessive is part of a longer name ("Varun's Hunter's Mark"), not the hero Mark
+  // a hero's name inside a god's title ("Mother Pell", "Gorm the Red") is the god, not the hero (league/gods.py god_name prints the title when they clash)
+  function inTitle(s, i, n) {
+    for (const t of S.god_titles || []) {
+      for (let j = s.indexOf(t); j >= 0; j = s.indexOf(t, j + 1)) if (j <= i && i + n <= j + t.length) return true;
+    }
+    return false;
+  }
   function indexOfWord(s, nm, word, place, hero) {
     let from = 0;
     for (;;) {
       const i = s.indexOf(nm, from);
       if (i < 0) return -1;
       const before = i > 0 ? s[i - 1] : "", after = s[i + nm.length] || "";
-      const named = (place && /^ [A-Z]/.test(s.slice(i + nm.length, i + nm.length + 2))) || (hero && /[A-Z][a-z]+'s $/.test(s.slice(Math.max(0, i - 16), i)));
+      const named = (place && /^ [A-Z]/.test(s.slice(i + nm.length, i + nm.length + 2))) || (hero && (/[A-Z][a-z]+'s $/.test(s.slice(Math.max(0, i - 16), i)) || inTitle(s, i, nm.length)));
       if (!(before && word.test(before)) && !(after && word.test(after)) && !named) return i;
       from = i + 1;
     }
@@ -290,6 +297,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
     if (e.loc) meta.push(S.towns[e.loc] || S.dungeons[e.loc] || S.wilds[e.loc] ? el("a", { href: placeHref(e.loc) }, nodeName(e.loc)) : nodeName(e.loc));
     const owners = [...new Set((e.heroes || []).map((id) => heroes[id]).filter((h) => h && !h.npc).map((h) => h.owner))].slice(0, 3);
     if (owners.length) meta.push("👤 " + owners.join(", "));
+    if (e.god && (S.god_names || {})[e.god]) meta.push(el("a", { class: "god-meta", href: `#/god/${e.god}` }, cap(S.god_names[e.god])));
     const fightLink = storyLink(e) || (e.kind === "song" ? el("a", { class: "watch", href: "#/songs" }, "♪ hear it") : null);
     const ks = e.kind === "keystone", tag = ks ? "✦ Keystone" : e.sk ? `✧ ${e.sk}` : null;
     const share = !opts.noShare && (SHARE_KINDS.has(e.kind) || e.imp >= 5) ? shareBtn(e.text, eventHash(e)) : null;
@@ -352,14 +360,19 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // the big tables only the heavy players read (the songbook, the fight effects, the gear tables, the dishes) ride in their own data file
   // (league/export.py LAZY_STATIC), folded into S before the player that reads them loads
   const STATIC_OF = { music: "static_music", music_replay: "static_music", fight_director: "static_fight", views_dungeon: "static_gear",
-    delve_scenes: "static_gear", food_art: "static_food", stage: "static_food" };
+    delve_scenes: "static_gear", food_art: "static_food", stage: "static_food", views_gods: "static_gods" };
+  // a gods-off league writes no static_gods file: the Mountain page then says so instead of failing to load
+  const OPTIONAL = new Set(["static_gods"]);
   function staticPart(key) {
     return load(key).then((d) => {
       for (const k of Object.keys(d)) S[k] = S[k] && typeof S[k] === "object" && !Array.isArray(S[k]) ? Object.assign(S[k], d[k]) : d[k];
-    });
+    }, (e) => { if (!OPTIONAL.has(key)) throw e; });
   }
+  // the town scenes dress each temple's altar and walk a feast's god from the pantheon, so with gods on the pantheon comes first: a
+  // temple hour opened cold (a shared link) is built once, before a late static_gods could reach it
+  const staticOf = (n) => STATIC_OF[n] || (n === "town_scenes" && L.gods ? "static_gods" : null);
   function need(names) {
-    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js${V}"]`) ? Promise.resolve() : (STATIC_OF[n] ? staticPart(STATIC_OF[n]) : Promise.resolve()).then(() => new Promise((resolve, reject) => {
+    return names.reduce((p, n) => p.then(() => scripts[n] || (scripts[n] = document.querySelector(`script[src="js/${n}.js${V}"]`) ? Promise.resolve() : (staticOf(n) ? staticPart(staticOf(n)) : Promise.resolve()).then(() => new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = `js/${n}.js${V}`;
       s.onload = resolve;
@@ -466,6 +479,8 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // pages few visits need are fetched the first time they're opened, so the first load stays light (with the build's version)
   const LAZY = [[/^\/dungeon\//, ["js/town_scenes.js", "js/wild_scenes.js", "js/isle_scenes.js", "js/dungeon_pen.js", "js/dungeon_map_ink.js", "js/views_dungeon.js"], ["css/dungeon.css"]],
     [/^\/places(\/|$)/, ["js/views_places.js"], ["css/places.css"]],
+    // the Mountain and the gods' pages, with the god art they draw
+    [/^\/gods?(\/|$)/, ["js/god_sprites.js", "js/god_art.js", "js/mountain_scene.js", "js/views_gods.js"], ["css/mountain.css"]],
     // a megabeast's fall, painted full size
     [/^\/fall\//, ["js/full_art.js"], []],
     // the ceremony and the Your Season card, with the trophies they hand out
@@ -487,7 +502,7 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
   // a deep page lights the tab it belongs under; a replay keeps the tab the reader came from
   const TAB_OF = [[/^\/(hero|roster)(\/|$)/, "/roster"], [/^\/(party|parties)(\/|$)/, "/parties"], [/^\/(map|dungeon|places)(\/|$)/, "/map"],
     [/^\/(days?|digest)(\/|$)/, "/"], [/^\/(finale|history)(\/|$)/, "/history"], [/^\/songs(\/|$)/, "/songs"], [/^\/guide(\/|$)/, "/guide"], [/^\/(event|world)(\/|$)/, "/world"],
-    [/^\/replays(\/|$)/, "/replays"]];
+    [/^\/replays(\/|$)/, "/replays"], [/^\/gods?(\/|$)/, "/gods"]];
   const REPLAY = /^\/((fight|night|meal|catch|road|reading|table)\/|day\/\w*[a-z]\w*\/\d+\/\d+$)/;
   let navTab = "/";
   function lightNav(hash) {
@@ -553,6 +568,11 @@ ${shareUrl(hash)}`, msg || "Copied with a link. Paste it anywhere."); } }, "↗ 
       a.href = "#/annals"; a.textContent = "Annals"; a.className = "annals-link";
       const guide = document.querySelector('#nav a[href="#/guide"]');
       guide.parentNode.insertBefore(a, guide);
+    }
+    // the Mountain sits after Map on a desktop and in More on a phone (web/css/app.css orders the More links after it)
+    if (L.gods && !document.querySelector('#nav a[href="#/gods"]')) {
+      const list = document.getElementById("nav-more-list");
+      if (list) list.insertBefore(Object.assign(document.createElement("a"), { href: "#/gods", textContent: "Mountain", className: "nav-gods" }), list.firstChild);
     }
     // the phone nav is one row of five and a "More" menu (round 38); on a desktop the menu's links sit in the row
     const more = document.getElementById("nav-more"), nav = document.getElementById("nav");
