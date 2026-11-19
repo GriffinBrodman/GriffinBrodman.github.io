@@ -33,7 +33,8 @@
   box-shadow: inset 0 0 0 1px #0b0a12; padding: 5px 14px; cursor: pointer; }
 .mtn-climb-go:hover, .mtn-climb-go:focus-visible { color: var(--brass2); border-color: var(--brass); }
 .mtn-hall { position: absolute; background: none; border: 0; padding: 0; cursor: pointer; }
-.mtn-hall:hover, .mtn-hall:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.55); outline-offset: -2px; }
+/* keyboard only: a mouse hover or a phone tap left a hard box hanging over the painted temple */
+.mtn-hall:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.55); outline-offset: -2px; }
 
 .god-card-slot { position: absolute; left: 50%; transform: translateX(-50%); width: min(300px, calc(100% - 16px)); z-index: 3; display: none; }
 .god-card-slot.open { display: block; }

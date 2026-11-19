@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r118"]={"day":27,"kind":"toll","place":"gants_bridge","road":"ironhaven~veldrock","biome":"plains","weather":"fog","tod":"afternoon","hour":15,"heroes":["h13","h5","h7","h9"],"lead":"h5","line":"Gant takes Griffin's 2 copper toll, bites each coin, and lifts the bar.","fare":2,"place_kind":"toll","tally":4,"outcome":"place","id":"r118"};
