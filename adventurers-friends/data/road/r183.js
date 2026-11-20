@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r183"]={"day":48,"kind":"meet","place":null,"road":"frosthold~ironhaven","biome":"plains","weather":"snow","tod":"morning","hour":11,"heroes":["h16","h4"],"lead":"h16","line":"Katie finds Ines for the first time sitting in the road, sketching a hill that is clearly behind her.","traveller":"ines","met":1,"outcome":"meet","id":"r183"};
