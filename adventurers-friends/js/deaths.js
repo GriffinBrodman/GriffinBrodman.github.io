@@ -17,7 +17,8 @@
   const PIVOT = { warchief: [0.2, 1], goblin: [0.22, 1], kobold: [0.24, 1], human: [0.18, 1], troll: [0.17, 1] };
 
   function monster(u) { const m = S().monsters && S().monsters[u.ref]; return m ? Art.withLook(Object.assign({ id: u.ref }, m, { boss: !!u.boss }), u.look) : null; }
-  const groupOf = (u) => { const m = u && S().monsters && S().monsters[u.ref]; return (m && m.death) || null; };
+  // a pet fights on a monster's stat block (the lizard is a drake) but falls as itself, not as that monster (Lord Basking, friends)
+  const groupOf = (u) => { const m = u && !(u.look && u.look.pet) && S().monsters && S().monsters[u.ref]; return (m && m.death) || null; };
 
   // ---------- sprites: the standing sprite and posed ones, as canvases facing dir ----------
   const cache = new Map();
