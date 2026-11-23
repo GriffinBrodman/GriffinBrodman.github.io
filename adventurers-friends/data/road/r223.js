@@ -1,0 +1,1 @@
+window.LD=window.LD||{};window.LD["road/r223"]={"day":52,"kind":"meet","place":null,"road":"ashfen~carrbridge","biome":"marsh","weather":"clear","tod":"morning","hour":11,"heroes":["h16","h4"],"lead":"h16","line":"Katie meets Lark again resting for exactly one breath at a milestone, hand on the satchel.","traveller":"lark","met":2,"outcome":"meet","id":"r223"};
