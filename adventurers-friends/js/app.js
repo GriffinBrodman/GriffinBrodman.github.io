@@ -38,12 +38,13 @@
   const IRREGULAR = { hero: "heroes", party: "parties" };
   function plural(n, w, p) { return `${n} ${n === 1 ? w : p || IRREGULAR[w] || w + "s"}`; }
   function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
-  // as league/content/world_map.py floor_words: n counts from 1, and the last of several floors reads "the bottom floor" (of two) or "the deepest floor"
+  // as league/content/world_map.py floor_words: n counts from 1, the last of several floors reads "the bottom floor" (of two) or "the deepest floor",
+  // and a one-floor lair's is "the only floor"
   const FLOOR_ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
   function floorOrd(n) { return FLOOR_ORD[n - 1] || `${n}th`; }
   function floorWords(n, did, capital, deep = true) {
     const t = ((S.dungeons || {})[did] || {}).floors || 0;
-    return `${capital ? "The" : "the"} ${deep && t > 1 && n >= t ? (t === 2 ? "bottom" : "deepest") : floorOrd(n)} floor`;
+    return `${capital ? "The" : "the"} ${t === 1 ? "only" : deep && t > 1 && n >= t ? (t === 2 ? "bottom" : "deepest") : floorOrd(n)} floor`;
   }
   // a crew's own exported possessive when there is one (party.poss), else as league/heroes.py poss: "The Mossy Cats'", "Brix's"
   function poss(s, pid) {
